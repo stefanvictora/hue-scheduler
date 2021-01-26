@@ -6,6 +6,9 @@ import at.sv.hue.api.HueApiImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -31,20 +34,38 @@ public final class HueEnforcer {
         lightStates = new HashMap<>();
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
         HueApi hueApi = new HueApiImpl(new HttpResourceProviderImpl(), args[0], args[1]);
         HueEnforcer enforcer = new HueEnforcer(hueApi, Executors.newSingleThreadScheduledExecutor(), LocalDateTime::now);
-
-        enforcer.addState(22, LocalTime.now(), 200, 100);  // Schreibtisch
-        enforcer.addState(22, LocalTime.now().plusSeconds(10), 100, 500);  // Schreibtisch
-        enforcer.addState(22, LocalTime.now().plusSeconds(15), 254, 500);  // Schreibtisch
-//        enforcer.addState(23, LocalTime.now(), 65, 500);  // Bad
-//        enforcer.addState(25, LocalTime.now(), 254, 213); // Klo
-
+        Files.lines(Paths.get(args[2]))
+             .filter(s -> !s.isEmpty())
+             .filter(s -> !s.startsWith("//"))
+             .forEachOrdered(enforcer::addState);
         enforcer.start();
     }
 
-    public void addState(int lampId, LocalTime start, int brightness, int ct) {
+    public void addState(String input) {
+        String[] parts = input.split("\t");
+        int id = Integer.parseInt(parts[0]);
+        LocalTime start = LocalTime.parse(parts[1]);
+        Integer bri = null;
+        Integer ct = null;
+        for (int i = 2; i < parts.length; i++) {
+            String part = parts[i];
+            String[] typeAndValue = part.split(":");
+            switch (typeAndValue[0]) {
+                case "bri":
+                    bri = Integer.valueOf(typeAndValue[1]);
+                    break;
+                case "ct":
+                    ct = Integer.valueOf(typeAndValue[1]);
+                    break;
+            }
+        }
+        addState(id, start, bri, ct);
+    }
+
+    public void addState(int lampId, LocalTime start, Integer brightness, Integer ct) {
         lightStates.computeIfAbsent(lampId, ArrayList::new)
                    .add(new EnforcedState(lampId, start, brightness, ct));
     }

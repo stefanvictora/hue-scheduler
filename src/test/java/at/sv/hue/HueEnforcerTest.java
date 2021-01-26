@@ -211,6 +211,23 @@ class HueEnforcerTest {
     }
 
     @Test
+    void parse_parsesInputLine_brightnessAndColorTemperature() {
+        String time = now.plusHours(1).toLocalTime().toString();
+        enforcer.addState(id + "\t" + time + "\tbri:" + defaultBrightness + "\tct:" + defaultCt);
+
+        startEnforcer();
+
+        List<ScheduledRunnable> scheduledRunnable = ensureScheduledRunnable(1);
+        assertDuration(scheduledRunnable.get(0), Duration.ofHours(1));
+
+        runAndAssertApiCalls(true, scheduledRunnable.get(0));
+
+        runAndAssertConfirmRunnables();
+
+        ensureNextDayRunnable();
+    }
+
+    @Test
     void run_execution_reachable_runsConfirmations_startsAgainNextDay_repeats() {
         addDefaultState();
         startEnforcer();
