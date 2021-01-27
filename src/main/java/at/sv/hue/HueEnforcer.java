@@ -36,7 +36,7 @@ public final class HueEnforcer {
 
     public static void main(String[] args) throws IOException {
         HueApi hueApi = new HueApiImpl(new HttpResourceProviderImpl(), args[0], args[1]);
-        HueEnforcer enforcer = new HueEnforcer(hueApi, Executors.newSingleThreadScheduledExecutor(), LocalDateTime::now);
+        HueEnforcer enforcer = new HueEnforcer(hueApi, Executors.newScheduledThreadPool(Runtime.getRuntime().availableProcessors()), LocalDateTime::now);
         Files.lines(Paths.get(args[2]))
              .filter(s -> !s.isEmpty())
              .filter(s -> !s.startsWith("//"))
