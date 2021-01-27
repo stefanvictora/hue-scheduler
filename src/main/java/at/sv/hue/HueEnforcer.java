@@ -46,23 +46,25 @@ public final class HueEnforcer {
 
     public void addState(String input) {
         String[] parts = input.split("\t");
-        int id = Integer.parseInt(parts[0]);
-        LocalTime start = LocalTime.parse(parts[1]);
-        Integer bri = null;
-        Integer ct = null;
-        for (int i = 2; i < parts.length; i++) {
-            String part = parts[i];
-            String[] typeAndValue = part.split(":");
-            switch (typeAndValue[0]) {
-                case "bri":
-                    bri = Integer.valueOf(typeAndValue[1]);
-                    break;
-                case "ct":
-                    ct = Integer.valueOf(typeAndValue[1]);
-                    break;
+        for (String idPart : parts[0].split(",")) {
+            int id = Integer.parseInt(idPart);
+            LocalTime start = LocalTime.parse(parts[1]);
+            Integer bri = null;
+            Integer ct = null;
+            for (int i = 2; i < parts.length; i++) {
+                String part = parts[i];
+                String[] typeAndValue = part.split(":");
+                switch (typeAndValue[0]) {
+                    case "bri":
+                        bri = Integer.valueOf(typeAndValue[1]);
+                        break;
+                    case "ct":
+                        ct = Integer.valueOf(typeAndValue[1]);
+                        break;
+                }
             }
+            addState(id, start, bri, ct);
         }
-        addState(id, start, bri, ct);
     }
 
     public void addState(int lampId, LocalTime start, Integer brightness, Integer ct) {

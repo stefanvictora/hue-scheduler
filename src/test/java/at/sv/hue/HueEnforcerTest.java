@@ -211,14 +211,16 @@ class HueEnforcerTest {
     }
 
     @Test
-    void parse_parsesInputLine_brightnessAndColorTemperature() {
+    void parse_parsesInputLine_brightnessAndColorTemperature_createsMultipleStates() {
         String time = now.plusHours(1).toLocalTime().toString();
-        enforcer.addState(id + "\t" + time + "\tbri:" + defaultBrightness + "\tct:" + defaultCt);
+        enforcer.addState("1,2,3" + "\t" + time + "\tbri:" + defaultBrightness + "\tct:" + defaultCt);
 
         startEnforcer();
 
-        List<ScheduledRunnable> scheduledRunnable = ensureScheduledRunnable(1);
+        List<ScheduledRunnable> scheduledRunnable = ensureScheduledRunnable(3);
         assertDuration(scheduledRunnable.get(0), Duration.ofHours(1));
+        assertDuration(scheduledRunnable.get(1), Duration.ofHours(1));
+        assertDuration(scheduledRunnable.get(2), Duration.ofHours(1));
 
         runAndAssertApiCalls(true, scheduledRunnable.get(0));
 
