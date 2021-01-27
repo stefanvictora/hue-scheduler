@@ -73,25 +73,24 @@ public final class HueEnforcer {
     public void start() {
         LocalDateTime now = currentTime.get();
         lightStates.forEach((id, states) -> {
-            calculateAndSetEndTimes(states);
+            calculateAndSetEndTimes(now, states);
             scheduleStates(now, states);
         });
     }
 
-    private void calculateAndSetEndTimes(List<EnforcedState> states) {
+    private void calculateAndSetEndTimes(LocalDateTime now, List<EnforcedState> states) {
         states.sort(Comparator.comparing(EnforcedState::getStart));
         for (int i = 1; i < states.size(); i++) {
             EnforcedState previous = states.get(i - 1);
             EnforcedState current = states.get(i);
-            previous.setEnd(current.getStart().minusSeconds(1));
+            previous.setEnd(LocalDateTime.of(now.toLocalDate(), current.getStart().minusSeconds(1)));
         }
         EnforcedState lastState = states.get(states.size() - 1);
-        lastState.setEnd(getStartOfFirstStateNextDay(states));
-        lastState.setEndsNextDay();
+        lastState.setEnd(getStartOfFirstStateNextDay(now, states));
     }
 
-    private LocalTime getStartOfFirstStateNextDay(List<EnforcedState> states) {
-        return states.get(0).getStart().plusHours(24).minusSeconds(1);
+    private LocalDateTime getStartOfFirstStateNextDay(LocalDateTime now, List<EnforcedState> states) {
+        return LocalDateTime.of(now.toLocalDate().plusDays(1), states.get(0).getStart().minusSeconds(1));
     }
 
     private void scheduleStates(LocalDateTime now, List<EnforcedState> states) {
@@ -114,8 +113,7 @@ public final class HueEnforcer {
         LOG.debug("Schedule state change for {} in {}", state, Duration.ofSeconds(delayInSeconds));
         scheduledExecutorService.schedule(() -> {
             if (state.endsAfter(currentTime.get())) {
-                state.resetConfirmations();
-                schedule(state, Duration.ofHours(24).getSeconds());
+                scheduleNextDay(state);
                 return;
             }
             hueApi.putState(state.getId(), state.getBrightness(), null, null, state.getCt());
@@ -129,8 +127,7 @@ public final class HueEnforcer {
                 state.addConfirmation();
                 schedule(state, 1);
             } else {
-                state.resetConfirmations();
-                schedule(state, Duration.ofHours(24).getSeconds());
+                scheduleNextDay(state);
             }
         }, delayInSeconds, TimeUnit.SECONDS);
     }
@@ -150,5 +147,11 @@ public final class HueEnforcer {
     private long secondsUntilNextDayFromStart(EnforcedState state, LocalDateTime now) {
         LocalDateTime startDateTime = LocalDateTime.of(now.toLocalDate(), state.getStart());
         return Duration.between(now, startDateTime).plusHours(24).getSeconds();
+    }
+
+    private void scheduleNextDay(EnforcedState state) {
+        state.resetConfirmations();
+        state.shiftEndToNextDay();
+        schedule(state, Duration.ofHours(24).getSeconds());
     }
 }

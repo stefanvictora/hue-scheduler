@@ -248,6 +248,26 @@ class HueEnforcerTest {
     }
 
     @Test
+    void run_execution_twoStates_overNight_detectsEndCorrectly() {
+        setCurrentTimeTo(now.withHour(23).withMinute(0));
+        addState(1, now, defaultBrightness, defaultCt);
+        LocalDateTime nextMorning = now.plusHours(8);
+        addState(1, nextMorning, defaultBrightness + 100, defaultCt);
+        startEnforcer();
+        List<ScheduledRunnable> initialRunnables = ensureScheduledRunnable(2);
+
+        runAndAssertApiCalls(true, initialRunnables.get(0));
+
+        setCurrentTimeTo(nextMorning);
+
+        ScheduledRunnable confirmRunnable = ensureScheduledRunnable(1).get(0);
+
+        confirmRunnable.run(); // does not call any API, as its past its end
+
+        ensureNextDayRunnable();
+    }
+
+    @Test
     void run_execution_firstUnreachable_triesAgainOneSecondLater_secondTimeReachable_success() {
         addDefaultState();
         startEnforcer();

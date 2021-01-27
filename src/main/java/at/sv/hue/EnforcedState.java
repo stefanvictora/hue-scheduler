@@ -10,8 +10,7 @@ final class EnforcedState {
     private final Integer brightness;
     private final Integer ct;
     private int confirmCounter;
-    private LocalTime end;
-    private boolean endsNextDay;
+    private LocalDateTime end;
 
     public EnforcedState(int id, LocalTime start, Integer brightness, Integer ct) {
         this.id = id;
@@ -19,7 +18,6 @@ final class EnforcedState {
         this.brightness = brightness;
         this.ct = ct;
         confirmCounter = 0;
-        endsNextDay = false;
     }
 
     public long getDelay(LocalDateTime now) {
@@ -64,26 +62,20 @@ final class EnforcedState {
         confirmCounter = 0;
     }
 
-    public LocalTime getEnd() {
+    public LocalDateTime getEnd() {
         return end;
     }
 
-    public void setEnd(LocalTime end) {
+    public void setEnd(LocalDateTime end) {
         this.end = end;
     }
 
-    public void setEndsNextDay() {
-        endsNextDay = true;
+    public boolean endsAfter(LocalDateTime now) {
+        return now.isAfter(end);
     }
 
-    public boolean endsAfter(LocalDateTime now) {
-        LocalDateTime endLocalDateTime;
-        if (endsNextDay) {
-            endLocalDateTime = LocalDateTime.of(now.toLocalDate().plusDays(1), end);
-        } else {
-            endLocalDateTime = LocalDateTime.of(now.toLocalDate(), end);
-        } 
-        return now.isAfter(endLocalDateTime);
+    public void shiftEndToNextDay() {
+        end = end.plusDays(1);
     }
 
     @Override
