@@ -143,7 +143,10 @@ public final class HueEnforcer {
     }
 
     private void addRemainingStatesTheNextDay(List<EnforcedState> remainingStates, LocalDateTime now) {
-        remainingStates.forEach(state -> schedule(state, secondsUntilNextDayFromStart(state, now)));
+        remainingStates.forEach(state -> {
+            state.shiftEndToNextDay();
+            schedule(state, secondsUntilNextDayFromStart(state, now));
+        });
     }
 
     private long secondsUntilNextDayFromStart(EnforcedState state, LocalDateTime now) {

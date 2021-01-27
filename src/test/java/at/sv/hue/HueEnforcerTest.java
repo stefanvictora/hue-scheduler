@@ -77,7 +77,7 @@ class HueEnforcerTest {
     }
 
     private void assertPutState(int id, Integer bri, Double x, Double y, Integer ct) {
-        assertTrue(putStates.size() > 0, "No more put states to assert");
+        assertTrue(putStates.size() > 0, "No PUT API calls happened");
         PutState putState = putStates.remove(0);
         assertThat("Brightness differs", putState.bri, is(bri));
         assertThat("X differs", putState.x, is(x));
@@ -265,6 +265,22 @@ class HueEnforcerTest {
         ScheduledRunnable confirmRunnable = ensureScheduledRunnable(1).get(0);
 
         confirmRunnable.run(); // does not call any API, as its past its end
+
+        ensureNextDayRunnable();
+    }
+
+    @Test
+    void run_execution_twoStates_oneAlreadyPassed_updatesEndCorrectly() {
+        addState(1, now.minusHours(1));
+        addState(1, now);
+        startEnforcer();
+        List<ScheduledRunnable> initialRunnables = ensureScheduledRunnable(2);
+
+        setCurrentTimeTo(now.minusHours(1).plusDays(1));
+
+        runAndAssertApiCalls(true, initialRunnables.get(1));
+
+        runAndAssertConfirmRunnables();
 
         ensureNextDayRunnable();
     }
