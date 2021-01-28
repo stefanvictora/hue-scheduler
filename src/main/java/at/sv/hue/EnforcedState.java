@@ -78,6 +78,10 @@ final class EnforcedState {
         end = end.plusDays(1);
     }
 
+    public void shiftEndToNextDay() {
+        end = end.plusDays(1);
+    }
+
     @Override
     public String toString() {
         return "State{" +
