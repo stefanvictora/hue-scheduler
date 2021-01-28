@@ -74,10 +74,6 @@ final class EnforcedState {
         confirmCounter = 0;
     }
 
-    public LocalDateTime getEnd() {
-        return end;
-    }
-
     public void setEnd(LocalDateTime end) {
         this.end = end;
     }

@@ -105,10 +105,6 @@ public final class HueApiImpl implements HueApi {
     private static final class Light {
         State state;
 
-        public State getState() {
-            return state;
-        }
-
         public void setState(State state) {
             this.state = state;
         }
@@ -173,10 +169,6 @@ public final class HueApiImpl implements HueApi {
     private static final class Group {
 
         private Integer[] lights = new Integer[0];
-
-        public Integer[] getLights() {
-            return lights;
-        }
 
         public void setLights(Integer[] lights) {
             this.lights = lights;
