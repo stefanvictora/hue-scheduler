@@ -5,19 +5,20 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.net.URL;
+import java.util.List;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.core.Is.is;
 import static org.junit.jupiter.api.Assertions.*;
 
 class HueApiTest {
+    private final String transitionTime = "\"transitiontime\":2";
     private HueApi api;
     private String baseUrl;
     private String expectedUrl;
     private String expectedBody;
     private String response;
     private boolean assertResponseMatch;
-    private final String transitionTime = "\"transitiontime\":2";
 
     private void setGetResponse(String expectedUrl, String response) {
         this.expectedUrl = baseUrl + expectedUrl;
@@ -46,8 +47,8 @@ class HueApiTest {
                 "}, \"name\": \"Name 2\"}";
     }
 
-    private LightState getState(int lightId) {
-        return api.getState(lightId);
+    private LightState getLightState(int lightId) {
+        return api.getLightState(lightId);
     }
 
     private void assertLightState(LightState lightState, boolean reachable, Double x, Double y, Integer ct, int brightness) {
@@ -60,7 +61,15 @@ class HueApiTest {
     }
 
     private boolean putState(int id, int bri) {
-        return api.putState(id, bri, null, null, null);
+        return putState(id, bri, false);
+    }
+
+    private boolean putState(int id, int bri, boolean groupState) {
+        return api.putState(id, bri, null, null, null, groupState);
+    }
+
+    private List<Integer> getGroupLights(int groupId) {
+        return api.getGroupLights(groupId);
     }
 
     @BeforeEach
@@ -105,7 +114,7 @@ class HueApiTest {
         int bri = 100;
         setGetResponse("/lights/" + lightId, createApiStateResponse(x, y, ct, bri, true));
 
-        LightState lightState = getState(lightId);
+        LightState lightState = getLightState(lightId);
 
         assertLightState(lightState, true, x, y, ct, bri);
     }
@@ -119,7 +128,7 @@ class HueApiTest {
         int bri = 41;
         setGetResponse("/lights/" + lightId, createApiStateResponse(x, y, ct, bri, false));
 
-        LightState lightState = getState(lightId);
+        LightState lightState = getLightState(lightId);
 
         assertLightState(lightState, false, x, y, ct, bri);
     }
@@ -136,9 +145,33 @@ class HueApiTest {
                 "\"reachable\": " + true + "\n" +
                 "}, \"name\": \"Name 2\"}");
 
-        LightState lightState = getState(lightId);
+        LightState lightState = getLightState(lightId);
 
         assertLightState(lightState, true, null, null, null, bri);
+    }
+
+    @Test
+    void getGroupLights_returnsLightIdsForGroup() {
+        setGetResponse("/groups/" + 9, "{\n" +
+                "\"name\": \"Flur\",\n" +
+                "\"lights\": [\n" +
+                "\"24\",\n" +
+                "\"17\",\n" +
+                "\"13\"\n" +
+                "],\n" +
+                "\"action\": {\n" +
+                "\"on\": true,\n" +
+                "\"bri\": 254,\n" +
+                "\"ct\": 301,\n" +
+                "\"alert\": \"select\",\n" +
+                "\"colormode\": \"ct\"\n" +
+                "}\n" +
+                "}");
+
+        List<Integer> groupLights = getGroupLights(9);
+
+        assertNotNull(groupLights, "GroupLights are null");
+        assertArrayEquals(new Integer[]{24, 17, 13}, groupLights.toArray(), "GroupLights differ");
     }
 
     @Test
@@ -158,10 +191,26 @@ class HueApiTest {
     }
 
     @Test
+    void putState_group_usesCorrectUrl() {
+        setPutResponse("/groups/" + 9 + "/action", "{\"bri\":200," + transitionTime + "}",
+                "[\n" +
+                        "{\n" +
+                        "\"success\": {\n" +
+                        "\"/groups/9/action/bri\": 200\n" +
+                        "}\n" +
+                        "}\n" +
+                        "]");
+
+        boolean success = putState(9, 200, true);
+
+        assertTrue(success, "Put not successful");
+    }
+
+    @Test
     void putState_ct_correctBody() {
         setPutResponse("/lights/" + 16 + "/state", "{\"ct\":100," + transitionTime + "}", "[success]");
 
-        boolean success = api.putState(16, null, null, null, 100);
+        boolean success = api.putState(16, null, null, null, 100, false);
 
         assertTrue(success, "Put not successful");
     }

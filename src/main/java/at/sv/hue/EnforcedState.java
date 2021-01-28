@@ -5,18 +5,26 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 
 final class EnforcedState {
-    private final int id;
+    private final int updateId;
+    private final int statusId;
     private final LocalTime start;
     private final Integer brightness;
     private final Integer ct;
+    private final boolean groupState;
     private int confirmCounter;
     private LocalDateTime end;
 
     public EnforcedState(int id, LocalTime start, Integer brightness, Integer ct) {
-        this.id = id;
+        this(id, id, start, brightness, ct, false);
+    }
+
+    public EnforcedState(int updateId, int statusId, LocalTime start, Integer brightness, Integer ct, boolean groupState) {
+        this.updateId = updateId;
+        this.statusId = statusId;
         this.start = start;
         this.brightness = brightness;
         this.ct = ct;
+        this.groupState = groupState;
         confirmCounter = 0;
     }
 
@@ -38,8 +46,12 @@ final class EnforcedState {
         return start;
     }
 
-    public int getId() {
-        return id;
+    public int getUpdateId() {
+        return updateId;
+    }
+
+    public int getStatusId() {
+        return statusId;
     }
 
     public Integer getBrightness() {
@@ -78,15 +90,21 @@ final class EnforcedState {
         end = end.plusDays(1);
     }
 
+    public boolean isGroupState() {
+        return groupState;
+    }
+
     @Override
     public String toString() {
-        return "State{" +
-                "id=" + id +
+        return "EnforcedState{" +
+                "updateId=" + updateId +
+                ", statusId=" + statusId +
+                ", start=" + start +
                 ", brightness=" + brightness +
                 ", ct=" + ct +
-                ", start=" + start +
-                ", end=" + end +
+                ", groupState=" + groupState +
                 ", confirmCounter=" + confirmCounter +
+                ", end=" + end +
                 '}';
     }
 }

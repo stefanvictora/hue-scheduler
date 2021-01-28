@@ -47,7 +47,15 @@ public final class HueEnforcer {
     public void addState(String input) {
         String[] parts = input.split("\t");
         for (String idPart : parts[0].split(",")) {
-            int id = Integer.parseInt(idPart);
+            int id;
+            boolean groupState;
+            if (idPart.startsWith("g")) {
+                id = Integer.parseInt(idPart.substring(1));
+                groupState = true;
+            } else {
+                groupState = false;
+                id = Integer.parseInt(idPart);
+            }
             LocalTime start = LocalTime.parse(parts[1]);
             Integer bri = null;
             Integer ct = null;
@@ -63,13 +71,26 @@ public final class HueEnforcer {
                         break;
                 }
             }
-            addState(id, start, bri, ct);
+            if (groupState) {
+                addGroupState(id, start, bri, ct);
+            } else {
+                addState(id, start, bri, ct);
+            }
         }
     }
 
     public void addState(int lampId, LocalTime start, Integer brightness, Integer ct) {
         lightStates.computeIfAbsent(lampId, ArrayList::new)
                    .add(new EnforcedState(lampId, start, brightness, ct));
+    }
+
+    public void addGroupState(int groupId, LocalTime start, Integer brightness, Integer ct) {
+        lightStates.computeIfAbsent(groupId, ArrayList::new)
+                   .add(new EnforcedState(groupId, getGroupLights(groupId).get(0), start, brightness, ct, true));
+    }
+
+    private List<Integer> getGroupLights(int groupId) {
+        return hueApi.getGroupLights(groupId);
     }
 
     public void start() {
@@ -112,15 +133,15 @@ public final class HueEnforcer {
     }
 
     private void schedule(EnforcedState state, long delayInSeconds) {
-        LOG.debug("Schedule state change for {} in {}", state, Duration.ofSeconds(delayInSeconds));
+        LOG.trace("Schedule state change for {} in {}", state, Duration.ofSeconds(delayInSeconds));
         scheduledExecutorService.schedule(() -> {
             if (state.endsAfter(currentTime.get())) {
                 scheduleNextDay(state);
                 return;
             }
-            hueApi.putState(state.getId(), state.getBrightness(), null, null, state.getCt());
-            if (!hueApi.getState(state.getId()).isReachable()) {
-                LOG.warn("Light {} not reachable, try again", state.getId());
+            hueApi.putState(state.getUpdateId(), state.getBrightness(), null, null, state.getCt(), state.isGroupState());
+            if (!hueApi.getLightState(state.getStatusId()).isReachable()) {
+                LOG.warn("Light {} not reachable, try again", state.getUpdateId());
                 state.resetConfirmations();
                 schedule(state, 1);
                 return;

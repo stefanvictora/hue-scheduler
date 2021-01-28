@@ -8,6 +8,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.Arrays;
+import java.util.List;
 
 public final class HueApiImpl implements HueApi {
 
@@ -24,10 +26,10 @@ public final class HueApiImpl implements HueApi {
     }
 
     @Override
-    public LightState getState(int id) {
-        Light light = readValue(resourceProvider.getResource(getStateUrl(id)), Light.class);
+    public LightState getLightState(int id) {
+        Light light = readValue(resourceProvider.getResource(getLightStateUrl(id)), Light.class);
         State state = light.state;
-        return new LightState(light.name, state.bri, state.ct, getX(state), getY(state), state.reachable);
+        return new LightState(state.bri, state.ct, getX(state), getY(state), state.reachable);
     }
 
     private Double getX(State state) {
@@ -45,7 +47,7 @@ public final class HueApiImpl implements HueApi {
         return null;
     }
 
-    private URL getStateUrl(int id) {
+    private URL getLightStateUrl(int id) {
         return createUrl("/lights/" + id);
     }
 
@@ -66,12 +68,22 @@ public final class HueApiImpl implements HueApi {
     }
 
     @Override
-    public boolean putState(int id, Integer bri, Double x, Double y, Integer ct) {
-        String response = resourceProvider.putResource(getUpdateUrl(id), getBody(new State(ct, bri, x, y)));
+    public boolean putState(int id, Integer bri, Double x, Double y, Integer ct, boolean groupState) {
+        String response = resourceProvider.putResource(getUpdateUrl(id, groupState), getBody(new State(ct, bri, x, y)));
         if (response == null) {
             return false;
         }
         return response.contains("success");
+    }
+
+    @Override
+    public List<Integer> getGroupLights(int groupId) {
+        Group group = readValue(resourceProvider.getResource(getGroupStateUrl(groupId)), Group.class);
+        return Arrays.asList(group.lights);
+    }
+
+    private URL getGroupStateUrl(int id) {
+        return createUrl("/groups/" + id);
     }
 
     private String getBody(State state) {
@@ -82,13 +94,16 @@ public final class HueApiImpl implements HueApi {
         }
     }
 
-    private URL getUpdateUrl(int id) {
-        return createUrl("/lights/" + id + "/state");
+    private URL getUpdateUrl(int id, boolean groupState) {
+        if (groupState) {
+            return createUrl("/groups/" + id + "/action");
+        } else {
+            return createUrl("/lights/" + id + "/state");
+        }
     }
 
     private static final class Light {
         State state;
-        String name;
 
         public State getState() {
             return state;
@@ -96,14 +111,6 @@ public final class HueApiImpl implements HueApi {
 
         public void setState(State state) {
             this.state = state;
-        }
-
-        public String getName() {
-            return name;
-        }
-
-        public void setName(String name) {
-            this.name = name;
         }
     }
 
@@ -160,6 +167,19 @@ public final class HueApiImpl implements HueApi {
 
         public void setTransitiontime(Integer transitiontime) {
             this.transitiontime = transitiontime;
+        }
+    }
+
+    private static final class Group {
+
+        private Integer[] lights = new Integer[0];
+
+        public Integer[] getLights() {
+            return lights;
+        }
+
+        public void setLights(Integer[] lights) {
+            this.lights = lights;
         }
     }
 }
