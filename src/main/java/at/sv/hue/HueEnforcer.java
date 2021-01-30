@@ -133,23 +133,28 @@ public final class HueEnforcer {
     }
 
     private void schedule(EnforcedState state, long delayInSeconds) {
-        LOG.trace("Schedule state change for {} in {}", state, Duration.ofSeconds(delayInSeconds));
+        if (delayInSeconds != 1) {
+            LOG.debug("Schedule {} in {}", state, Duration.ofSeconds(delayInSeconds));
+        }
         scheduledExecutorService.schedule(() -> {
             if (state.endsAfter(currentTime.get())) {
+                LOG.debug("State {} already ended", state);
                 scheduleNextDay(state);
                 return;
             }
             hueApi.putState(state.getUpdateId(), state.getBrightness(), null, null, state.getCt(), state.isGroupState());
             if (!hueApi.getLightState(state.getStatusId()).isReachable()) {
-                LOG.warn("Light {} not reachable, try again", state.getUpdateId());
+                LOG.debug("Light {} not reachable, try again", state.getUpdateId());
                 state.resetConfirmations();
                 schedule(state, 1);
                 return;
             }
             if (!state.isFullyConfirmed()) {
                 state.addConfirmation();
+                LOG.debug("Confirmed light {} ({})", state.getUpdateId(), state.getConfirmDebugString());
                 schedule(state, 1);
             } else {
+                LOG.debug("State {} fully confirmed", state);
                 scheduleNextDay(state);
             }
         }, delayInSeconds, TimeUnit.SECONDS);

@@ -5,6 +5,8 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 
 final class EnforcedState {
+    private static final int CONFIRM_AMOUNT = 120;
+
     private final int updateId;
     private final int statusId;
     private final LocalTime start;
@@ -63,7 +65,7 @@ final class EnforcedState {
     }
 
     public boolean isFullyConfirmed() {
-        return confirmCounter >= 120;
+        return confirmCounter >= CONFIRM_AMOUNT;
     }
 
     public void addConfirmation() {
@@ -90,6 +92,10 @@ final class EnforcedState {
         return groupState;
     }
 
+    public String getConfirmDebugString() {
+        return confirmCounter + "/" + CONFIRM_AMOUNT;
+    }
+
     @Override
     public String toString() {
         return "EnforcedState{" +
@@ -98,7 +104,6 @@ final class EnforcedState {
                 ", start=" + start +
                 ", brightness=" + brightness +
                 ", ct=" + ct +
-                ", groupState=" + groupState +
                 ", confirmCounter=" + confirmCounter +
                 ", end=" + end +
                 '}';
