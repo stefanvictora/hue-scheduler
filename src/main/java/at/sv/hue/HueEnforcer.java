@@ -172,12 +172,16 @@ public final class HueEnforcer {
 
     private long secondsUntilNextDayFromStart(EnforcedState state, LocalDateTime now) {
         LocalDateTime startDateTime = LocalDateTime.of(now.toLocalDate(), state.getStart());
-        return Duration.between(now, startDateTime).plusHours(24).getSeconds();
+        Duration between = Duration.between(now, startDateTime);
+        if (now.isAfter(startDateTime) || now.isEqual(startDateTime)) {
+            return between.plusHours(24).getSeconds();
+        }
+        return between.getSeconds();
     }
 
     private void scheduleNextDay(EnforcedState state) {
         state.resetConfirmations();
         state.shiftEndToNextDay();
-        schedule(state, Duration.ofHours(24).getSeconds());
+        schedule(state, secondsUntilNextDayFromStart(state, currentTime.get()));
     }
 }

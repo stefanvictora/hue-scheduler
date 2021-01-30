@@ -156,20 +156,21 @@ class HueEnforcerTest {
     }
 
     private ScheduledRunnable ensureNextDayRunnable() {
+        return ensureRunnable(Duration.ofHours(24));
+    }
+
+    private ScheduledRunnable ensureRunnable(Duration duration) {
         ScheduledRunnable runnable = ensureScheduledRunnable(1).get(0);
-        assertDuration(runnable, Duration.ofHours(24));
+        assertDuration(runnable, duration);
         return runnable;
     }
 
     private ScheduledRunnable ensureRetryRunnable() {
-        ScheduledRunnable runnable = ensureScheduledRunnable(1).get(0);
-        assertDuration(runnable, Duration.ofSeconds(1));
-        return runnable;
+        return ensureRunnable(Duration.ofSeconds(1));
     }
 
     private void ensureAndRunSingleConfirmation(boolean reachable) {
-        ScheduledRunnable runnable = ensureScheduledRunnable(1).get(0);
-        assertDuration(runnable, Duration.ofSeconds(1));
+        ScheduledRunnable runnable = ensureRunnable(Duration.ofSeconds(1));
 
         runAndAssertApiCalls(reachable, runnable);
     }
@@ -273,6 +274,8 @@ class HueEnforcerTest {
         assertDuration(scheduledRunnable.get(1), Duration.ofHours(1));
         assertDuration(scheduledRunnable.get(2), Duration.ofHours(1));
 
+        setCurrentTimeTo(now.plusHours(1));
+
         runAndAssertApiCalls(true, scheduledRunnable.get(0));
 
         runAndAssertConfirmRunnables();
@@ -316,7 +319,7 @@ class HueEnforcerTest {
     }
 
     @Test
-    void run_execution_twoStates_overNight_detectsEndCorrectly() {
+    void run_execution_twoStates_overNight_detectsEndCorrectlyAndDoesNotExecuteConfirmRunnable() {
         setCurrentTimeTo(now.withHour(23).withMinute(0));
         addState(1, now, defaultBrightness, defaultCt);
         LocalDateTime nextMorning = now.plusHours(8);
@@ -332,19 +335,21 @@ class HueEnforcerTest {
 
         confirmRunnable.run(); // does not call any API, as its past its end
 
-        ensureNextDayRunnable();
+        ensureRunnable(Duration.ofHours(24).minusHours(8));
     }
 
     @Test
-    void run_execution_twoStates_oneAlreadyPassed_updatesEndCorrectly() {
-        addState(1, now.minusHours(1));
+    void run_execution_twoStates_oneAlreadyPassed_runTheOneAlreadyPassedTheNextDay_correctExecution_asEndWasAdjustedCorrectlyInitially() {
         addState(1, now);
+        addState(1, now.minusHours(1));
         startEnforcer();
         List<ScheduledRunnable> initialRunnables = ensureScheduledRunnable(2);
+        ScheduledRunnable nextDayRunnable = initialRunnables.get(1);
+        assertDuration(nextDayRunnable, Duration.ofHours(23));
 
         setCurrentTimeTo(now.minusHours(1).plusDays(1));
 
-        runAndAssertApiCalls(true, initialRunnables.get(1));
+        runAndAssertApiCalls(true, nextDayRunnable);
 
         runAndAssertConfirmRunnables();
 
@@ -369,6 +374,21 @@ class HueEnforcerTest {
     }
 
     @Test
+    void run_execution_nextDayRunnableUsesStartTimeAsReference_notCurrentTime() {
+        addDefaultState();
+        startEnforcer();
+        List<ScheduledRunnable> scheduledRunnable = ensureScheduledRunnable(1);
+
+        runAndAssertApiCalls(true, scheduledRunnable.get(0));
+
+        setCurrentTimeTo(now.plusHours(4));
+
+        runAndAssertConfirmRunnables();
+
+        ensureRunnable(Duration.ofHours(20));
+    }
+
+    @Test
     void run_execution_multipleStates_unreachable_stopsRetryingIfNextIntervallStarts() {
         int ct2 = 400;
         int brightness2 = 254;
@@ -385,7 +405,7 @@ class HueEnforcerTest {
 
         retryRunnable.run();  /* this aborts without any api calls, as the current state already ended */
 
-        ensureNextDayRunnable();
+        ensureRunnable(Duration.ofHours(24).minusSeconds(10));
 
         /* run and assert second state: */
 
@@ -414,7 +434,7 @@ class HueEnforcerTest {
 
         furtherConfirmRunnable.run(); // aborts and does not call any api calls
 
-        ScheduledRunnable nextDayRunnable = ensureNextDayRunnable();
+        ScheduledRunnable nextDayRunnable = ensureRunnable(Duration.ofHours(24).minusSeconds(10));
         setCurrentTimeTo(now.plusDays(1).minusSeconds(10));
 
         runAndAssertApiCalls(true, nextDayRunnable);
