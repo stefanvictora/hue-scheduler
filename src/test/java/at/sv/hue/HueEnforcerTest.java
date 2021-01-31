@@ -213,13 +213,25 @@ class HueEnforcerTest {
     }
 
     @Test
-    void run_singleState_inOneHour_singleRunnableScheduled_correctDelay() {
+    void run_singleState_inOneHour_scheduledImmediately_becauseOfDayWrapAround() {
         addState(22, now.plus(1, ChronoUnit.HOURS));
 
         startEnforcer();
 
         List<ScheduledRunnable> scheduledRunnable = ensureScheduledRunnable(1);
-        assertDuration(scheduledRunnable.get(0), Duration.ofHours(1));
+        assertDuration(scheduledRunnable.get(0), Duration.ZERO);
+    }
+
+    @Test
+    void run_multipleStates_allInTheFuture_runsTheOneOfTheNextDayImmediately_theNextWithCorrectDelay() {
+        addState(1, now.plusHours(1));
+        addState(1, now.plusHours(2));
+
+        startEnforcer();
+
+        List<ScheduledRunnable> scheduledRunnable = ensureScheduledRunnable(2);
+        assertDuration(scheduledRunnable.get(0), Duration.ZERO);
+        assertDuration(scheduledRunnable.get(1), Duration.ofHours(1));
     }
 
     @Test
@@ -235,14 +247,16 @@ class HueEnforcerTest {
 
     @Test
     void run_multipleStates_sameId_differentTimes_multipleScheduled_addedLastFirst() {
+        addState(22, now);
         addState(22, now.plusHours(1));
         addState(22, now.plusHours(2));
 
         startEnforcer();
 
-        List<ScheduledRunnable> scheduledRunnable = ensureScheduledRunnable(2);
-        assertDuration(scheduledRunnable.get(0), Duration.ofHours(1));
-        assertDuration(scheduledRunnable.get(1), Duration.ofHours(2));
+        List<ScheduledRunnable> scheduledRunnable = ensureScheduledRunnable(3);
+        assertDuration(scheduledRunnable.get(0), Duration.ZERO);
+        assertDuration(scheduledRunnable.get(1), Duration.ofHours(1));
+        assertDuration(scheduledRunnable.get(2), Duration.ofHours(2));
     }
 
     @Test
@@ -270,9 +284,9 @@ class HueEnforcerTest {
         startEnforcer();
 
         List<ScheduledRunnable> scheduledRunnable = ensureScheduledRunnable(3);
-        assertDuration(scheduledRunnable.get(0), Duration.ofHours(1));
-        assertDuration(scheduledRunnable.get(1), Duration.ofHours(1));
-        assertDuration(scheduledRunnable.get(2), Duration.ofHours(1));
+        assertDuration(scheduledRunnable.get(0), Duration.ZERO);
+        assertDuration(scheduledRunnable.get(1), Duration.ZERO);
+        assertDuration(scheduledRunnable.get(2), Duration.ZERO);
 
         setCurrentTimeTo(now.plusHours(1));
 

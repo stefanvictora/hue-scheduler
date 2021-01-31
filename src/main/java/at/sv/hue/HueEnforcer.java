@@ -117,7 +117,11 @@ public final class HueEnforcer {
     }
 
     private void scheduleStates(LocalDateTime now, List<EnforcedState> states) {
-        states.sort(Comparator.comparing(EnforcedState::getStart, Comparator.reverseOrder()));
+        sortByLastFirst(states);
+        if (allInTheFuture(states, now)) {
+            scheduleLastImmediately(states);
+            states = skipLast(states);
+        }
         for (int i = 0; i < states.size(); i++) {
             EnforcedState state = states.get(i);
             schedule(now, state);
@@ -126,6 +130,22 @@ public final class HueEnforcer {
                 break;
             }
         }
+    }
+
+    private void sortByLastFirst(List<EnforcedState> states) {
+        states.sort(Comparator.comparing(EnforcedState::getStart, Comparator.reverseOrder()));
+    }
+
+    private boolean allInTheFuture(List<EnforcedState> states, LocalDateTime now) {
+        return !states.get(states.size() - 1).isInThePast(now);
+    }
+
+    private void scheduleLastImmediately(List<EnforcedState> states) {
+        schedule(states.get(0), 0);
+    }
+
+    private List<EnforcedState> skipLast(List<EnforcedState> states) {
+        return states.subList(1, states.size());
     }
 
     private void schedule(LocalDateTime now, EnforcedState state) {
