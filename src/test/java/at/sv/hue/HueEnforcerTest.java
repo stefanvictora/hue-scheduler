@@ -6,7 +6,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -21,7 +23,7 @@ class HueEnforcerTest {
 
     private DummyScheduledExecutorService executor;
     private HueEnforcer enforcer;
-    private LocalDateTime now;
+    private ZonedDateTime now;
     private List<GetState> lightGetStates;
     private List<GetState> groupGetStates;
     private List<PutState> putStates;
@@ -30,8 +32,9 @@ class HueEnforcerTest {
     private int defaultCt;
     private int defaultBrightness;
     private int id;
+    private LocalTime sunrise;
 
-    private void setCurrentTimeTo(LocalDateTime secondStateStart) {
+    private void setCurrentTimeTo(ZonedDateTime secondStateStart) {
         now = secondStateStart;
     }
 
@@ -57,20 +60,26 @@ class HueEnforcerTest {
                 return groupLightsResponses.remove(0);
             }
         };
-        enforcer = new HueEnforcer(hueApi, executor, () -> now);
+        enforcer = new HueEnforcer(hueApi, executor, input -> {
+            if (input.equals("sunrise")) {
+                return sunrise;
+            } else {
+                return LocalTime.parse(input);
+            }
+        }, () -> now);
     }
 
-    private void addState(int id, LocalDateTime start) {
+    private void addState(int id, ZonedDateTime start) {
         addState(id, start, defaultBrightness, defaultCt);
     }
 
-    private void addState(int id, LocalDateTime start, int brightness, int ct) {
-        enforcer.addState(id, start.toLocalTime(), brightness, ct);
+    private void addState(int id, ZonedDateTime start, int brightness, int ct) {
+        enforcer.addState(id, start.toLocalTime().toString(), brightness, ct);
     }
 
-    private void addGroupState(int groupId, LocalDateTime start, Integer... lights) {
+    private void addGroupState(int groupId, ZonedDateTime start, Integer... lights) {
         groupLightsResponses.add(Arrays.asList(lights));
-        enforcer.addGroupState(groupId, start.toLocalTime(), defaultBrightness, defaultCt);
+        enforcer.addGroupState(groupId, start.toLocalTime().toString(), defaultBrightness, defaultCt);
     }
 
     private void addLightStateResponse(int brightness, int ct, boolean reachable) {
@@ -177,8 +186,9 @@ class HueEnforcerTest {
 
     @BeforeEach
     void setUp() {
+        sunrise = LocalTime.of(6, 0);
         executor = new DummyScheduledExecutorService();
-        setCurrentTimeTo(LocalDateTime.of(2021, 1, 1, 10, 0));
+        setCurrentTimeTo(ZonedDateTime.of(2021, 1, 1, 10, 0, 0, 0, ZoneId.systemDefault()));
         lightGetStates = new ArrayList<>();
         putStates = new ArrayList<>();
         lightStateResponses = new ArrayList<>();
@@ -263,7 +273,7 @@ class HueEnforcerTest {
     void run_multipleStates_sameId_oneInTheFuture_twoInThePast_onlyOnePastAddedImmediately_theOtherOneNextDay() {
         addState(13, now.plusHours(1));
         addState(13, now.minusHours(1));
-        LocalDateTime secondStart = now.minusHours(2);
+        ZonedDateTime secondStart = now.minusHours(2);
         addState(13, secondStart);
 
         startEnforcer();
@@ -278,7 +288,7 @@ class HueEnforcerTest {
     void parse_parsesInputLine_brightnessAndColorTemperature_createsMultipleStates_canHandleGroups() {
         String time = now.plusHours(1).toLocalTime().toString();
         groupLightsResponses.add(Collections.singletonList(77));
-        enforcer.addState("1,2,g9" + "\t" + time + "\tbri:" + defaultBrightness + "\tct:" + defaultCt);
+        enforcer.addState("1,2,g9\t" + time + "\tbri:" + defaultBrightness + "\tct:" + defaultCt);
         assertGroupGetState(9);
 
         startEnforcer();
@@ -295,6 +305,36 @@ class HueEnforcerTest {
         runAndAssertConfirmRunnables();
 
         ensureNextDayRunnable();
+    }
+
+    /*
+    Ok, welche Features brauch ich:
+    - Nautischer Start, für etwas heller als in der Nacht
+    - Civil Start, für mittlere Helligkeit; noch gelblich
+    - Sonnenaufgang, um maximale Helligkeit; weiße Farbe
+    - Sonnenuntergang (vlt sogar Golden Hour), um Farbtempertur zu ändern
+    - Nautisches Ende, um Helligkeit zu reduzieren
+     */
+
+    @Test
+    void parse_sunrise_callsStartTimeProvider_usesUpdatedSunriseTimeNextDay() {
+        addState(1, now);
+        enforcer.addState("1\tsunrise\tbri:" + defaultBrightness + "\tct:" + defaultCt);
+
+        startEnforcer();
+
+        List<ScheduledRunnable> scheduledRunnable = ensureScheduledRunnable(2);
+
+        assertDuration(scheduledRunnable.get(0), Duration.ZERO);
+        assertDuration(scheduledRunnable.get(1), Duration.ofHours(20));
+
+        setCurrentTimeTo(now.plusDays(1).minusHours(4));
+        sunrise = sunrise.plusHours(1);
+
+        runAndAssertApiCalls(true, scheduledRunnable.get(1));
+        runAndAssertConfirmRunnables();
+
+        ensureRunnable(Duration.ofHours(25));
     }
 
     @Test
@@ -336,7 +376,7 @@ class HueEnforcerTest {
     void run_execution_twoStates_overNight_detectsEndCorrectlyAndDoesNotExecuteConfirmRunnable() {
         setCurrentTimeTo(now.withHour(23).withMinute(0));
         addState(1, now, defaultBrightness, defaultCt);
-        LocalDateTime nextMorning = now.plusHours(8);
+        ZonedDateTime nextMorning = now.plusHours(8);
         addState(1, nextMorning, defaultBrightness + 100, defaultCt);
         startEnforcer();
         List<ScheduledRunnable> initialRunnables = ensureScheduledRunnable(2);
@@ -407,7 +447,7 @@ class HueEnforcerTest {
         int ct2 = 400;
         int brightness2 = 254;
         addDefaultState();
-        LocalDateTime secondStateStart = now.plusSeconds(10);
+        ZonedDateTime secondStateStart = now.plusSeconds(10);
         addState(id, secondStateStart, brightness2, ct2);
         startEnforcer();
         List<ScheduledRunnable> initialRunnable = ensureScheduledRunnable(2);
@@ -433,7 +473,7 @@ class HueEnforcerTest {
     @Test
     void run_execution_multipleStates_reachable_stopsConfirmationIfNextIntervallStarts_resetsConfirms() {
         addDefaultState();
-        LocalDateTime secondStateStart = now.plusSeconds(10);
+        ZonedDateTime secondStateStart = now.plusSeconds(10);
         addState(id, secondStateStart);
         startEnforcer();
         List<ScheduledRunnable> initialRunnable = ensureScheduledRunnable(2);

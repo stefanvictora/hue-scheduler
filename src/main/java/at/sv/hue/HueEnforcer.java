@@ -11,7 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
+import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -24,19 +24,23 @@ public final class HueEnforcer {
 
     private final HueApi hueApi;
     private final ScheduledExecutorService scheduledExecutorService;
-    private final Supplier<LocalDateTime> currentTime;
+    private final StartTimeProvider startTimeProvider;
+    private final Supplier<ZonedDateTime> currentTime;
     private final Map<Integer, List<EnforcedState>> lightStates;
 
-    public HueEnforcer(HueApi hueApi, ScheduledExecutorService scheduledExecutorService, Supplier<LocalDateTime> currentTime) {
+    public HueEnforcer(HueApi hueApi, ScheduledExecutorService scheduledExecutorService, StartTimeProvider startTimeProvider,
+                       Supplier<ZonedDateTime> currentTime) {
         this.hueApi = hueApi;
         this.scheduledExecutorService = scheduledExecutorService;
+        this.startTimeProvider = startTimeProvider;
         this.currentTime = currentTime;
         lightStates = new HashMap<>();
     }
 
     public static void main(String[] args) throws IOException {
         HueApi hueApi = new HueApiImpl(new HttpResourceProviderImpl(), args[0], args[1]);
-        HueEnforcer enforcer = new HueEnforcer(hueApi, Executors.newScheduledThreadPool(Runtime.getRuntime().availableProcessors()), LocalDateTime::now);
+        StartTimeProviderImpl startTimeProvider = new StartTimeProviderImpl(new SunDataProviderImpl(ZonedDateTime::now, 48.20, 16.39));
+        HueEnforcer enforcer = new HueEnforcer(hueApi, Executors.newSingleThreadScheduledExecutor(), startTimeProvider, ZonedDateTime::now);
         Files.lines(Paths.get(args[2]))
              .filter(s -> !s.isEmpty())
              .filter(s -> !s.startsWith("//"))
@@ -56,7 +60,6 @@ public final class HueEnforcer {
                 groupState = false;
                 id = Integer.parseInt(idPart);
             }
-            LocalTime start = LocalTime.parse(parts[1]);
             Integer bri = null;
             Integer ct = null;
             for (int i = 2; i < parts.length; i++) {
@@ -71,6 +74,7 @@ public final class HueEnforcer {
                         break;
                 }
             }
+            String start = parts[1];
             if (groupState) {
                 addGroupState(id, start, bri, ct);
             } else {
@@ -79,14 +83,15 @@ public final class HueEnforcer {
         }
     }
 
-    public void addState(int lampId, LocalTime start, Integer brightness, Integer ct) {
+    public void addState(int lampId, String start, Integer brightness, Integer ct) {
         lightStates.computeIfAbsent(lampId, ArrayList::new)
-                   .add(new EnforcedState(lampId, start, brightness, ct));
+                   .add(new EnforcedState(lampId, start, brightness, ct, startTimeProvider));
     }
 
-    public void addGroupState(int groupId, LocalTime start, Integer brightness, Integer ct) {
+    public void addGroupState(int groupId, String start, Integer brightness, Integer ct) {
         lightStates.computeIfAbsent(groupId, ArrayList::new)
-                   .add(new EnforcedState(groupId, getGroupLights(groupId).get(0), start, brightness, ct, true));
+                   .add(new EnforcedState(groupId, getGroupLights(groupId).get(0), start, brightness, ct,
+                           startTimeProvider, true));
     }
 
     private List<Integer> getGroupLights(int groupId) {
@@ -94,29 +99,30 @@ public final class HueEnforcer {
     }
 
     public void start() {
-        LocalDateTime now = currentTime.get();
+        ZonedDateTime now = currentTime.get();
         lightStates.forEach((id, states) -> {
             calculateAndSetEndTimes(now, states);
             scheduleStates(now, states);
         });
     }
 
-    private void calculateAndSetEndTimes(LocalDateTime now, List<EnforcedState> states) {
+    private void calculateAndSetEndTimes(ZonedDateTime now, List<EnforcedState> states) {
         states.sort(Comparator.comparing(EnforcedState::getStart));
         for (int i = 1; i < states.size(); i++) {
             EnforcedState previous = states.get(i - 1);
             EnforcedState current = states.get(i);
-            previous.setEnd(LocalDateTime.of(now.toLocalDate(), current.getStart().minusSeconds(1)));
+            LocalDateTime end = LocalDateTime.of(now.toLocalDate(), current.getStart().minusSeconds(1));
+            previous.setEnd(ZonedDateTime.of(end, now.getZone()));
         }
         EnforcedState lastState = states.get(states.size() - 1);
         lastState.setEnd(getStartOfFirstStateNextDay(now, states));
     }
 
-    private LocalDateTime getStartOfFirstStateNextDay(LocalDateTime now, List<EnforcedState> states) {
-        return LocalDateTime.of(now.toLocalDate().plusDays(1), states.get(0).getStart().minusSeconds(1));
+    private ZonedDateTime getStartOfFirstStateNextDay(ZonedDateTime now, List<EnforcedState> states) {
+        return ZonedDateTime.of(LocalDateTime.of(now.toLocalDate().plusDays(1), states.get(0).getStart().minusSeconds(1)), now.getZone());
     }
 
-    private void scheduleStates(LocalDateTime now, List<EnforcedState> states) {
+    private void scheduleStates(ZonedDateTime now, List<EnforcedState> states) {
         sortByLastFirst(states);
         if (allInTheFuture(states, now)) {
             scheduleLastImmediately(states);
@@ -124,7 +130,7 @@ public final class HueEnforcer {
         }
         for (int i = 0; i < states.size(); i++) {
             EnforcedState state = states.get(i);
-            schedule(now, state);
+            schedule(state, now);
             if (state.isInThePast(now) && hasMorePastStates(states, i)) {
                 addRemainingStatesTheNextDay(getRemaining(states, i), now);
                 break;
@@ -136,7 +142,7 @@ public final class HueEnforcer {
         states.sort(Comparator.comparing(EnforcedState::getStart, Comparator.reverseOrder()));
     }
 
-    private boolean allInTheFuture(List<EnforcedState> states, LocalDateTime now) {
+    private boolean allInTheFuture(List<EnforcedState> states, ZonedDateTime now) {
         return !states.get(states.size() - 1).isInThePast(now);
     }
 
@@ -148,7 +154,8 @@ public final class HueEnforcer {
         return states.subList(1, states.size());
     }
 
-    private void schedule(LocalDateTime now, EnforcedState state) {
+    private void schedule(EnforcedState state, ZonedDateTime now) {
+        state.updateLastStart(now);
         schedule(state, state.getDelay(now));
     }
 
@@ -188,25 +195,20 @@ public final class HueEnforcer {
         return states.subList(i + 1, states.size());
     }
 
-    private void addRemainingStatesTheNextDay(List<EnforcedState> remainingStates, LocalDateTime now) {
+    private void addRemainingStatesTheNextDay(List<EnforcedState> remainingStates, ZonedDateTime now) {
         remainingStates.forEach(state -> {
-            state.shiftEndToNextDay();
-            schedule(state, secondsUntilNextDayFromStart(state, now));
+            scheduleNextDay(state, now);
         });
     }
 
-    private long secondsUntilNextDayFromStart(EnforcedState state, LocalDateTime now) {
-        LocalDateTime startDateTime = LocalDateTime.of(now.toLocalDate(), state.getStart());
-        Duration between = Duration.between(now, startDateTime);
-        if (now.isAfter(startDateTime) || now.isEqual(startDateTime)) {
-            return between.plusHours(24).getSeconds();
-        }
-        return between.getSeconds();
+    private void scheduleNextDay(EnforcedState state) {
+        scheduleNextDay(state, currentTime.get());
     }
 
-    private void scheduleNextDay(EnforcedState state) {
+    private void scheduleNextDay(EnforcedState state, ZonedDateTime now) {
         state.resetConfirmations();
         state.shiftEndToNextDay();
-        schedule(state, secondsUntilNextDayFromStart(state, currentTime.get()));
+        schedule(state, state.secondsUntilNextDayFromStart(now));
+        state.updateLastStart(now);
     }
 }

@@ -3,36 +3,40 @@ package at.sv.hue;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZonedDateTime;
 
 final class EnforcedState {
     private static final int CONFIRM_AMOUNT = 120;
 
     private final int updateId;
     private final int statusId;
-    private final LocalTime start;
+    private final String start;
     private final Integer brightness;
     private final Integer ct;
+    private final StartTimeProvider startTimeProvider;
     private final boolean groupState;
     private int confirmCounter;
-    private LocalDateTime end;
+    private ZonedDateTime end;
+    private ZonedDateTime lastStart;
 
-    public EnforcedState(int id, LocalTime start, Integer brightness, Integer ct) {
-        this(id, id, start, brightness, ct, false);
+    public EnforcedState(int id, String start, Integer brightness, Integer ct, StartTimeProvider startTimeProvider) {
+        this(id, id, start, brightness, ct, startTimeProvider, false);
     }
 
-    public EnforcedState(int updateId, int statusId, LocalTime start, Integer brightness, Integer ct, boolean groupState) {
+    public EnforcedState(int updateId, int statusId, String start, Integer brightness, Integer ct,
+                         StartTimeProvider startTimeProvider, boolean groupState) {
         this.updateId = updateId;
         this.statusId = statusId;
         this.start = start;
         this.brightness = brightness;
         this.ct = ct;
+        this.startTimeProvider = startTimeProvider;
         this.groupState = groupState;
         confirmCounter = 0;
     }
 
-    public long getDelay(LocalDateTime now) {
-        LocalDateTime startDateTime = LocalDateTime.of(now.toLocalDate(), start);
-        Duration between = Duration.between(now, startDateTime);
+    public long getDelay(ZonedDateTime now) {
+        Duration between = Duration.between(now, getZonedStart(now));
         if (between.isNegative()) {
             return 0;
         } else {
@@ -40,12 +44,29 @@ final class EnforcedState {
         }
     }
 
-    public boolean isInThePast(LocalDateTime now) {
+    private ZonedDateTime getZonedStart(ZonedDateTime now) {
+        return ZonedDateTime.of(LocalDateTime.of(now.toLocalDate(), getStart()), now.getZone());
+    }
+
+    public long secondsUntilNextDayFromStart(ZonedDateTime now) {
+        ZonedDateTime zonedStart = getZonedStart(now);
+        Duration between = Duration.between(now, zonedStart);
+        if (now.isAfter(zonedStart) || now.isEqual(zonedStart) || startHasAdvancedSinceLastTime(zonedStart)) {
+            return between.plusDays(1).getSeconds();
+        }
+        return between.getSeconds();
+    }
+
+    private boolean startHasAdvancedSinceLastTime(ZonedDateTime zonedStart) {
+        return lastStart != null && zonedStart.toLocalTime().isAfter(lastStart.toLocalTime());
+    }
+
+    public boolean isInThePast(ZonedDateTime now) {
         return getDelay(now) == 0;
     }
 
     public LocalTime getStart() {
-        return start;
+        return startTimeProvider.getStart(start);
     }
 
     public int getUpdateId() {
@@ -76,11 +97,11 @@ final class EnforcedState {
         confirmCounter = 0;
     }
 
-    public void setEnd(LocalDateTime end) {
+    public void setEnd(ZonedDateTime end) {
         this.end = end;
     }
 
-    public boolean endsAfter(LocalDateTime now) {
+    public boolean endsAfter(ZonedDateTime now) {
         return now.isAfter(end);
     }
 
@@ -96,16 +117,20 @@ final class EnforcedState {
         return confirmCounter + "/" + CONFIRM_AMOUNT;
     }
 
+    public void updateLastStart(ZonedDateTime now) {
+        this.lastStart = getZonedStart(now);
+    }
+
     @Override
     public String toString() {
         return "EnforcedState{" +
                 "updateId=" + updateId +
                 ", statusId=" + statusId +
-                ", start=" + start +
+                ", start=" + start + " (" + getStart() + ")" +
                 ", brightness=" + brightness +
                 ", ct=" + ct +
                 ", confirmCounter=" + confirmCounter +
-                ", end=" + end +
+                ", end=" + end.toLocalDateTime() +
                 '}';
     }
 }
