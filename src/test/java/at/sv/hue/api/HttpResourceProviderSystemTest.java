@@ -3,8 +3,6 @@ package at.sv.hue.api;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
-import java.io.Reader;
 import java.net.MalformedURLException;
 import java.net.URL;
 
@@ -22,13 +20,6 @@ public class HttpResourceProviderSystemTest {
             return new URL(url);
         } catch (MalformedURLException e) {
             throw new IllegalArgumentException(e);
-        }
-    }
-
-    private void closeSilently(Reader reader) {
-        try {
-            reader.close();
-        } catch (IOException ignore) {
         }
     }
 
