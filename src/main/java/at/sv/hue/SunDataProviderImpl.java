@@ -57,4 +57,15 @@ public class SunDataProviderImpl implements SunDataProvider {
     private SunTimes.Parameters getProviderForCurrentDay() {
         return parameters.on(timeProvider.get());
     }
+
+    @Override
+    public String toString() {
+        return "Nautical Start: " + getNauticalStart() +
+                ", civil start: " + getCivilStart() +
+                ", sunrise: " + getSunrise() +
+                ", sunset: " + getSunset() +
+                ", civil end: " + getCivilEnd() +
+                ", nautical end: " + getNauticalEnd() +
+                "";
+    }
 }

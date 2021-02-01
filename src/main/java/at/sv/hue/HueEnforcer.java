@@ -11,6 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.concurrent.Executors;
@@ -104,6 +105,7 @@ public final class HueEnforcer {
             calculateAndSetEndTimes(now, states);
             scheduleStates(now, states);
         });
+        scheduleSunDataInfoLog();
     }
 
     private void calculateAndSetEndTimes(ZonedDateTime now, List<EnforcedState> states) {
@@ -171,7 +173,7 @@ public final class HueEnforcer {
             }
             hueApi.putState(state.getUpdateId(), state.getBrightness(), null, null, state.getCt(), state.isGroupState());
             if (!hueApi.getLightState(state.getStatusId()).isReachable()) {
-                LOG.debug("Light {} not reachable, try again", state.getUpdateId());
+                LOG.trace("Light {} not reachable, try again", state.getUpdateId());
                 state.resetConfirmations();
                 schedule(state, 1);
                 return;
@@ -210,5 +212,17 @@ public final class HueEnforcer {
         state.shiftEndToNextDay();
         schedule(state, state.secondsUntilNextDayFromStart(now));
         state.updateLastStart(now);
+    }
+
+    private void scheduleSunDataInfoLog() {
+        logSunDataInfo();
+        ZonedDateTime now = currentTime.get();
+        ZonedDateTime midnight = ZonedDateTime.of(now.toLocalDate().plusDays(1), LocalTime.MIDNIGHT, now.getZone());
+        long delay = Duration.between(now, midnight).toMinutes();
+        scheduledExecutorService.scheduleAtFixedRate(this::logSunDataInfo, delay, 60 * 24, TimeUnit.MINUTES);
+    }
+
+    private void logSunDataInfo() {
+        LOG.info("{}", startTimeProvider);
     }
 }

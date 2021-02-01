@@ -62,4 +62,9 @@ public final class StartTimeProviderImpl implements StartTimeProvider {
         }
         throw new IllegalArgumentException("Invalid sun keyword: " + input);
     }
+
+    @Override
+    public String toString() {
+        return sunDataProvider.toString();
+    }
 }
