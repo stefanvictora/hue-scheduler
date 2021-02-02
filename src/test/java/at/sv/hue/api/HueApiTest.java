@@ -216,8 +216,19 @@ class HueApiTest {
     }
 
     @Test
-    void putState_failure_noResponse() {
+    void putState_noResponse_failure() {
         assertResponseMatch = false;
+
+        boolean success = putState(123, 100);
+
+        assertFalse(success, "Put did not fail");
+    }
+
+    @Test
+    void putState_emptyResponse_failure() {
+        setPutResponse("/lights/" + 123 + "/state", "{\"bri\":100," + transitionTime + "}",
+                "[\n" +
+                        "]");
 
         boolean success = putState(123, 100);
 
@@ -228,6 +239,7 @@ class HueApiTest {
     void putState_failure_returnsCorrectResult() {
         setPutResponse("/lights/" + 777 + "/state", "{\"bri\":300," + transitionTime + "}",
                 "[\n" +
+                        "{\"success\":{\"/lights/22/state/transitiontime\":2}}," +
                         "{\n" +
                         "\"error\": {\n" +
                         "\"type\": 7,\n" +

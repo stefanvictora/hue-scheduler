@@ -33,6 +33,7 @@ class HueEnforcerTest {
     private int defaultBrightness;
     private int id;
     private LocalTime sunrise;
+    private boolean apiPutSuccessful;
 
     private void setCurrentTimeTo(ZonedDateTime secondStateStart) {
         now = secondStateStart;
@@ -50,7 +51,7 @@ class HueEnforcerTest {
             @Override
             public boolean putState(int id, Integer bri, Double x, Double y, Integer ct, boolean groupState) {
                 putStates.add(new PutState(id, bri, x, y, ct, groupState));
-                return true;
+                return apiPutSuccessful;
             }
 
             @Override
@@ -157,11 +158,14 @@ class HueEnforcerTest {
 
     private void runAndAssertApiCalls(boolean reachable, ScheduledRunnable runnable, int brightness, int ct, boolean groupState) {
         addLightStateResponse(brightness, ct, reachable);
+        runAndAssertPutCall(reachable, runnable, brightness, ct, groupState);
+        assertLightGetState(id);
+    }
 
+    private void runAndAssertPutCall(boolean reachable, ScheduledRunnable runnable, int brightness, int ct, boolean groupState) {
         runnable.run();
 
         assertPutState(id, brightness, null, null, ct, groupState);
-        assertLightGetState(id);
     }
 
     private ScheduledRunnable ensureNextDayRunnable() {
@@ -186,6 +190,7 @@ class HueEnforcerTest {
 
     @BeforeEach
     void setUp() {
+        apiPutSuccessful = true;
         sunrise = LocalTime.of(6, 0);
         executor = new DummyScheduledExecutorService();
         setCurrentTimeTo(ZonedDateTime.of(2021, 1, 1, 10, 0, 0, 0, ZoneId.systemDefault()));
@@ -502,6 +507,25 @@ class HueEnforcerTest {
 
         ScheduledRunnable retryRunnable = ensureRetryRunnable();
 
+        runAndAssertApiCalls(true, retryRunnable);
+
+        runAndAssertConfirmRunnables();
+
+        ensureNextDayRunnable();
+    }
+
+    @Test
+    void run_execution_putNotSuccessful_butReachable_whichHappensWhenLightIsSoftwareBasedOff_triesAgain_withoutCallingGetStatus() {
+        addDefaultState();
+        startEnforcer();
+
+        List<ScheduledRunnable> scheduledRunnable = ensureScheduledRunnable(1);
+
+        apiPutSuccessful = false;
+        runAndAssertPutCall(true, scheduledRunnable.get(0), defaultBrightness, defaultCt, false);
+
+        ScheduledRunnable retryRunnable = ensureRetryRunnable();
+        apiPutSuccessful = true;
         runAndAssertApiCalls(true, retryRunnable);
 
         runAndAssertConfirmRunnables();

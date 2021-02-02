@@ -171,9 +171,9 @@ public final class HueEnforcer {
                 scheduleNextDay(state);
                 return;
             }
-            hueApi.putState(state.getUpdateId(), state.getBrightness(), null, null, state.getCt(), state.isGroupState());
-            if (!hueApi.getLightState(state.getStatusId()).isReachable()) {
-                LOG.trace("Light {} not reachable, try again", state.getUpdateId());
+            boolean success = hueApi.putState(state.getUpdateId(), state.getBrightness(), null, null, state.getCt(), state.isGroupState());
+            if (!success || !hueApi.getLightState(state.getStatusId()).isReachable()) {
+                LOG.trace("Light {} not reachable or off, try again", state.getUpdateId());
                 state.resetConfirmations();
                 schedule(state, 1);
                 return;

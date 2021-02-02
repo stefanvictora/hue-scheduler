@@ -73,7 +73,7 @@ public final class HueApiImpl implements HueApi {
         if (response == null) {
             return false;
         }
-        return response.contains("success");
+        return !response.contains("error") && response.contains("success");
     }
 
     @Override
