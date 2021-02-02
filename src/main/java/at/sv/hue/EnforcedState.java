@@ -93,6 +93,10 @@ final class EnforcedState {
         confirmCounter++;
     }
 
+    public int getConfirmCounter() {
+        return confirmCounter;
+    }
+
     public void resetConfirmations() {
         confirmCounter = 0;
     }

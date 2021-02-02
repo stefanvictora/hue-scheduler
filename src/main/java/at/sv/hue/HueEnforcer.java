@@ -179,8 +179,10 @@ public final class HueEnforcer {
                 return;
             }
             if (!state.isFullyConfirmed()) {
+                if (state.getConfirmCounter() % 20 == 0) {
+                    LOG.debug("Confirmed light {} ({})", state.getUpdateId(), state.getConfirmDebugString());
+                }
                 state.addConfirmation();
-                LOG.debug("Confirmed light {} ({})", state.getUpdateId(), state.getConfirmDebugString());
                 schedule(state, 1);
             } else {
                 LOG.debug("State {} fully confirmed", state);
