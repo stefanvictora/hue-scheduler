@@ -307,15 +307,6 @@ class HueEnforcerTest {
         ensureNextDayRunnable();
     }
 
-    /*
-    Ok, welche Features brauch ich:
-    - Nautischer Start, für etwas heller als in der Nacht
-    - Civil Start, für mittlere Helligkeit; noch gelblich
-    - Sonnenaufgang, um maximale Helligkeit; weiße Farbe
-    - Sonnenuntergang (vlt sogar Golden Hour), um Farbtempertur zu ändern
-    - Nautisches Ende, um Helligkeit zu reduzieren
-     */
-
     @Test
     void parse_sunrise_callsStartTimeProvider_usesUpdatedSunriseTimeNextDay() {
         addState(1, now);
