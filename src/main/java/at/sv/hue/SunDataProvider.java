@@ -16,4 +16,9 @@ public interface SunDataProvider {
 
     LocalTime getCivilEnd();
 
+    LocalTime getGoldenHour();
+
+    LocalTime getAstronomicalEnd();
+
+    LocalTime getAstronomicalStart();
 }

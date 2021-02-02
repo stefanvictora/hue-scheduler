@@ -18,6 +18,9 @@ class StartTimeProviderTest {
     private LocalTime nauticalEnd;
     private LocalTime civilStart;
     private LocalTime civilEnd;
+    private LocalTime goldenHour;
+    private LocalTime astronomicalStart;
+    private LocalTime astronomicalEnd;
 
     private void assertStart(String input, LocalTime time) {
         assertThat("Start differs", provider.getStart(input), is(time));
@@ -25,12 +28,15 @@ class StartTimeProviderTest {
 
     @BeforeEach
     void setUp() {
+        astronomicalStart = LocalTime.of(5, 0);
         nauticalStart = LocalTime.of(6, 13);
-        nauticalEnd = LocalTime.of(18, 4);
         civilStart = LocalTime.of(6, 50);
+        sunrise = LocalTime.of(7, 0);
+        goldenHour = LocalTime.of(15, 0);
+        sunset = LocalTime.of(16, 0);
         civilEnd = LocalTime.of(17, 26);
-        sunrise = LocalTime.of(6, 0);
-        sunset = LocalTime.of(20, 0);
+        nauticalEnd = LocalTime.of(18, 4);
+        astronomicalEnd = LocalTime.of(19, 10);
         provider = new StartTimeProviderImpl(new SunDataProvider() {
             @Override
             public LocalTime getSunrise() {
@@ -61,6 +67,21 @@ class StartTimeProviderTest {
             public LocalTime getCivilEnd() {
                 return civilEnd;
             }
+
+            @Override
+            public LocalTime getGoldenHour() {
+                return goldenHour;
+            }
+
+            @Override
+            public LocalTime getAstronomicalEnd() {
+                return astronomicalEnd;
+            }
+
+            @Override
+            public LocalTime getAstronomicalStart() {
+                return astronomicalStart;
+            }
         });
     }
 
@@ -78,6 +99,9 @@ class StartTimeProviderTest {
         assertStart("nautical_end", nauticalEnd);
         assertStart("civil_start", civilStart);
         assertStart("civil_end", civilEnd);
+        assertStart("golden_hour", goldenHour);
+        assertStart("astronomical_start", astronomicalStart);
+        assertStart("astronomical_end", astronomicalEnd);
     }
 
     @Test

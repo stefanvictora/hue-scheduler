@@ -46,6 +46,21 @@ public class SunDataProviderImpl implements SunDataProvider {
         return sunTimesForCurrentDay(SunTimes.Twilight.CIVIL).getSet().toLocalTime();
     }
 
+    @Override
+    public LocalTime getGoldenHour() {
+        return sunTimesForCurrentDay(SunTimes.Twilight.GOLDEN_HOUR).getSet().toLocalTime();
+    }
+
+    @Override
+    public LocalTime getAstronomicalEnd() {
+        return sunTimesForCurrentDay(SunTimes.Twilight.ASTRONOMICAL).getSet().toLocalTime();
+    }
+
+    @Override
+    public LocalTime getAstronomicalStart() {
+        return sunTimesForCurrentDay(SunTimes.Twilight.ASTRONOMICAL).getRise().toLocalTime();
+    }
+
     private SunTimes sunTimesForCurrentDay() {
         return sunTimesForCurrentDay(SunTimes.Twilight.VISUAL);
     }
@@ -60,12 +75,15 @@ public class SunDataProviderImpl implements SunDataProvider {
 
     @Override
     public String toString() {
-        return "Nautical Start: " + getNauticalStart() +
-                ", civil start: " + getCivilStart() +
-                ", sunrise: " + getSunrise() +
-                ", sunset: " + getSunset() +
-                ", civil end: " + getCivilEnd() +
-                ", nautical end: " + getNauticalEnd() +
+        return "\nastronomical start: " + getAstronomicalStart() +
+                "\nnautical start: " + getNauticalStart() +
+                "\ncivil start: " + getCivilStart() +
+                "\nsunrise: " + getSunrise() +
+                "\ngolden hour: " + getGoldenHour() +
+                "\nsunset: " + getSunset() +
+                "\ncivil end: " + getCivilEnd() +
+                "\nnautical end: " + getNauticalEnd() +
+                "\nastronomical end: " + getAstronomicalEnd() +
                 "";
     }
 }

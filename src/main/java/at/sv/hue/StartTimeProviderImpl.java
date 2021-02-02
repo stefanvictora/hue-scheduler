@@ -49,6 +49,8 @@ public final class StartTimeProviderImpl implements StartTimeProvider {
         switch (input.toLowerCase(Locale.ENGLISH)) {
             case "sunrise":
                 return sunDataProvider.getSunrise();
+            case "golden_hour":
+                return sunDataProvider.getGoldenHour();
             case "sunset":
                 return sunDataProvider.getSunset();
             case "nautical_start":
@@ -59,6 +61,10 @@ public final class StartTimeProviderImpl implements StartTimeProvider {
                 return sunDataProvider.getCivilStart();
             case "civil_end":
                 return sunDataProvider.getCivilEnd();
+            case "astronomical_start":
+                return sunDataProvider.getAstronomicalStart();
+            case "astronomical_end":
+                return sunDataProvider.getAstronomicalEnd();
         }
         throw new IllegalArgumentException("Invalid sun keyword: " + input);
     }
