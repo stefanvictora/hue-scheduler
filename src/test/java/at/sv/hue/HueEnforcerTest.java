@@ -83,8 +83,8 @@ class HueEnforcerTest {
         enforcer.addGroupState(groupId, start.toLocalTime().toString(), defaultBrightness, defaultCt);
     }
 
-    private void addLightStateResponse(int brightness, int ct, boolean reachable) {
-        lightStateResponses.add(new LightState(brightness, ct, null, null, reachable));
+    private void addLightStateResponse(int brightness, int ct, boolean reachable, boolean on) {
+        lightStateResponses.add(new LightState(brightness, ct, null, null, reachable, on));
     }
 
     private void startEnforcer() {
@@ -140,7 +140,7 @@ class HueEnforcerTest {
             ScheduledRunnable runnable = confirmRunnable.get(0);
             assertDuration(runnable, Duration.ofSeconds(1));
 
-            runAndAssertApiCalls(true, runnable, brightness, ct, groupState);
+            runAndAssertApiCalls(true, runnable, brightness, ct, groupState, true);
         }
     }
 
@@ -153,11 +153,11 @@ class HueEnforcerTest {
     }
 
     private void runAndAssertApiCalls(boolean reachable, ScheduledRunnable runnable, boolean groupState) {
-        runAndAssertApiCalls(reachable, runnable, defaultBrightness, defaultCt, groupState);
+        runAndAssertApiCalls(reachable, runnable, defaultBrightness, defaultCt, groupState, true);
     }
 
-    private void runAndAssertApiCalls(boolean reachable, ScheduledRunnable runnable, int brightness, int ct, boolean groupState) {
-        addLightStateResponse(brightness, ct, reachable);
+    private void runAndAssertApiCalls(boolean reachable, ScheduledRunnable runnable, int brightness, int ct, boolean groupState, boolean on) {
+        addLightStateResponse(brightness, ct, reachable, on);
         runAndAssertPutCall(reachable, runnable, brightness, ct, groupState);
         assertLightGetState(id);
     }
@@ -459,7 +459,7 @@ class HueEnforcerTest {
 
         /* run and assert second state: */
 
-        runAndAssertApiCalls(true, initialRunnable.get(1), brightness2, ct2, false);
+        runAndAssertApiCalls(true, initialRunnable.get(1), brightness2, ct2, false, true);
 
         runAndAssertConfirmRunnables(id, brightness2, ct2, 120, false);
 
@@ -527,6 +527,23 @@ class HueEnforcerTest {
         ScheduledRunnable retryRunnable = ensureRetryRunnable();
         apiPutSuccessful = true;
         runAndAssertApiCalls(true, retryRunnable);
+
+        runAndAssertConfirmRunnables();
+
+        ensureNextDayRunnable();
+    }
+
+    @Test
+    void run_execution_putSuccessful_reachable_butOff_triesAgain() {
+        addDefaultState();
+        startEnforcer();
+
+        List<ScheduledRunnable> scheduledRunnable = ensureScheduledRunnable(1);
+
+        runAndAssertApiCalls(true, scheduledRunnable.get(0), defaultBrightness, defaultCt, false, false);
+
+        ScheduledRunnable retryRunnable = ensureRetryRunnable();
+        runAndAssertApiCalls(true, retryRunnable, defaultBrightness, defaultCt, false, true);
 
         runAndAssertConfirmRunnables();
 

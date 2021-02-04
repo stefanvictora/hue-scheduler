@@ -172,7 +172,7 @@ public final class HueEnforcer {
                 return;
             }
             boolean success = hueApi.putState(state.getUpdateId(), state.getBrightness(), null, null, state.getCt(), state.isGroupState());
-            if (!success || !hueApi.getLightState(state.getStatusId()).isReachable()) {
+            if (!success || hueApi.getLightState(state.getStatusId()).isUnreachableOrOff()) {
                 LOG.trace("Light {} not reachable or off, try again", state.getUpdateId());
                 state.resetConfirmations();
                 schedule(state, 1);

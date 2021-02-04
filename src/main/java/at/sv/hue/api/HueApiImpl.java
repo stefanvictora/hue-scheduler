@@ -29,7 +29,7 @@ public final class HueApiImpl implements HueApi {
     public LightState getLightState(int id) {
         Light light = readValue(resourceProvider.getResource(getLightStateUrl(id)), Light.class);
         State state = light.state;
-        return new LightState(state.bri, state.ct, getX(state), getY(state), state.reachable);
+        return new LightState(state.bri, state.ct, getX(state), getY(state), state.reachable, state.on);
     }
 
     private Double getX(State state) {
@@ -111,6 +111,7 @@ public final class HueApiImpl implements HueApi {
     }
 
     private static final class State {
+        Boolean on;
         Boolean reachable;
         Double[] xy;
         Integer ct;
@@ -123,6 +124,18 @@ public final class HueApiImpl implements HueApi {
         public State(Integer ct, Integer bri, Double x, Double y) {
             this.ct = ct;
             this.bri = bri;
+        }
+
+        public Boolean getOn() {
+            return on;
+        }
+
+        public void setOn(Boolean on) {
+            this.on = on;
+        }
+
+        public Boolean getReachable() {
+            return reachable;
         }
 
         public Boolean isReachable() {
