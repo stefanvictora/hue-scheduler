@@ -28,21 +28,26 @@ public final class HueEnforcer {
     private final StartTimeProvider startTimeProvider;
     private final Supplier<ZonedDateTime> currentTime;
     private final Map<Integer, List<EnforcedState>> lightStates;
+    private final int retryDelay;
+    private final int confirmDelay;
 
     public HueEnforcer(HueApi hueApi, ScheduledExecutorService scheduledExecutorService, StartTimeProvider startTimeProvider,
-                       Supplier<ZonedDateTime> currentTime) {
+                       Supplier<ZonedDateTime> currentTime, int retryDelay, int confirmDelay) {
         this.hueApi = hueApi;
         this.scheduledExecutorService = scheduledExecutorService;
         this.startTimeProvider = startTimeProvider;
         this.currentTime = currentTime;
         lightStates = new HashMap<>();
+        this.retryDelay = retryDelay;
+        this.confirmDelay = confirmDelay;
     }
 
     public static void main(String[] args) throws IOException {
         HueApi hueApi = new HueApiImpl(new HttpResourceProviderImpl(), args[0], args[1]);
         StartTimeProviderImpl startTimeProvider = new StartTimeProviderImpl(new SunDataProviderImpl(ZonedDateTime::now, 48.20, 16.39));
-        HueEnforcer enforcer = new HueEnforcer(hueApi, Executors.newScheduledThreadPool(2), startTimeProvider, ZonedDateTime::now);
-        Files.lines(Paths.get(args[2]))
+        HueEnforcer enforcer = new HueEnforcer(hueApi, Executors.newSingleThreadScheduledExecutor(), startTimeProvider, ZonedDateTime::now,
+                Integer.parseInt(args[2]), Integer.parseInt(args[3]));
+        Files.lines(Paths.get(args[4]))
              .filter(s -> !s.isEmpty())
              .filter(s -> !s.startsWith("//"))
              .forEachOrdered(enforcer::addState);
@@ -100,6 +105,7 @@ public final class HueEnforcer {
     }
 
     public void start() {
+        LOG.info("Retry delay: {} s, Confirm delay: {} s", retryDelay, confirmDelay);
         ZonedDateTime now = currentTime.get();
         lightStates.forEach((id, states) -> {
             calculateAndSetEndTimes(now, states);
@@ -162,7 +168,7 @@ public final class HueEnforcer {
     }
 
     private void schedule(EnforcedState state, long delayInSeconds) {
-        if (delayInSeconds != 1) {
+        if (delayInSeconds != retryDelay && delayInSeconds != confirmDelay) {
             LOG.debug("Schedule {} in {}", state, Duration.ofSeconds(delayInSeconds));
         }
         scheduledExecutorService.schedule(() -> {
@@ -175,15 +181,15 @@ public final class HueEnforcer {
             if (!success || hueApi.getLightState(state.getStatusId()).isUnreachableOrOff()) {
                 LOG.trace("Light {} not reachable or off, try again", state.getUpdateId());
                 state.resetConfirmations();
-                schedule(state, 1);
+                schedule(state, retryDelay);
                 return;
             }
             if (!state.isFullyConfirmed()) {
-                if (state.getConfirmCounter() % 20 == 0) {
+                if (state.getConfirmCounter() % 5 == 0) {
                     LOG.debug("Confirmed light {} ({})", state.getUpdateId(), state.getConfirmDebugString());
                 }
                 state.addConfirmation();
-                schedule(state, 1);
+                schedule(state, confirmDelay);
             } else {
                 LOG.debug("State {} fully confirmed", state);
                 scheduleNextDay(state);
@@ -221,7 +227,7 @@ public final class HueEnforcer {
         ZonedDateTime now = currentTime.get();
         ZonedDateTime midnight = ZonedDateTime.of(now.toLocalDate().plusDays(1), LocalTime.MIDNIGHT, now.getZone());
         long delay = Duration.between(now, midnight).toMinutes();
-        scheduledExecutorService.scheduleAtFixedRate(this::logSunDataInfo, delay, 60 * 24, TimeUnit.MINUTES);
+        scheduledExecutorService.scheduleAtFixedRate(this::logSunDataInfo, delay + 1, 60 * 24, TimeUnit.MINUTES);
     }
 
     private void logSunDataInfo() {

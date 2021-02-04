@@ -34,6 +34,8 @@ class HueEnforcerTest {
     private int id;
     private LocalTime sunrise;
     private boolean apiPutSuccessful;
+    private int retryDelay;
+    private int confirmDelay;
 
     private void setCurrentTimeTo(ZonedDateTime secondStateStart) {
         now = secondStateStart;
@@ -61,13 +63,15 @@ class HueEnforcerTest {
                 return groupLightsResponses.remove(0);
             }
         };
+        retryDelay = 1;
+        confirmDelay = 2;
         enforcer = new HueEnforcer(hueApi, executor, input -> {
             if (input.equals("sunrise")) {
                 return sunrise;
             } else {
                 return LocalTime.parse(input);
             }
-        }, () -> now);
+        }, () -> now, retryDelay, confirmDelay);
     }
 
     private void addState(int id, ZonedDateTime start) {
@@ -131,14 +135,14 @@ class HueEnforcerTest {
     }
 
     private void runAndAssertConfirmRunnables(boolean groupState) {
-        runAndAssertConfirmRunnables(id, defaultBrightness, defaultCt, 120, groupState);
+        runAndAssertConfirmRunnables(id, defaultBrightness, defaultCt, EnforcedState.CONFIRM_AMOUNT, groupState);
     }
 
     private void runAndAssertConfirmRunnables(int id, int brightness, int ct, int confirmTimes, boolean groupState) {
         for (int i = 0; i < confirmTimes; i++) {
             List<ScheduledRunnable> confirmRunnable = ensureScheduledRunnable(1);
             ScheduledRunnable runnable = confirmRunnable.get(0);
-            assertDuration(runnable, Duration.ofSeconds(1));
+            assertDuration(runnable, Duration.ofSeconds(2));
 
             runAndAssertApiCalls(true, runnable, brightness, ct, groupState, true);
         }
@@ -179,11 +183,11 @@ class HueEnforcerTest {
     }
 
     private ScheduledRunnable ensureRetryRunnable() {
-        return ensureRunnable(Duration.ofSeconds(1));
+        return ensureRunnable(Duration.ofSeconds(retryDelay));
     }
 
     private void ensureAndRunSingleConfirmation(boolean reachable) {
-        ScheduledRunnable runnable = ensureRunnable(Duration.ofSeconds(1));
+        ScheduledRunnable runnable = ensureRunnable(Duration.ofSeconds(confirmDelay));
 
         runAndAssertApiCalls(reachable, runnable);
     }
@@ -461,7 +465,7 @@ class HueEnforcerTest {
 
         runAndAssertApiCalls(true, initialRunnable.get(1), brightness2, ct2, false, true);
 
-        runAndAssertConfirmRunnables(id, brightness2, ct2, 120, false);
+        runAndAssertConfirmRunnables(id, brightness2, ct2, EnforcedState.CONFIRM_AMOUNT, false);
 
         ensureNextDayRunnable();
     }

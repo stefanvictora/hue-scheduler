@@ -6,7 +6,7 @@ import java.time.LocalTime;
 import java.time.ZonedDateTime;
 
 final class EnforcedState {
-    private static final int CONFIRM_AMOUNT = 120;
+    static final int CONFIRM_AMOUNT = 30;
 
     private final int updateId;
     private final int statusId;
