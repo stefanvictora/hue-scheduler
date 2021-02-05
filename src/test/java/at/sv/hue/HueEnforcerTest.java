@@ -68,6 +68,8 @@ class HueEnforcerTest {
         enforcer = new HueEnforcer(hueApi, executor, input -> {
             if (input.equals("sunrise")) {
                 return sunrise;
+            } else if (input.equals("sunrise+10")) {
+                return sunrise.plusMinutes(10);
             } else {
                 return LocalTime.parse(input);
             }
@@ -78,7 +80,7 @@ class HueEnforcerTest {
         addState(id, start, defaultBrightness, defaultCt);
     }
 
-    private void addState(int id, ZonedDateTime start, int brightness, int ct) {
+    private void addState(int id, ZonedDateTime start, Integer brightness, Integer ct) {
         enforcer.addState(id, start.toLocalTime().toString(), brightness, ct);
     }
 
@@ -150,6 +152,10 @@ class HueEnforcerTest {
 
     private void addDefaultState() {
         addState(1, now, defaultBrightness, defaultCt);
+    }
+
+    private void addNullState(ZonedDateTime start) {
+        addState(1, start, null, null);
     }
 
     private void runAndAssertApiCalls(boolean reachable, ScheduledRunnable runnable) {
@@ -335,6 +341,15 @@ class HueEnforcerTest {
         runAndAssertConfirmRunnables();
 
         ensureRunnable(Duration.ofHours(25));
+    }
+
+    @Test
+    void parse_nullState_correctlyAdded() {
+        enforcer.addState("1\tsunrise\tct:" + defaultCt);
+        enforcer.addState("1\tsunrise+10");
+        startEnforcer();
+
+        ensureScheduledRunnable(1);
     }
 
     @Test
@@ -552,6 +567,30 @@ class HueEnforcerTest {
         runAndAssertConfirmRunnables();
 
         ensureNextDayRunnable();
+    }
+
+    @Test
+    void run_execution_nullState_notExecuted_justUsedToProvideEndToPreviousState() {
+        addDefaultState();
+        addNullState(now.plusMinutes(5));
+        startEnforcer();
+
+        List<ScheduledRunnable> scheduledRunnable = ensureScheduledRunnable(1);
+
+        setCurrentTimeTo(now.plusMinutes(5));
+
+        scheduledRunnable.get(0).run(); // no API calls, as already ended
+
+        ensureRunnable(Duration.ofHours(24).minusMinutes(5));
+    }
+
+    @Test
+    void run_execution_nullState_allInTheFuture_stillIgnored() {
+        addState(1, now.plusMinutes(5));
+        addNullState(now.plusMinutes(10));
+        startEnforcer();
+        
+        ensureScheduledRunnable(1);
     }
 
     private static final class GetState {

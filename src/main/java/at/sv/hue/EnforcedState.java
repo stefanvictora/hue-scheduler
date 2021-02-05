@@ -117,6 +117,10 @@ final class EnforcedState {
         return groupState;
     }
 
+    public boolean isNullState() {
+        return brightness == null && ct == null;
+    }
+
     public String getConfirmDebugString() {
         return confirmCounter + "/" + CONFIRM_AMOUNT;
     }

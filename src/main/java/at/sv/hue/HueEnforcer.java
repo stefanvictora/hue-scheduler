@@ -168,6 +168,7 @@ public final class HueEnforcer {
     }
 
     private void schedule(EnforcedState state, long delayInSeconds) {
+        if (state.isNullState()) return;
         if (delayInSeconds != retryDelay && delayInSeconds != confirmDelay) {
             LOG.debug("Schedule {} in {}", state, Duration.ofSeconds(delayInSeconds));
         }
