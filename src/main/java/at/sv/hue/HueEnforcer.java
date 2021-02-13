@@ -15,8 +15,6 @@ import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 public final class HueEnforcer {
@@ -24,17 +22,17 @@ public final class HueEnforcer {
     private static final Logger LOG = LoggerFactory.getLogger(HueEnforcer.class);
 
     private final HueApi hueApi;
-    private final ScheduledExecutorService scheduledExecutorService;
+    private final StateScheduler stateScheduler;
     private final StartTimeProvider startTimeProvider;
     private final Supplier<ZonedDateTime> currentTime;
     private final Map<Integer, List<EnforcedState>> lightStates;
     private final int retryDelay;
     private final int confirmDelay;
 
-    public HueEnforcer(HueApi hueApi, ScheduledExecutorService scheduledExecutorService, StartTimeProvider startTimeProvider,
+    public HueEnforcer(HueApi hueApi, StateScheduler stateScheduler, StartTimeProvider startTimeProvider,
                        Supplier<ZonedDateTime> currentTime, int retryDelay, int confirmDelay) {
         this.hueApi = hueApi;
-        this.scheduledExecutorService = scheduledExecutorService;
+        this.stateScheduler = stateScheduler;
         this.startTimeProvider = startTimeProvider;
         this.currentTime = currentTime;
         lightStates = new HashMap<>();
@@ -45,7 +43,8 @@ public final class HueEnforcer {
     public static void main(String[] args) throws IOException {
         HueApi hueApi = new HueApiImpl(new HttpResourceProviderImpl(), args[0], args[1]);
         StartTimeProviderImpl startTimeProvider = new StartTimeProviderImpl(new SunDataProviderImpl(ZonedDateTime::now, 48.20, 16.39));
-        HueEnforcer enforcer = new HueEnforcer(hueApi, Executors.newSingleThreadScheduledExecutor(), startTimeProvider, ZonedDateTime::now,
+        StateScheduler stateScheduler = new StateSchedulerImpl(Executors.newSingleThreadScheduledExecutor(), ZonedDateTime::now);
+        HueEnforcer enforcer = new HueEnforcer(hueApi, stateScheduler, startTimeProvider, ZonedDateTime::now,
                 Integer.parseInt(args[2]), Integer.parseInt(args[3]));
         Files.lines(Paths.get(args[4]))
              .filter(s -> !s.isEmpty())
@@ -95,7 +94,7 @@ public final class HueEnforcer {
     }
 
     public void addGroupState(int groupId, String start, Integer brightness, Integer ct) {
-        lightStates.computeIfAbsent(groupId, ArrayList::new)
+        lightStates.computeIfAbsent(groupId + 1000, ArrayList::new)
                    .add(new EnforcedState(groupId, getGroupLights(groupId).get(0), start, brightness, ct,
                            startTimeProvider, true));
     }
@@ -172,7 +171,7 @@ public final class HueEnforcer {
         if (delayInSeconds != retryDelay && delayInSeconds != confirmDelay) {
             LOG.debug("Schedule {} in {}", state, Duration.ofSeconds(delayInSeconds));
         }
-        scheduledExecutorService.schedule(() -> {
+        stateScheduler.schedule(() -> {
             if (state.endsAfter(currentTime.get())) {
                 LOG.debug("State {} already ended", state);
                 scheduleNextDay(state);
@@ -195,7 +194,8 @@ public final class HueEnforcer {
                 LOG.debug("State {} fully confirmed", state);
                 scheduleNextDay(state);
             }
-        }, delayInSeconds, TimeUnit.SECONDS);
+
+        }, currentTime.get().plusSeconds(delayInSeconds));
     }
 
     private boolean hasMorePastStates(List<EnforcedState> states, int i) {
@@ -228,7 +228,7 @@ public final class HueEnforcer {
         ZonedDateTime now = currentTime.get();
         ZonedDateTime midnight = ZonedDateTime.of(now.toLocalDate().plusDays(1), LocalTime.MIDNIGHT, now.getZone());
         long delay = Duration.between(now, midnight).toMinutes();
-        scheduledExecutorService.scheduleAtFixedRate(this::logSunDataInfo, delay + 1, 60 * 24, TimeUnit.MINUTES);
+//        stateScheduler.scheduleAtFixedRate(this::logSunDataInfo, delay + 1, 60 * 24, TimeUnit.MINUTES);
     }
 
     private void logSunDataInfo() {
