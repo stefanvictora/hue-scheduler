@@ -45,11 +45,15 @@ final class EnforcedState {
     }
 
     private ZonedDateTime getZonedStart(ZonedDateTime now) {
-        return ZonedDateTime.of(LocalDateTime.of(now.toLocalDate(), getStart()), now.getZone());
+        return getZonedStart(now, getStart(now));
+    }
+
+    private ZonedDateTime getZonedStart(ZonedDateTime now, LocalTime start) {
+        return ZonedDateTime.of(LocalDateTime.of(now.toLocalDate(), start), now.getZone());
     }
 
     public long secondsUntilNextDayFromStart(ZonedDateTime now) {
-        ZonedDateTime zonedStart = getZonedStart(now);
+        ZonedDateTime zonedStart = getZonedStart(now, getStart(now.plusDays(1)));
         Duration between = Duration.between(now, zonedStart);
         if (now.isAfter(zonedStart) || now.isEqual(zonedStart) || startHasAdvancedSinceLastTime(zonedStart)) {
             return between.plusDays(1).getSeconds();
@@ -65,8 +69,8 @@ final class EnforcedState {
         return getDelay(now) == 0;
     }
 
-    public LocalTime getStart() {
-        return startTimeProvider.getStart(start);
+    public LocalTime getStart(ZonedDateTime dateTime) {
+        return startTimeProvider.getStart(start, dateTime);
     }
 
     public int getUpdateId() {
@@ -134,7 +138,7 @@ final class EnforcedState {
         return "EnforcedState{" +
                 "updateId=" + updateId +
                 ", statusId=" + statusId +
-                ", start=" + start + " (" + getStart() + ")" +
+                ", start=" + start + " (" + getStart(lastStart) + ")" +
                 ", brightness=" + brightness +
                 ", ct=" + ct +
                 ", confirmCounter=" + confirmCounter +

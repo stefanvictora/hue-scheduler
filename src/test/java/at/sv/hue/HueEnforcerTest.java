@@ -38,6 +38,7 @@ class HueEnforcerTest {
     private int defaultBrightness;
     private int id;
     private LocalTime sunrise;
+    private LocalTime nextDaySunrise;
     private boolean apiPutSuccessful;
     private int retryDelay;
     private int confirmDelay;
@@ -76,11 +77,13 @@ class HueEnforcerTest {
                 return groupLightsResponses.remove(0);
             }
         };
-        retryDelay = 1;
-        confirmDelay = 2;
-        enforcer = new HueEnforcer(hueApi, stateScheduler, input -> {
+        enforcer = new HueEnforcer(hueApi, stateScheduler, (input, dateTime) -> {
             if (input.equals("sunrise")) {
-                return sunrise;
+                if (dateTime.getDayOfWeek().equals(initialNow.plusDays(1).getDayOfWeek())) {
+                    return nextDaySunrise;
+                } else {
+                    return sunrise;
+                }
             } else if (input.equals("sunrise+10")) {
                 return sunrise.plusMinutes(10);
             } else {
@@ -217,6 +220,7 @@ class HueEnforcerTest {
     void setUp() {
         apiPutSuccessful = true;
         sunrise = LocalTime.of(6, 0);
+        nextDaySunrise = LocalTime.of(7, 0);
         stateScheduler = new TestStateScheduler();
         setCurrentTimeTo(ZonedDateTime.of(2021, 1, 1, 10, 0, 0, 0, ZoneId.systemDefault()));
         initialNow = now;
@@ -225,10 +229,12 @@ class HueEnforcerTest {
         lightStateResponses = new ArrayList<>();
         groupGetStates = new ArrayList<>();
         groupLightsResponses = new ArrayList<>();
-        create();
+        retryDelay = 1;
+        confirmDelay = 2;
         defaultCt = 500;
         defaultBrightness = 50;
         id = 1;
+        create();
     }
 
     @AfterEach
@@ -355,6 +361,8 @@ class HueEnforcerTest {
 
     @Test
     void parse_sunrise_callsStartTimeProvider_usesUpdatedSunriseTimeNextDay() {
+        initialNow = now.plusDays(1).with(sunrise).minusHours(1);
+        setCurrentTimeTo(initialNow);
         addState(1, now);
         addState("1\tsunrise\tbri:" + defaultBrightness + "\tct:" + defaultCt);
 
@@ -362,14 +370,12 @@ class HueEnforcerTest {
 
         List<ScheduledState> scheduledStates = ensureScheduledStates(2);
         assertScheduleStart(scheduledStates.get(0), now);
-        assertScheduleStart(scheduledStates.get(1), now.plusHours(20));
-
-        sunrise = sunrise.plusHours(1);
+        assertScheduleStart(scheduledStates.get(1), now.plusHours(1));
 
         advanceTimeAndRunAndAssertApiCalls(true, scheduledStates.get(1));
         runAndAssertConfirmations();
 
-        ensureRunnable(initialNow.plusDays(2).minusHours(3));
+        ensureRunnable(initialNow.plusDays(1).with(nextDaySunrise));
     }
 
     @Test

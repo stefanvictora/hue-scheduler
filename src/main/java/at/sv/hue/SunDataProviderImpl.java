@@ -4,86 +4,83 @@ import org.shredzone.commons.suncalc.SunTimes;
 
 import java.time.LocalTime;
 import java.time.ZonedDateTime;
-import java.util.function.Supplier;
 
 public class SunDataProviderImpl implements SunDataProvider {
 
-    private final Supplier<ZonedDateTime> timeProvider;
     private final SunTimes.Parameters parameters;
 
-    public SunDataProviderImpl(Supplier<ZonedDateTime> timeProvider, double lat, double lng) {
-        this.timeProvider = timeProvider;
+    public SunDataProviderImpl(double lat, double lng) {
         parameters = SunTimes.compute().at(lat, lng);
     }
 
     @Override
-    public LocalTime getSunrise() {
-        return sunTimesForCurrentDay().getRise().toLocalTime();
+    public LocalTime getSunrise(ZonedDateTime dateTime) {
+        return sunTimesFor(dateTime).getRise().toLocalTime();
     }
 
     @Override
-    public LocalTime getSunset() {
-        return sunTimesForCurrentDay().getSet().toLocalTime();
+    public LocalTime getSunset(ZonedDateTime dateTime) {
+        return sunTimesFor(dateTime).getSet().toLocalTime();
     }
 
     @Override
-    public LocalTime getNauticalStart() {
-        return sunTimesForCurrentDay(SunTimes.Twilight.NAUTICAL).getRise().toLocalTime();
+    public LocalTime getNauticalStart(ZonedDateTime dateTime) {
+        return sunTimesFor(dateTime, SunTimes.Twilight.NAUTICAL).getRise().toLocalTime();
     }
 
     @Override
-    public LocalTime getNauticalEnd() {
-        return sunTimesForCurrentDay(SunTimes.Twilight.NAUTICAL).getSet().toLocalTime();
+    public LocalTime getNauticalEnd(ZonedDateTime dateTime) {
+        return sunTimesFor(dateTime, SunTimes.Twilight.NAUTICAL).getSet().toLocalTime();
     }
 
     @Override
-    public LocalTime getCivilStart() {
-        return sunTimesForCurrentDay(SunTimes.Twilight.CIVIL).getRise().toLocalTime();
+    public LocalTime getCivilStart(ZonedDateTime dateTime) {
+        return sunTimesFor(dateTime, SunTimes.Twilight.CIVIL).getRise().toLocalTime();
     }
 
     @Override
-    public LocalTime getCivilEnd() {
-        return sunTimesForCurrentDay(SunTimes.Twilight.CIVIL).getSet().toLocalTime();
+    public LocalTime getCivilEnd(ZonedDateTime dateTime) {
+        return sunTimesFor(dateTime, SunTimes.Twilight.CIVIL).getSet().toLocalTime();
     }
 
     @Override
-    public LocalTime getGoldenHour() {
-        return sunTimesForCurrentDay(SunTimes.Twilight.GOLDEN_HOUR).getSet().toLocalTime();
+    public LocalTime getGoldenHour(ZonedDateTime dateTime) {
+        return sunTimesFor(dateTime, SunTimes.Twilight.GOLDEN_HOUR).getSet().toLocalTime();
     }
 
     @Override
-    public LocalTime getAstronomicalEnd() {
-        return sunTimesForCurrentDay(SunTimes.Twilight.ASTRONOMICAL).getSet().toLocalTime();
+    public LocalTime getAstronomicalEnd(ZonedDateTime dateTime) {
+        return sunTimesFor(dateTime, SunTimes.Twilight.ASTRONOMICAL).getSet().toLocalTime();
     }
 
     @Override
-    public LocalTime getAstronomicalStart() {
-        return sunTimesForCurrentDay(SunTimes.Twilight.ASTRONOMICAL).getRise().toLocalTime();
+    public LocalTime getAstronomicalStart(ZonedDateTime dateTime) {
+        return sunTimesFor(dateTime, SunTimes.Twilight.ASTRONOMICAL).getRise().toLocalTime();
     }
 
-    private SunTimes sunTimesForCurrentDay() {
-        return sunTimesForCurrentDay(SunTimes.Twilight.VISUAL);
+    private SunTimes sunTimesFor(ZonedDateTime dateTime) {
+        return sunTimesFor(dateTime, SunTimes.Twilight.VISUAL);
     }
 
-    private SunTimes sunTimesForCurrentDay(SunTimes.Twilight twilight) {
-        return getProviderForCurrentDay().twilight(twilight).execute();
+    private SunTimes sunTimesFor(ZonedDateTime dateTime, SunTimes.Twilight twilight) {
+        return getProviderFor(dateTime).twilight(twilight).execute();
     }
 
-    private SunTimes.Parameters getProviderForCurrentDay() {
-        return parameters.on(timeProvider.get());
+    private SunTimes.Parameters getProviderFor(ZonedDateTime dateTime) {
+        return parameters.on(dateTime);
     }
 
     @Override
-    public String toString() {
-        return "\nastronomical start: " + getAstronomicalStart() +
-                "\nnautical start: " + getNauticalStart() +
-                "\ncivil start: " + getCivilStart() +
-                "\nsunrise: " + getSunrise() +
-                "\ngolden hour: " + getGoldenHour() +
-                "\nsunset: " + getSunset() +
-                "\ncivil end: " + getCivilEnd() +
-                "\nnautical end: " + getNauticalEnd() +
-                "\nastronomical end: " + getAstronomicalEnd() +
+    public String toDebugString(ZonedDateTime dateTime) {
+        return "\nastronomical start: " + getAstronomicalStart(dateTime) +
+                "\nnautical start: " + getNauticalStart(dateTime) +
+                "\ncivil start: " + getCivilStart(dateTime) +
+                "\nsunrise: " + getSunrise(dateTime) +
+                "\ngolden hour: " + getGoldenHour(dateTime) +
+                "\nsunset: " + getSunset(dateTime) +
+                "\ncivil end: " + getCivilEnd(dateTime) +
+                "\nnautical end: " + getNauticalEnd(dateTime) +
+                "\nastronomical end: " + getAstronomicalEnd(dateTime) +
                 "";
     }
 }

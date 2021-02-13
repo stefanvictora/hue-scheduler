@@ -1,6 +1,7 @@
 package at.sv.hue;
 
 import java.time.LocalTime;
+import java.time.ZonedDateTime;
 import java.util.Locale;
 
 public final class StartTimeProviderImpl implements StartTimeProvider {
@@ -12,13 +13,13 @@ public final class StartTimeProviderImpl implements StartTimeProvider {
     }
 
     @Override
-    public LocalTime getStart(String input) {
+    public LocalTime getStart(String input, ZonedDateTime dateTime) {
         LocalTime time = tryParseTimeString(input);
         if (time != null) return time;
         if (isOffsetExpression(input)) {
-            return parseOffsetExpresion(input);
+            return parseOffsetExpresion(input, dateTime);
         }
-        return parseSunKeywords(input);
+        return parseSunKeywords(input, dateTime);
     }
 
     private LocalTime tryParseTimeString(String input) {
@@ -34,9 +35,9 @@ public final class StartTimeProviderImpl implements StartTimeProvider {
         return input.contains("+") || input.contains("-");
     }
 
-    private LocalTime parseOffsetExpresion(String input) {
+    private LocalTime parseOffsetExpresion(String input, ZonedDateTime dateTime) {
         String[] parts = input.split("[+-]");
-        LocalTime localTime = parseSunKeywords(parts[0].trim());
+        LocalTime localTime = parseSunKeywords(parts[0].trim(), dateTime);
         int offset = Integer.parseInt(parts[1].trim());
         if (input.contains("+")) {
             return localTime.plusMinutes(offset);
@@ -45,32 +46,27 @@ public final class StartTimeProviderImpl implements StartTimeProvider {
         }
     }
 
-    private LocalTime parseSunKeywords(String input) {
+    private LocalTime parseSunKeywords(String input, ZonedDateTime dateTime) {
         switch (input.toLowerCase(Locale.ENGLISH)) {
             case "sunrise":
-                return sunDataProvider.getSunrise();
+                return sunDataProvider.getSunrise(dateTime);
             case "golden_hour":
-                return sunDataProvider.getGoldenHour();
+                return sunDataProvider.getGoldenHour(dateTime);
             case "sunset":
-                return sunDataProvider.getSunset();
+                return sunDataProvider.getSunset(dateTime);
             case "nautical_start":
-                return sunDataProvider.getNauticalStart();
+                return sunDataProvider.getNauticalStart(dateTime);
             case "nautical_end":
-                return sunDataProvider.getNauticalEnd();
+                return sunDataProvider.getNauticalEnd(dateTime);
             case "civil_start":
-                return sunDataProvider.getCivilStart();
+                return sunDataProvider.getCivilStart(dateTime);
             case "civil_end":
-                return sunDataProvider.getCivilEnd();
+                return sunDataProvider.getCivilEnd(dateTime);
             case "astronomical_start":
-                return sunDataProvider.getAstronomicalStart();
+                return sunDataProvider.getAstronomicalStart(dateTime);
             case "astronomical_end":
-                return sunDataProvider.getAstronomicalEnd();
+                return sunDataProvider.getAstronomicalEnd(dateTime);
         }
         throw new IllegalArgumentException("Invalid sun keyword: " + input);
-    }
-
-    @Override
-    public String toString() {
-        return sunDataProvider.toString();
     }
 }

@@ -42,7 +42,7 @@ public final class HueEnforcer {
 
     public static void main(String[] args) throws IOException {
         HueApi hueApi = new HueApiImpl(new HttpResourceProviderImpl(), args[0], args[1]);
-        StartTimeProviderImpl startTimeProvider = new StartTimeProviderImpl(new SunDataProviderImpl(ZonedDateTime::now, 48.20, 16.39));
+        StartTimeProviderImpl startTimeProvider = new StartTimeProviderImpl(new SunDataProviderImpl(48.20, 16.39));
         StateScheduler stateScheduler = new StateSchedulerImpl(Executors.newSingleThreadScheduledExecutor(), ZonedDateTime::now);
         HueEnforcer enforcer = new HueEnforcer(hueApi, stateScheduler, startTimeProvider, ZonedDateTime::now,
                 Integer.parseInt(args[2]), Integer.parseInt(args[3]));
@@ -114,11 +114,11 @@ public final class HueEnforcer {
     }
 
     private void calculateAndSetEndTimes(ZonedDateTime now, List<EnforcedState> states) {
-        states.sort(Comparator.comparing(EnforcedState::getStart));
+        states.sort(Comparator.comparing(enforcedState -> enforcedState.getStart(now)));
         for (int i = 1; i < states.size(); i++) {
             EnforcedState previous = states.get(i - 1);
             EnforcedState current = states.get(i);
-            LocalDateTime end = LocalDateTime.of(now.toLocalDate(), current.getStart().minusSeconds(1));
+            LocalDateTime end = LocalDateTime.of(now.toLocalDate(), current.getStart(now).minusSeconds(1));
             previous.setEnd(ZonedDateTime.of(end, now.getZone()));
         }
         EnforcedState lastState = states.get(states.size() - 1);
@@ -126,11 +126,11 @@ public final class HueEnforcer {
     }
 
     private ZonedDateTime getStartOfFirstStateNextDay(ZonedDateTime now, List<EnforcedState> states) {
-        return ZonedDateTime.of(LocalDateTime.of(now.toLocalDate().plusDays(1), states.get(0).getStart().minusSeconds(1)), now.getZone());
+        return ZonedDateTime.of(LocalDateTime.of(now.toLocalDate().plusDays(1), states.get(0).getStart(now).minusSeconds(1)), now.getZone());
     }
 
     private void scheduleStates(ZonedDateTime now, List<EnforcedState> states) {
-        sortByLastFirst(states);
+        sortByLastFirst(states, now);
         if (allInTheFuture(states, now)) {
             scheduleLastImmediately(states);
             states = skipLast(states);
@@ -145,8 +145,8 @@ public final class HueEnforcer {
         }
     }
 
-    private void sortByLastFirst(List<EnforcedState> states) {
-        states.sort(Comparator.comparing(EnforcedState::getStart, Comparator.reverseOrder()));
+    private void sortByLastFirst(List<EnforcedState> states, ZonedDateTime now) {
+        states.sort(Comparator.comparing(enforcedState -> enforcedState.getStart(now), Comparator.reverseOrder()));
     }
 
     private boolean allInTheFuture(List<EnforcedState> states, ZonedDateTime now) {
