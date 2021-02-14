@@ -23,5 +23,7 @@ public interface SunDataProvider {
 
     LocalTime getAstronomicalStart(ZonedDateTime dateTime);
 
-    String toDebugString(ZonedDateTime dateTime);
+    default String toDebugString(ZonedDateTime dateTime) {
+        return null;
+    }
 }

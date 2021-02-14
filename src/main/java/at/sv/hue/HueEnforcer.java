@@ -264,10 +264,10 @@ public final class HueEnforcer {
         ZonedDateTime now = currentTime.get();
         ZonedDateTime midnight = ZonedDateTime.of(now.toLocalDate().plusDays(1), LocalTime.MIDNIGHT, now.getZone());
         long delay = Duration.between(now, midnight).toMinutes();
-//        stateScheduler.scheduleAtFixedRate(this::logSunDataInfo, delay + 1, 60 * 24, TimeUnit.MINUTES);
+        stateScheduler.scheduleAtFixedRate(this::logSunDataInfo, delay + 1, 60 * 24, TimeUnit.MINUTES);
     }
 
     private void logSunDataInfo() {
-        LOG.info("{}", startTimeProvider);
+        LOG.info("{}", startTimeProvider.toDebugString(currentTime.get()));
     }
 }

@@ -20,4 +20,9 @@ public final class StateSchedulerImpl implements StateScheduler {
     public void schedule(Runnable runnable, ZonedDateTime start) {
         scheduledExecutorService.schedule(runnable, Duration.between(currentTime.get(), start).getSeconds(), TimeUnit.SECONDS);
     }
+
+    @Override
+    public void scheduleAtFixedRate(Runnable command, long initialDelay, long period, TimeUnit unit) {
+        scheduledExecutorService.scheduleAtFixedRate(command, initialDelay, period, unit);
+    }
 }

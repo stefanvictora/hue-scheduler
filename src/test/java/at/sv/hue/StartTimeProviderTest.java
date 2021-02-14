@@ -98,11 +98,6 @@ class StartTimeProviderTest {
             public LocalTime getAstronomicalStart(ZonedDateTime dateTime) {
                 return astronomicalStart;
             }
-
-            @Override
-            public String toDebugString(ZonedDateTime dateTime) {
-                return null;
-            }
         });
     }
 
