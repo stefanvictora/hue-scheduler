@@ -15,6 +15,7 @@ import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 public final class HueEnforcer {
@@ -94,9 +95,13 @@ public final class HueEnforcer {
     }
 
     public void addGroupState(int groupId, String start, Integer brightness, Integer ct) {
-        lightStates.computeIfAbsent(groupId + 1000, ArrayList::new)
+        lightStates.computeIfAbsent(getGroupId(groupId), ArrayList::new)
                    .add(new EnforcedState(groupId, getGroupLights(groupId).get(0), start, brightness, ct,
                            startTimeProvider, true));
+    }
+
+    private int getGroupId(int id) {
+        return id + 1000;
     }
 
     private List<Integer> getGroupLights(int groupId) {
@@ -114,19 +119,26 @@ public final class HueEnforcer {
     }
 
     private void calculateAndSetEndTimes(ZonedDateTime now, List<EnforcedState> states) {
-        states.sort(Comparator.comparing(enforcedState -> enforcedState.getStart(now)));
+        sortByTimeAscending(states, now);
         for (int i = 1; i < states.size(); i++) {
             EnforcedState previous = states.get(i - 1);
             EnforcedState current = states.get(i);
-            LocalDateTime end = LocalDateTime.of(now.toLocalDate(), current.getStart(now).minusSeconds(1));
-            previous.setEnd(ZonedDateTime.of(end, now.getZone()));
+            previous.setEnd(getRightBeforeStartOfState(current, now));
         }
         EnforcedState lastState = states.get(states.size() - 1);
-        lastState.setEnd(getStartOfFirstStateNextDay(now, states));
+        lastState.setEnd(getRightBeforeStartOfStateNextDay(states.get(0), now));
     }
 
-    private ZonedDateTime getStartOfFirstStateNextDay(ZonedDateTime now, List<EnforcedState> states) {
-        return ZonedDateTime.of(LocalDateTime.of(now.toLocalDate().plusDays(1), states.get(0).getStart(now).minusSeconds(1)), now.getZone());
+    private void sortByTimeAscending(List<EnforcedState> states, ZonedDateTime now) {
+        states.sort(Comparator.comparing(enforcedState -> enforcedState.getStart(now)));
+    }
+
+    private ZonedDateTime getRightBeforeStartOfState(EnforcedState state, ZonedDateTime dateTime) {
+        return ZonedDateTime.of(LocalDateTime.of(dateTime.toLocalDate(), state.getStart(dateTime).minusSeconds(1)), dateTime.getZone());
+    }
+
+    private ZonedDateTime getRightBeforeStartOfStateNextDay(EnforcedState state, ZonedDateTime now) {
+        return getRightBeforeStartOfState(state, now.plusDays(1));
     }
 
     private void scheduleStates(ZonedDateTime now, List<EnforcedState> states) {
@@ -218,9 +230,33 @@ public final class HueEnforcer {
 
     private void scheduleNextDay(EnforcedState state, ZonedDateTime now) {
         state.resetConfirmations();
-        state.shiftEndToNextDay();
+        recalculateEnd(state, now);
         schedule(state, state.secondsUntilNextDayFromStart(now));
         state.updateLastStart(now);
+    }
+
+    private void recalculateEnd(EnforcedState state, ZonedDateTime now) {
+        List<EnforcedState> states = getLightStatesForId(state);
+        sortByTimeAscending(states, now);
+        int index = states.indexOf(state);
+        if (index + 1 < states.size()) {
+            EnforcedState next = states.get(index + 1);
+            state.setEnd(getRightBeforeStartOfStateNextDay(next, state.getEnd()));
+        } else {
+            state.setEnd(getRightBeforeStartOfStateNextDay(states.get(0), state.getEnd()));
+        }
+    }
+
+    private List<EnforcedState> getLightStatesForId(EnforcedState state) {
+        return lightStates.get(getLightId(state));
+    }
+
+    private int getLightId(EnforcedState state) {
+        if (state.isGroupState()) {
+            return getGroupId(state.getUpdateId());
+        } else {
+            return state.getUpdateId();
+        }
     }
 
     private void scheduleSunDataInfoLog() {

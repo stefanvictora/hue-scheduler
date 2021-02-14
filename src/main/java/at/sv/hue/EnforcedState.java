@@ -113,8 +113,8 @@ final class EnforcedState {
         return now.isAfter(end);
     }
 
-    public void shiftEndToNextDay() {
-        end = end.plusDays(1);
+    public ZonedDateTime getEnd() {
+        return end;
     }
 
     public boolean isGroupState() {

@@ -39,6 +39,7 @@ class HueEnforcerTest {
     private int id;
     private LocalTime sunrise;
     private LocalTime nextDaySunrise;
+    private LocalTime nextNextDaysSunrises;
     private boolean apiPutSuccessful;
     private int retryDelay;
     private int confirmDelay;
@@ -49,6 +50,11 @@ class HueEnforcerTest {
         }
         now = newTime;
         LOG.info("Current time: {}", now);
+    }
+
+    private void setCurrentAndInitialTimeTo(ZonedDateTime dateTime) {
+        initialNow = dateTime;
+        setCurrentTimeTo(initialNow);
     }
 
     private void advanceCurrentTime(Duration duration) {
@@ -79,11 +85,15 @@ class HueEnforcerTest {
         };
         enforcer = new HueEnforcer(hueApi, stateScheduler, (input, dateTime) -> {
             if (input.equals("sunrise")) {
-                if (dateTime.getDayOfWeek().equals(initialNow.plusDays(1).getDayOfWeek())) {
-                    return nextDaySunrise;
-                } else {
+                long daysBetween = Duration.between(initialNow, dateTime).toDays();
+                if (daysBetween == 0) {
                     return sunrise;
+                } else if (daysBetween == 1) {
+                    return nextDaySunrise;
+                } else if (daysBetween >= 2) {
+                    return nextNextDaysSunrises;
                 }
+                throw new IllegalStateException("No sunrise time for dateTime defined: " + dateTime);
             } else if (input.equals("sunrise+10")) {
                 return sunrise.plusMinutes(10);
             } else {
@@ -184,16 +194,25 @@ class HueEnforcerTest {
     }
 
     private void advanceTimeAndRunAndAssertApiCalls(boolean reachable, ScheduledState state, int brightness, int ct, boolean groupState, boolean on) {
+        setCurrentTimeTo(state.getStart());
+        runAndAssertApiCalls(reachable, state, brightness, ct, groupState, on);
+    }
+
+    private void runAndAssertApiCalls(boolean reachable, ScheduledState state, int brightness, int ct, boolean groupState, boolean on) {
         addLightStateResponse(brightness, ct, reachable, on);
-        advanceTimeAndRunAndAssertPutCall(state, brightness, ct, groupState);
+        runAndAssertPutCall(state, brightness, ct, groupState);
         assertLightGetState(id);
+    }
+
+    private void runAndAssertPutCall(ScheduledState state, int brightness, int ct, boolean groupState) {
+        state.run();
+
+        assertPutState(id, brightness, null, null, ct, groupState);
     }
 
     private void advanceTimeAndRunAndAssertPutCall(ScheduledState state, int brightness, int ct, boolean groupState) {
         setCurrentTimeTo(state.getStart());
-        state.run();
-
-        assertPutState(id, brightness, null, null, ct, groupState);
+        runAndAssertPutCall(state, brightness, ct, groupState);
     }
 
     private ScheduledState ensureRunnable(ZonedDateTime scheduleStart) {
@@ -221,9 +240,9 @@ class HueEnforcerTest {
         apiPutSuccessful = true;
         sunrise = LocalTime.of(6, 0);
         nextDaySunrise = LocalTime.of(7, 0);
+        nextNextDaysSunrises = LocalTime.of(7, 15);
         stateScheduler = new TestStateScheduler();
-        setCurrentTimeTo(ZonedDateTime.of(2021, 1, 1, 10, 0, 0, 0, ZoneId.systemDefault()));
-        initialNow = now;
+        setCurrentAndInitialTimeTo(ZonedDateTime.of(2021, 1, 1, 0, 0, 0, 0, ZoneId.systemDefault()));
         lightGetStates = new ArrayList<>();
         putStates = new ArrayList<>();
         lightStateResponses = new ArrayList<>();
@@ -361,9 +380,8 @@ class HueEnforcerTest {
 
     @Test
     void parse_sunrise_callsStartTimeProvider_usesUpdatedSunriseTimeNextDay() {
-        initialNow = now.plusDays(1).with(sunrise).minusHours(1);
-        setCurrentTimeTo(initialNow);
-        addState(1, now);
+        setCurrentAndInitialTimeTo(now.with(sunrise).minusHours(1));
+        addState(1, now); // one hour before sunrise
         addState("1\tsunrise\tbri:" + defaultBrightness + "\tct:" + defaultCt);
 
         startEnforcer();
@@ -372,10 +390,35 @@ class HueEnforcerTest {
         assertScheduleStart(scheduledStates.get(0), now);
         assertScheduleStart(scheduledStates.get(1), now.plusHours(1));
 
-        advanceTimeAndRunAndAssertApiCalls(true, scheduledStates.get(1));
+        advanceTimeAndRunAndAssertApiCalls(true, scheduledStates.get(1)); // sunrise state
         runAndAssertConfirmations();
 
         ensureRunnable(initialNow.plusDays(1).with(nextDaySunrise));
+    }
+
+    @Test
+    void parse_sunrise_singleState_callsStartTimeProvider_calculatesInitialAndNextEndCorrectly() {
+        setCurrentAndInitialTimeTo(now.with(sunrise));
+        addState("1\tsunrise\tbri:" + defaultBrightness + "\tct:" + defaultCt);
+
+        startEnforcer();
+
+        List<ScheduledState> scheduledStates = ensureScheduledStates(1);
+        assertScheduleStart(scheduledStates.get(0), now);
+
+        setCurrentTimeTo(initialNow.plusDays(1).with(nextDaySunrise).minusMinutes(5));
+
+        runAndAssertApiCalls(true, scheduledStates.get(0), defaultBrightness, defaultCt, false, true);
+        runAndAssertConfirmations();
+
+        ScheduledState nextDayState = ensureRunnable(initialNow.plusDays(2).with(nextNextDaysSunrises));
+
+        setCurrentTimeTo(initialNow.plusDays(2).with(nextNextDaysSunrises).minusMinutes(5));
+
+        runAndAssertApiCalls(true, nextDayState, defaultBrightness, defaultCt, false, true);
+        runAndAssertConfirmations();
+
+        ensureRunnable(initialNow.plusDays(3).with(nextNextDaysSunrises));
     }
 
     @Test
@@ -420,8 +463,7 @@ class HueEnforcerTest {
 
     @Test
     void run_execution_twoStates_overNight_detectsEndCorrectlyAndDoesNotExecuteConfirmRunnable() {
-        initialNow = now.withHour(23).withMinute(0);
-        setCurrentTimeTo(initialNow);
+        setCurrentAndInitialTimeTo(now.withHour(23).withMinute(0));
         addState(1, now, defaultBrightness, defaultCt);
         ZonedDateTime nextMorning = now.plusHours(8);
         addState(1, nextMorning, defaultBrightness + 100, defaultCt);
@@ -452,6 +494,27 @@ class HueEnforcerTest {
         runAndAssertConfirmations();
 
         ensureRunnable(initialNow.plusDays(2).minusHours(1));
+    }
+
+    @Test
+    void run_execution_twoStates_multipleRuns_updatesEndsCorrectly() {
+        addState(1, now);
+        addState(1, now.plusHours(1));
+        startEnforcer();
+        List<ScheduledState> initialStates = ensureScheduledStates(2);
+        assertScheduleStart(initialStates.get(0), now);
+        assertScheduleStart(initialStates.get(1), now.plusHours(1));
+
+        advanceTimeAndRunAndAssertApiCalls(true, initialStates.get(0));
+        runAndAssertConfirmations();
+
+        ScheduledState nextDayRunnable = ensureRunnable(initialNow.plusDays(1));
+
+        setCurrentTimeTo(initialNow.plusDays(1).plusHours(1));
+        
+        nextDayRunnable.run(); // already past end, no api calls
+
+        ensureRunnable(initialNow.plusDays(2));
     }
 
     @Test
