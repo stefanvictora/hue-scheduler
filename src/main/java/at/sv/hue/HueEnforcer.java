@@ -236,7 +236,7 @@ public final class HueEnforcer {
     }
 
     private void recalculateEnd(EnforcedState state, ZonedDateTime now) {
-        List<EnforcedState> states = getLightStatesForId(state);
+        List<EnforcedState> states = new ArrayList<>(getLightStatesForId(state));
         sortByTimeAscending(states, now);
         int index = states.indexOf(state);
         if (index + 1 < states.size()) {
