@@ -138,11 +138,19 @@ final class EnforcedState {
         return "EnforcedState{" +
                 "updateId=" + updateId +
                 ", statusId=" + statusId +
-                ", start=" + start + " (" + getStart(lastStart) + ")" +
+                ", start=" + start + " (" + getStartIfAvailable() + ")" +
                 ", brightness=" + brightness +
                 ", ct=" + ct +
                 ", confirmCounter=" + confirmCounter +
                 ", end=" + end.toLocalDateTime() +
                 '}';
+    }
+
+    private LocalTime getStartIfAvailable() {
+        if (lastStart != null) {
+            return getStart(lastStart);
+        } else {
+            return null;
+        }
     }
 }
