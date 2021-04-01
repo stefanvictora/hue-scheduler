@@ -7,7 +7,7 @@ import java.util.List;
 public interface HueApi {
     LightState getLightState(int id);
 
-    boolean putState(int id, Integer bri, Double x, Double y, Integer ct, boolean groupState);
+    boolean putState(int id, Integer bri, Double x, Double y, Integer ct, Boolean on, boolean groupState);
 
     List<Integer> getGroupLights(int groupId);
 }

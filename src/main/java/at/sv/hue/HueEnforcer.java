@@ -44,15 +44,20 @@ public final class HueEnforcer {
 
     public static void main(String[] args) throws IOException {
         HueApi hueApi = new HueApiImpl(new HttpResourceProviderImpl(), args[0], args[1]);
-        StartTimeProviderImpl startTimeProvider = new StartTimeProviderImpl(new SunDataProviderImpl(48.20, 16.39));
+        double lat = Double.parseDouble(args[2]);
+        double lng = Double.parseDouble(args[3]);
+        StartTimeProviderImpl startTimeProvider = new StartTimeProviderImpl(new SunDataProviderImpl(lat, lng));
         StateScheduler stateScheduler = new StateSchedulerImpl(Executors.newSingleThreadScheduledExecutor(), ZonedDateTime::now);
-        int retryMaxValue = Integer.parseInt(args[2]);
+        int retryMaxValue = Integer.parseInt(args[4]);
+        int confirmDelay = Integer.parseInt(args[5]);
         HueEnforcer enforcer = new HueEnforcer(hueApi, stateScheduler, startTimeProvider, ZonedDateTime::now,
-                () -> getRandomRetryDelay(retryMaxValue), Integer.parseInt(args[3]));
-        Files.lines(Paths.get(args[4]))
+                () -> getRandomRetryDelay(retryMaxValue), confirmDelay);
+        Files.lines(Paths.get(args[6]))
              .filter(s -> !s.isEmpty())
              .filter(s -> !s.startsWith("//"))
              .forEachOrdered(enforcer::addState);
+        LOG.info("Retry delay: {} s, Confirm delay: {} s", retryMaxValue, confirmDelay);
+        LOG.info("Lat: {}, Long: {}", lat, lng);
         enforcer.start();
     }
 
@@ -74,6 +79,7 @@ public final class HueEnforcer {
             }
             Integer bri = null;
             Integer ct = null;
+            Boolean on = null;
             for (int i = 2; i < parts.length; i++) {
                 String part = parts[i];
                 String[] typeAndValue = part.split(":");
@@ -84,25 +90,28 @@ public final class HueEnforcer {
                     case "ct":
                         ct = Integer.valueOf(typeAndValue[1]);
                         break;
+                    case "on":
+                        on = Boolean.valueOf(typeAndValue[1]);
+                        break;
                 }
             }
             String start = parts[1];
             if (groupState) {
-                addGroupState(id, start, bri, ct);
+                addGroupState(id, start, bri, ct, on);
             } else {
-                addState(id, start, bri, ct);
+                addState(id, start, bri, ct, on);
             }
         }
     }
 
-    public void addState(int lampId, String start, Integer brightness, Integer ct) {
+    public void addState(int lampId, String start, Integer brightness, Integer ct, Boolean on) {
         lightStates.computeIfAbsent(lampId, ArrayList::new)
-                   .add(new EnforcedState(lampId, start, brightness, ct, startTimeProvider));
+                   .add(new EnforcedState(lampId, start, brightness, ct, on, startTimeProvider));
     }
 
-    public void addGroupState(int groupId, String start, Integer brightness, Integer ct) {
+    public void addGroupState(int groupId, String start, Integer brightness, Integer ct, Boolean on) {
         lightStates.computeIfAbsent(getGroupId(groupId), ArrayList::new)
-                   .add(new EnforcedState(groupId, getGroupLights(groupId).get(0), start, brightness, ct,
+                   .add(new EnforcedState(groupId, getGroupLights(groupId).get(0), start, brightness, ct, on,
                            startTimeProvider, true));
     }
 
@@ -115,7 +124,6 @@ public final class HueEnforcer {
     }
 
     public void start() {
-        LOG.info("Retry delay: {} s, Confirm delay: {} s", retryDelay, confirmDelay);
         ZonedDateTime now = currentTime.get();
         lightStates.forEach((id, states) -> {
             calculateAndSetEndTimes(now, states);
@@ -195,8 +203,17 @@ public final class HueEnforcer {
                 scheduleNextDay(state);
                 return;
             }
-            boolean success = hueApi.putState(state.getUpdateId(), state.getBrightness(), null, null, state.getCt(), state.isGroupState());
-            if (!success || hueApi.getLightState(state.getStatusId()).isUnreachableOrOff()) {
+            boolean success = hueApi.putState(state.getUpdateId(), state.getBrightness(), null, null, state.getCt(), state.getOn(), state.isGroupState());
+            LightState lightState = null;
+            if (success) {
+                lightState = hueApi.getLightState(state.getStatusId());
+            }
+            if (success && state.isOff() && lightState.isUnreachableOrOff()) {
+                LOG.trace("Light {} turned off or already off", state.getUpdateId());
+                scheduleNextDay(state);
+                return;
+            }
+            if (!success || lightState.isUnreachableOrOff()) {
                 LOG.trace("Light {} not reachable or off, try again", state.getUpdateId());
                 state.resetConfirmations();
                 schedule(state, retryDelay.get());

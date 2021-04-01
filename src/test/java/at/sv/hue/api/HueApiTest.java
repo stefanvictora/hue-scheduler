@@ -66,7 +66,7 @@ class HueApiTest {
     }
 
     private boolean putState(int id, int bri, boolean groupState) {
-        return api.putState(id, bri, null, null, null, groupState);
+        return api.putState(id, bri, null, null, null, null, groupState);
     }
 
     private List<Integer> getGroupLights(int groupId) {
@@ -211,7 +211,16 @@ class HueApiTest {
     void putState_ct_correctBody() {
         setPutResponse("/lights/" + 16 + "/state", "{\"ct\":100," + transitionTime + "}", "[success]");
 
-        boolean success = api.putState(16, null, null, null, 100, false);
+        boolean success = api.putState(16, null, null, null, 100, null, false);
+
+        assertTrue(success, "Put not successful");
+    }
+
+    @Test
+    void putState_on_setsFlagCorrectly() {
+        setPutResponse("/lights/" + 16 + "/state", "{\"on\":true," + transitionTime + "}", "[success]");
+
+        boolean success = api.putState(16, null, null, null, null, true, false);
 
         assertTrue(success, "Put not successful");
     }

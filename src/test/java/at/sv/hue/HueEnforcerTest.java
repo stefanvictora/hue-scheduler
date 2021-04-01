@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Consumer;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.core.Is.is;
@@ -71,8 +72,8 @@ class HueEnforcerTest {
             }
 
             @Override
-            public boolean putState(int id, Integer bri, Double x, Double y, Integer ct, boolean groupState) {
-                putStates.add(new PutState(id, bri, x, y, ct, groupState));
+            public boolean putState(int id, Integer bri, Double x, Double y, Integer ct, Boolean on, boolean groupState) {
+                putStates.add(new PutState(id, bri, x, y, ct, on, groupState));
                 return apiPutSuccessful;
             }
 
@@ -107,7 +108,11 @@ class HueEnforcerTest {
     }
 
     private void addState(int id, ZonedDateTime start, Integer brightness, Integer ct) {
-        enforcer.addState(id, start.toLocalTime().toString(), brightness, ct);
+        addState(id, start, brightness, ct, null);
+    }
+
+    private void addState(int id, ZonedDateTime start, Integer brightness, Integer ct, Boolean on) {
+        enforcer.addState(id, start.toLocalTime().toString(), brightness, ct, on);
     }
 
     private void addState(String input) {
@@ -116,7 +121,7 @@ class HueEnforcerTest {
 
     private void addGroupState(int groupId, ZonedDateTime start, Integer... lights) {
         groupLightsResponses.add(Arrays.asList(lights));
-        enforcer.addGroupState(groupId, start.toLocalTime().toString(), defaultBrightness, defaultCt);
+        enforcer.addGroupState(groupId, start.toLocalTime().toString(), defaultBrightness, defaultCt, null);
     }
 
     private void addLightStateResponse(int brightness, int ct, boolean reachable, boolean on) {
@@ -134,13 +139,14 @@ class HueEnforcerTest {
         return scheduledStates;
     }
 
-    private void assertPutState(int id, Integer bri, Double x, Double y, Integer ct, boolean groupState) {
+    private void assertPutState(int id, Integer bri, Double x, Double y, Integer ct, Boolean on, boolean groupState) {
         assertTrue(putStates.size() > 0, "No PUT API calls happened");
         PutState putState = putStates.remove(0);
         assertThat("Brightness differs", putState.bri, is(bri));
         assertThat("X differs", putState.x, is(x));
         assertThat("Y differs", putState.y, is(y));
         assertThat("CT differs", putState.ct, is(ct));
+        assertThat("On differs", putState.on, is(on));
         assertThat("isGroupState differs", putState.groupState, is(groupState));
     }
 
@@ -163,17 +169,22 @@ class HueEnforcerTest {
     }
 
     private void runAndAssertConfirmations(boolean groupState) {
-        runAndAssertConfirmations(id, defaultBrightness, defaultCt, EnforcedState.CONFIRM_AMOUNT, groupState);
+        runAndAssertConfirmations(id, defaultBrightness, defaultCt, groupState);
     }
 
-    private void runAndAssertConfirmations(int id, int brightness, int ct, int confirmTimes, boolean groupState) {
-        for (int i = 0; i < confirmTimes; i++) {
+    private void runAndAssertConfirmations(int id, int brightness, int ct, boolean groupState) {
+        runAndAssertConfirmations(state ->
+                advanceTimeAndRunAndAssertApiCalls(true, state, brightness, ct, groupState, true));
+    }
+
+    private void runAndAssertConfirmations(Consumer<ScheduledState> consumer) {
+        for (int i = 0; i < EnforcedState.CONFIRM_AMOUNT; i++) {
             List<ScheduledState> confirmRunnable = ensureScheduledStates(1);
             ScheduledState state = confirmRunnable.get(0);
             assertScheduleStart(state, now.plusSeconds(confirmDelay));
 
-            LOG.info("Confirm state {} [{}/{}]", id, i, confirmTimes);
-            advanceTimeAndRunAndAssertApiCalls(true, state, brightness, ct, groupState, true);
+            LOG.info("Confirm state {} [{}/{}]", id, i, EnforcedState.CONFIRM_AMOUNT);
+            consumer.accept(state);
         }
     }
 
@@ -193,26 +204,40 @@ class HueEnforcerTest {
         advanceTimeAndRunAndAssertApiCalls(reachable, state, defaultBrightness, defaultCt, groupState, true);
     }
 
-    private void advanceTimeAndRunAndAssertApiCalls(boolean reachable, ScheduledState state, int brightness, int ct, boolean groupState, boolean on) {
+    private void advanceTimeAndRunAndAssertApiCalls(boolean reachable, ScheduledState state, int brightness, int ct,
+                                                    boolean groupState, boolean onLightStateResponse) {
         setCurrentTimeTo(state.getStart());
-        runAndAssertApiCalls(reachable, state, brightness, ct, groupState, on);
+        runAndAssertApiCalls(reachable, state, brightness, ct, groupState, onLightStateResponse);
     }
 
-    private void runAndAssertApiCalls(boolean reachable, ScheduledState state, int brightness, int ct, boolean groupState, boolean on) {
-        addLightStateResponse(brightness, ct, reachable, on);
-        runAndAssertPutCall(state, brightness, ct, groupState);
+    private void runAndAssertApiCalls(boolean reachable, ScheduledState state, int brightness, int ct, boolean groupState,
+                                      boolean onLightStateResponse) {
+        addLightStateResponse(brightness, ct, reachable, onLightStateResponse);
+        runAndAssertPutCall(state, brightness, ct, groupState, null);
         assertLightGetState(id);
     }
 
-    private void runAndAssertPutCall(ScheduledState state, int brightness, int ct, boolean groupState) {
-        state.run();
-
-        assertPutState(id, brightness, null, null, ct, groupState);
+    private void advanceTimeAndRunAndAssertTurnOffApiCall(boolean reachable, ScheduledState state, boolean onLightStateResponse) {
+        addLightStateResponse(defaultBrightness, defaultCt, reachable, onLightStateResponse);
+        advanceTimeAndRunAndAssertPutCall(state, null, null, false, false);
+        assertLightGetState(id);
     }
 
-    private void advanceTimeAndRunAndAssertPutCall(ScheduledState state, int brightness, int ct, boolean groupState) {
+    private void advanceTimeAndRunAndAssertTurnOnApiCall(ScheduledState state) {
+        addLightStateResponse(defaultBrightness, defaultCt, true, true);
+        advanceTimeAndRunAndAssertPutCall(state, null, null, false, true);
+        assertLightGetState(id);
+    }
+
+    private void runAndAssertPutCall(ScheduledState state, Integer brightness, Integer ct, boolean groupState, Boolean on) {
+        state.run();
+
+        assertPutState(id, brightness, null, null, ct, on, groupState);
+    }
+
+    private void advanceTimeAndRunAndAssertPutCall(ScheduledState state, Integer brightness, Integer ct, boolean groupState, Boolean on) {
         setCurrentTimeTo(state.getStart());
-        runAndAssertPutCall(state, brightness, ct, groupState);
+        runAndAssertPutCall(state, brightness, ct, groupState, on);
     }
 
     private ScheduledState ensureRunnable(ZonedDateTime scheduleStart) {
@@ -233,6 +258,10 @@ class HueEnforcerTest {
 
     private void assertScheduleStart(ScheduledState state, ZonedDateTime start) {
         assertThat("Schedule start differs", state.getStart(), is(start));
+    }
+
+    private void addOffState() {
+        addState(1, now, null, null, false);
     }
 
     @BeforeEach
@@ -374,6 +403,21 @@ class HueEnforcerTest {
 
         advanceTimeAndRunAndAssertApiCalls(true, scheduledStates.get(1));
         runAndAssertConfirmations();
+
+        ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
+    void parse_detectsOnProperty() {
+        String time = now.toLocalTime().toString();
+        addState("1\t" + time + "\ton:" + true);
+
+        startEnforcer();
+
+        List<ScheduledState> scheduledStates = ensureScheduledStates(1);
+
+        advanceTimeAndRunAndAssertTurnOnApiCall(scheduledStates.get(0));
+        runAndAssertConfirmations(this::advanceTimeAndRunAndAssertTurnOnApiCall);
 
         ensureRunnable(initialNow.plusDays(1));
     }
@@ -556,7 +600,7 @@ class HueEnforcerTest {
 
         advanceTimeAndRunAndAssertApiCalls(true, initialStates.get(1), brightness2, ct2, false, true);
 
-        runAndAssertConfirmations(id, brightness2, ct2, EnforcedState.CONFIRM_AMOUNT, false);
+        runAndAssertConfirmations(id, brightness2, ct2, false);
 
         ensureRunnable(secondStateStart.plusDays(1));
     }
@@ -611,7 +655,7 @@ class HueEnforcerTest {
         List<ScheduledState> scheduledStates = ensureScheduledStates(1);
 
         apiPutSuccessful = false;
-        advanceTimeAndRunAndAssertPutCall(scheduledStates.get(0), defaultBrightness, defaultCt, false);
+        advanceTimeAndRunAndAssertPutCall(scheduledStates.get(0), defaultBrightness, defaultCt, false, null);
 
         ScheduledState retryState = ensureRetryState();
         apiPutSuccessful = true;
@@ -661,6 +705,47 @@ class HueEnforcerTest {
         ensureScheduledStates(1);
     }
 
+    @Test
+    void run_execution_off_reachable_turnedOff_noConfirm() {
+        addOffState();
+        startEnforcer();
+
+        List<ScheduledState> scheduledStates = ensureScheduledStates(1);
+
+        advanceTimeAndRunAndAssertTurnOffApiCall(true, scheduledStates.get(0), false);
+
+        ensureRunnable(now.plusDays(1));
+    }
+
+    @Test
+    void run_execution_off_unreachable_treatedAsSuccess_noConfirm() {
+        addOffState();
+        startEnforcer();
+
+        List<ScheduledState> scheduledStates = ensureScheduledStates(1);
+
+        advanceTimeAndRunAndAssertTurnOffApiCall(false, scheduledStates.get(0), true);
+
+        ensureRunnable(now.plusDays(1));
+    }
+
+    @Test
+    void run_execution_off_putFailed_retries_secondTimeSuccess_noConfirms() {
+        addOffState();
+        startEnforcer();
+
+        List<ScheduledState> scheduledStates = ensureScheduledStates(1);
+
+        apiPutSuccessful = false;
+        advanceTimeAndRunAndAssertPutCall(scheduledStates.get(0), null, null, false, false);
+
+        ScheduledState retryState = ensureRetryState();
+        apiPutSuccessful = true;
+        advanceTimeAndRunAndAssertTurnOffApiCall(false, retryState, true);
+
+        ensureRunnable(initialNow.plusDays(1));
+    }
+
     private static final class GetState {
         int id;
 
@@ -675,14 +760,16 @@ class HueEnforcerTest {
         Double x;
         Double y;
         Integer ct;
+        Boolean on;
         boolean groupState;
 
-        public PutState(int id, Integer bri, Double x, Double y, Integer ct, boolean groupState) {
+        public PutState(int id, Integer bri, Double x, Double y, Integer ct, Boolean on, boolean groupState) {
             this.id = id;
             this.bri = bri;
             this.x = x;
             this.y = y;
             this.ct = ct;
+            this.on = on;
             this.groupState = groupState;
         }
     }

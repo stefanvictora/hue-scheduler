@@ -13,23 +13,25 @@ final class EnforcedState {
     private final String start;
     private final Integer brightness;
     private final Integer ct;
+    private final Boolean on;
     private final StartTimeProvider startTimeProvider;
     private final boolean groupState;
     private int confirmCounter;
     private ZonedDateTime end;
     private ZonedDateTime lastStart;
 
-    public EnforcedState(int id, String start, Integer brightness, Integer ct, StartTimeProvider startTimeProvider) {
-        this(id, id, start, brightness, ct, startTimeProvider, false);
+    public EnforcedState(int id, String start, Integer brightness, Integer ct, Boolean on, StartTimeProvider startTimeProvider) {
+        this(id, id, start, brightness, ct, on, startTimeProvider, false);
     }
 
-    public EnforcedState(int updateId, int statusId, String start, Integer brightness, Integer ct,
+    public EnforcedState(int updateId, int statusId, String start, Integer brightness, Integer ct, Boolean on,
                          StartTimeProvider startTimeProvider, boolean groupState) {
         this.updateId = updateId;
         this.statusId = statusId;
         this.start = start;
         this.brightness = brightness;
         this.ct = ct;
+        this.on = on;
         this.startTimeProvider = startTimeProvider;
         this.groupState = groupState;
         confirmCounter = 0;
@@ -89,6 +91,10 @@ final class EnforcedState {
         return ct;
     }
 
+    public Boolean getOn() {
+        return on;
+    }
+
     public boolean isFullyConfirmed() {
         return confirmCounter >= CONFIRM_AMOUNT;
     }
@@ -122,7 +128,11 @@ final class EnforcedState {
     }
 
     public boolean isNullState() {
-        return brightness == null && ct == null;
+        return brightness == null && ct == null && on == null;
+    }
+
+    public boolean isOff() {
+        return on == Boolean.FALSE;
     }
 
     public String getConfirmDebugString() {
@@ -140,6 +150,7 @@ final class EnforcedState {
                 ", statusId=" + statusId +
                 ", start=" + start + " (" + getStartIfAvailable() + ")" +
                 ", brightness=" + brightness +
+                ", on=" + on +
                 ", ct=" + ct +
                 ", confirmCounter=" + confirmCounter +
                 ", end=" + end.toLocalDateTime() +
