@@ -15,6 +15,7 @@ import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
@@ -27,11 +28,11 @@ public final class HueEnforcer {
     private final StartTimeProvider startTimeProvider;
     private final Supplier<ZonedDateTime> currentTime;
     private final Map<Integer, List<EnforcedState>> lightStates;
-    private final int retryDelay;
+    private final Supplier<Integer> retryDelay;
     private final int confirmDelay;
 
     public HueEnforcer(HueApi hueApi, StateScheduler stateScheduler, StartTimeProvider startTimeProvider,
-                       Supplier<ZonedDateTime> currentTime, int retryDelay, int confirmDelay) {
+                       Supplier<ZonedDateTime> currentTime, Supplier<Integer> retryDelay, int confirmDelay) {
         this.hueApi = hueApi;
         this.stateScheduler = stateScheduler;
         this.startTimeProvider = startTimeProvider;
@@ -45,13 +46,18 @@ public final class HueEnforcer {
         HueApi hueApi = new HueApiImpl(new HttpResourceProviderImpl(), args[0], args[1]);
         StartTimeProviderImpl startTimeProvider = new StartTimeProviderImpl(new SunDataProviderImpl(48.20, 16.39));
         StateScheduler stateScheduler = new StateSchedulerImpl(Executors.newSingleThreadScheduledExecutor(), ZonedDateTime::now);
+        int retryMaxValue = Integer.parseInt(args[2]);
         HueEnforcer enforcer = new HueEnforcer(hueApi, stateScheduler, startTimeProvider, ZonedDateTime::now,
-                Integer.parseInt(args[2]), Integer.parseInt(args[3]));
+                () -> getRandomRetryDelay(retryMaxValue), Integer.parseInt(args[3]));
         Files.lines(Paths.get(args[4]))
              .filter(s -> !s.isEmpty())
              .filter(s -> !s.startsWith("//"))
              .forEachOrdered(enforcer::addState);
         enforcer.start();
+    }
+
+    private static int getRandomRetryDelay(int retryMaxValue) {
+        return ThreadLocalRandom.current().nextInt(1, retryMaxValue + 1);
     }
 
     public void addState(String input) {
@@ -180,7 +186,7 @@ public final class HueEnforcer {
 
     private void schedule(EnforcedState state, long delayInSeconds) {
         if (state.isNullState()) return;
-        if (delayInSeconds != retryDelay && delayInSeconds != confirmDelay) {
+        if (delayInSeconds > 5) {
             LOG.debug("Schedule {} in {}", state, Duration.ofSeconds(delayInSeconds));
         }
         stateScheduler.schedule(() -> {
@@ -193,7 +199,7 @@ public final class HueEnforcer {
             if (!success || hueApi.getLightState(state.getStatusId()).isUnreachableOrOff()) {
                 LOG.trace("Light {} not reachable or off, try again", state.getUpdateId());
                 state.resetConfirmations();
-                schedule(state, retryDelay);
+                schedule(state, retryDelay.get());
                 return;
             }
             if (!state.isFullyConfirmed()) {

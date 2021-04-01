@@ -99,7 +99,7 @@ class HueEnforcerTest {
             } else {
                 return LocalTime.parse(input);
             }
-        }, () -> now, retryDelay, confirmDelay);
+        }, () -> now, () -> retryDelay, confirmDelay);
     }
 
     private void addState(int id, ZonedDateTime start) {
