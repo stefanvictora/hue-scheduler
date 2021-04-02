@@ -66,6 +66,7 @@ public final class HueScheduler {
         LOG.info("HueScheduler version: {}", VERSION);
         LOG.info("Max retry delay: {} s, Confirm delay: {} s", retryMaxValue, confirmDelay);
         LOG.info("Lat: {}, Long: {}", lat, lng);
+        LOG.info("Input file: {}", inputPath.toAbsolutePath());
         scheduler.start();
     }
 
@@ -245,12 +246,12 @@ public final class HueScheduler {
 
     private void schedule(ScheduledState state, long delayInSeconds) {
         if (state.isNullState()) return;
-        if (delayInSeconds > 5) {
+        if (delayInSeconds == 0 || delayInSeconds > 5) {
             LOG.debug("Schedule {} in {}", state, Duration.ofSeconds(delayInSeconds));
         }
         stateScheduler.schedule(() -> {
             if (state.endsAfter(currentTime.get())) {
-                LOG.debug("State {} already ended", state);
+                LOG.debug("{} already ended", state);
                 scheduleNextDay(state);
                 return;
             }
@@ -261,24 +262,24 @@ public final class HueScheduler {
                 lightState = hueApi.getLightState(state.getStatusId());
             }
             if (success && state.isOff() && lightState.isUnreachableOrOff()) {
-                LOG.debug("Light '{}' turned off or already off", state.getName());
+                LOG.debug("{} turned off or already off", state);
                 scheduleNextDay(state);
                 return;
             }
             if (!success || lightState.isUnreachableOrOff()) {
-                LOG.trace("Light '{}' not reachable or off, try again", state.getName());
+                LOG.trace("'{}' not reachable or off, try again", state.getName());
                 state.resetConfirmations();
                 schedule(state, retryDelay.get());
                 return;
             }
             if (!state.isFullyConfirmed()) {
                 if (state.getConfirmCounter() % 5 == 0) {
-                    LOG.debug("Confirmed light '{}' ({})", state.getName(), state.getConfirmDebugString());
+                    LOG.debug("Confirmed {} ({})", state, state.getConfirmDebugString());
                 }
                 state.addConfirmation();
                 schedule(state, confirmDelay);
             } else {
-                LOG.debug("State {} fully confirmed", state);
+                LOG.debug("{} fully confirmed", state);
                 scheduleNextDay(state);
             }
         }, currentTime.get().plusSeconds(delayInSeconds));
@@ -342,6 +343,6 @@ public final class HueScheduler {
     }
 
     private void logSunDataInfo() {
-        LOG.info("{}", startTimeProvider.toDebugString(currentTime.get()));
+        LOG.info("Current sun times:{}", startTimeProvider.toDebugString(currentTime.get()));
     }
 }

@@ -4,8 +4,10 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 
 final class ScheduledState {
+    private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
     static final int CONFIRM_AMOUNT = 30;
 
     private final String name;
@@ -172,24 +174,44 @@ final class ScheduledState {
 
     @Override
     public String toString() {
-        return "ScheduledState{" +
-                "name=" + name +
-                ", updateId=" + updateId +
-                ", statusId=" + statusId +
-                ", start=" + start + " (" + getStartIfAvailable() + ")" +
-                ", brightness=" + brightness +
-                ", on=" + on +
-                ", ct=" + ct +
-                ", confirmCounter=" + confirmCounter +
-                ", end=" + end.toLocalDateTime() +
+        return "State{" +
+                getFormattedName() +
+                ", start=" + getFormattedStart() +
+                ", end=" + getFormattedEnd() +
+                getFormattedPropertyIfSet("on", on) +
+                getFormattedPropertyIfSet("brightness", brightness) +
+                getFormattedPropertyIfSet("ct", ct) +
+                ", transitionTime=" + Duration.ofMillis(transitionTime * 100) +
                 '}';
     }
 
-    private LocalTime getStartIfAvailable() {
-        if (lastStart != null) {
-            return getStart(lastStart);
-        } else {
-            return null;
+    private String getFormattedName() {
+        if (groupState) {
+            return "group=" +  name;
         }
+        return "light=" + name;
+    }
+
+    private String getFormattedStart() {
+        if (lastStart != null) {
+            LocalTime parsedStart = getStart(lastStart);
+            if (!parsedStart.equals(lastStart.toLocalTime())) {
+                return start + " (" + getFormattedTime(parsedStart) + ")";
+            }
+        }
+        return start;
+    }
+
+    private String getFormattedTime(LocalTime localTime) {
+        return TIME_FORMATTER.format(localTime);
+    }
+
+    private String getFormattedEnd() {
+        return getFormattedTime(end.toLocalDateTime().toLocalTime());
+    }
+
+    private String getFormattedPropertyIfSet(String name, Object property) {
+        if (property == null) return "";
+        return ", " + name + "=" + property;
     }
 }

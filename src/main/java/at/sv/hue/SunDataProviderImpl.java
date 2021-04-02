@@ -4,8 +4,11 @@ import org.shredzone.commons.suncalc.SunTimes;
 
 import java.time.LocalTime;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 
 public class SunDataProviderImpl implements SunDataProvider {
+
+    private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
 
     private final SunTimes.Parameters parameters;
 
@@ -72,15 +75,19 @@ public class SunDataProviderImpl implements SunDataProvider {
 
     @Override
     public String toDebugString(ZonedDateTime dateTime) {
-        return "\nastronomical start: " + getAstronomicalStart(dateTime) +
-                "\nnautical start: " + getNauticalStart(dateTime) +
-                "\ncivil start: " + getCivilStart(dateTime) +
-                "\nsunrise: " + getSunrise(dateTime) +
-                "\ngolden hour: " + getGoldenHour(dateTime) +
-                "\nsunset: " + getSunset(dateTime) +
-                "\ncivil end: " + getCivilEnd(dateTime) +
-                "\nnautical end: " + getNauticalEnd(dateTime) +
-                "\nastronomical end: " + getAstronomicalEnd(dateTime) +
+        return "\nastronomical start: " + format(getAstronomicalStart(dateTime)) +
+                "\nnautical start: " + format(getNauticalStart(dateTime)) +
+                "\ncivil start: " + format(getCivilStart(dateTime)) +
+                "\nsunrise: " + format(getSunrise(dateTime)) +
+                "\ngolden hour: " + format(getGoldenHour(dateTime)) +
+                "\nsunset: " + format(getSunset(dateTime)) +
+                "\ncivil end: " + format(getCivilEnd(dateTime)) +
+                "\nnautical end: " + format(getNauticalEnd(dateTime)) +
+                "\nastronomical end: " + format(getAstronomicalEnd(dateTime)) +
                 "";
+    }
+
+    private String format(LocalTime time) {
+        return TIME_FORMATTER.format(time);
     }
 }
