@@ -15,15 +15,11 @@
         <mainClass>at.sv.hue.HueEnforcer</mainClass>
     </properties>
 
-    <prerequisites>
-        <maven>3.0.0</maven>
-    </prerequisites>
-
     <dependencies>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
-            <version>2.12.1</version>
+            <version>2.12.2</version>
         </dependency>
         <dependency>
             <groupId>ch.qos.logback</groupId>
@@ -39,13 +35,13 @@
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
-            <version>5.7.0</version>
+            <version>5.7.1</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-engine</artifactId>
-            <version>5.7.0</version>
+            <version>5.7.1</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -62,13 +58,9 @@
                 <plugin>
                     <groupId>org.codehaus.mojo</groupId>
                     <artifactId>appassembler-maven-plugin</artifactId>
-                    <version>2.0.0</version>
+                    <version>2.1.0</version>
                     <configuration>
-                        <!-- set alternative assemble directory -->
                         <assembleDirectory>${project.build.directory}/${project.artifactId}</assembleDirectory>
-                        <!-- Extra JVM arguments that will be included in the bin scripts -->
-                        <!--<extraJvmArguments>-Xms128m</extraJvmArguments>-->
-                        <!-- Generate bin scripts for windows and unix pr default -->
                         <platforms>
                             <platform>windows</platform>
                             <platform>unix</platform>
@@ -112,6 +104,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-source-plugin</artifactId>
+                <version>3.2.1</version>
                 <executions>
                     <execution>
                         <id>attach-sources</id>
