@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Optional;
 
 final class ScheduledState {
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
@@ -181,7 +182,7 @@ final class ScheduledState {
                 getFormattedPropertyIfSet("on", on) +
                 getFormattedPropertyIfSet("brightness", brightness) +
                 getFormattedPropertyIfSet("ct", ct) +
-                ", transitionTime=" + Duration.ofMillis(transitionTime * 100) +
+                ", transitionTime=" + getFormattedTransitionTime() +
                 '}';
     }
 
@@ -213,5 +214,9 @@ final class ScheduledState {
     private String getFormattedPropertyIfSet(String name, Object property) {
         if (property == null) return "";
         return ", " + name + "=" + property;
+    }
+
+    private Duration getFormattedTransitionTime() {
+        return Duration.ofMillis(Optional.ofNullable(transitionTime).orElse(4) * 100);
     }
 }

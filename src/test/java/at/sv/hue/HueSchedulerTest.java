@@ -47,6 +47,7 @@ class HueSchedulerTest {
     private boolean apiPutSuccessful;
     private int retryDelay;
     private int confirmDelay;
+    private int defaultTransitionTime;
 
     private void setCurrentTimeTo(ZonedDateTime newTime) {
         if (now != null && newTime.isBefore(now)) {
@@ -133,7 +134,7 @@ class HueSchedulerTest {
     }
 
     private void addState(int id, ZonedDateTime start, Integer brightness, Integer ct, Boolean on) {
-        scheduler.addState("Name", id, start.toLocalTime().toString(), brightness, ct, on, null);
+        scheduler.addState("Name", id, start.toLocalTime().toString(), brightness, ct, on, defaultTransitionTime);
     }
 
     private void addState(String input) {
@@ -142,7 +143,8 @@ class HueSchedulerTest {
 
     private void addGroupState(int groupId, ZonedDateTime start, Integer... lights) {
         groupLightsResponses.add(Arrays.asList(lights));
-        scheduler.addGroupState("Name", groupId, start.toLocalTime().toString(), defaultBrightness, defaultCt, null, null);
+        scheduler.addGroupState("Name", groupId, start.toLocalTime().toString(), defaultBrightness, defaultCt,
+                null, defaultTransitionTime);
     }
 
     private void addLightStateResponse(int brightness, int ct, boolean reachable, boolean on) {
@@ -246,19 +248,19 @@ class HueSchedulerTest {
     private void runAndAssertApiCalls(boolean reachable, ScheduledRunnable state, int brightness, int ct, boolean groupState,
                                       boolean onLightStateResponse) {
         addLightStateResponse(brightness, ct, reachable, onLightStateResponse);
-        runAndAssertPutCall(state, brightness, ct, groupState, null, null);
+        runAndAssertPutCall(state, brightness, ct, groupState, null, defaultTransitionTime);
         assertLightGetState(id);
     }
 
     private void advanceTimeAndRunAndAssertTurnOffApiCall(boolean reachable, ScheduledRunnable state, boolean onLightStateResponse) {
         addLightStateResponse(defaultBrightness, defaultCt, reachable, onLightStateResponse);
-        advanceTimeAndRunAndAssertPutCall(state, null, null, false, false, null);
+        advanceTimeAndRunAndAssertPutCall(state, null, null, false, false, defaultTransitionTime);
         assertLightGetState(id);
     }
 
     private void advanceTimeAndRunAndAssertTurnOnApiCall(ScheduledRunnable state) {
         addLightStateResponse(defaultBrightness, defaultCt, true, true);
-        advanceTimeAndRunAndAssertPutCall(state, null, null, false, true, null);
+        advanceTimeAndRunAndAssertPutCall(state, null, null, false, true, defaultTransitionTime);
         assertLightGetState(id);
     }
 
@@ -318,6 +320,7 @@ class HueSchedulerTest {
         confirmDelay = 2;
         defaultCt = 500;
         defaultBrightness = 50;
+        defaultTransitionTime = 2;
         id = 1;
         create();
     }
@@ -762,7 +765,7 @@ class HueSchedulerTest {
         List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(1);
 
         apiPutSuccessful = false;
-        advanceTimeAndRunAndAssertPutCall(scheduledRunnables.get(0), defaultBrightness, defaultCt, false, null, null);
+        advanceTimeAndRunAndAssertPutCall(scheduledRunnables.get(0), defaultBrightness, defaultCt, false, null, defaultTransitionTime);
 
         ScheduledRunnable retryState = ensureRetryState();
         apiPutSuccessful = true;
@@ -844,7 +847,7 @@ class HueSchedulerTest {
         List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(1);
 
         apiPutSuccessful = false;
-        advanceTimeAndRunAndAssertPutCall(scheduledRunnables.get(0), null, null, false, false, null);
+        advanceTimeAndRunAndAssertPutCall(scheduledRunnables.get(0), null, null, false, false, defaultTransitionTime);
 
         ScheduledRunnable retryState = ensureRetryState();
         apiPutSuccessful = true;
