@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -22,6 +23,7 @@ import java.util.function.Supplier;
 public final class HueScheduler {
 
     private static final Logger LOG = LoggerFactory.getLogger(HueScheduler.class);
+    private static final String VERSION = "1.0-SNAPSHOT";
 
     private final HueApi hueApi;
     private final StateScheduler stateScheduler;
@@ -43,26 +45,62 @@ public final class HueScheduler {
     }
 
     public static void main(String[] args) throws IOException {
+        if (args.length != 7) {
+            System.out.println("Usage: hue-scheduler bridgeIp bridgeUsername latitude longitude retryDelayMaxSeconds confirmDelaySeconds inputFilePath");
+            System.exit(1);
+        }
         HueApi hueApi = new HueApiImpl(new HttpResourceProviderImpl(), args[0], args[1]);
-        double lat = Double.parseDouble(args[2]);
-        double lng = Double.parseDouble(args[3]);
+        double lat = parseDouble(args[2], "Failed to parse latitude");
+        double lng = parseDouble(args[3], "Failed to parse longitude");
         StartTimeProviderImpl startTimeProvider = new StartTimeProviderImpl(new SunDataProviderImpl(lat, lng));
         StateScheduler stateScheduler = new StateSchedulerImpl(Executors.newSingleThreadScheduledExecutor(), ZonedDateTime::now);
-        int retryMaxValue = Integer.parseInt(args[4]);
-        int confirmDelay = Integer.parseInt(args[5]);
+        int retryMaxValue = parseInt(args[4], "Failed to parse retryDelay");
+        int confirmDelay = parseInt(args[5], "Failed to parse confirmDelay");
         HueScheduler enforcer = new HueScheduler(hueApi, stateScheduler, startTimeProvider, ZonedDateTime::now,
                 () -> getRandomRetryDelay(retryMaxValue), confirmDelay);
-        Files.lines(Paths.get(args[6]))
+        Path inputPath = getPathAndAssertReadable(args[6]);
+        Files.lines(inputPath)
              .filter(s -> !s.isEmpty())
              .filter(s -> !s.startsWith("//"))
              .forEachOrdered(enforcer::addState);
-        LOG.info("Retry delay: {} s, Confirm delay: {} s", retryMaxValue, confirmDelay);
+        LOG.info("HueScheduler version: {}", VERSION);
+        LOG.info("Using input file: {}", inputPath.toAbsolutePath());
+        LOG.info("Max retry delay: {} s, Confirm delay: {} s", retryMaxValue, confirmDelay);
         LOG.info("Lat: {}, Long: {}", lat, lng);
         enforcer.start();
     }
 
+    private static double parseDouble(String arg, String errorMessage) {
+        try {
+            return Double.parseDouble(arg);
+        } catch (NumberFormatException e) {
+            System.err.println(errorMessage + ": " + e.getLocalizedMessage());
+            System.exit(1);
+            return -1;
+        }
+    }
+
+    private static int parseInt(String arg, String errorMessage) {
+        try {
+            return Integer.parseInt(arg);
+        } catch (NumberFormatException e) {
+            System.err.println(errorMessage + ": " + e.getLocalizedMessage());
+            System.exit(1);
+            return -1;
+        }
+    }
+
     private static int getRandomRetryDelay(int retryMaxValue) {
         return ThreadLocalRandom.current().nextInt(1, retryMaxValue + 1);
+    }
+
+    private static Path getPathAndAssertReadable(String arg) {
+        Path path = Paths.get(arg);
+        if (!Files.isReadable(path)) {
+            System.err.println("Given input file '" + path.toAbsolutePath() + "' does not exist or is not readable!");
+            System.exit(1);
+        }
+        return path;
     }
 
     public void addState(String input) {
