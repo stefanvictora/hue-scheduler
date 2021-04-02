@@ -11,6 +11,7 @@ import java.time.Duration;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -74,8 +75,9 @@ class HueSchedulerTest {
             }
 
             @Override
-            public boolean putState(int id, Integer bri, Double x, Double y, Integer ct, Boolean on, boolean groupState) {
-                putStates.add(new PutState(id, bri, x, y, ct, on, groupState));
+            public boolean putState(int id, Integer bri, Double x, Double y, Integer ct, Boolean on, Integer transitionTime,
+                                    boolean groupState) {
+                putStates.add(new PutState(id, bri, x, y, ct, on, transitionTime, groupState));
                 return apiPutSuccessful;
             }
 
@@ -131,7 +133,7 @@ class HueSchedulerTest {
     }
 
     private void addState(int id, ZonedDateTime start, Integer brightness, Integer ct, Boolean on) {
-        scheduler.addState("Name", id, start.toLocalTime().toString(), brightness, ct, on);
+        scheduler.addState("Name", id, start.toLocalTime().toString(), brightness, ct, on, null);
     }
 
     private void addState(String input) {
@@ -140,7 +142,7 @@ class HueSchedulerTest {
 
     private void addGroupState(int groupId, ZonedDateTime start, Integer... lights) {
         groupLightsResponses.add(Arrays.asList(lights));
-        scheduler.addGroupState("Name", groupId, start.toLocalTime().toString(), defaultBrightness, defaultCt, null);
+        scheduler.addGroupState("Name", groupId, start.toLocalTime().toString(), defaultBrightness, defaultCt, null, null);
     }
 
     private void addLightStateResponse(int brightness, int ct, boolean reachable, boolean on) {
@@ -158,7 +160,8 @@ class HueSchedulerTest {
         return scheduledRunnables;
     }
 
-    private void assertPutState(int id, Integer bri, Double x, Double y, Integer ct, Boolean on, boolean groupState) {
+    private void assertPutState(int id, Integer bri, Double x, Double y, Integer ct, Boolean on, Integer transitionTime,
+                                boolean groupState) {
         assertTrue(putStates.size() > 0, "No PUT API calls happened");
         PutState putState = putStates.remove(0);
         assertThat("Brightness differs", putState.bri, is(bri));
@@ -166,6 +169,7 @@ class HueSchedulerTest {
         assertThat("Y differs", putState.y, is(y));
         assertThat("CT differs", putState.ct, is(ct));
         assertThat("On differs", putState.on, is(on));
+        assertThat("TransitionTime differs", putState.transitionTime, is(transitionTime));
         assertThat("isGroupState differs", putState.groupState, is(groupState));
     }
 
@@ -242,31 +246,33 @@ class HueSchedulerTest {
     private void runAndAssertApiCalls(boolean reachable, ScheduledRunnable state, int brightness, int ct, boolean groupState,
                                       boolean onLightStateResponse) {
         addLightStateResponse(brightness, ct, reachable, onLightStateResponse);
-        runAndAssertPutCall(state, brightness, ct, groupState, null);
+        runAndAssertPutCall(state, brightness, ct, groupState, null, null);
         assertLightGetState(id);
     }
 
     private void advanceTimeAndRunAndAssertTurnOffApiCall(boolean reachable, ScheduledRunnable state, boolean onLightStateResponse) {
         addLightStateResponse(defaultBrightness, defaultCt, reachable, onLightStateResponse);
-        advanceTimeAndRunAndAssertPutCall(state, null, null, false, false);
+        advanceTimeAndRunAndAssertPutCall(state, null, null, false, false, null);
         assertLightGetState(id);
     }
 
     private void advanceTimeAndRunAndAssertTurnOnApiCall(ScheduledRunnable state) {
         addLightStateResponse(defaultBrightness, defaultCt, true, true);
-        advanceTimeAndRunAndAssertPutCall(state, null, null, false, true);
+        advanceTimeAndRunAndAssertPutCall(state, null, null, false, true, null);
         assertLightGetState(id);
     }
 
-    private void runAndAssertPutCall(ScheduledRunnable state, Integer brightness, Integer ct, boolean groupState, Boolean on) {
+    private void runAndAssertPutCall(ScheduledRunnable state, Integer brightness, Integer ct, boolean groupState, Boolean on,
+                                     Integer transitionTime) {
         state.run();
 
-        assertPutState(id, brightness, null, null, ct, on, groupState);
+        assertPutState(id, brightness, null, null, ct, on, transitionTime, groupState);
     }
 
-    private void advanceTimeAndRunAndAssertPutCall(ScheduledRunnable state, Integer brightness, Integer ct, boolean groupState, Boolean on) {
+    private void advanceTimeAndRunAndAssertPutCall(ScheduledRunnable state, Integer brightness, Integer ct, boolean groupState,
+                                                   Boolean on, Integer transitionTime) {
         setCurrentTimeTo(state.getStart());
-        runAndAssertPutCall(state, brightness, ct, groupState, on);
+        runAndAssertPutCall(state, brightness, ct, groupState, on, transitionTime);
     }
 
     private ScheduledRunnable ensureRunnable(ZonedDateTime scheduleStart) {
@@ -436,6 +442,41 @@ class HueSchedulerTest {
 
         advanceTimeAndRunAndAssertApiCalls(true, scheduledRunnables.get(1));
         runAndAssertConfirmations();
+
+        ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
+    void parse_unknownFlag_exception() {
+        assertThrows(UnknownStateProperty.class, () -> addState("1\t10:00\tUNKNOWN:1"));
+    }
+
+    @Test
+    void parse_missingTime_exception() {
+        assertThrows(DateTimeParseException.class, () -> {
+            addState("1\tct:" + defaultCt);
+            startScheduler();
+        });
+    }
+
+    @Test
+    void parse_setsTransitionTime() {
+        String time = now.toLocalTime().toString();
+        addState("1\t" + time + "\tbri:" + defaultBrightness + "\tct:" + defaultCt + "\ttr:" + 5);
+
+        startScheduler();
+
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(1);
+
+        addLightStateResponse(defaultBrightness, defaultCt, true, true);
+        advanceTimeAndRunAndAssertPutCall(scheduledRunnables.get(0), defaultBrightness, defaultCt, false, null, 5);
+        assertLightGetState(id);
+
+        runAndAssertConfirmations(state -> {
+            addLightStateResponse(defaultBrightness, defaultCt, true, true);
+            advanceTimeAndRunAndAssertPutCall(state, defaultBrightness, defaultCt, false, null, 5);
+            assertLightGetState(id);
+        });
 
         ensureRunnable(initialNow.plusDays(1));
     }
@@ -721,7 +762,7 @@ class HueSchedulerTest {
         List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(1);
 
         apiPutSuccessful = false;
-        advanceTimeAndRunAndAssertPutCall(scheduledRunnables.get(0), defaultBrightness, defaultCt, false, null);
+        advanceTimeAndRunAndAssertPutCall(scheduledRunnables.get(0), defaultBrightness, defaultCt, false, null, null);
 
         ScheduledRunnable retryState = ensureRetryState();
         apiPutSuccessful = true;
@@ -803,7 +844,7 @@ class HueSchedulerTest {
         List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(1);
 
         apiPutSuccessful = false;
-        advanceTimeAndRunAndAssertPutCall(scheduledRunnables.get(0), null, null, false, false);
+        advanceTimeAndRunAndAssertPutCall(scheduledRunnables.get(0), null, null, false, false, null);
 
         ScheduledRunnable retryState = ensureRetryState();
         apiPutSuccessful = true;
@@ -827,15 +868,17 @@ class HueSchedulerTest {
         Double y;
         Integer ct;
         Boolean on;
+        Integer transitionTime;
         boolean groupState;
 
-        public PutState(int id, Integer bri, Double x, Double y, Integer ct, Boolean on, boolean groupState) {
+        public PutState(int id, Integer bri, Double x, Double y, Integer ct, Boolean on, Integer transitionTime, boolean groupState) {
             this.id = id;
             this.bri = bri;
             this.x = x;
             this.y = y;
             this.ct = ct;
             this.on = on;
+            this.transitionTime = transitionTime;
             this.groupState = groupState;
         }
     }

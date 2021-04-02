@@ -64,7 +64,6 @@ public final class HueScheduler {
              .filter(s -> !s.startsWith("//"))
              .forEachOrdered(scheduler::addState);
         LOG.info("HueScheduler version: {}", VERSION);
-        LOG.info("Using input file: {}", inputPath.toAbsolutePath());
         LOG.info("Max retry delay: {} s, Confirm delay: {} s", retryMaxValue, confirmDelay);
         LOG.info("Lat: {}, Long: {}", lat, lng);
         scheduler.start();
@@ -125,6 +124,7 @@ public final class HueScheduler {
             Integer bri = null;
             Integer ct = null;
             Boolean on = null;
+            int transitionTime = 2;
             for (int i = 2; i < parts.length; i++) {
                 String part = parts[i];
                 String[] typeAndValue = part.split(":");
@@ -138,25 +138,31 @@ public final class HueScheduler {
                     case "on":
                         on = Boolean.valueOf(typeAndValue[1]);
                         break;
+                    case "tr":
+                        transitionTime = Integer.parseInt(typeAndValue[1]);
+                        break;
+                    default:
+                        throw new UnknownStateProperty("Unknown state property '" + typeAndValue[0] + "' with value '" + typeAndValue[1] + "'");
                 }
             }
             String start = parts[1];
             if (groupState) {
-                addGroupState(name, id, start, bri, ct, on);
+                addGroupState(name, id, start, bri, ct, on, transitionTime);
             } else {
-                addState(name, id, start, bri, ct, on);
+                addState(name, id, start, bri, ct, on, transitionTime);
             }
         }
     }
 
-    public void addState(String name, int lampId, String start, Integer brightness, Integer ct, Boolean on) {
+    public void addState(String name, int lampId, String start, Integer brightness, Integer ct, Boolean on, Integer transitionTime) {
         lightStates.computeIfAbsent(lampId, ArrayList::new)
-                   .add(new ScheduledState(name, lampId, start, brightness, ct, on, startTimeProvider));
+                   .add(new ScheduledState(name, lampId, start, brightness, ct, on, transitionTime, startTimeProvider));
     }
 
-    public void addGroupState(String name, int groupId, String start, Integer brightness, Integer ct, Boolean on) {
+    public void addGroupState(String name, int groupId, String start, Integer brightness, Integer ct, Boolean on,
+                              Integer transitionTime) {
         lightStates.computeIfAbsent(getGroupId(groupId), ArrayList::new)
-                   .add(new ScheduledState(name, groupId, getGroupLights(groupId).get(0), start, brightness, ct, on,
+                   .add(new ScheduledState(name, groupId, getGroupLights(groupId).get(0), start, brightness, ct, on, transitionTime,
                            startTimeProvider, true));
     }
 
@@ -248,7 +254,8 @@ public final class HueScheduler {
                 scheduleNextDay(state);
                 return;
             }
-            boolean success = hueApi.putState(state.getUpdateId(), state.getBrightness(), null, null, state.getCt(), state.getOn(), state.isGroupState());
+            boolean success = hueApi.putState(state.getUpdateId(), state.getBrightness(), null, null,
+                    state.getCt(), state.getOn(), state.getTransitionTime(), state.isGroupState());
             LightState lightState = null;
             if (success) {
                 lightState = hueApi.getLightState(state.getStatusId());

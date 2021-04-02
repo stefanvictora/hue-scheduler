@@ -15,18 +15,20 @@ final class ScheduledState {
     private final Integer brightness;
     private final Integer ct;
     private final Boolean on;
+    private final Integer transitionTime;
     private final StartTimeProvider startTimeProvider;
     private final boolean groupState;
     private int confirmCounter;
     private ZonedDateTime end;
     private ZonedDateTime lastStart;
 
-    public ScheduledState(String name, int id, String start, Integer brightness, Integer ct, Boolean on, StartTimeProvider startTimeProvider) {
-        this(name, id, id, start, brightness, ct, on, startTimeProvider, false);
+    public ScheduledState(String name, int id, String start, Integer brightness, Integer ct, Boolean on, Integer transitionTime,
+                          StartTimeProvider startTimeProvider) {
+        this(name, id, id, start, brightness, ct, on, transitionTime, startTimeProvider, false);
     }
 
     public ScheduledState(String name, int updateId, int statusId, String start, Integer brightness, Integer ct, Boolean on,
-                          StartTimeProvider startTimeProvider, boolean groupState) {
+                          Integer transitionTime, StartTimeProvider startTimeProvider, boolean groupState) {
         this.name = name;
         this.updateId = updateId;
         this.statusId = statusId;
@@ -34,6 +36,7 @@ final class ScheduledState {
         this.brightness = assertValidBrightnessValue(brightness);
         this.ct = assertValidCtValue(ct);
         this.on = on;
+        this.transitionTime = transitionTime;
         this.startTimeProvider = startTimeProvider;
         this.groupState = groupState;
         confirmCounter = 0;
@@ -91,6 +94,10 @@ final class ScheduledState {
         return startTimeProvider.getStart(start, dateTime);
     }
 
+    public String getName() {
+        return name;
+    }
+
     public int getUpdateId() {
         return updateId;
     }
@@ -109,6 +116,10 @@ final class ScheduledState {
 
     public Boolean getOn() {
         return on;
+    }
+
+    public Integer getTransitionTime() {
+        return transitionTime;
     }
 
     public boolean isFullyConfirmed() {
@@ -157,10 +168,6 @@ final class ScheduledState {
 
     public void updateLastStart(ZonedDateTime now) {
         this.lastStart = getZonedStart(now);
-    }
-
-    public String getName() {
-        return name;
     }
 
     @Override

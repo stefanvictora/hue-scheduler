@@ -76,8 +76,9 @@ public final class HueApiImpl implements HueApi {
     }
 
     @Override
-    public boolean putState(int id, Integer bri, Double x, Double y, Integer ct, Boolean on, boolean groupState) {
-        String response = resourceProvider.putResource(getUpdateUrl(id, groupState), getBody(new State(ct, bri, x, y, on)));
+    public boolean putState(int id, Integer bri, Double x, Double y, Integer ct, Boolean on, Integer transitionTime,
+                            boolean groupState) {
+        String response = resourceProvider.putResource(getUpdateUrl(id, groupState), getBody(new State(ct, bri, x, y, on, transitionTime)));
         if (response == null) {
             return false;
         }
@@ -209,15 +210,16 @@ public final class HueApiImpl implements HueApi {
         Double[] xy;
         Integer ct;
         Integer bri;
-        Integer transitiontime = 2;
+        Integer transitiontime;
 
         public State() {
         }
 
-        public State(Integer ct, Integer bri, Double x, Double y, Boolean on) {
+        public State(Integer ct, Integer bri, Double x, Double y, Boolean on, Integer transitiontime) {
             this.ct = ct;
             this.bri = bri;
             this.on = on;
+            this.transitiontime = transitiontime;
         }
 
         public Boolean getOn() {
