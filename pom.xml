@@ -4,15 +4,15 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>org.example</groupId>
-    <artifactId>hue-enforcer</artifactId>
+    <groupId>at.sv.hue</groupId>
+    <artifactId>hue-scheduler</artifactId>
     <version>1.0-SNAPSHOT</version>
 
     <properties>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <mainClass>at.sv.hue.HueEnforcer</mainClass>
+        <mainClass>at.sv.hue.HueScheduler</mainClass>
     </properties>
 
     <dependencies>
@@ -70,7 +70,7 @@
                         <programs>
                             <program>
                                 <mainClass>${mainClass}</mainClass>
-                                <id>hue-enforcer</id>
+                                <id>hue-scheduler</id>
                             </program>
                         </programs>
                     </configuration>

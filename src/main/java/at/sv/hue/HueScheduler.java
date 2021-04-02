@@ -19,9 +19,9 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
-public final class HueEnforcer {
+public final class HueScheduler {
 
-    private static final Logger LOG = LoggerFactory.getLogger(HueEnforcer.class);
+    private static final Logger LOG = LoggerFactory.getLogger(HueScheduler.class);
 
     private final HueApi hueApi;
     private final StateScheduler stateScheduler;
@@ -31,8 +31,8 @@ public final class HueEnforcer {
     private final Supplier<Integer> retryDelay;
     private final int confirmDelay;
 
-    public HueEnforcer(HueApi hueApi, StateScheduler stateScheduler, StartTimeProvider startTimeProvider,
-                       Supplier<ZonedDateTime> currentTime, Supplier<Integer> retryDelay, int confirmDelay) {
+    public HueScheduler(HueApi hueApi, StateScheduler stateScheduler, StartTimeProvider startTimeProvider,
+                        Supplier<ZonedDateTime> currentTime, Supplier<Integer> retryDelay, int confirmDelay) {
         this.hueApi = hueApi;
         this.stateScheduler = stateScheduler;
         this.startTimeProvider = startTimeProvider;
@@ -50,7 +50,7 @@ public final class HueEnforcer {
         StateScheduler stateScheduler = new StateSchedulerImpl(Executors.newSingleThreadScheduledExecutor(), ZonedDateTime::now);
         int retryMaxValue = Integer.parseInt(args[4]);
         int confirmDelay = Integer.parseInt(args[5]);
-        HueEnforcer enforcer = new HueEnforcer(hueApi, stateScheduler, startTimeProvider, ZonedDateTime::now,
+        HueScheduler enforcer = new HueScheduler(hueApi, stateScheduler, startTimeProvider, ZonedDateTime::now,
                 () -> getRandomRetryDelay(retryMaxValue), confirmDelay);
         Files.lines(Paths.get(args[6]))
              .filter(s -> !s.isEmpty())

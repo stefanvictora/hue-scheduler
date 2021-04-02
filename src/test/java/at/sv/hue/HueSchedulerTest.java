@@ -22,12 +22,12 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.core.Is.is;
 import static org.junit.jupiter.api.Assertions.*;
 
-class HueEnforcerTest {
+class HueSchedulerTest {
 
-    private static final Logger LOG = LoggerFactory.getLogger(HueEnforcerTest.class);
+    private static final Logger LOG = LoggerFactory.getLogger(HueSchedulerTest.class);
 
     private TestStateScheduler stateScheduler;
-    private HueEnforcer enforcer;
+    private HueScheduler enforcer;
     private ZonedDateTime now;
     private ZonedDateTime initialNow;
     private List<GetState> lightGetStates;
@@ -84,7 +84,7 @@ class HueEnforcerTest {
                 return groupLightsResponses.remove(0);
             }
         };
-        enforcer = new HueEnforcer(hueApi, stateScheduler, (input, dateTime) -> {
+        enforcer = new HueScheduler(hueApi, stateScheduler, (input, dateTime) -> {
             if (input.equals("sunrise")) {
                 long daysBetween = Duration.between(initialNow, dateTime).toDays();
                 if (daysBetween == 0) {
