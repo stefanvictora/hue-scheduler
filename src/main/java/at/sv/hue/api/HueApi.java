@@ -10,4 +10,10 @@ public interface HueApi {
     boolean putState(int id, Integer bri, Double x, Double y, Integer ct, Boolean on, boolean groupState);
 
     List<Integer> getGroupLights(int groupId);
+
+    String getGroupName(int groupId);
+
+    int getLightId(String name);
+
+    String getLightName(int id);
 }

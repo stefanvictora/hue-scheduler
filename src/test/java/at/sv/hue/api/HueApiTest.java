@@ -31,6 +31,12 @@ class HueApiTest {
         this.response = response;
     }
 
+    private void clearResponse() {
+        expectedUrl = null;
+        expectedBody = null;
+        response = null;
+    }
+
     private String createApiStateResponse(double x, double y, int ct, int bri, boolean reachable, boolean on) {
         return "{\n" +
                 "\"state\": {\n" +
@@ -85,7 +91,9 @@ class HueApiTest {
                     assertEquals(expectedUrl, url.toString(), "Url differs");
                 }
                 if (url.toString().equals(expectedUrl)) {
-                    return response;
+                    String result = response;
+                    clearResponse();
+                    return result;
                 }
                 return null;
             }
@@ -97,7 +105,9 @@ class HueApiTest {
                     assertEquals(expectedBody, body, "Body differs");
                 }
                 if (url.toString().equals(expectedUrl) && body.equals(expectedBody)) {
-                    return response;
+                    String result = response;
+                    clearResponse();
+                    return result;
                 }
                 return null;
             }
@@ -152,27 +162,120 @@ class HueApiTest {
     }
 
     @Test
-    void getGroupLights_returnsLightIdsForGroup() {
-        setGetResponse("/groups/" + 9, "{\n" +
-                "\"name\": \"Flur\",\n" +
+    void getGroupLights_returnsLightIdsForGroup_reusesSameForName() {
+        setGetResponse("/groups", "{\n" +
+                "\"1\": {\n" +
+                "\"name\": \"Group 1\",\n" +
                 "\"lights\": [\n" +
-                "\"24\",\n" +
-                "\"17\",\n" +
-                "\"13\"\n" +
-                "],\n" +
-                "\"action\": {\n" +
-                "\"on\": true,\n" +
-                "\"bri\": 254,\n" +
-                "\"ct\": 301,\n" +
-                "\"alert\": \"select\",\n" +
-                "\"colormode\": \"ct\"\n" +
+                "\"1\",\n" +
+                "\"2\",\n" +
+                "\"3\"\n" +
+                "]\n" +
+                "},\n" +
+                "\"2\": {\n" +
+                "\"name\": \"Group 2\",\n" +
+                "\"lights\": [\n" +
+                "\"4\",\n" +
+                "\"5\"\n" +
+                "]\n" +
+                "}}");
+
+        List<Integer> groupLights = getGroupLights(2);
+        String groupName = api.getGroupName(2);
+
+        assertNotNull(groupLights, "GroupLights are null");
+        assertArrayEquals(new Integer[]{4, 5}, groupLights.toArray(), "GroupLights differ");
+        assertThat("Group name differs", groupName, is("Group 2"));
+    }
+
+    @Test
+    void getGroupLights_unknownId_exception() {
+        setGetResponse("/groups", "{}");
+
+        assertThrows(GroupNotFoundException.class, () -> api.getGroupLights(1234));
+    }
+
+    @Test
+    void getGroupName_returnsNameForGroupId() {
+        setGetResponse("/groups", "{\n" +
+                "\"1\": {\n" +
+                "\"name\": \"Group 1\",\n" +
+                "\"lights\": [\n" +
+                "\"1\",\n" +
+                "\"2\",\n" +
+                "\"3\"\n" +
+                "]\n" +
+                "},\n" +
+                "\"2\": {\n" +
+                "\"name\": \"Group 2\",\n" +
+                "\"lights\": [\n" +
+                "\"4\",\n" +
+                "\"5\"\n" +
+                "]\n" +
+                "}}");
+
+        String name1 = api.getGroupName(1);
+        String name2 = api.getGroupName(2);
+
+        assertThat("Group name differs", name1, is("Group 1"));
+        assertThat("Group name differs", name2, is("Group 2"));
+    }
+
+    @Test
+    void getGroupName_unknownId_exception() {
+        setGetResponse("/groups", "{}");
+
+        assertThrows(GroupNotFoundException.class, () -> api.getGroupName(1234));
+    }
+
+    @Test
+    void getLightId_returnsIdForLightName_reusesResponseForMultipleRequest() {
+        setGetResponse("/lights", "{\n" +
+                "\"7\": {\n" +
+                "\"name\": \"Lamp 1\"\n" +
+                "},\n" +
+                "\"1234\": {\n" +
+                "\"name\": \"Lamp 2\"\n" +
                 "}\n" +
                 "}");
 
-        List<Integer> groupLights = getGroupLights(9);
+        int lightId1 = api.getLightId("Lamp 1");
+        int lightId2 = api.getLightId("Lamp 2");
 
-        assertNotNull(groupLights, "GroupLights are null");
-        assertArrayEquals(new Integer[]{24, 17, 13}, groupLights.toArray(), "GroupLights differ");
+        assertThat("Lamp id differs", lightId1, is(7));
+        assertThat("Lamp id differs", lightId2, is(1234));
+    }
+
+    @Test
+    void getLightId_unknownName_exception() {
+        setGetResponse("/lights", "{}");
+
+        assertThrows(LightNotFoundException.class, () -> api.getLightId("Lamp"));
+    }
+
+    @Test
+    void getLightName_returnsNameForLightId() {
+        setGetResponse("/lights", "{\n" +
+                "\"7\": {\n" +
+                "\"name\": \"Lamp 1\"\n" +
+                "},\n" +
+                "\"1234\": {\n" +
+                "\"name\": \"Lamp 2\"\n" +
+                "}\n" +
+                "}");
+
+        String name1 = api.getLightName(7);
+        String name2 = api.getLightName(1234);
+
+        assertThat(name1, is("Lamp 1"));
+        assertThat(name2, is("Lamp 2"));
+    }
+
+    @Test
+    void getLightName_unknownId_exception() {
+        setGetResponse("/lights", "{}");
+
+        assertThrows(LightNotFoundException.class, () -> api.getLightName(1234));
     }
 
     @Test

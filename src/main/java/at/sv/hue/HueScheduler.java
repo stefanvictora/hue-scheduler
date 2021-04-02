@@ -56,18 +56,18 @@ public final class HueScheduler {
         StateScheduler stateScheduler = new StateSchedulerImpl(Executors.newSingleThreadScheduledExecutor(), ZonedDateTime::now);
         int retryMaxValue = parseInt(args[4], "Failed to parse retryDelay");
         int confirmDelay = parseInt(args[5], "Failed to parse confirmDelay");
-        HueScheduler enforcer = new HueScheduler(hueApi, stateScheduler, startTimeProvider, ZonedDateTime::now,
+        HueScheduler scheduler = new HueScheduler(hueApi, stateScheduler, startTimeProvider, ZonedDateTime::now,
                 () -> getRandomRetryDelay(retryMaxValue), confirmDelay);
         Path inputPath = getPathAndAssertReadable(args[6]);
         Files.lines(inputPath)
              .filter(s -> !s.isEmpty())
              .filter(s -> !s.startsWith("//"))
-             .forEachOrdered(enforcer::addState);
+             .forEachOrdered(scheduler::addState);
         LOG.info("HueScheduler version: {}", VERSION);
         LOG.info("Using input file: {}", inputPath.toAbsolutePath());
         LOG.info("Max retry delay: {} s, Confirm delay: {} s", retryMaxValue, confirmDelay);
         LOG.info("Lat: {}, Long: {}", lat, lng);
-        enforcer.start();
+        scheduler.start();
     }
 
     private static double parseDouble(String arg, String errorMessage) {
@@ -108,12 +108,19 @@ public final class HueScheduler {
         for (String idPart : parts[0].split(",")) {
             int id;
             boolean groupState;
-            if (idPart.startsWith("g")) {
+            String name = "";
+            if (idPart.matches("g\\d+")) {
                 id = Integer.parseInt(idPart.substring(1));
                 groupState = true;
-            } else {
+                name = hueApi.getGroupName(id);
+            } else if (idPart.matches("\\d+")) {
                 groupState = false;
                 id = Integer.parseInt(idPart);
+                name = hueApi.getLightName(id);
+            } else {
+                groupState = false;
+                id = hueApi.getLightId(idPart);
+                name = idPart;
             }
             Integer bri = null;
             Integer ct = null;
@@ -135,21 +142,21 @@ public final class HueScheduler {
             }
             String start = parts[1];
             if (groupState) {
-                addGroupState(id, start, bri, ct, on);
+                addGroupState(name, id, start, bri, ct, on);
             } else {
-                addState(id, start, bri, ct, on);
+                addState(name, id, start, bri, ct, on);
             }
         }
     }
 
-    public void addState(int lampId, String start, Integer brightness, Integer ct, Boolean on) {
+    public void addState(String name, int lampId, String start, Integer brightness, Integer ct, Boolean on) {
         lightStates.computeIfAbsent(lampId, ArrayList::new)
-                   .add(new EnforcedState(lampId, start, brightness, ct, on, startTimeProvider));
+                   .add(new EnforcedState(name, lampId, start, brightness, ct, on, startTimeProvider));
     }
 
-    public void addGroupState(int groupId, String start, Integer brightness, Integer ct, Boolean on) {
+    public void addGroupState(String name, int groupId, String start, Integer brightness, Integer ct, Boolean on) {
         lightStates.computeIfAbsent(getGroupId(groupId), ArrayList::new)
-                   .add(new EnforcedState(groupId, getGroupLights(groupId).get(0), start, brightness, ct, on,
+                   .add(new EnforcedState(name, groupId, getGroupLights(groupId).get(0), start, brightness, ct, on,
                            startTimeProvider, true));
     }
 
@@ -247,19 +254,19 @@ public final class HueScheduler {
                 lightState = hueApi.getLightState(state.getStatusId());
             }
             if (success && state.isOff() && lightState.isUnreachableOrOff()) {
-                LOG.trace("Light {} turned off or already off", state.getUpdateId());
+                LOG.debug("Light '{}' turned off or already off", state.getName());
                 scheduleNextDay(state);
                 return;
             }
             if (!success || lightState.isUnreachableOrOff()) {
-                LOG.trace("Light {} not reachable or off, try again", state.getUpdateId());
+                LOG.trace("Light '{}' not reachable or off, try again", state.getName());
                 state.resetConfirmations();
                 schedule(state, retryDelay.get());
                 return;
             }
             if (!state.isFullyConfirmed()) {
                 if (state.getConfirmCounter() % 5 == 0) {
-                    LOG.debug("Confirmed light {} ({})", state.getUpdateId(), state.getConfirmDebugString());
+                    LOG.debug("Confirmed light '{}' ({})", state.getName(), state.getConfirmDebugString());
                 }
                 state.addConfirmation();
                 schedule(state, confirmDelay);
@@ -267,7 +274,6 @@ public final class HueScheduler {
                 LOG.debug("State {} fully confirmed", state);
                 scheduleNextDay(state);
             }
-
         }, currentTime.get().plusSeconds(delayInSeconds));
     }
 

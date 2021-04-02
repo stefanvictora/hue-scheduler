@@ -33,8 +33,10 @@ class HueSchedulerTest {
     private List<GetState> lightGetStates;
     private List<GetState> groupGetStates;
     private List<PutState> putStates;
+    private List<String> lightIdLookups;
     private List<LightState> lightStateResponses;
     private List<List<Integer>> groupLightsResponses;
+    private List<Integer> lightIdResponses;
     private int defaultCt;
     private int defaultBrightness;
     private int id;
@@ -83,6 +85,23 @@ class HueSchedulerTest {
                 assertFalse(groupLightsResponses.isEmpty(), "TestCase mis-configured: no groupLights response available");
                 return groupLightsResponses.remove(0);
             }
+
+            @Override
+            public String getGroupName(int groupId) {
+                return "Group";
+            }
+
+            @Override
+            public int getLightId(String name) {
+                lightIdLookups.add(name);
+                assertFalse(lightIdResponses.isEmpty(), "TestCase mis-configured: no lightId response available");
+                return lightIdResponses.remove(0);
+            }
+
+            @Override
+            public String getLightName(int id) {
+                return "Name";
+            }
         };
         enforcer = new HueScheduler(hueApi, stateScheduler, (input, dateTime) -> {
             if (input.equals("sunrise")) {
@@ -112,7 +131,7 @@ class HueSchedulerTest {
     }
 
     private void addState(int id, ZonedDateTime start, Integer brightness, Integer ct, Boolean on) {
-        enforcer.addState(id, start.toLocalTime().toString(), brightness, ct, on);
+        enforcer.addState("Name", id, start.toLocalTime().toString(), brightness, ct, on);
     }
 
     private void addState(String input) {
@@ -121,7 +140,7 @@ class HueSchedulerTest {
 
     private void addGroupState(int groupId, ZonedDateTime start, Integer... lights) {
         groupLightsResponses.add(Arrays.asList(lights));
-        enforcer.addGroupState(groupId, start.toLocalTime().toString(), defaultBrightness, defaultCt, null);
+        enforcer.addGroupState("Name", groupId, start.toLocalTime().toString(), defaultBrightness, defaultCt, null);
     }
 
     private void addLightStateResponse(int brightness, int ct, boolean reachable, boolean on) {
@@ -162,6 +181,16 @@ class HueSchedulerTest {
         assertTrue(states.size() > 0, "No more get states to assert");
         GetState getState = states.remove(0);
         assertThat("ID differs", getState.id, is(id));
+    }
+
+    private void assertLightIdLookup(String name) {
+        assertTrue(lightIdLookups.size() > 0, "No more lightId lookups to assert");
+        String lookup = lightIdLookups.remove(0);
+        assertThat("Name differs", lookup, is(name));
+    }
+
+    private void addLightIdResponse(int id) {
+        lightIdResponses.add(id);
     }
 
     private void runAndAssertConfirmations() {
@@ -275,6 +304,8 @@ class HueSchedulerTest {
         lightGetStates = new ArrayList<>();
         putStates = new ArrayList<>();
         lightStateResponses = new ArrayList<>();
+        lightIdLookups = new ArrayList<>();
+        lightIdResponses = new ArrayList<>();
         groupGetStates = new ArrayList<>();
         groupLightsResponses = new ArrayList<>();
         retryDelay = 1;
@@ -289,6 +320,8 @@ class HueSchedulerTest {
     void tearDown() {
         assertEquals(0, lightGetStates.size(), "Not all lightGetState calls asserted");
         assertEquals(0, putStates.size(), "Not all putState calls asserted");
+        assertEquals(0, lightIdLookups.size(), "Not all lightIdLookups asserted");
+        assertEquals(0, lightIdResponses.size(), "Not all lightIdResponses returned");
         assertEquals(0, lightStateResponses.size(), "Not all lightStateResponses returned");
         assertEquals(0, groupGetStates.size(), "Not all groupGetState calls asserted");
         assertEquals(0, groupLightsResponses.size(), "Not all groupLightResponses returned");
@@ -472,6 +505,39 @@ class HueSchedulerTest {
         startEnforcer();
 
         ensureScheduledStates(1);
+    }
+
+    @Test
+    void parse_useLampNameInsteadOfId_nameIsCorrectlyResolved() {
+        String name = "gKitchen Lamp";
+        addLightIdResponse(2);
+        addState(name + "\t12:00\tct:" + defaultCt);
+
+        assertLightIdLookup(name);
+
+        startEnforcer();
+
+        ensureScheduledStates(1);
+    }
+
+    @Test
+    void parse_invalidBrightnessValue_tooLow_exception() {
+        assertThrows(InvalidBrightnessValue.class, () -> addState(1, now, 0, null));
+    }
+
+    @Test
+    void parse_invalidBrightnessValue_tooHigh_exception() {
+        assertThrows(InvalidBrightnessValue.class, () -> addState(1, now, 255, null));
+    }
+
+    @Test
+    void parse_invalidCtValue_tooLow_exception() {
+        assertThrows(InvalidColorTemperatureValue.class, () -> addState(1, now, null, 152));
+    }
+
+    @Test
+    void parse_invalidCtValue_tooHigh_exception() {
+        assertThrows(InvalidColorTemperatureValue.class, () -> addState(1, now, null, 501));
     }
 
     @Test

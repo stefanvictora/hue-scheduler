@@ -3,19 +3,27 @@ package at.sv.hue.api;
 import at.sv.hue.LightState;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public final class HueApiImpl implements HueApi {
 
     private final HttpResourceProvider resourceProvider;
     private final ObjectMapper mapper;
     private final String baseApi;
+    private final Object lightMapLock = new Object();
+    private final Object groupMapLock = new Object();
+    private Map<Integer, Light> availableLights;
+    private Map<Integer, Group> availableGroups;
+    private Map<String, Integer> lightNameToIdMap;
 
     public HueApiImpl(HttpResourceProvider resourceProvider, String ip, String username) {
         this.resourceProvider = resourceProvider;
@@ -78,12 +86,92 @@ public final class HueApiImpl implements HueApi {
 
     @Override
     public List<Integer> getGroupLights(int groupId) {
-        Group group = readValue(resourceProvider.getResource(getGroupStateUrl(groupId)), Group.class);
+        Group group = getOrLookupGroups().get(groupId);
+        if (group == null) {
+            throw new GroupNotFoundException("Group with id '" + groupId + "' not found!");
+        }
         return Arrays.asList(group.lights);
     }
 
-    private URL getGroupStateUrl(int id) {
-        return createUrl("/groups/" + id);
+    private Map<Integer, Group> getOrLookupGroups() {
+        synchronized (groupMapLock) {
+            if (availableGroups == null) {
+                availableGroups = lookupGroups();
+            }
+        }
+        return availableGroups;
+    }
+
+    private Map<Integer, Group> lookupGroups() {
+        try {
+            return mapper.readValue(resourceProvider.getResource(getGroupsUrl()), new TypeReference<Map<Integer, Group>>() {
+            });
+        } catch (JsonProcessingException e) {
+            throw new IllegalArgumentException("Failed to parse groups response", e);
+        }
+    }
+
+    private URL getGroupsUrl() {
+        return createUrl("/groups");
+    }
+
+    @Override
+    public String getGroupName(int groupId) {
+        Group group = getOrLookupGroups().get(groupId);
+        if (group == null) {
+            throw new GroupNotFoundException("Group with id '" + groupId + "' not found!");
+        }
+        return group.name;
+    }
+
+    @Override
+    public int getLightId(String name) {
+        Integer lightId = getOrLookupLightNameToIdMap().get(name);
+        if (lightId == null) {
+            throw new LightNotFoundException("Light with name '" + name + "' was not found!");
+        }
+        return lightId;
+    }
+
+    private Map<String, Integer> getOrLookupLightNameToIdMap() {
+        synchronized (lightMapLock) {
+            if (lightNameToIdMap == null) {
+                lightNameToIdMap = new HashMap<>();
+                getOrLookupLights().forEach((key, light) -> lightNameToIdMap.put(light.name, key));
+            }
+        }
+        return lightNameToIdMap;
+    }
+
+    private Map<Integer, Light> getOrLookupLights() {
+        synchronized (lightMapLock) {
+            if (availableLights == null) {
+                availableLights = lookupLights();
+            }
+        }
+        return availableLights;
+    }
+
+    private Map<Integer, Light> lookupLights() {
+        try {
+            return mapper.readValue(resourceProvider.getResource(getLightsUrl()), new TypeReference<Map<Integer, Light>>() {
+            });
+        } catch (JsonProcessingException e) {
+            throw new IllegalArgumentException("Failed to parse lights response", e);
+        }
+    }
+
+    @Override
+    public String getLightName(int id) {
+        Light light = getOrLookupLights().get(id);
+        if (light == null) {
+            throw new LightNotFoundException("Light with id '" + id + "' not found!");
+        }
+        return light.name;
+    }
+
+    private URL getLightsUrl() {
+        return createUrl("/lights");
     }
 
     private String getBody(State state) {
@@ -104,9 +192,14 @@ public final class HueApiImpl implements HueApi {
 
     private static final class Light {
         State state;
+        String name;
 
         public void setState(State state) {
             this.state = state;
+        }
+
+        public void setName(String name) {
+            this.name = name;
         }
     }
 
@@ -139,12 +232,12 @@ public final class HueApiImpl implements HueApi {
             return reachable;
         }
 
-        public Boolean isReachable() {
-            return reachable;
-        }
-
         public void setReachable(Boolean reachable) {
             this.reachable = reachable;
+        }
+
+        public Boolean isReachable() {
+            return reachable;
         }
 
         public Double[] getXy() {
@@ -182,7 +275,12 @@ public final class HueApiImpl implements HueApi {
 
     private static final class Group {
 
-        private Integer[] lights = new Integer[0];
+        String name;
+        Integer[] lights = new Integer[0];
+
+        public void setName(String name) {
+            this.name = name;
+        }
 
         public void setLights(Integer[] lights) {
             this.lights = lights;

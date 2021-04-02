@@ -8,6 +8,7 @@ import java.time.ZonedDateTime;
 final class EnforcedState {
     static final int CONFIRM_AMOUNT = 30;
 
+    private final String name;
     private final int updateId;
     private final int statusId;
     private final String start;
@@ -20,21 +21,36 @@ final class EnforcedState {
     private ZonedDateTime end;
     private ZonedDateTime lastStart;
 
-    public EnforcedState(int id, String start, Integer brightness, Integer ct, Boolean on, StartTimeProvider startTimeProvider) {
-        this(id, id, start, brightness, ct, on, startTimeProvider, false);
+    public EnforcedState(String name, int id, String start, Integer brightness, Integer ct, Boolean on, StartTimeProvider startTimeProvider) {
+        this(name, id, id, start, brightness, ct, on, startTimeProvider, false);
     }
 
-    public EnforcedState(int updateId, int statusId, String start, Integer brightness, Integer ct, Boolean on,
+    public EnforcedState(String name, int updateId, int statusId, String start, Integer brightness, Integer ct, Boolean on,
                          StartTimeProvider startTimeProvider, boolean groupState) {
+        this.name = name;
         this.updateId = updateId;
         this.statusId = statusId;
         this.start = start;
-        this.brightness = brightness;
-        this.ct = ct;
+        this.brightness = assertValidBrightnessValue(brightness);
+        this.ct = assertValidCtValue(ct);
         this.on = on;
         this.startTimeProvider = startTimeProvider;
         this.groupState = groupState;
         confirmCounter = 0;
+    }
+
+    private Integer assertValidBrightnessValue(Integer brightness) {
+        if (brightness != null && (brightness > 254 || brightness < 1)) {
+            throw new InvalidBrightnessValue("Invalid brightness value '" + brightness + "'. Allowed range: 1-254");
+        }
+        return brightness;
+    }
+
+    private Integer assertValidCtValue(Integer ct) {
+        if (ct != null && (ct > 500 || ct < 153)) {
+            throw new InvalidColorTemperatureValue("Invalid ct value '" + ct + "'. Allowed range: 153-500");
+        }
+        return ct;
     }
 
     public long getDelay(ZonedDateTime now) {
@@ -111,16 +127,16 @@ final class EnforcedState {
         confirmCounter = 0;
     }
 
-    public void setEnd(ZonedDateTime end) {
-        this.end = end;
-    }
-
     public boolean endsAfter(ZonedDateTime now) {
         return now.isAfter(end);
     }
 
     public ZonedDateTime getEnd() {
         return end;
+    }
+
+    public void setEnd(ZonedDateTime end) {
+        this.end = end;
     }
 
     public boolean isGroupState() {
@@ -143,10 +159,15 @@ final class EnforcedState {
         this.lastStart = getZonedStart(now);
     }
 
+    public String getName() {
+        return name;
+    }
+
     @Override
     public String toString() {
         return "EnforcedState{" +
-                "updateId=" + updateId +
+                "name=" + name +
+                ", updateId=" + updateId +
                 ", statusId=" + statusId +
                 ", start=" + start + " (" + getStartIfAvailable() + ")" +
                 ", brightness=" + brightness +
