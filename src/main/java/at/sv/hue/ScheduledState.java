@@ -17,6 +17,8 @@ final class ScheduledState {
     private final String start;
     private final Integer brightness;
     private final Integer ct;
+    private final Double x;
+    private final Double y;
     private final Boolean on;
     private final Integer transitionTime;
     private final StartTimeProvider startTimeProvider;
@@ -25,12 +27,12 @@ final class ScheduledState {
     private ZonedDateTime end;
     private ZonedDateTime lastStart;
 
-    public ScheduledState(String name, int id, String start, Integer brightness, Integer ct, Boolean on, Integer transitionTime,
+    public ScheduledState(String name, int id, String start, Integer brightness, Integer ct, Double x, Double y, Boolean on, Integer transitionTime,
                           StartTimeProvider startTimeProvider) {
-        this(name, id, id, start, brightness, ct, on, transitionTime, startTimeProvider, false);
+        this(name, id, id, start, brightness, ct, x, y, on, transitionTime, startTimeProvider, false);
     }
 
-    public ScheduledState(String name, int updateId, int statusId, String start, Integer brightness, Integer ct, Boolean on,
+    public ScheduledState(String name, int updateId, int statusId, String start, Integer brightness, Integer ct, Double x, Double y, Boolean on,
                           Integer transitionTime, StartTimeProvider startTimeProvider, boolean groupState) {
         this.name = name;
         this.updateId = updateId;
@@ -38,6 +40,8 @@ final class ScheduledState {
         this.start = start;
         this.brightness = assertValidBrightnessValue(brightness);
         this.ct = assertValidCtValue(ct);
+        this.x = x;
+        this.y = y;
         this.on = on;
         this.transitionTime = transitionTime;
         this.startTimeProvider = startTimeProvider;
@@ -117,6 +121,14 @@ final class ScheduledState {
         return ct;
     }
 
+    public Double getX() {
+        return x;
+    }
+
+    public Double getY() {
+        return y;
+    }
+
     public Boolean getOn() {
         return on;
     }
@@ -158,7 +170,7 @@ final class ScheduledState {
     }
 
     public boolean isNullState() {
-        return brightness == null && ct == null && on == null;
+        return brightness == null && ct == null && on == null && x == null && y == null;
     }
 
     public boolean isOff() {
@@ -182,6 +194,8 @@ final class ScheduledState {
                 getFormattedPropertyIfSet("on", on) +
                 getFormattedPropertyIfSet("brightness", brightness) +
                 getFormattedPropertyIfSet("ct", ct) +
+                getFormattedPropertyIfSet("x", x) +
+                getFormattedPropertyIfSet("y", y) +
                 ", transitionTime=" + getFormattedTransitionTime() +
                 '}';
     }

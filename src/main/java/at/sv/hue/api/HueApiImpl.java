@@ -220,6 +220,9 @@ public final class HueApiImpl implements HueApi {
             this.bri = bri;
             this.on = on;
             this.transitiontime = transitiontime;
+            if (x != null && y != null) {
+                this.xy = new Double[]{x, y};
+            }
         }
 
         public Boolean getOn() {

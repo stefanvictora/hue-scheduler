@@ -320,6 +320,17 @@ class HueApiTest {
     }
 
     @Test
+    void putState_XAndY_correctBody() {
+        double x = 0.6075;
+        double y = 0.3525;
+        setPutResponse("/lights/" + 16 + "/state", "{\"xy\":[" + x + "," + y + "]}", "[success]");
+
+        boolean success = api.putState(16, null, x, y, null, null, null, false);
+
+        assertTrue(success, "Put not successful");
+    }
+
+    @Test
     void putState_on_setsFlagCorrectly() {
         setPutResponse("/lights/" + 16 + "/state", "{\"on\":true}", "[success]");
 

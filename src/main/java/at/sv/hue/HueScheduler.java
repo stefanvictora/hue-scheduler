@@ -125,6 +125,8 @@ public final class HueScheduler {
             Integer bri = null;
             Integer ct = null;
             Boolean on = null;
+            Double x = null;
+            Double y = null;
             int transitionTime = 2;
             for (int i = 2; i < parts.length; i++) {
                 String part = parts[i];
@@ -142,28 +144,34 @@ public final class HueScheduler {
                     case "tr":
                         transitionTime = Integer.parseInt(typeAndValue[1]);
                         break;
+                    case "x":
+                        x = Double.parseDouble(typeAndValue[1]);
+                        break;
+                    case "y":
+                        y = Double.parseDouble(typeAndValue[1]);
+                        break;
                     default:
                         throw new UnknownStateProperty("Unknown state property '" + typeAndValue[0] + "' with value '" + typeAndValue[1] + "'");
                 }
             }
             String start = parts[1];
             if (groupState) {
-                addGroupState(name, id, start, bri, ct, on, transitionTime);
+                addGroupState(name, id, start, bri, ct, null, null, on, transitionTime);
             } else {
-                addState(name, id, start, bri, ct, on, transitionTime);
+                addState(name, id, start, bri, ct, x, y, on, transitionTime);
             }
         }
     }
 
-    public void addState(String name, int lampId, String start, Integer brightness, Integer ct, Boolean on, Integer transitionTime) {
+    public void addState(String name, int lampId, String start, Integer brightness, Integer ct, Double x, Double y, Boolean on, Integer transitionTime) {
         lightStates.computeIfAbsent(lampId, ArrayList::new)
-                   .add(new ScheduledState(name, lampId, start, brightness, ct, on, transitionTime, startTimeProvider));
+                   .add(new ScheduledState(name, lampId, start, brightness, ct, x, y, on, transitionTime, startTimeProvider));
     }
 
-    public void addGroupState(String name, int groupId, String start, Integer brightness, Integer ct, Boolean on,
+    public void addGroupState(String name, int groupId, String start, Integer brightness, Integer ct, Double x, Double y, Boolean on,
                               Integer transitionTime) {
         lightStates.computeIfAbsent(getGroupId(groupId), ArrayList::new)
-                   .add(new ScheduledState(name, groupId, getGroupLights(groupId).get(0), start, brightness, ct, on, transitionTime,
+                   .add(new ScheduledState(name, groupId, getGroupLights(groupId).get(0), start, brightness, ct, x, y, on, transitionTime,
                            startTimeProvider, true));
     }
 
@@ -255,7 +263,7 @@ public final class HueScheduler {
                 scheduleNextDay(state);
                 return;
             }
-            boolean success = hueApi.putState(state.getUpdateId(), state.getBrightness(), null, null,
+            boolean success = hueApi.putState(state.getUpdateId(), state.getBrightness(), state.getX(), state.getY(),
                     state.getCt(), state.getOn(), state.getTransitionTime(), state.isGroupState());
             LightState lightState = null;
             if (success) {
