@@ -5,7 +5,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZonedDateTime;
 
-final class EnforcedState {
+final class ScheduledState {
     static final int CONFIRM_AMOUNT = 30;
 
     private final String name;
@@ -21,12 +21,12 @@ final class EnforcedState {
     private ZonedDateTime end;
     private ZonedDateTime lastStart;
 
-    public EnforcedState(String name, int id, String start, Integer brightness, Integer ct, Boolean on, StartTimeProvider startTimeProvider) {
+    public ScheduledState(String name, int id, String start, Integer brightness, Integer ct, Boolean on, StartTimeProvider startTimeProvider) {
         this(name, id, id, start, brightness, ct, on, startTimeProvider, false);
     }
 
-    public EnforcedState(String name, int updateId, int statusId, String start, Integer brightness, Integer ct, Boolean on,
-                         StartTimeProvider startTimeProvider, boolean groupState) {
+    public ScheduledState(String name, int updateId, int statusId, String start, Integer brightness, Integer ct, Boolean on,
+                          StartTimeProvider startTimeProvider, boolean groupState) {
         this.name = name;
         this.updateId = updateId;
         this.statusId = statusId;
@@ -165,7 +165,7 @@ final class EnforcedState {
 
     @Override
     public String toString() {
-        return "EnforcedState{" +
+        return "ScheduledState{" +
                 "name=" + name +
                 ", updateId=" + updateId +
                 ", statusId=" + statusId +

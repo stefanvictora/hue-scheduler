@@ -8,15 +8,15 @@ import java.util.concurrent.TimeUnit;
 
 final class TestStateScheduler implements StateScheduler {
 
-    private final List<ScheduledState> scheduledStates;
+    private final List<ScheduledRunnable> scheduledRunnables;
 
     public TestStateScheduler() {
-        scheduledStates = new ArrayList<>();
+        scheduledRunnables = new ArrayList<>();
     }
 
     @Override
     public void schedule(Runnable runnable, ZonedDateTime start) {
-        scheduledStates.add(new ScheduledState(start, runnable));
+        scheduledRunnables.add(new ScheduledRunnable(start, runnable));
     }
 
     @Override
@@ -24,13 +24,13 @@ final class TestStateScheduler implements StateScheduler {
         
     }
 
-    public List<ScheduledState> getScheduledStates() {
-        ArrayList<ScheduledState> states = new ArrayList<>(scheduledStates);
-        states.sort(Comparator.comparing(ScheduledState::getStart));
+    public List<ScheduledRunnable> getScheduledStates() {
+        ArrayList<ScheduledRunnable> states = new ArrayList<>(scheduledRunnables);
+        states.sort(Comparator.comparing(ScheduledRunnable::getStart));
         return states;
     }
 
     public void clear() {
-        scheduledStates.clear();
+        scheduledRunnables.clear();
     }
 }

@@ -151,11 +151,11 @@ class HueSchedulerTest {
         enforcer.start();
     }
 
-    private List<ScheduledState> ensureScheduledStates(int expectedSize) {
-        List<ScheduledState> scheduledStates = stateScheduler.getScheduledStates();
-        assertThat("ScheduledStates size differs", scheduledStates.size(), is(expectedSize));
+    private List<ScheduledRunnable> ensureScheduledStates(int expectedSize) {
+        List<ScheduledRunnable> scheduledRunnables = stateScheduler.getScheduledStates();
+        assertThat("ScheduledStates size differs", scheduledRunnables.size(), is(expectedSize));
         stateScheduler.clear();
-        return scheduledStates;
+        return scheduledRunnables;
     }
 
     private void assertPutState(int id, Integer bri, Double x, Double y, Integer ct, Boolean on, boolean groupState) {
@@ -206,13 +206,13 @@ class HueSchedulerTest {
                 advanceTimeAndRunAndAssertApiCalls(true, state, brightness, ct, groupState, true));
     }
 
-    private void runAndAssertConfirmations(Consumer<ScheduledState> consumer) {
-        for (int i = 0; i < EnforcedState.CONFIRM_AMOUNT; i++) {
-            List<ScheduledState> confirmRunnable = ensureScheduledStates(1);
-            ScheduledState state = confirmRunnable.get(0);
+    private void runAndAssertConfirmations(Consumer<ScheduledRunnable> consumer) {
+        for (int i = 0; i < ScheduledState.CONFIRM_AMOUNT; i++) {
+            List<ScheduledRunnable> confirmRunnable = ensureScheduledStates(1);
+            ScheduledRunnable state = confirmRunnable.get(0);
             assertScheduleStart(state, now.plusSeconds(confirmDelay));
 
-            LOG.info("Confirm state {} [{}/{}]", id, i, EnforcedState.CONFIRM_AMOUNT);
+            LOG.info("Confirm state {} [{}/{}]", id, i, ScheduledState.CONFIRM_AMOUNT);
             consumer.accept(state);
         }
     }
@@ -225,67 +225,67 @@ class HueSchedulerTest {
         addState(1, start, null, null);
     }
 
-    private void advanceTimeAndRunAndAssertApiCalls(boolean reachable, ScheduledState state) {
+    private void advanceTimeAndRunAndAssertApiCalls(boolean reachable, ScheduledRunnable state) {
         advanceTimeAndRunAndAssertApiCalls(reachable, state, false);
     }
 
-    private void advanceTimeAndRunAndAssertApiCalls(boolean reachable, ScheduledState state, boolean groupState) {
+    private void advanceTimeAndRunAndAssertApiCalls(boolean reachable, ScheduledRunnable state, boolean groupState) {
         advanceTimeAndRunAndAssertApiCalls(reachable, state, defaultBrightness, defaultCt, groupState, true);
     }
 
-    private void advanceTimeAndRunAndAssertApiCalls(boolean reachable, ScheduledState state, int brightness, int ct,
+    private void advanceTimeAndRunAndAssertApiCalls(boolean reachable, ScheduledRunnable state, int brightness, int ct,
                                                     boolean groupState, boolean onLightStateResponse) {
         setCurrentTimeTo(state.getStart());
         runAndAssertApiCalls(reachable, state, brightness, ct, groupState, onLightStateResponse);
     }
 
-    private void runAndAssertApiCalls(boolean reachable, ScheduledState state, int brightness, int ct, boolean groupState,
+    private void runAndAssertApiCalls(boolean reachable, ScheduledRunnable state, int brightness, int ct, boolean groupState,
                                       boolean onLightStateResponse) {
         addLightStateResponse(brightness, ct, reachable, onLightStateResponse);
         runAndAssertPutCall(state, brightness, ct, groupState, null);
         assertLightGetState(id);
     }
 
-    private void advanceTimeAndRunAndAssertTurnOffApiCall(boolean reachable, ScheduledState state, boolean onLightStateResponse) {
+    private void advanceTimeAndRunAndAssertTurnOffApiCall(boolean reachable, ScheduledRunnable state, boolean onLightStateResponse) {
         addLightStateResponse(defaultBrightness, defaultCt, reachable, onLightStateResponse);
         advanceTimeAndRunAndAssertPutCall(state, null, null, false, false);
         assertLightGetState(id);
     }
 
-    private void advanceTimeAndRunAndAssertTurnOnApiCall(ScheduledState state) {
+    private void advanceTimeAndRunAndAssertTurnOnApiCall(ScheduledRunnable state) {
         addLightStateResponse(defaultBrightness, defaultCt, true, true);
         advanceTimeAndRunAndAssertPutCall(state, null, null, false, true);
         assertLightGetState(id);
     }
 
-    private void runAndAssertPutCall(ScheduledState state, Integer brightness, Integer ct, boolean groupState, Boolean on) {
+    private void runAndAssertPutCall(ScheduledRunnable state, Integer brightness, Integer ct, boolean groupState, Boolean on) {
         state.run();
 
         assertPutState(id, brightness, null, null, ct, on, groupState);
     }
 
-    private void advanceTimeAndRunAndAssertPutCall(ScheduledState state, Integer brightness, Integer ct, boolean groupState, Boolean on) {
+    private void advanceTimeAndRunAndAssertPutCall(ScheduledRunnable state, Integer brightness, Integer ct, boolean groupState, Boolean on) {
         setCurrentTimeTo(state.getStart());
         runAndAssertPutCall(state, brightness, ct, groupState, on);
     }
 
-    private ScheduledState ensureRunnable(ZonedDateTime scheduleStart) {
-        ScheduledState state = ensureScheduledStates(1).get(0);
+    private ScheduledRunnable ensureRunnable(ZonedDateTime scheduleStart) {
+        ScheduledRunnable state = ensureScheduledStates(1).get(0);
         assertScheduleStart(state, scheduleStart);
         return state;
     }
 
-    private ScheduledState ensureRetryState() {
+    private ScheduledRunnable ensureRetryState() {
         return ensureRunnable(now.plusSeconds(retryDelay));
     }
 
     private void ensureAndRunSingleConfirmation(boolean reachable) {
-        ScheduledState runnable = ensureRunnable(now.plusSeconds(confirmDelay));
+        ScheduledRunnable runnable = ensureRunnable(now.plusSeconds(confirmDelay));
 
         advanceTimeAndRunAndAssertApiCalls(reachable, runnable);
     }
 
-    private void assertScheduleStart(ScheduledState state, ZonedDateTime start) {
+    private void assertScheduleStart(ScheduledRunnable state, ZonedDateTime start) {
         assertThat("Schedule start differs", state.getStart(), is(start));
     }
 
@@ -336,8 +336,8 @@ class HueSchedulerTest {
 
         startEnforcer();
 
-        List<ScheduledState> scheduledStates = ensureScheduledStates(1);
-        assertScheduleStart(scheduledStates.get(0), now);
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(1);
+        assertScheduleStart(scheduledRunnables.get(0), now);
     }
 
     @Test
@@ -349,12 +349,12 @@ class HueSchedulerTest {
 
         startEnforcer();
 
-        List<ScheduledState> scheduledStates = ensureScheduledStates(2);
-        assertScheduleStart(scheduledStates.get(0), now);
-        assertScheduleStart(scheduledStates.get(1), now);
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(2);
+        assertScheduleStart(scheduledRunnables.get(0), now);
+        assertScheduleStart(scheduledRunnables.get(1), now);
 
         // group state still calls api as the groups and lamps have different end states
-        advanceTimeAndRunAndAssertApiCalls(true, scheduledStates.get(1), true);
+        advanceTimeAndRunAndAssertApiCalls(true, scheduledRunnables.get(1), true);
         runAndAssertConfirmations(true);
 
         ensureRunnable(initialNow.plusDays(1));
@@ -366,8 +366,8 @@ class HueSchedulerTest {
 
         startEnforcer();
 
-        List<ScheduledState> scheduledStates = ensureScheduledStates(1);
-        assertScheduleStart(scheduledStates.get(0), now);
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(1);
+        assertScheduleStart(scheduledRunnables.get(0), now);
     }
 
     @Test
@@ -377,9 +377,9 @@ class HueSchedulerTest {
 
         startEnforcer();
 
-        List<ScheduledState> scheduledStates = ensureScheduledStates(2);
-        assertScheduleStart(scheduledStates.get(0), now);
-        assertScheduleStart(scheduledStates.get(1), now.plusHours(1));
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(2);
+        assertScheduleStart(scheduledRunnables.get(0), now);
+        assertScheduleStart(scheduledRunnables.get(1), now.plusHours(1));
     }
 
     @Test
@@ -388,8 +388,8 @@ class HueSchedulerTest {
 
         startEnforcer();
 
-        List<ScheduledState> scheduledStates = ensureScheduledStates(1);
-        assertScheduleStart(scheduledStates.get(0), now);
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(1);
+        assertScheduleStart(scheduledRunnables.get(0), now);
     }
 
     @Test
@@ -400,10 +400,10 @@ class HueSchedulerTest {
 
         startEnforcer();
 
-        List<ScheduledState> scheduledStates = ensureScheduledStates(3);
-        assertScheduleStart(scheduledStates.get(0), now);
-        assertScheduleStart(scheduledStates.get(1), now.plusHours(1));
-        assertScheduleStart(scheduledStates.get(2), now.plusHours(2));
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(3);
+        assertScheduleStart(scheduledRunnables.get(0), now);
+        assertScheduleStart(scheduledRunnables.get(1), now.plusHours(1));
+        assertScheduleStart(scheduledRunnables.get(2), now.plusHours(2));
     }
 
     @Test
@@ -414,10 +414,10 @@ class HueSchedulerTest {
 
         startEnforcer();
 
-        List<ScheduledState> scheduledStates = ensureScheduledStates(3);
-        assertScheduleStart(scheduledStates.get(0), now);
-        assertScheduleStart(scheduledStates.get(1), now.plusHours(1));
-        assertScheduleStart(scheduledStates.get(2), now.plusHours(22));
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(3);
+        assertScheduleStart(scheduledRunnables.get(0), now);
+        assertScheduleStart(scheduledRunnables.get(1), now.plusHours(1));
+        assertScheduleStart(scheduledRunnables.get(2), now.plusHours(22));
     }
 
     @Test
@@ -429,12 +429,12 @@ class HueSchedulerTest {
 
         startEnforcer();
 
-        List<ScheduledState> scheduledStates = ensureScheduledStates(3);
-        assertScheduleStart(scheduledStates.get(0), now);
-        assertScheduleStart(scheduledStates.get(1), now);
-        assertScheduleStart(scheduledStates.get(2), now);
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(3);
+        assertScheduleStart(scheduledRunnables.get(0), now);
+        assertScheduleStart(scheduledRunnables.get(1), now);
+        assertScheduleStart(scheduledRunnables.get(2), now);
 
-        advanceTimeAndRunAndAssertApiCalls(true, scheduledStates.get(1));
+        advanceTimeAndRunAndAssertApiCalls(true, scheduledRunnables.get(1));
         runAndAssertConfirmations();
 
         ensureRunnable(initialNow.plusDays(1));
@@ -447,9 +447,9 @@ class HueSchedulerTest {
 
         startEnforcer();
 
-        List<ScheduledState> scheduledStates = ensureScheduledStates(1);
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(1);
 
-        advanceTimeAndRunAndAssertTurnOnApiCall(scheduledStates.get(0));
+        advanceTimeAndRunAndAssertTurnOnApiCall(scheduledRunnables.get(0));
         runAndAssertConfirmations(this::advanceTimeAndRunAndAssertTurnOnApiCall);
 
         ensureRunnable(initialNow.plusDays(1));
@@ -463,11 +463,11 @@ class HueSchedulerTest {
 
         startEnforcer();
 
-        List<ScheduledState> scheduledStates = ensureScheduledStates(2);
-        assertScheduleStart(scheduledStates.get(0), now);
-        assertScheduleStart(scheduledStates.get(1), now.plusHours(1));
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(2);
+        assertScheduleStart(scheduledRunnables.get(0), now);
+        assertScheduleStart(scheduledRunnables.get(1), now.plusHours(1));
 
-        advanceTimeAndRunAndAssertApiCalls(true, scheduledStates.get(1)); // sunrise state
+        advanceTimeAndRunAndAssertApiCalls(true, scheduledRunnables.get(1)); // sunrise state
         runAndAssertConfirmations();
 
         ensureRunnable(initialNow.plusDays(1).with(nextDaySunrise));
@@ -480,15 +480,15 @@ class HueSchedulerTest {
 
         startEnforcer();
 
-        List<ScheduledState> scheduledStates = ensureScheduledStates(1);
-        assertScheduleStart(scheduledStates.get(0), now);
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(1);
+        assertScheduleStart(scheduledRunnables.get(0), now);
 
         setCurrentTimeTo(initialNow.plusDays(1).with(nextDaySunrise).minusMinutes(5));
 
-        runAndAssertApiCalls(true, scheduledStates.get(0), defaultBrightness, defaultCt, false, true);
+        runAndAssertApiCalls(true, scheduledRunnables.get(0), defaultBrightness, defaultCt, false, true);
         runAndAssertConfirmations();
 
-        ScheduledState nextDayState = ensureRunnable(initialNow.plusDays(2).with(nextNextDaysSunrises));
+        ScheduledRunnable nextDayState = ensureRunnable(initialNow.plusDays(2).with(nextNextDaysSunrises));
 
         setCurrentTimeTo(initialNow.plusDays(2).with(nextNextDaysSunrises).minusMinutes(5));
 
@@ -544,12 +544,12 @@ class HueSchedulerTest {
     void run_execution_reachable_runsConfirmations_startsAgainNextDay_repeats() {
         addDefaultState();
         startEnforcer();
-        List<ScheduledState> scheduledStates = ensureScheduledStates(1);
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(1);
 
-        advanceTimeAndRunAndAssertApiCalls(true, scheduledStates.get(0));
+        advanceTimeAndRunAndAssertApiCalls(true, scheduledRunnables.get(0));
         runAndAssertConfirmations();
 
-        ScheduledState nextDayState = ensureRunnable(initialNow.plusDays(1));
+        ScheduledRunnable nextDayState = ensureRunnable(initialNow.plusDays(1));
 
         advanceTimeAndRunAndAssertApiCalls(true, nextDayState);
         runAndAssertConfirmations();
@@ -563,9 +563,9 @@ class HueSchedulerTest {
         assertGroupGetState(10);
         startEnforcer();
 
-        List<ScheduledState> scheduledStates = ensureScheduledStates(1);
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(1);
 
-        advanceTimeAndRunAndAssertApiCalls(true, scheduledStates.get(0), true);
+        advanceTimeAndRunAndAssertApiCalls(true, scheduledRunnables.get(0), true);
         runAndAssertConfirmations(true);
 
         ensureRunnable(initialNow.plusDays(1));
@@ -578,13 +578,13 @@ class HueSchedulerTest {
         ZonedDateTime nextMorning = now.plusHours(8);
         addState(1, nextMorning, defaultBrightness + 100, defaultCt);
         startEnforcer();
-        List<ScheduledState> initalStates = ensureScheduledStates(2);
+        List<ScheduledRunnable> initalStates = ensureScheduledStates(2);
 
         advanceTimeAndRunAndAssertApiCalls(true, initalStates.get(0));
 
         setCurrentTimeTo(nextMorning);
 
-        ScheduledState confirmRunnable = ensureScheduledStates(1).get(0);
+        ScheduledRunnable confirmRunnable = ensureScheduledStates(1).get(0);
 
         confirmRunnable.run(); // does not call any API, as its past its end
 
@@ -596,8 +596,8 @@ class HueSchedulerTest {
         addState(1, now);
         addState(1, now.minusHours(1));
         startEnforcer();
-        List<ScheduledState> initialStates = ensureScheduledStates(2);
-        ScheduledState nextDayState = initialStates.get(1);
+        List<ScheduledRunnable> initialStates = ensureScheduledStates(2);
+        ScheduledRunnable nextDayState = initialStates.get(1);
         assertScheduleStart(nextDayState, now.plusHours(23));
 
         advanceTimeAndRunAndAssertApiCalls(true, nextDayState);
@@ -611,14 +611,14 @@ class HueSchedulerTest {
         addState(1, now);
         addState(1, now.plusHours(1));
         startEnforcer();
-        List<ScheduledState> initialStates = ensureScheduledStates(2);
+        List<ScheduledRunnable> initialStates = ensureScheduledStates(2);
         assertScheduleStart(initialStates.get(0), now);
         assertScheduleStart(initialStates.get(1), now.plusHours(1));
 
         advanceTimeAndRunAndAssertApiCalls(true, initialStates.get(0));
         runAndAssertConfirmations();
 
-        ScheduledState nextDayRunnable = ensureRunnable(initialNow.plusDays(1));
+        ScheduledRunnable nextDayRunnable = ensureRunnable(initialNow.plusDays(1));
 
         setCurrentTimeTo(initialNow.plusDays(1).plusHours(1));
         
@@ -631,11 +631,11 @@ class HueSchedulerTest {
     void run_execution_firstUnreachable_triesAgainOneSecondLater_secondTimeReachable_success() {
         addDefaultState();
         startEnforcer();
-        List<ScheduledState> scheduledStates = ensureScheduledStates(1);
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(1);
 
-        advanceTimeAndRunAndAssertApiCalls(false, scheduledStates.get(0));
+        advanceTimeAndRunAndAssertApiCalls(false, scheduledRunnables.get(0));
 
-        ScheduledState retryState = ensureRetryState();
+        ScheduledRunnable retryState = ensureRetryState();
 
         advanceTimeAndRunAndAssertApiCalls(true, retryState);
         runAndAssertConfirmations();
@@ -651,11 +651,11 @@ class HueSchedulerTest {
         ZonedDateTime secondStateStart = now.plusSeconds(10);
         addState(id, secondStateStart, brightness2, ct2);
         startEnforcer();
-        List<ScheduledState> initialStates = ensureScheduledStates(2);
+        List<ScheduledRunnable> initialStates = ensureScheduledStates(2);
 
         advanceTimeAndRunAndAssertApiCalls(false, initialStates.get(0));
 
-        ScheduledState retryState = ensureRetryState();
+        ScheduledRunnable retryState = ensureRetryState();
         setCurrentTimeTo(secondStateStart);
 
         retryState.run();  /* this aborts without any api calls, as the current state already ended */
@@ -677,17 +677,17 @@ class HueSchedulerTest {
         ZonedDateTime secondStateStart = now.plusMinutes(10);
         addState(id, secondStateStart);
         startEnforcer();
-        List<ScheduledState> initialStates = ensureScheduledStates(2);
+        List<ScheduledRunnable> initialStates = ensureScheduledStates(2);
 
         advanceTimeAndRunAndAssertApiCalls(true, initialStates.get(0));
         ensureAndRunSingleConfirmation(true);
 
         setCurrentTimeTo(secondStateStart);
-        ScheduledState furtherConfirmRunnable = ensureScheduledStates(1).get(0);
+        ScheduledRunnable furtherConfirmRunnable = ensureScheduledStates(1).get(0);
 
         furtherConfirmRunnable.run(); // aborts and does not call any api calls
 
-        ScheduledState nextDayRunnable = ensureRunnable(initialNow.plusDays(1));
+        ScheduledRunnable nextDayRunnable = ensureRunnable(initialNow.plusDays(1));
 
         advanceTimeAndRunAndAssertApiCalls(true, nextDayRunnable);
         runAndAssertConfirmations();
@@ -699,13 +699,13 @@ class HueSchedulerTest {
     void run_execution_firstReachable_butDuringConfirmationUnreachableAgain_resetsConfirms() {
         addDefaultState();
         startEnforcer();
-        List<ScheduledState> scheduledStates = ensureScheduledStates(1);
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(1);
 
-        advanceTimeAndRunAndAssertApiCalls(true, scheduledStates.get(0));
+        advanceTimeAndRunAndAssertApiCalls(true, scheduledRunnables.get(0));
         ensureAndRunSingleConfirmation(true);
         ensureAndRunSingleConfirmation(false);
 
-        ScheduledState retryRunnable = ensureRetryState();
+        ScheduledRunnable retryRunnable = ensureRetryState();
 
         advanceTimeAndRunAndAssertApiCalls(true, retryRunnable);
         runAndAssertConfirmations();
@@ -718,12 +718,12 @@ class HueSchedulerTest {
         addDefaultState();
         startEnforcer();
 
-        List<ScheduledState> scheduledStates = ensureScheduledStates(1);
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(1);
 
         apiPutSuccessful = false;
-        advanceTimeAndRunAndAssertPutCall(scheduledStates.get(0), defaultBrightness, defaultCt, false, null);
+        advanceTimeAndRunAndAssertPutCall(scheduledRunnables.get(0), defaultBrightness, defaultCt, false, null);
 
-        ScheduledState retryState = ensureRetryState();
+        ScheduledRunnable retryState = ensureRetryState();
         apiPutSuccessful = true;
         advanceTimeAndRunAndAssertApiCalls(true, retryState);
         runAndAssertConfirmations();
@@ -736,11 +736,11 @@ class HueSchedulerTest {
         addDefaultState();
         startEnforcer();
 
-        List<ScheduledState> scheduledStates = ensureScheduledStates(1);
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(1);
 
-        advanceTimeAndRunAndAssertApiCalls(true, scheduledStates.get(0), defaultBrightness, defaultCt, false, false);
+        advanceTimeAndRunAndAssertApiCalls(true, scheduledRunnables.get(0), defaultBrightness, defaultCt, false, false);
 
-        ScheduledState retryState = ensureRetryState();
+        ScheduledRunnable retryState = ensureRetryState();
         advanceTimeAndRunAndAssertApiCalls(true, retryState, defaultBrightness, defaultCt, false, true);
         runAndAssertConfirmations();
 
@@ -753,11 +753,11 @@ class HueSchedulerTest {
         addNullState(now.plusMinutes(5));
         startEnforcer();
 
-        List<ScheduledState> scheduledStates = ensureScheduledStates(1);
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(1);
 
         advanceCurrentTime(Duration.ofMinutes(5));
 
-        scheduledStates.get(0).run(); // no API calls, as already ended
+        scheduledRunnables.get(0).run(); // no API calls, as already ended
 
         ensureRunnable(initialNow.plusDays(1));
     }
@@ -776,9 +776,9 @@ class HueSchedulerTest {
         addOffState();
         startEnforcer();
 
-        List<ScheduledState> scheduledStates = ensureScheduledStates(1);
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(1);
 
-        advanceTimeAndRunAndAssertTurnOffApiCall(true, scheduledStates.get(0), false);
+        advanceTimeAndRunAndAssertTurnOffApiCall(true, scheduledRunnables.get(0), false);
 
         ensureRunnable(now.plusDays(1));
     }
@@ -788,9 +788,9 @@ class HueSchedulerTest {
         addOffState();
         startEnforcer();
 
-        List<ScheduledState> scheduledStates = ensureScheduledStates(1);
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(1);
 
-        advanceTimeAndRunAndAssertTurnOffApiCall(false, scheduledStates.get(0), true);
+        advanceTimeAndRunAndAssertTurnOffApiCall(false, scheduledRunnables.get(0), true);
 
         ensureRunnable(now.plusDays(1));
     }
@@ -800,12 +800,12 @@ class HueSchedulerTest {
         addOffState();
         startEnforcer();
 
-        List<ScheduledState> scheduledStates = ensureScheduledStates(1);
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(1);
 
         apiPutSuccessful = false;
-        advanceTimeAndRunAndAssertPutCall(scheduledStates.get(0), null, null, false, false);
+        advanceTimeAndRunAndAssertPutCall(scheduledRunnables.get(0), null, null, false, false);
 
-        ScheduledState retryState = ensureRetryState();
+        ScheduledRunnable retryState = ensureRetryState();
         apiPutSuccessful = true;
         advanceTimeAndRunAndAssertTurnOffApiCall(false, retryState, true);
 

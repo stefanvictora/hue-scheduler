@@ -2,11 +2,11 @@ package at.sv.hue;
 
 import java.time.ZonedDateTime;
 
-final class ScheduledState implements Runnable {
+final class ScheduledRunnable implements Runnable {
     private final ZonedDateTime start;
     private final Runnable runnable;
 
-    public ScheduledState(ZonedDateTime start, Runnable runnable) {
+    public ScheduledRunnable(ZonedDateTime start, Runnable runnable) {
         this.start = start;
         this.runnable = runnable;
     }

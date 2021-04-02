@@ -29,7 +29,7 @@ public final class HueScheduler {
     private final StateScheduler stateScheduler;
     private final StartTimeProvider startTimeProvider;
     private final Supplier<ZonedDateTime> currentTime;
-    private final Map<Integer, List<EnforcedState>> lightStates;
+    private final Map<Integer, List<ScheduledState>> lightStates;
     private final Supplier<Integer> retryDelay;
     private final int confirmDelay;
 
@@ -151,12 +151,12 @@ public final class HueScheduler {
 
     public void addState(String name, int lampId, String start, Integer brightness, Integer ct, Boolean on) {
         lightStates.computeIfAbsent(lampId, ArrayList::new)
-                   .add(new EnforcedState(name, lampId, start, brightness, ct, on, startTimeProvider));
+                   .add(new ScheduledState(name, lampId, start, brightness, ct, on, startTimeProvider));
     }
 
     public void addGroupState(String name, int groupId, String start, Integer brightness, Integer ct, Boolean on) {
         lightStates.computeIfAbsent(getGroupId(groupId), ArrayList::new)
-                   .add(new EnforcedState(name, groupId, getGroupLights(groupId).get(0), start, brightness, ct, on,
+                   .add(new ScheduledState(name, groupId, getGroupLights(groupId).get(0), start, brightness, ct, on,
                            startTimeProvider, true));
     }
 
@@ -177,37 +177,37 @@ public final class HueScheduler {
         scheduleSunDataInfoLog();
     }
 
-    private void calculateAndSetEndTimes(ZonedDateTime now, List<EnforcedState> states) {
+    private void calculateAndSetEndTimes(ZonedDateTime now, List<ScheduledState> states) {
         sortByTimeAscending(states, now);
         for (int i = 1; i < states.size(); i++) {
-            EnforcedState previous = states.get(i - 1);
-            EnforcedState current = states.get(i);
+            ScheduledState previous = states.get(i - 1);
+            ScheduledState current = states.get(i);
             previous.setEnd(getRightBeforeStartOfState(current, now));
         }
-        EnforcedState lastState = states.get(states.size() - 1);
+        ScheduledState lastState = states.get(states.size() - 1);
         lastState.setEnd(getRightBeforeStartOfStateNextDay(states.get(0), now));
     }
 
-    private void sortByTimeAscending(List<EnforcedState> states, ZonedDateTime now) {
-        states.sort(Comparator.comparing(enforcedState -> enforcedState.getStart(now)));
+    private void sortByTimeAscending(List<ScheduledState> states, ZonedDateTime now) {
+        states.sort(Comparator.comparing(scheduledState -> scheduledState.getStart(now)));
     }
 
-    private ZonedDateTime getRightBeforeStartOfState(EnforcedState state, ZonedDateTime dateTime) {
+    private ZonedDateTime getRightBeforeStartOfState(ScheduledState state, ZonedDateTime dateTime) {
         return ZonedDateTime.of(LocalDateTime.of(dateTime.toLocalDate(), state.getStart(dateTime).minusSeconds(1)), dateTime.getZone());
     }
 
-    private ZonedDateTime getRightBeforeStartOfStateNextDay(EnforcedState state, ZonedDateTime now) {
+    private ZonedDateTime getRightBeforeStartOfStateNextDay(ScheduledState state, ZonedDateTime now) {
         return getRightBeforeStartOfState(state, now.plusDays(1));
     }
 
-    private void scheduleStates(ZonedDateTime now, List<EnforcedState> states) {
+    private void scheduleStates(ZonedDateTime now, List<ScheduledState> states) {
         sortByLastFirst(states, now);
         if (allInTheFuture(states, now)) {
             scheduleLastImmediately(states);
             states = skipLast(states);
         }
         for (int i = 0; i < states.size(); i++) {
-            EnforcedState state = states.get(i);
+            ScheduledState state = states.get(i);
             schedule(state, now);
             if (state.isInThePast(now) && hasMorePastStates(states, i)) {
                 addRemainingStatesTheNextDay(getRemaining(states, i), now);
@@ -216,28 +216,28 @@ public final class HueScheduler {
         }
     }
 
-    private void sortByLastFirst(List<EnforcedState> states, ZonedDateTime now) {
-        states.sort(Comparator.comparing(enforcedState -> enforcedState.getStart(now), Comparator.reverseOrder()));
+    private void sortByLastFirst(List<ScheduledState> states, ZonedDateTime now) {
+        states.sort(Comparator.comparing(scheduledState -> scheduledState.getStart(now), Comparator.reverseOrder()));
     }
 
-    private boolean allInTheFuture(List<EnforcedState> states, ZonedDateTime now) {
+    private boolean allInTheFuture(List<ScheduledState> states, ZonedDateTime now) {
         return !states.get(states.size() - 1).isInThePast(now);
     }
 
-    private void scheduleLastImmediately(List<EnforcedState> states) {
+    private void scheduleLastImmediately(List<ScheduledState> states) {
         schedule(states.get(0), 0);
     }
 
-    private List<EnforcedState> skipLast(List<EnforcedState> states) {
+    private List<ScheduledState> skipLast(List<ScheduledState> states) {
         return states.subList(1, states.size());
     }
 
-    private void schedule(EnforcedState state, ZonedDateTime now) {
+    private void schedule(ScheduledState state, ZonedDateTime now) {
         state.updateLastStart(now);
         schedule(state, state.getDelay(now));
     }
 
-    private void schedule(EnforcedState state, long delayInSeconds) {
+    private void schedule(ScheduledState state, long delayInSeconds) {
         if (state.isNullState()) return;
         if (delayInSeconds > 5) {
             LOG.debug("Schedule {} in {}", state, Duration.ofSeconds(delayInSeconds));
@@ -277,48 +277,48 @@ public final class HueScheduler {
         }, currentTime.get().plusSeconds(delayInSeconds));
     }
 
-    private boolean hasMorePastStates(List<EnforcedState> states, int i) {
+    private boolean hasMorePastStates(List<ScheduledState> states, int i) {
         return states.size() > i + 1;
     }
 
-    private List<EnforcedState> getRemaining(List<EnforcedState> states, int i) {
+    private List<ScheduledState> getRemaining(List<ScheduledState> states, int i) {
         return states.subList(i + 1, states.size());
     }
 
-    private void addRemainingStatesTheNextDay(List<EnforcedState> remainingStates, ZonedDateTime now) {
+    private void addRemainingStatesTheNextDay(List<ScheduledState> remainingStates, ZonedDateTime now) {
         remainingStates.forEach(state -> {
             scheduleNextDay(state, now);
         });
     }
 
-    private void scheduleNextDay(EnforcedState state) {
+    private void scheduleNextDay(ScheduledState state) {
         scheduleNextDay(state, currentTime.get());
     }
 
-    private void scheduleNextDay(EnforcedState state, ZonedDateTime now) {
+    private void scheduleNextDay(ScheduledState state, ZonedDateTime now) {
         state.resetConfirmations();
         recalculateEnd(state, now);
         schedule(state, state.secondsUntilNextDayFromStart(now));
         state.updateLastStart(now);
     }
 
-    private void recalculateEnd(EnforcedState state, ZonedDateTime now) {
-        List<EnforcedState> states = new ArrayList<>(getLightStatesForId(state));
+    private void recalculateEnd(ScheduledState state, ZonedDateTime now) {
+        List<ScheduledState> states = new ArrayList<>(getLightStatesForId(state));
         sortByTimeAscending(states, now);
         int index = states.indexOf(state);
         if (index + 1 < states.size()) {
-            EnforcedState next = states.get(index + 1);
+            ScheduledState next = states.get(index + 1);
             state.setEnd(getRightBeforeStartOfStateNextDay(next, state.getEnd()));
         } else {
             state.setEnd(getRightBeforeStartOfStateNextDay(states.get(0), state.getEnd()));
         }
     }
 
-    private List<EnforcedState> getLightStatesForId(EnforcedState state) {
+    private List<ScheduledState> getLightStatesForId(ScheduledState state) {
         return lightStates.get(getLightId(state));
     }
 
-    private int getLightId(EnforcedState state) {
+    private int getLightId(ScheduledState state) {
         if (state.isGroupState()) {
             return getGroupId(state.getUpdateId());
         } else {
