@@ -138,6 +138,9 @@ public final class HueScheduler {
                     case "ct":
                         ct = Integer.valueOf(typeAndValue[1]);
                         break;
+                    case "k":
+                        ct = convertToMiredCt(Integer.valueOf(typeAndValue[1]));
+                        break;
                     case "on":
                         on = Boolean.valueOf(typeAndValue[1]);
                         break;
@@ -161,6 +164,10 @@ public final class HueScheduler {
                 addState(name, id, start, bri, ct, x, y, on, transitionTime);
             }
         }
+    }
+
+    private Integer convertToMiredCt(Integer kelvin) {
+        return 1_000_000 / kelvin;
     }
 
     public void addState(String name, int lampId, String start, Integer brightness, Integer ct, Double x, Double y, Boolean on, Integer transitionTime) {

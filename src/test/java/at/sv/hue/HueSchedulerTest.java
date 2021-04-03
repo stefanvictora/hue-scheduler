@@ -509,6 +509,25 @@ class HueSchedulerTest {
     }
 
     @Test
+    void parse_canHandleColorTemperatureInKelvin_correctlyTranslatedToMired() {
+        String time = now.toLocalTime().toString();
+        int kelvin = 6500;
+        addState("1\t" + time + "\tk:" + kelvin);
+
+        startScheduler();
+
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(1);
+
+        advanceTimeAndRunAndAssertApiCalls(scheduledRunnables.get(0), true, true, null,
+                153, null, null, null, defaultTransitionTime, false);
+
+        runAndAssertConfirmations(true, true, false, null, 153, null, null, null,
+                defaultTransitionTime);
+
+        ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
     void parse_detectsOnProperty() {
         String time = now.toLocalTime().toString();
         addState("1\t" + time + "\ton:" + true);
