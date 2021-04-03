@@ -8,8 +8,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.Optional;
 
 final class ScheduledState {
-    private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
     static final int CONFIRM_AMOUNT = 30;
+    private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
 
     private final String name;
     private final int updateId;
@@ -218,7 +218,7 @@ final class ScheduledState {
 
     private String getFormattedName() {
         if (groupState) {
-            return "group=" +  name;
+            return "group=" + name;
         }
         return "light=" + name;
     }

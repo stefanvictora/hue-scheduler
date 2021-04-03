@@ -8,7 +8,7 @@ import java.time.format.DateTimeFormatter;
 
 public class SunDataProviderImpl implements SunDataProvider {
 
-    private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
+    private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
 
     private final SunTimes.Parameters parameters;
 
