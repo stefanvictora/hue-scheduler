@@ -12,7 +12,6 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeParseException;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -125,16 +124,16 @@ class HueSchedulerTest {
         }, () -> now, () -> retryDelay, confirmDelay);
     }
 
-    private void addState(int id, ZonedDateTime start) {
-        addState(id, start, defaultBrightness, defaultCt);
+    private void addState(int id, ZonedDateTime startTime) {
+        addState(id, startTime, defaultBrightness, defaultCt);
     }
 
-    private void addState(int id, ZonedDateTime start, Integer brightness, Integer ct) {
-        addState(id, start, brightness, ct, null);
+    private void addState(int id, ZonedDateTime startTime, Integer brightness, Integer ct) {
+        addState(id, startTime, brightness, ct, null);
     }
 
-    private void addState(int id, ZonedDateTime start, Integer brightness, Integer ct, Boolean on) {
-        scheduler.addState("Name", id, start.toLocalTime().toString(), brightness, ct, null, null, on, defaultTransitionTime);
+    private void addState(int id, ZonedDateTime startTime, Integer brightness, Integer ct, Boolean on) {
+        scheduler.addState("Name", id, startTime.toLocalTime().toString(), brightness, ct, null, null, on, defaultTransitionTime);
     }
 
     private void addState(String input) {
@@ -219,12 +218,9 @@ class HueSchedulerTest {
 
     private void runAndAssertConfirmations(Consumer<ScheduledRunnable> repeatedState) {
         for (int i = 0; i < ScheduledState.CONFIRM_AMOUNT; i++) {
-            List<ScheduledRunnable> confirmRunnable = ensureScheduledStates(1);
-            ScheduledRunnable state = confirmRunnable.get(0);
-            assertScheduleStart(state, now.plusSeconds(confirmDelay));
-
-            LOG.info("Confirm state {} [{}/{}]", id, i, ScheduledState.CONFIRM_AMOUNT);
-            repeatedState.accept(state);
+            ScheduledRunnable confirmRunnable = ensureConfirmRunnable();
+            LOG.info("Confirming state {} [{}/{}]", id, i + 1, ScheduledState.CONFIRM_AMOUNT);
+            repeatedState.accept(confirmRunnable);
         }
     }
 
@@ -296,9 +292,13 @@ class HueSchedulerTest {
     }
 
     private void ensureAndRunSingleConfirmation(boolean reachable) {
-        ScheduledRunnable runnable = ensureRunnable(now.plusSeconds(confirmDelay));
+        ScheduledRunnable runnable = ensureConfirmRunnable();
 
         advanceTimeAndRunAndAssertApiCalls(runnable, reachable);
+    }
+
+    private ScheduledRunnable ensureConfirmRunnable() {
+        return ensureRunnable(now.plusSeconds(confirmDelay));
     }
 
     private void assertScheduleStart(ScheduledRunnable state, ZonedDateTime start) {
@@ -360,7 +360,7 @@ class HueSchedulerTest {
     @Test
     void run_groupState_andLightState_sameId_treatedDifferently_endIsCalculatedIndependently() {
         addGroupState(1, now, 1);
-        addState(1, now.plusHours(1));
+        addState(1, now);
 
         assertGroupGetState(1);
 
@@ -378,19 +378,8 @@ class HueSchedulerTest {
     }
 
     @Test
-    void run_singleState_inOneHour_scheduledImmediately_becauseOfDayWrapAround() {
-        addState(22, now.plus(1, ChronoUnit.HOURS));
-
-        startScheduler();
-
-        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(1);
-        assertScheduleStart(scheduledRunnables.get(0), now);
-    }
-
-    @Test
-    void run_multipleStates_allInTheFuture_runsTheOneOfTheNextDayImmediately_theNextWithCorrectDelay() {
-        addState(1, now.plusHours(1));
-        addState(1, now.plusHours(2));
+    void run_singleState_inOneHour_scheduledImmediately_asAdditionalCopy_becauseOfDayWrapAround() {
+        addState(22, now.plusHours(1));
 
         startScheduler();
 
@@ -400,8 +389,22 @@ class HueSchedulerTest {
     }
 
     @Test
+    void run_multipleStates_allInTheFuture_runsTheOneOfTheNextDayImmediately_asAdditionalCopy_theNextWithCorrectDelay() {
+        addState(1, now.plusHours(1));
+        addState(1, now.plusHours(2));
+
+        startScheduler();
+
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(3);
+        assertScheduleStart(scheduledRunnables.get(0), now);
+        assertScheduleStart(scheduledRunnables.get(1), now.plusHours(1));
+        assertScheduleStart(scheduledRunnables.get(2), now.plusHours(2));
+    }
+
+    @Test
     void run_singleState_inThePast_singleRunnableScheduled_immediately() {
-        addState(11, now.minus(1, ChronoUnit.HOURS));
+        setCurrentTimeTo(now.plusHours(2));
+        addState(11, now.minusHours(1));
 
         startScheduler();
 
@@ -425,6 +428,7 @@ class HueSchedulerTest {
 
     @Test
     void run_multipleStates_sameId_oneInTheFuture_twoInThePast_onlyOnePastAddedImmediately_theOtherOneNextDay() {
+        setCurrentTimeTo(now.plusHours(3));
         addState(13, now.plusHours(1));
         addState(13, now.minusHours(1));
         addState(13, now.minusHours(2));
@@ -604,7 +608,7 @@ class HueSchedulerTest {
 
         startScheduler();
 
-        ensureScheduledStates(1);
+        ensureScheduledStates(2);
     }
 
     @Test
@@ -756,6 +760,30 @@ class HueSchedulerTest {
         runAndAssertConfirmations(brightness2, ct2, false);
 
         ensureRunnable(secondStateStart.plusDays(1));
+    }
+
+    @Test
+    void run_execution_allStatesInTheFuture_schedulesLastStateImmediately_asCopy_butAbortsIfFirstStateOfDayStarts() {
+        ZonedDateTime firstStart = now.plusMinutes(5);
+        ZonedDateTime secondStart = now.plusMinutes(10);
+        addState(1, firstStart);
+        addState(1, secondStart);
+        startScheduler();
+
+        List<ScheduledRunnable> states = ensureScheduledStates(3);
+        assertScheduleStart(states.get(0), now);
+        assertScheduleStart(states.get(1), firstStart);
+        assertScheduleStart(states.get(2), secondStart);
+
+        advanceTimeAndRunAndAssertApiCalls(states.get(0), true);
+
+        ScheduledRunnable confirmRunnable = ensureConfirmRunnable();
+
+        setCurrentTimeTo(firstStart);
+        
+        confirmRunnable.run(); // should abort, as now the first state already starts
+
+        // no next day runnable, as it was just a temporary copy
     }
 
     @Test

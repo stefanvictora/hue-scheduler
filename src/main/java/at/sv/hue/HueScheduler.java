@@ -225,8 +225,7 @@ public final class HueScheduler {
     private void scheduleStates(ZonedDateTime now, List<ScheduledState> states) {
         sortByLastFirst(states, now);
         if (allInTheFuture(states, now)) {
-            scheduleLastImmediately(states);
-            states = skipLast(states);
+            scheduleTemporaryCopyOfLastImmediately(states, now);
         }
         for (int i = 0; i < states.size(); i++) {
             ScheduledState state = states.get(i);
@@ -246,12 +245,10 @@ public final class HueScheduler {
         return !states.get(states.size() - 1).isInThePast(now);
     }
 
-    private void scheduleLastImmediately(List<ScheduledState> states) {
-        schedule(states.get(0), 0);
-    }
-
-    private List<ScheduledState> skipLast(List<ScheduledState> states) {
-        return states.subList(1, states.size());
+    private void scheduleTemporaryCopyOfLastImmediately(List<ScheduledState> states, ZonedDateTime now) {
+        ZonedDateTime newEnd = getRightBeforeStartOfState(states.get(states.size() - 1), now);
+        ScheduledState temporaryCopy = ScheduledState.createTemporaryCopy(states.get(0), now, newEnd);
+        schedule(temporaryCopy, 0);
     }
 
     private void schedule(ScheduledState state, ZonedDateTime now) {
@@ -309,9 +306,7 @@ public final class HueScheduler {
     }
 
     private void addRemainingStatesTheNextDay(List<ScheduledState> remainingStates, ZonedDateTime now) {
-        remainingStates.forEach(state -> {
-            scheduleNextDay(state, now);
-        });
+        remainingStates.forEach(state -> scheduleNextDay(state, now));
     }
 
     private void scheduleNextDay(ScheduledState state) {
@@ -319,6 +314,7 @@ public final class HueScheduler {
     }
 
     private void scheduleNextDay(ScheduledState state, ZonedDateTime now) {
+        if (state.isTemporary()) return;
         state.resetConfirmations();
         recalculateEnd(state, now);
         schedule(state, state.secondsUntilNextDayFromStart(now));

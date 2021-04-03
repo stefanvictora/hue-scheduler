@@ -26,6 +26,7 @@ final class ScheduledState {
     private int confirmCounter;
     private ZonedDateTime end;
     private ZonedDateTime lastStart;
+    private boolean temporary;
 
     public ScheduledState(String name, int id, String start, Integer brightness, Integer ct, Double x, Double y, Boolean on, Integer transitionTime,
                           StartTimeProvider startTimeProvider) {
@@ -47,6 +48,16 @@ final class ScheduledState {
         this.startTimeProvider = startTimeProvider;
         this.groupState = groupState;
         confirmCounter = 0;
+        temporary = false;
+    }
+
+    public static ScheduledState createTemporaryCopy(ScheduledState state, ZonedDateTime start, ZonedDateTime end) {
+        ScheduledState copy = new ScheduledState(state.name, state.updateId, state.statusId, start.toLocalTime().toString(),
+                state.brightness, state.ct, state.x, state.y, state.on, state.transitionTime, state.startTimeProvider, state.groupState);
+        copy.end = end;
+        copy.temporary = true;
+        copy.lastStart = start;
+        return copy;
     }
 
     private Integer assertValidBrightnessValue(Integer brightness) {
@@ -185,10 +196,15 @@ final class ScheduledState {
         this.lastStart = getZonedStart(now);
     }
 
+    public boolean isTemporary() {
+        return temporary;
+    }
+
     @Override
     public String toString() {
         return "State{" +
                 getFormattedName() +
+                (temporary ? ", temporary" : "") +
                 ", start=" + getFormattedStart() +
                 ", end=" + getFormattedEnd() +
                 getFormattedPropertyIfSet("on", on) +
