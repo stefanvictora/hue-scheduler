@@ -53,7 +53,7 @@ class HueSchedulerTest {
             throw new IllegalArgumentException("New time is before now: " + newTime);
         }
         now = newTime;
-        LOG.info("Current time: {}", now);
+        LOG.info("New time: {}", now);
     }
 
     private void setCurrentAndInitialTimeTo(ZonedDateTime dateTime) {
@@ -70,7 +70,7 @@ class HueSchedulerTest {
             @Override
             public LightState getLightState(int id) {
                 lightGetStates.add(new GetState(id));
-                assertFalse(lightStateResponses.isEmpty(), "TestCase mis-configured: no lightState response available");
+                assertFalse(lightStateResponses.isEmpty(), "TestCase mis-configured or error: no lightState response available");
                 return lightStateResponses.remove(0);
             }
 
@@ -84,7 +84,7 @@ class HueSchedulerTest {
             @Override
             public List<Integer> getGroupLights(int groupId) {
                 groupGetStates.add(new GetState(groupId));
-                assertFalse(groupLightsResponses.isEmpty(), "TestCase mis-configured: no groupLights response available");
+                assertFalse(groupLightsResponses.isEmpty(), "TestCase mis-configured or error: no groupLights response available");
                 return groupLightsResponses.remove(0);
             }
 
@@ -96,7 +96,7 @@ class HueSchedulerTest {
             @Override
             public int getLightId(String name) {
                 lightIdLookups.add(name);
-                assertFalse(lightIdResponses.isEmpty(), "TestCase mis-configured: no lightId response available");
+                assertFalse(lightIdResponses.isEmpty(), "TestCase mis-configured or error: no lightId response available");
                 return lightIdResponses.remove(0);
             }
 
