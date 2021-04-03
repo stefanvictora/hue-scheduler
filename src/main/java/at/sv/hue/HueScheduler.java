@@ -285,10 +285,12 @@ public final class HueScheduler {
                 return;
             }
             if (!state.isFullyConfirmed()) {
-                if (state.getConfirmCounter() % 5 == 0) {
+                state.addConfirmation();
+                if (state.getConfirmCounter() == 1) {
+                    LOG.debug("Set {}", state);
+                } else if (state.getConfirmCounter() % 5 == 0) {
                     LOG.debug("Confirmed {} ({})", state, state.getConfirmDebugString());
                 }
-                state.addConfirmation();
                 schedule(state, confirmDelay);
             } else {
                 LOG.debug("{} fully confirmed", state);
