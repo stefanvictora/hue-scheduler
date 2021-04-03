@@ -238,7 +238,7 @@ final class ScheduledState {
     }
 
     private String getFormattedEnd() {
-        return getFormattedTime(end.toLocalDateTime().toLocalTime());
+        return end.toLocalDateTime().toString();
     }
 
     private String getFormattedPropertyIfSet(String name, Object property) {
