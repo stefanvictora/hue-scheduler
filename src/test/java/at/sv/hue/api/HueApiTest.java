@@ -382,6 +382,15 @@ class HueApiTest {
     }
 
     @Test
+    void putState_transitionTime_defaultValueOfFour_isIgnored() {
+        setPutResponse("/lights/" + 16 + "/state", "{}", "[success]");
+
+        boolean success = api.putState(16, null, null, null, null, null, 4, false);
+
+        assertTrue(success, "Put not successful");
+    }
+
+    @Test
     void putState_noResponse_failure() {
         assertResponseMatch = false;
 

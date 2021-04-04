@@ -239,10 +239,16 @@ public final class HueApiImpl implements HueApi {
             this.ct = ct;
             this.bri = bri;
             this.on = on;
-            this.transitiontime = transitiontime;
+            if (isNotDefaultValue(transitiontime)) {
+                this.transitiontime = transitiontime;
+            }
             if (x != null && y != null) {
                 this.xy = new Double[]{x, y};
             }
+        }
+
+        private boolean isNotDefaultValue(Integer transitiontime) {
+            return transitiontime != null && transitiontime != 4;
         }
 
         public Boolean getOn() {
