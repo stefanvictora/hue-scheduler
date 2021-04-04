@@ -135,7 +135,7 @@ public final class HueScheduler {
             Boolean on = null;
             Double x = null;
             Double y = null;
-            int transitionTime = 2;
+            Integer transitionTime = null;
             for (int i = 2; i < parts.length; i++) {
                 String part = parts[i];
                 String[] typeAndValue = part.split(":");
@@ -153,7 +153,7 @@ public final class HueScheduler {
                         on = Boolean.valueOf(typeAndValue[1]);
                         break;
                     case "tr":
-                        transitionTime = Integer.parseInt(typeAndValue[1]);
+                        transitionTime = Integer.valueOf(typeAndValue[1]);
                         break;
                     case "x":
                         x = Double.parseDouble(typeAndValue[1]);
