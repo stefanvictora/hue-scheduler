@@ -105,7 +105,9 @@ public final class HueScheduler {
     }
 
     public void addState(String input) {
-        String[] parts = input.split("\t");
+        String[] parts = input.split("\\t|\\s{4}");
+        if (parts.length < 2)
+            throw new InvalidConfigurationLine("Invalid configuration line '" + input + "': at least id and start time have to be set!");
         for (String idPart : parts[0].split(",")) {
             int id;
             boolean groupState;
