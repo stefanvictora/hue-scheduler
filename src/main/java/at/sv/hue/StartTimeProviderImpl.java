@@ -16,10 +16,14 @@ public final class StartTimeProviderImpl implements StartTimeProvider {
     public LocalTime getStart(String input, ZonedDateTime dateTime) {
         LocalTime time = tryParseTimeString(input);
         if (time != null) return time;
-        if (isOffsetExpression(input)) {
-            return parseOffsetExpresion(input, dateTime);
+        try {
+            if (isOffsetExpression(input)) {
+                return parseOffsetExpresion(input, dateTime);
+            }
+            return parseSunKeywords(input, dateTime);
+        } catch (Exception e) {
+            throw new InvalidStartTimeExpression("Failed to parse start time expression '" + input + "': " + e.getMessage());
         }
-        return parseSunKeywords(input, dateTime);
     }
 
     private LocalTime tryParseTimeString(String input) {
@@ -67,7 +71,7 @@ public final class StartTimeProviderImpl implements StartTimeProvider {
             case "astronomical_end":
                 return sunDataProvider.getAstronomicalEnd(dateTime);
         }
-        throw new IllegalArgumentException("Invalid sun keyword: " + input);
+        throw new IllegalArgumentException("Invalid sun keyword: '" + input + "'");
     }
 
     @Override

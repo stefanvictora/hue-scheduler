@@ -133,7 +133,17 @@ class StartTimeProviderTest {
     }
 
     @Test
+    void parse_keyWord_withOffset_invalidExpression() {
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("sunrise + sunrise", now));
+    }
+
+    @Test
+    void parse_invalidOffsetExpression() {
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("+10", now));
+    }
+
+    @Test
     void parse_invalidKeyword_exception() {
-        assertThrows(IllegalArgumentException.class, () -> provider.getStart("INVALID_KEYWORD", now));
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("INVALID_KEYWORD", now));
     }
 }
