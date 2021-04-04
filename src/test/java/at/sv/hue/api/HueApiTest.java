@@ -254,6 +254,39 @@ class HueApiTest {
     }
 
     @Test
+    void getGroupId_returnsIdForGroupName_reusesResponse() {
+        setGetResponse("/groups", "{\n" +
+                "\"11\": {\n" +
+                "\"name\": \"Group 1\",\n" +
+                "\"lights\": [\n" +
+                "\"1\",\n" +
+                "\"2\"\n" +
+                "]\n" +
+                "},\n" +
+                "\"789\": {\n" +
+                "\"name\": \"Group 2\",\n" +
+                "\"lights\": [\n" +
+                "\"3\",\n" +
+                "\"4\"\n" +
+                "]\n" +
+                "}\n" +
+                "}");
+
+        int groupId1 = api.getGroupId("Group 1");
+        int groupId2 = api.getGroupId("Group 2");
+
+        assertThat("Group id differs", groupId1, is(11));
+        assertThat("Group id differs", groupId2, is(789));
+    }
+
+    @Test
+    void getGroupId_unknownName_exception() {
+        setGetResponse("/groups", "{}");
+
+        assertThrows(GroupNotFoundException.class, () -> api.getGroupId("Unknown Group"));
+    }
+
+    @Test
     void getLightName_returnsNameForLightId() {
         setGetResponse("/lights", "{\n" +
                 "\"7\": {\n" +

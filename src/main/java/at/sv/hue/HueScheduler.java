@@ -1,5 +1,6 @@
 package at.sv.hue;
 
+import at.sv.hue.api.GroupNotFoundException;
 import at.sv.hue.api.HttpResourceProviderImpl;
 import at.sv.hue.api.HueApi;
 import at.sv.hue.api.HueApiImpl;
@@ -111,16 +112,21 @@ public final class HueScheduler {
             String name = "";
             if (idPart.matches("g\\d+")) {
                 id = Integer.parseInt(idPart.substring(1));
-                groupState = true;
                 name = hueApi.getGroupName(id);
+                groupState = true;
             } else if (idPart.matches("\\d+")) {
-                groupState = false;
                 id = Integer.parseInt(idPart);
                 name = hueApi.getLightName(id);
-            } else {
                 groupState = false;
-                id = hueApi.getLightId(idPart);
+            } else {
                 name = idPart;
+                try {
+                    id = hueApi.getGroupId(idPart);
+                    groupState = true;
+                } catch (GroupNotFoundException e) {
+                    id = hueApi.getLightId(idPart);
+                    groupState = false;
+                }
             }
             Integer bri = null;
             Integer ct = null;

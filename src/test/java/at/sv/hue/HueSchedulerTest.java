@@ -1,6 +1,8 @@
 package at.sv.hue;
 
+import at.sv.hue.api.GroupNotFoundException;
 import at.sv.hue.api.HueApi;
+import at.sv.hue.api.LightNotFoundException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -12,10 +14,7 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeParseException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.function.Consumer;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -30,13 +29,13 @@ class HueSchedulerTest {
     private HueScheduler scheduler;
     private ZonedDateTime now;
     private ZonedDateTime initialNow;
-    private List<GetState> lightGetStates;
-    private List<GetState> groupGetStates;
     private List<PutState> putStates;
-    private List<String> lightIdLookups;
-    private List<LightState> lightStateResponses;
-    private List<List<Integer>> groupLightsResponses;
-    private List<Integer> lightIdResponses;
+    private Set<Integer> knownGroupIds;
+    private Set<Integer> knownLightIds;
+    private Map<String, Integer> lightIdsForName;
+    private Map<String, Integer> groupIdsForName;
+    private Map<Integer, LightState> lightStatesForId;
+    private Map<Integer, List<Integer>> groupLightsForId;
     private int defaultCt;
     private int defaultBrightness;
     private int id;
@@ -69,9 +68,9 @@ class HueSchedulerTest {
         HueApi hueApi = new HueApi() {
             @Override
             public LightState getLightState(int id) {
-                lightGetStates.add(new GetState(id));
-                assertFalse(lightStateResponses.isEmpty(), "TestCase mis-configured or error: no lightState response available");
-                return lightStateResponses.remove(0);
+                LightState lightState = lightStatesForId.remove(id);
+                assertNotNull(lightState, "Unexpected getLightState call!");
+                return lightState;
             }
 
             @Override
@@ -83,25 +82,39 @@ class HueSchedulerTest {
 
             @Override
             public List<Integer> getGroupLights(int groupId) {
-                groupGetStates.add(new GetState(groupId));
-                assertFalse(groupLightsResponses.isEmpty(), "TestCase mis-configured or error: no groupLights response available");
-                return groupLightsResponses.remove(0);
+                List<Integer> lights = groupLightsForId.remove(groupId);
+                if (lights == null)
+                    throw new GroupNotFoundException("Not lights for group with id " + groupId + " found!");
+                return lights;
+            }
+
+            @Override
+            public int getGroupId(String name) {
+                Integer id = groupIdsForName.remove(name);
+                if (id == null) throw new GroupNotFoundException("Group with name '" + name + "' not found!");
+                return id;
             }
 
             @Override
             public String getGroupName(int groupId) {
+                if (!knownGroupIds.contains(groupId)) {
+                    throw new GroupNotFoundException("Group with id " + groupId + " not known!");
+                }
                 return "Group";
             }
 
             @Override
             public int getLightId(String name) {
-                lightIdLookups.add(name);
-                assertFalse(lightIdResponses.isEmpty(), "TestCase mis-configured or error: no lightId response available");
-                return lightIdResponses.remove(0);
+                Integer id = lightIdsForName.remove(name);
+                if (id == null) throw new LightNotFoundException("Light with name '" + name + "' not found!");
+                return id;
             }
 
             @Override
             public String getLightName(int id) {
+                if (!knownLightIds.contains(id)) {
+                    throw new LightNotFoundException("Light with id " + id + " not known!");
+                }
                 return "Name";
             }
         };
@@ -141,13 +154,9 @@ class HueSchedulerTest {
     }
 
     private void addGroupState(int groupId, ZonedDateTime start, Integer... lights) {
-        groupLightsResponses.add(Arrays.asList(lights));
+        addGroupLightsForId(groupId, lights);
         scheduler.addGroupState("Name", groupId, start.toLocalTime().toString(), defaultBrightness, defaultCt,
                 null, null, null, defaultTransitionTime);
-    }
-
-    private void addLightStateResponse(boolean reachable, boolean on) {
-        lightStateResponses.add(new LightState(defaultBrightness, defaultCt, null, null, reachable, on));
     }
 
     private void startScheduler() {
@@ -174,28 +183,16 @@ class HueSchedulerTest {
         assertThat("isGroupState differs", putState.groupState, is(groupState));
     }
 
-    private void assertLightGetState(int id) {
-        assertGetState(id, lightGetStates);
+    private void addLightIdForName(String name, int id) {
+        lightIdsForName.put(name, id);
     }
 
-    private void assertGroupGetState(int id) {
-        assertGetState(id, groupGetStates);
+    private void addGroupLightsForId(int groupId, Integer... lights) {
+        groupLightsForId.put(groupId, Arrays.asList(lights));
     }
 
-    private void assertGetState(int id, List<GetState> states) {
-        assertTrue(states.size() > 0, "No more get states to assert");
-        GetState getState = states.remove(0);
-        assertThat("ID differs", getState.id, is(id));
-    }
-
-    private void assertLightIdLookup(String name) {
-        assertTrue(lightIdLookups.size() > 0, "No more lightId lookups to assert");
-        String lookup = lightIdLookups.remove(0);
-        assertThat("Name differs", lookup, is(name));
-    }
-
-    private void addLightIdResponse(int id) {
-        lightIdResponses.add(id);
+    private void addGroupIdForName(String name, int id) {
+        groupIdsForName.put(name, id);
     }
 
     private void runAndAssertConfirmations() {
@@ -253,9 +250,12 @@ class HueSchedulerTest {
 
     private void runAndAssertApiCalls(ScheduledRunnable state, boolean reachable, boolean onState, Integer putBrightness,
                                       Integer putCt, Double putX, Double putY, Boolean putOn, Integer putTransitionTime, boolean groupState) {
-        addLightStateResponse(reachable, onState);
+        addLightStateResponse(id, reachable, onState);
         runAndAssertPutCall(state, putBrightness, putCt, putX, putY, putOn, putTransitionTime, groupState);
-        assertLightGetState(id);
+    }
+
+    private void addLightStateResponse(int id, boolean reachable, boolean on) {
+        lightStatesForId.put(id, new LightState(defaultBrightness, defaultCt, null, null, reachable, on));
     }
 
     private void runAndAssertPutCall(ScheduledRunnable state, Integer putBrightness, Integer putCt, Double putX, Double putY,
@@ -309,6 +309,14 @@ class HueSchedulerTest {
         addState(1, now, null, null, false);
     }
 
+    private void addKnownLightIds(Integer... ids) {
+        knownLightIds.addAll(Arrays.asList(ids));
+    }
+
+    private void addKnownGroupIds(Integer... ids) {
+        knownGroupIds.addAll(Arrays.asList(ids));
+    }
+
     @BeforeEach
     void setUp() {
         apiPutSuccessful = true;
@@ -317,13 +325,13 @@ class HueSchedulerTest {
         nextNextDaysSunrises = LocalTime.of(7, 15);
         stateScheduler = new TestStateScheduler();
         setCurrentAndInitialTimeTo(ZonedDateTime.of(2021, 1, 1, 0, 0, 0, 0, ZoneId.systemDefault()));
-        lightGetStates = new ArrayList<>();
         putStates = new ArrayList<>();
-        lightStateResponses = new ArrayList<>();
-        lightIdLookups = new ArrayList<>();
-        lightIdResponses = new ArrayList<>();
-        groupGetStates = new ArrayList<>();
-        groupLightsResponses = new ArrayList<>();
+        lightStatesForId = new HashMap<>();
+        lightIdsForName = new HashMap<>();
+        groupIdsForName = new HashMap<>();
+        groupLightsForId = new HashMap<>();
+        knownGroupIds = new HashSet<>();
+        knownLightIds = new HashSet<>();
         retryDelay = 1;
         confirmDelay = 2;
         defaultCt = 500;
@@ -335,21 +343,17 @@ class HueSchedulerTest {
 
     @AfterEach
     void tearDown() {
-        assertEquals(0, lightGetStates.size(), "Not all lightGetState calls asserted");
         assertEquals(0, putStates.size(), "Not all putState calls asserted");
-        assertEquals(0, lightIdLookups.size(), "Not all lightIdLookups asserted");
-        assertEquals(0, lightIdResponses.size(), "Not all lightIdResponses returned");
-        assertEquals(0, lightStateResponses.size(), "Not all lightStateResponses returned");
-        assertEquals(0, groupGetStates.size(), "Not all groupGetState calls asserted");
-        assertEquals(0, groupLightsResponses.size(), "Not all groupLightResponses returned");
+        assertEquals(0, lightIdsForName.size(), "Not all lightIdsForName looked up");
+        assertEquals(0, groupIdsForName.size(), "Not all groupIdsForName looked up");
+        assertEquals(0, lightStatesForId.size(), "Not all lightStatesForId looked up");
+        assertEquals(0, groupLightsForId.size(), "Not all groupLightsForId looked up");
         ensureScheduledStates(0);
     }
 
     @Test
     void run_groupState_looksUpContainingLights_addsState() {
         addGroupState(9, now, 1, 2, 3);
-
-        assertGroupGetState(9);
 
         startScheduler();
 
@@ -361,8 +365,6 @@ class HueSchedulerTest {
     void run_groupState_andLightState_sameId_treatedDifferently_endIsCalculatedIndependently() {
         addGroupState(1, now, 1);
         addState(1, now);
-
-        assertGroupGetState(1);
 
         startScheduler();
 
@@ -442,11 +444,23 @@ class HueSchedulerTest {
     }
 
     @Test
+    void parse_unknownLightId_exception() {
+        assertThrows(LightNotFoundException.class, () -> addState("1\t12:00\ton:true"));
+    }
+
+    @Test
+    void parse_unknownGroupId_exception() {
+        assertThrows(GroupNotFoundException.class, () -> addState("g1\t12:00\ton:true"));
+    }
+
+    @Test
     void parse_parsesInputLine_createsMultipleStates_canHandleGroups() {
         String time = now.toLocalTime().toString();
-        groupLightsResponses.add(Collections.singletonList(77));
-        addState("1,2,g9\t" + time + "\tbri:" + defaultBrightness + "\tct:" + defaultCt);
-        assertGroupGetState(9);
+        int groupId = 9;
+        addGroupLightsForId(groupId, 77);
+        addKnownLightIds(1, 2);
+        addKnownGroupIds(groupId);
+        addState("1,2,g" + groupId + "\t" + time + "\tbri:" + defaultBrightness + "\tct:" + defaultCt);
 
         startScheduler();
 
@@ -463,11 +477,13 @@ class HueSchedulerTest {
 
     @Test
     void parse_unknownFlag_exception() {
+        addKnownLightIds(1);
         assertThrows(UnknownStateProperty.class, () -> addState("1\t10:00\tUNKNOWN:1"));
     }
 
     @Test
     void parse_missingTime_exception() {
+        addKnownLightIds(1);
         assertThrows(DateTimeParseException.class, () -> {
             addState("1\tct:" + defaultCt);
             startScheduler();
@@ -476,6 +492,7 @@ class HueSchedulerTest {
 
     @Test
     void parse_setsTransitionTime() {
+        addKnownLightIds(1);
         String time = now.toLocalTime().toString();
         addState("1\t" + time + "\tbri:" + defaultBrightness + "\ttr:" + 5);
 
@@ -494,6 +511,7 @@ class HueSchedulerTest {
 
     @Test
     void parse_canHandleColorInput_viaXAndY() {
+        addKnownLightIds(1);
         String time = now.toLocalTime().toString();
         double x = 0.6075;
         double y = 0.3525;
@@ -514,6 +532,7 @@ class HueSchedulerTest {
 
     @Test
     void parse_canHandleColorTemperatureInKelvin_correctlyTranslatedToMired() {
+        addKnownLightIds(1);
         String time = now.toLocalTime().toString();
         int kelvin = 6500;
         addState("1\t" + time + "\tk:" + kelvin);
@@ -533,6 +552,7 @@ class HueSchedulerTest {
 
     @Test
     void parse_detectsOnProperty() {
+        addKnownLightIds(1);
         String time = now.toLocalTime().toString();
         addState("1\t" + time + "\ton:" + true);
 
@@ -548,6 +568,7 @@ class HueSchedulerTest {
 
     @Test
     void parse_sunrise_callsStartTimeProvider_usesUpdatedSunriseTimeNextDay() {
+        addKnownLightIds(1);
         setCurrentAndInitialTimeTo(now.with(sunrise).minusHours(1));
         addState(1, now); // one hour before sunrise
         addState("1\tsunrise\tbri:" + defaultBrightness + "\tct:" + defaultCt);
@@ -566,6 +587,7 @@ class HueSchedulerTest {
 
     @Test
     void parse_sunrise_singleState_callsStartTimeProvider_calculatesInitialAndNextEndCorrectly() {
+        addKnownLightIds(1);
         setCurrentAndInitialTimeTo(now.with(sunrise));
         addState("1\tsunrise\tbri:" + defaultBrightness + "\tct:" + defaultCt);
 
@@ -591,6 +613,7 @@ class HueSchedulerTest {
 
     @Test
     void parse_nullState_treatedCorrectly_notAddedAsState() {
+        addKnownLightIds(1);
         addState("1\tsunrise\tct:" + defaultCt);
         addState("1\tsunrise+10");
         startScheduler();
@@ -601,10 +624,26 @@ class HueSchedulerTest {
     @Test
     void parse_useLampNameInsteadOfId_nameIsCorrectlyResolved() {
         String name = "gKitchen Lamp";
-        addLightIdResponse(2);
+        addLightIdForName(name, 2);
         addState(name + "\t12:00\tct:" + defaultCt);
 
-        assertLightIdLookup(name);
+        startScheduler();
+
+        ensureScheduledStates(2);
+    }
+
+    @Test
+    void parse_unknownLampName_exception() {
+        assertThrows(LightNotFoundException.class, () -> addState("Unknown Light\t12:00\tct:" + defaultCt));
+    }
+
+    @Test
+    void parse_useGroupNameInsteadOfId_nameIsCorrectlyResolved() {
+        String name = "Kitchen";
+        int id = 12345;
+        addGroupIdForName(name, id);
+        addGroupLightsForId(id, 1, 2);
+        addState(name + "\t12:00\tct:" + defaultCt);
 
         startScheduler();
 
@@ -651,7 +690,6 @@ class HueSchedulerTest {
     @Test
     void run_execution_groupState_correctPutCall() {
         addGroupState(10, now, 1, 2, 3);
-        assertGroupGetState(10);
         startScheduler();
 
         List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(1);
@@ -780,7 +818,7 @@ class HueSchedulerTest {
         ScheduledRunnable confirmRunnable = ensureConfirmRunnable();
 
         setCurrentTimeTo(firstStart);
-        
+
         confirmRunnable.run(); // should abort, as now the first state already starts
 
         // no next day runnable, as it was just a temporary copy
@@ -925,14 +963,6 @@ class HueSchedulerTest {
         advanceTimeAndRunAndAssertTurnOffApiCall(false, retryState, true);
 
         ensureRunnable(initialNow.plusDays(1));
-    }
-
-    private static final class GetState {
-        int id;
-
-        public GetState(int id) {
-            this.id = id;
-        }
     }
 
     private static final class PutState {

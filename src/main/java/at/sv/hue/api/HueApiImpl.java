@@ -24,6 +24,7 @@ public final class HueApiImpl implements HueApi {
     private Map<Integer, Light> availableLights;
     private Map<Integer, Group> availableGroups;
     private Map<String, Integer> lightNameToIdMap;
+    private Map<String, Integer> groupNameToIdMap;
 
     public HueApiImpl(HttpResourceProvider resourceProvider, String ip, String username) {
         this.resourceProvider = resourceProvider;
@@ -117,6 +118,25 @@ public final class HueApiImpl implements HueApi {
     }
 
     @Override
+    public int getGroupId(String name) {
+        Integer groupId = getOrLookupGroupNameToIdMap().get(name);
+        if (groupId == null) {
+            throw new GroupNotFoundException("Group with name '" + name + "' was not found!");
+        }
+        return groupId;
+    }
+
+    private Map<String, Integer> getOrLookupGroupNameToIdMap() {
+        synchronized (groupMapLock) {
+            if (groupNameToIdMap == null) {
+                groupNameToIdMap = new HashMap<>();
+                getOrLookupGroups().forEach((id, group) -> groupNameToIdMap.put(group.name, id));
+            }
+        }
+        return groupNameToIdMap;
+    }
+
+    @Override
     public String getGroupName(int groupId) {
         Group group = getOrLookupGroups().get(groupId);
         if (group == null) {
@@ -138,7 +158,7 @@ public final class HueApiImpl implements HueApi {
         synchronized (lightMapLock) {
             if (lightNameToIdMap == null) {
                 lightNameToIdMap = new HashMap<>();
-                getOrLookupLights().forEach((key, light) -> lightNameToIdMap.put(light.name, key));
+                getOrLookupLights().forEach((id, light) -> lightNameToIdMap.put(light.name, id));
             }
         }
         return lightNameToIdMap;
