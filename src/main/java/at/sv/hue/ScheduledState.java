@@ -74,7 +74,7 @@ final class ScheduledState {
         return ct;
     }
 
-    public long getDelay(ZonedDateTime now) {
+    public long getDelayInSeconds(ZonedDateTime now) {
         Duration between = Duration.between(now, getZonedStart(now));
         if (between.isNegative()) {
             return 0;
@@ -105,7 +105,7 @@ final class ScheduledState {
     }
 
     public boolean isInThePast(ZonedDateTime now) {
-        return getDelay(now) == 0;
+        return getDelayInSeconds(now) == 0;
     }
 
     public LocalTime getStart(ZonedDateTime dateTime) {

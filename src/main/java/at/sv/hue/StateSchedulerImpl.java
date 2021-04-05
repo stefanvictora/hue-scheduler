@@ -18,7 +18,7 @@ public final class StateSchedulerImpl implements StateScheduler {
 
     @Override
     public void schedule(Runnable runnable, ZonedDateTime start) {
-        scheduledExecutorService.schedule(runnable, Duration.between(currentTime.get(), start).getSeconds(), TimeUnit.SECONDS);
+        scheduledExecutorService.schedule(runnable, Duration.between(currentTime.get(), start).toMillis(), TimeUnit.MILLISECONDS);
     }
 
     @Override

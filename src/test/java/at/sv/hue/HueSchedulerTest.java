@@ -133,7 +133,7 @@ class HueSchedulerTest {
             } else {
                 return LocalTime.parse(input);
             }
-        }, () -> now, () -> retryDelay, confirmDelay);
+        }, () -> now, () -> retryDelay * 1000, confirmDelay);
     }
 
     private void addState(int id, ZonedDateTime startTime) {

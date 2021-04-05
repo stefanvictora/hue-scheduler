@@ -15,6 +15,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
@@ -35,19 +36,19 @@ public final class HueScheduler {
     private final int confirmDelay;
 
     public HueScheduler(HueApi hueApi, StateScheduler stateScheduler, StartTimeProvider startTimeProvider,
-                        Supplier<ZonedDateTime> currentTime, Supplier<Integer> retryDelay, int confirmDelay) {
+                        Supplier<ZonedDateTime> currentTime, Supplier<Integer> retryDelayInMs, int confirmDelayInSeconds) {
         this.hueApi = hueApi;
         this.stateScheduler = stateScheduler;
         this.startTimeProvider = startTimeProvider;
         this.currentTime = currentTime;
         lightStates = new HashMap<>();
-        this.retryDelay = retryDelay;
-        this.confirmDelay = confirmDelay;
+        this.retryDelay = retryDelayInMs;
+        this.confirmDelay = confirmDelayInSeconds * 1000;
     }
 
     public static void main(String[] args) throws IOException {
         if (args.length != 7) {
-            System.out.println("Usage: hue-scheduler bridgeIp bridgeUsername latitude longitude retryDelayMaxSeconds confirmDelaySeconds inputFilePath");
+            System.out.println("Usage: hue-scheduler bridgeIp bridgeUsername latitude longitude retryMaxDelaySeconds confirmDelaySeconds inputFilePath");
             System.exit(1);
         }
         HueApi hueApi = new HueApiImpl(new HttpResourceProviderImpl(), args[0], args[1]);
@@ -92,7 +93,7 @@ public final class HueScheduler {
     }
 
     private static int getRandomRetryDelay(int retryMaxValue) {
-        return ThreadLocalRandom.current().nextInt(1, retryMaxValue + 1);
+        return ThreadLocalRandom.current().nextInt(1000, retryMaxValue * 1000 + 1);
     }
 
     private static Path getPathAndAssertReadable(String arg) {
@@ -261,13 +262,13 @@ public final class HueScheduler {
 
     private void schedule(ScheduledState state, ZonedDateTime now) {
         state.updateLastStart(now);
-        schedule(state, state.getDelay(now));
+        schedule(state, state.getDelayInSeconds(now) * 1000L);
     }
 
-    private void schedule(ScheduledState state, long delayInSeconds) {
+    private void schedule(ScheduledState state, long delayInMs) {
         if (state.isNullState()) return;
-        if (delayInSeconds == 0 || delayInSeconds > 5) {
-            LOG.debug("Schedule {} in {}", state, Duration.ofSeconds(delayInSeconds));
+        if (delayInMs == 0 || delayInMs > Math.max(5000, confirmDelay)) {
+            LOG.debug("Schedule {} in {}", state, Duration.ofMillis(delayInMs));
         }
         stateScheduler.schedule(() -> {
             if (state.endsAfter(currentTime.get())) {
@@ -304,7 +305,7 @@ public final class HueScheduler {
                 LOG.debug("{} fully confirmed", state);
                 scheduleNextDay(state);
             }
-        }, currentTime.get().plusSeconds(delayInSeconds));
+        }, currentTime.get().plus(delayInMs, ChronoUnit.MILLIS));
     }
 
     private boolean hasMorePastStates(List<ScheduledState> states, int i) {
@@ -327,7 +328,7 @@ public final class HueScheduler {
         if (state.isTemporary()) return;
         state.resetConfirmations();
         recalculateEnd(state, now);
-        schedule(state, state.secondsUntilNextDayFromStart(now));
+        schedule(state, state.secondsUntilNextDayFromStart(now) * 1000L);
         state.updateLastStart(now);
     }
 
