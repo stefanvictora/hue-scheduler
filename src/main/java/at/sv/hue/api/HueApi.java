@@ -10,7 +10,8 @@ public interface HueApi {
     /**
      * @return true if the put api call was successful, false otherwise
      */
-    boolean putState(int id, Integer bri, Double x, Double y, Integer ct, Boolean on, Integer transitionTime, boolean groupState);
+    boolean putState(int id, Integer bri, Integer ct, Double x, Double y, Integer hue, Integer sat, Boolean on,
+                     Integer transitionTime, boolean groupState);
 
     /**
      * @throws GroupNotFoundException if no group with given id was found

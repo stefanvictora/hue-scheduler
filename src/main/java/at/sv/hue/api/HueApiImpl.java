@@ -77,9 +77,10 @@ public final class HueApiImpl implements HueApi {
     }
 
     @Override
-    public boolean putState(int id, Integer bri, Double x, Double y, Integer ct, Boolean on, Integer transitionTime,
+    public boolean putState(int id, Integer bri, Integer ct, Double x, Double y, Integer hue, Integer sat, Boolean on, Integer transitionTime,
                             boolean groupState) {
-        String response = resourceProvider.putResource(getUpdateUrl(id, groupState), getBody(new State(ct, bri, x, y, on, transitionTime)));
+        String response = resourceProvider.putResource(getUpdateUrl(id, groupState),
+                getBody(new State(bri, ct, x, y, hue, sat, on, transitionTime)));
         if (response == null) {
             return false;
         }
@@ -225,19 +226,23 @@ public final class HueApiImpl implements HueApi {
     }
 
     private static final class State {
+        Integer bri;
+        Integer ct;
+        Double[] xy;
+        Integer hue;
+        Integer sat;
         Boolean on;
         Boolean reachable;
-        Double[] xy;
-        Integer ct;
-        Integer bri;
         Integer transitiontime;
 
         public State() {
         }
 
-        public State(Integer ct, Integer bri, Double x, Double y, Boolean on, Integer transitiontime) {
+        public State(Integer bri, Integer ct, Double x, Double y, Integer hue, Integer sat, Boolean on, Integer transitiontime) {
             this.ct = ct;
             this.bri = bri;
+            this.hue = hue;
+            this.sat = sat;
             this.on = on;
             if (isNotDefaultValue(transitiontime)) {
                 this.transitiontime = transitiontime;
@@ -251,12 +256,60 @@ public final class HueApiImpl implements HueApi {
             return transitiontime != null && transitiontime != 4;
         }
 
+        public Integer getBri() {
+            return bri;
+        }
+
+        public void setBri(Integer bri) {
+            this.bri = bri;
+        }
+
+        public Integer getCt() {
+            return ct;
+        }
+
+        public void setCt(Integer ct) {
+            this.ct = ct;
+        }
+
+        public Double[] getXy() {
+            return xy;
+        }
+
+        public void setXy(Double[] xy) {
+            this.xy = xy;
+        }
+
+        public Integer getHue() {
+            return hue;
+        }
+
+        public void setHue(Integer hue) {
+            this.hue = hue;
+        }
+
+        public Integer getSat() {
+            return sat;
+        }
+
+        public void setSat(Integer sat) {
+            this.sat = sat;
+        }
+
         public Boolean getOn() {
             return on;
         }
 
         public void setOn(Boolean on) {
             this.on = on;
+        }
+
+        public Integer getTransitiontime() {
+            return transitiontime;
+        }
+
+        public void setTransitiontime(Integer transitiontime) {
+            this.transitiontime = transitiontime;
         }
 
         public Boolean getReachable() {
@@ -269,38 +322,6 @@ public final class HueApiImpl implements HueApi {
 
         public Boolean isReachable() {
             return reachable;
-        }
-
-        public Double[] getXy() {
-            return xy;
-        }
-
-        public void setXy(Double[] xy) {
-            this.xy = xy;
-        }
-
-        public Integer getCt() {
-            return ct;
-        }
-
-        public void setCt(Integer ct) {
-            this.ct = ct;
-        }
-
-        public Integer getBri() {
-            return bri;
-        }
-
-        public void setBri(Integer bri) {
-            this.bri = bri;
-        }
-
-        public Integer getTransitiontime() {
-            return transitiontime;
-        }
-
-        public void setTransitiontime(Integer transitiontime) {
-            this.transitiontime = transitiontime;
         }
     }
 

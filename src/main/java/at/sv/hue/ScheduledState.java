@@ -19,6 +19,8 @@ final class ScheduledState {
     private final Integer ct;
     private final Double x;
     private final Double y;
+    private final Integer hue;
+    private final Integer sat;
     private final Boolean on;
     private final Integer transitionTime;
     private final StartTimeProvider startTimeProvider;
@@ -28,13 +30,13 @@ final class ScheduledState {
     private ZonedDateTime lastStart;
     private boolean temporary;
 
-    public ScheduledState(String name, int id, String start, Integer brightness, Integer ct, Double x, Double y, Boolean on, Integer transitionTime,
-                          StartTimeProvider startTimeProvider) {
-        this(name, id, id, start, brightness, ct, x, y, on, transitionTime, startTimeProvider, false);
+    public ScheduledState(String name, int id, String start, Integer brightness, Integer ct, Double x, Double y,
+                          Integer hue, Integer sat, Boolean on, Integer transitionTime, StartTimeProvider startTimeProvider) {
+        this(name, id, id, start, brightness, ct, x, y, hue, sat, on, transitionTime, startTimeProvider, false);
     }
 
-    public ScheduledState(String name, int updateId, int statusId, String start, Integer brightness, Integer ct, Double x, Double y, Boolean on,
-                          Integer transitionTime, StartTimeProvider startTimeProvider, boolean groupState) {
+    public ScheduledState(String name, int updateId, int statusId, String start, Integer brightness, Integer ct, Double x, Double y,
+                          Integer hue, Integer sat, Boolean on, Integer transitionTime, StartTimeProvider startTimeProvider, boolean groupState) {
         this.name = name;
         this.updateId = updateId;
         this.statusId = statusId;
@@ -43,6 +45,8 @@ final class ScheduledState {
         this.ct = assertValidCtValue(ct);
         this.x = x;
         this.y = y;
+        this.hue = assertValidHueValue(hue);
+        this.sat = assertValidSaturationValue(sat);
         this.on = on;
         this.transitionTime = transitionTime;
         this.startTimeProvider = startTimeProvider;
@@ -53,7 +57,7 @@ final class ScheduledState {
 
     public static ScheduledState createTemporaryCopy(ScheduledState state, ZonedDateTime start, ZonedDateTime end) {
         ScheduledState copy = new ScheduledState(state.name, state.updateId, state.statusId, start.toLocalTime().toString(),
-                state.brightness, state.ct, state.x, state.y, state.on, state.transitionTime, state.startTimeProvider, state.groupState);
+                state.brightness, state.ct, state.x, state.y, state.hue, state.sat, state.on, state.transitionTime, state.startTimeProvider, state.groupState);
         copy.end = end;
         copy.temporary = true;
         copy.lastStart = start;
@@ -62,16 +66,30 @@ final class ScheduledState {
 
     private Integer assertValidBrightnessValue(Integer brightness) {
         if (brightness != null && (brightness > 254 || brightness < 1)) {
-            throw new InvalidBrightnessValue("Invalid brightness value '" + brightness + "'. Allowed range: 1-254");
+            throw new InvalidBrightnessValue("Invalid brightness value '" + brightness + "'. Allowed integer range: 1-254");
         }
         return brightness;
     }
 
     private Integer assertValidCtValue(Integer ct) {
         if (ct != null && (ct > 500 || ct < 153)) {
-            throw new InvalidColorTemperatureValue("Invalid ct value '" + ct + "'. Allowed range: 153-500");
+            throw new InvalidColorTemperatureValue("Invalid ct value '" + ct + "'. Allowed integer range: 153-500");
         }
         return ct;
+    }
+
+    private Integer assertValidHueValue(Integer hue) {
+        if (hue != null && (hue > 65535 || hue < 0)) {
+            throw new InvalidHueValue("Invalid hue value '" + hue + "'. Allowed integer range: 0-65535");
+        }
+        return hue;
+    }
+
+    private Integer assertValidSaturationValue(Integer sat) {
+        if (sat != null && (sat > 254 || sat < 0)) {
+            throw new InvalidSaturationValue("Invalid saturation value '" + sat + "'. Allowed integer range: 0-254");
+        }
+        return sat;
     }
 
     public long getDelayInSeconds(ZonedDateTime now) {
@@ -140,6 +158,14 @@ final class ScheduledState {
         return y;
     }
 
+    public Integer getHue() {
+        return hue;
+    }
+
+    public Integer getSat() {
+        return sat;
+    }
+
     public Boolean getOn() {
         return on;
     }
@@ -181,7 +207,7 @@ final class ScheduledState {
     }
 
     public boolean isNullState() {
-        return brightness == null && ct == null && on == null && x == null && y == null;
+        return brightness == null && ct == null && on == null && x == null && y == null && hue == null && sat == null;
     }
 
     public boolean isOff() {
@@ -212,6 +238,8 @@ final class ScheduledState {
                 getFormattedPropertyIfSet("ct", ct) +
                 getFormattedPropertyIfSet("x", x) +
                 getFormattedPropertyIfSet("y", y) +
+                getFormattedPropertyIfSet("hue", hue) +
+                getFormattedPropertyIfSet("sat", sat) +
                 ", transitionTime=" + getFormattedTransitionTime() +
                 '}';
     }
