@@ -43,8 +43,8 @@ final class ScheduledState {
         this.start = start;
         this.brightness = assertValidBrightnessValue(brightness);
         this.ct = assertValidCtValue(ct);
-        this.x = x;
-        this.y = y;
+        this.x = assertValidXAndY(x);
+        this.y = assertValidXAndY(y);
         this.hue = assertValidHueValue(hue);
         this.sat = assertValidSaturationValue(sat);
         this.on = on;
@@ -76,6 +76,13 @@ final class ScheduledState {
             throw new InvalidColorTemperatureValue("Invalid ct value '" + ct + "'. Allowed integer range: 153-500");
         }
         return ct;
+    }
+
+    private Double assertValidXAndY(Double xOrY) {
+        if (xOrY != null && (xOrY > 1 || xOrY < 0)) {
+            throw new InvalidXAndYValue("Invalid x or y value '" + xOrY + "'. Allowed double range: 0-1");
+        }
+        return xOrY;
     }
 
     private Integer assertValidHueValue(Integer hue) {

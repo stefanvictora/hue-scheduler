@@ -755,6 +755,18 @@ class HueSchedulerTest {
     }
 
     @Test
+    void parse_invalidXAndYValue_tooHigh_exception() {
+        addKnownLightIds(1);
+        assertThrows(InvalidXAndYValue.class, () -> addState("1\t" + nowTimeString + "\tx:" + 1.1));
+    }
+
+    @Test
+    void parse_invalidXAndYValue_tooLow_exception() {
+        addKnownLightIds(1);
+        assertThrows(InvalidXAndYValue.class, () -> addState("1\t" + nowTimeString + "\ty:" + -0.1));
+    }
+
+    @Test
     void run_execution_reachable_runsConfirmations_startsAgainNextDay_repeats() {
         addDefaultState();
         startScheduler();
