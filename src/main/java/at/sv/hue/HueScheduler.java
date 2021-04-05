@@ -168,7 +168,7 @@ public final class HueScheduler {
             }
             String start = parts[1];
             if (groupState) {
-                addGroupState(name, id, start, bri, ct, null, null, on, transitionTime);
+                addGroupState(name, id, start, bri, ct, x, y, on, transitionTime);
             } else {
                 addState(name, id, start, bri, ct, x, y, on, transitionTime);
             }

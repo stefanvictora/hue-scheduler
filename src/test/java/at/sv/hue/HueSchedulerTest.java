@@ -45,6 +45,7 @@ class HueSchedulerTest {
     private boolean apiPutSuccessful;
     private int retryDelay;
     private int confirmDelay;
+    private String nowTimeString;
 
     private void setCurrentTimeTo(ZonedDateTime newTime) {
         if (now != null && newTime.isBefore(now)) {
@@ -68,7 +69,7 @@ class HueSchedulerTest {
             @Override
             public LightState getLightState(int id) {
                 LightState lightState = lightStatesForId.remove(id);
-                assertNotNull(lightState, "Unexpected getLightState call!");
+                assertNotNull(lightState, "No light state call expected with id " + id + "!");
                 return lightState;
             }
 
@@ -203,11 +204,11 @@ class HueSchedulerTest {
     }
 
     private void runAndAssertConfirmations(int brightness, int ct, boolean groupState) {
-        runAndAssertConfirmations(true, true, groupState, brightness, ct, null, null, null, null);
+        runAndAssertConfirmations(true, true, brightness, ct, null, null, null, null, groupState);
     }
 
-    private void runAndAssertConfirmations(boolean reachable, boolean onState, boolean groupState, Integer putBrightness,
-                                           Integer putCt, Double putX, Double putY, Boolean putOn, Integer putTransitionTime) {
+    private void runAndAssertConfirmations(boolean reachable, boolean onState, Integer putBrightness, Integer putCt,
+                                           Double putX, Double putY, Boolean putOn, Integer putTransitionTime, boolean groupState) {
         runAndAssertConfirmations(state ->
                 advanceTimeAndRunAndAssertApiCalls(state, reachable, onState, putBrightness, putCt, putX, putY, putOn, putTransitionTime, groupState));
     }
@@ -324,6 +325,7 @@ class HueSchedulerTest {
         nextNextDaysSunrises = LocalTime.of(7, 15);
         stateScheduler = new TestStateScheduler();
         setCurrentAndInitialTimeTo(ZonedDateTime.of(2021, 1, 1, 0, 0, 0, 0, ZoneId.systemDefault()));
+        nowTimeString = now.toLocalTime().toString();
         putStates = new ArrayList<>();
         lightStatesForId = new HashMap<>();
         lightIdsForName = new HashMap<>();
@@ -453,12 +455,11 @@ class HueSchedulerTest {
 
     @Test
     void parse_parsesInputLine_createsMultipleStates_canHandleGroups() {
-        String time = now.toLocalTime().toString();
         int groupId = 9;
         addGroupLightsForId(groupId, 77);
         addKnownLightIds(1, 2);
         addKnownGroupIds(groupId);
-        addState("1,2,g" + groupId + "\t" + time + "\tbri:" + defaultBrightness + "\tct:" + defaultCt);
+        addState("1,2,g" + groupId + "\t" + nowTimeString + "\tbri:" + defaultBrightness + "\tct:" + defaultCt);
 
         startScheduler();
 
@@ -476,11 +477,11 @@ class HueSchedulerTest {
     @Test
     void parse_alsoSupportsFourSpacesInsteadOfTabs() {
         addKnownLightIds(1);
-        addState("1    12:00    bri:" + defaultBrightness + "    ct:" + defaultCt);
+        addState("1    " + nowTimeString + "    bri:" + defaultBrightness + "    ct:" + defaultCt);
 
         startScheduler();
 
-        ensureScheduledStates(2);
+        ensureScheduledStates(1);
     }
 
     @Test
@@ -507,8 +508,7 @@ class HueSchedulerTest {
     @Test
     void parse_setsTransitionTime() {
         addKnownLightIds(1);
-        String time = now.toLocalTime().toString();
-        addState("1\t" + time + "\tbri:" + defaultBrightness + "\ttr:" + 5);
+        addState("1\t" + nowTimeString + "\tbri:" + defaultBrightness + "\ttr:" + 5);
 
         startScheduler();
 
@@ -517,8 +517,8 @@ class HueSchedulerTest {
         advanceTimeAndRunAndAssertApiCalls(scheduledRunnables.get(0), true, true, defaultBrightness,
                 null, null, null, null, 5, false);
 
-        runAndAssertConfirmations(true, true, false, defaultBrightness, null, null, null, null,
-                5);
+        runAndAssertConfirmations(true, true, defaultBrightness, null, null, null,
+                null, 5, false);
 
         ensureRunnable(initialNow.plusDays(1));
     }
@@ -526,10 +526,9 @@ class HueSchedulerTest {
     @Test
     void parse_canHandleColorInput_viaXAndY() {
         addKnownLightIds(1);
-        String time = now.toLocalTime().toString();
         double x = 0.6075;
         double y = 0.3525;
-        addState("1\t" + time + "\tx:" + x + "\ty:" + y);
+        addState("1\t" + nowTimeString + "\tx:" + x + "\ty:" + y);
 
         startScheduler();
 
@@ -538,8 +537,29 @@ class HueSchedulerTest {
         advanceTimeAndRunAndAssertApiCalls(scheduledRunnables.get(0), true, true, null,
                 null, x, y, null, null, false);
 
-        runAndAssertConfirmations(true, true, false, null, null, x, y, null,
-                null);
+        runAndAssertConfirmations(true, true, null, null, x, y, null,
+                null, false);
+
+        ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
+    void parse_canHandleColorInput_viaXAndY_forGroups() {
+        addKnownGroupIds(1);
+        addGroupLightsForId(1, id);
+        double x = 0.5043;
+        double y = 0.6079;
+        addState("g1\t" + nowTimeString + "\tx:" + x + "\ty:" + y);
+
+        startScheduler();
+
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(1);
+
+        advanceTimeAndRunAndAssertApiCalls(scheduledRunnables.get(0), true, true, null,
+                null, x, y, null, null, true);
+
+        runAndAssertConfirmations(true, true, null, null, x, y, null,
+                null, true);
 
         ensureRunnable(initialNow.plusDays(1));
     }
@@ -547,9 +567,8 @@ class HueSchedulerTest {
     @Test
     void parse_canHandleColorTemperatureInKelvin_correctlyTranslatedToMired() {
         addKnownLightIds(1);
-        String time = now.toLocalTime().toString();
         int kelvin = 6500;
-        addState("1\t" + time + "\tk:" + kelvin);
+        addState("1\t" + nowTimeString + "\tk:" + kelvin);
 
         startScheduler();
 
@@ -558,8 +577,8 @@ class HueSchedulerTest {
         advanceTimeAndRunAndAssertApiCalls(scheduledRunnables.get(0), true, true, null,
                 153, null, null, null, null, false);
 
-        runAndAssertConfirmations(true, true, false, null, 153, null, null, null,
-                null);
+        runAndAssertConfirmations(true, true, null, 153, null, null,
+                null, null, false);
 
         ensureRunnable(initialNow.plusDays(1));
     }
@@ -567,8 +586,7 @@ class HueSchedulerTest {
     @Test
     void parse_detectsOnProperty() {
         addKnownLightIds(1);
-        String time = now.toLocalTime().toString();
-        addState("1\t" + time + "\ton:" + true);
+        addState("1\t" + nowTimeString + "\ton:" + true);
 
         startScheduler();
 
@@ -641,11 +659,11 @@ class HueSchedulerTest {
     void parse_useLampNameInsteadOfId_nameIsCorrectlyResolved() {
         String name = "gKitchen Lamp";
         addLightIdForName(name, 2);
-        addState(name + "\t12:00\tct:" + defaultCt);
+        addState(name + "\t" + nowTimeString + "\tct:" + defaultCt);
 
         startScheduler();
 
-        ensureScheduledStates(2);
+        ensureScheduledStates(1);
     }
 
     @Test
@@ -659,11 +677,11 @@ class HueSchedulerTest {
         int id = 12345;
         addGroupIdForName(name, id);
         addGroupLightsForId(id, 1, 2);
-        addState(name + "\t12:00\tct:" + defaultCt);
+        addState(name + "\t" + nowTimeString + "\tct:" + defaultCt);
 
         startScheduler();
 
-        ensureScheduledStates(2);
+        ensureScheduledStates(1);
     }
 
     @Test
