@@ -63,7 +63,7 @@ public final class HueScheduler {
         Path inputPath = getPathAndAssertReadable(args[6]);
         Files.lines(inputPath)
              .filter(s -> !s.isEmpty())
-             .filter(s -> !s.startsWith("//"))
+             .filter(s -> !s.startsWith("//") && !s.startsWith("#"))
              .forEachOrdered(scheduler::addState);
         LOG.info("HueScheduler version: {}", VERSION);
         LOG.info("Max retry delay: {} s, Confirm delay: {} s", retryMaxValue, confirmDelay);
