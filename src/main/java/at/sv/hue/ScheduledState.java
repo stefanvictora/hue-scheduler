@@ -7,7 +7,6 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Optional;
 
 final class ScheduledState {
     static final int CONFIRM_AMOUNT = 30;
@@ -249,7 +248,7 @@ final class ScheduledState {
                 getFormattedPropertyIfSet("y", y) +
                 getFormattedPropertyIfSet("hue", hue) +
                 getFormattedPropertyIfSet("sat", sat) +
-                ", transitionTime=" + getFormattedTransitionTime() +
+                getFormattedTransitionTimeIfSet() +
                 '}';
     }
 
@@ -280,10 +279,15 @@ final class ScheduledState {
 
     private String getFormattedPropertyIfSet(String name, Object property) {
         if (property == null) return "";
-        return ", " + name + "=" + property;
+        return formatPropertyName(name) + property;
     }
 
-    private Duration getFormattedTransitionTime() {
-        return Duration.ofMillis(Optional.ofNullable(transitionTime).orElse(4) * 100);
+    private String formatPropertyName(String name) {
+        return ", " + name + "=";
+    }
+
+    private String getFormattedTransitionTimeIfSet() {
+        if (transitionTime == null) return "";
+        return formatPropertyName("transitionTime") + Duration.ofMillis(transitionTime * 100).toString();
     }
 }
