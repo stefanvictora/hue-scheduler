@@ -26,6 +26,7 @@ public final class HueScheduler {
 
     private static final Logger LOG = LoggerFactory.getLogger(HueScheduler.class);
     private static final String VERSION = "1.0-SNAPSHOT";
+    private static final int DEFAULT_CONFIRM_DELAY = 6;
 
     private final HueApi hueApi;
     private final StateScheduler stateScheduler;
@@ -47,29 +48,37 @@ public final class HueScheduler {
     }
 
     public static void main(String[] args) throws IOException {
-        if (args.length != 7) {
-            System.out.println("Usage: hue-scheduler bridgeIp bridgeUsername latitude longitude retryMaxDelaySeconds confirmDelaySeconds inputFilePath");
+        System.out.println("HueScheduler "+ VERSION);
+        if (args.length == 2) {
+            System.out.println(createStartTimeProvider(args[0], args[1]).toDebugString(ZonedDateTime.now()));
+            System.exit(0);
+        }
+        if (args.length != 6) {
+            System.out.println("Usage: hue-scheduler bridgeIp bridgeUsername latitude longitude maxRetryDelayInSeconds inputFilePath");
             System.exit(1);
         }
         HueApi hueApi = new HueApiImpl(new HttpResourceProviderImpl(), args[0], args[1]);
-        double lat = parseDouble(args[2], "Failed to parse latitude");
-        double lng = parseDouble(args[3], "Failed to parse longitude");
-        StartTimeProviderImpl startTimeProvider = new StartTimeProviderImpl(new SunTimesProviderImpl(lat, lng));
-        StateScheduler stateScheduler = new StateSchedulerImpl(Executors.newSingleThreadScheduledExecutor(), ZonedDateTime::now);
-        int retryMaxValue = parseInt(args[4], "Failed to parse retryDelay");
-        int confirmDelay = parseInt(args[5], "Failed to parse confirmDelay");
-        HueScheduler scheduler = new HueScheduler(hueApi, stateScheduler, startTimeProvider, ZonedDateTime::now,
-                () -> getRandomRetryDelay(retryMaxValue), confirmDelay);
-        Path inputPath = getPathAndAssertReadable(args[6]);
+        int maxRetryDelayInSeconds = parseInt(args[4], "Failed to parse retryDelay");
+        LOG.info("Max retry delay: {} s", maxRetryDelayInSeconds);
+        HueScheduler scheduler = new HueScheduler(hueApi, createStateScheduler(), createStartTimeProvider(args[2], args[3]), ZonedDateTime::now,
+                () -> getRandomRetryDelayMs(maxRetryDelayInSeconds), DEFAULT_CONFIRM_DELAY);
+        Path inputPath = getPathAndAssertReadable(args[5]);
         Files.lines(inputPath)
              .filter(s -> !s.isEmpty())
              .filter(s -> !s.startsWith("//") && !s.startsWith("#"))
              .forEachOrdered(scheduler::addState);
-        LOG.info("HueScheduler version: {}", VERSION);
-        LOG.info("Max retry delay: {} s, Confirm delay: {} s", retryMaxValue, confirmDelay);
-        LOG.info("Lat: {}, Long: {}", lat, lng);
-        LOG.info("Input file: {}", inputPath.toAbsolutePath());
         scheduler.start();
+    }
+
+    private static StateSchedulerImpl createStateScheduler() {
+        return new StateSchedulerImpl(Executors.newSingleThreadScheduledExecutor(), ZonedDateTime::now);
+    }
+
+    private static StartTimeProviderImpl createStartTimeProvider(String latitude, String longitude) {
+        double lat = parseDouble(latitude, "Failed to parse latitude");
+        double lng = parseDouble(longitude, "Failed to parse longitude");
+        LOG.info("Lat: {}, Long: {}", lat, lng);
+        return new StartTimeProviderImpl(new SunTimesProviderImpl(lat, lng));
     }
 
     private static double parseDouble(String arg, String errorMessage) {
@@ -92,8 +101,8 @@ public final class HueScheduler {
         }
     }
 
-    private static int getRandomRetryDelay(int retryMaxValue) {
-        return ThreadLocalRandom.current().nextInt(1000, retryMaxValue * 1000 + 1);
+    private static int getRandomRetryDelayMs(int maxRetryDelaySeconds) {
+        return ThreadLocalRandom.current().nextInt(1000, maxRetryDelaySeconds * 1000 + 1);
     }
 
     private static Path getPathAndAssertReadable(String arg) {
@@ -102,6 +111,7 @@ public final class HueScheduler {
             System.err.println("Given input file '" + path.toAbsolutePath() + "' does not exist or is not readable!");
             System.exit(1);
         }
+        LOG.info("Input file: {}", path.toAbsolutePath());
         return path;
     }
 
@@ -380,6 +390,6 @@ public final class HueScheduler {
     }
 
     private void logSunDataInfo() {
-        LOG.info("Current sun times:{}", startTimeProvider.toDebugString(currentTime.get()));
+        LOG.info("Current sun times:\n{}", startTimeProvider.toDebugString(currentTime.get()));
     }
 }

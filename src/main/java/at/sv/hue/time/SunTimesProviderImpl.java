@@ -75,7 +75,7 @@ public final class SunTimesProviderImpl implements SunTimesProvider {
 
     @Override
     public String toDebugString(ZonedDateTime dateTime) {
-        return "\nastronomical start: " + format(getAstronomicalStart(dateTime)) +
+        return "astronomical start: " + format(getAstronomicalStart(dateTime)) +
                 "\nnautical start: " + format(getNauticalStart(dateTime)) +
                 "\ncivil start: " + format(getCivilStart(dateTime)) +
                 "\nsunrise: " + format(getSunrise(dateTime)) +
