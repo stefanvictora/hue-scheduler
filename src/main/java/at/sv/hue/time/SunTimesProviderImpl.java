@@ -6,7 +6,7 @@ import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 
-public class SunTimesProviderImpl implements SunTimesProvider {
+public final class SunTimesProviderImpl implements SunTimesProvider {
 
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
 

@@ -8,7 +8,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 
-public class HttpResourceProviderImpl implements HttpResourceProvider {
+public final class HttpResourceProviderImpl implements HttpResourceProvider {
 
     private static final Logger LOG = LoggerFactory.getLogger(HttpResourceProviderImpl.class);
 
