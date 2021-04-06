@@ -6,11 +6,15 @@ import at.sv.hue.time.StartTimeProviderImpl;
 import at.sv.hue.time.SunTimesProviderImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
+import picocli.CommandLine.Command;
+import picocli.CommandLine.Option;
+import picocli.CommandLine.Parameters;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -22,98 +26,100 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
-public final class HueScheduler {
+@Command(name = "HueScheduler", version = "1.0-SNAPSHOT", mixinStandardHelpOptions = true, sortOptions = false)
+public final class HueScheduler implements Runnable {
 
     private static final Logger LOG = LoggerFactory.getLogger(HueScheduler.class);
-    private static final String VERSION = "1.0-SNAPSHOT";
-    private static final int DEFAULT_CONFIRM_DELAY = 6;
 
-    private final HueApi hueApi;
-    private final StateScheduler stateScheduler;
-    private final StartTimeProvider startTimeProvider;
-    private final Supplier<ZonedDateTime> currentTime;
     private final Map<Integer, List<ScheduledState>> lightStates;
-    private final Supplier<Integer> retryDelay;
-    private final int confirmDelay;
+    @Parameters(description = "The IP address of your Philips Hue Bridge.")
+    String ip;
+    @Parameters(description = "The Philips Hue Bridge username created for Hue Scheduler during setup.")
+    String username;
+    @Parameters(paramLabel = "FILE", description = "The configuration file containing your schedules.")
+    Path inputFile;
+    @Option(names = "--lat", required = true, description = "The latitude of your location.")
+    double latitude;
+    @Option(names = "--long", required = true, description = "The longitude of your location.")
+    double longitude;
+    @Option(names = "--elevation", description = "The optional elevation (in meters) of your location, used to provide more accurate sunrise and sunset times.",
+            defaultValue = "0.0")
+    double elevation;
+    @Option(names = "--retry-delay", paramLabel = "<delay>",
+            description = "The maximum amount of seconds Hue Scheduler should wait before retrying to control a light that was not reachable." +
+                    " Default: ${DEFAULT-VALUE} seconds.",
+            defaultValue = "5")
+    int maxRetryDelayInSeconds;
+    @Option(names = "--confirm-delay", hidden = true, defaultValue = "6")
+    int confirmDelayInSeconds;
+    private HueApi hueApi;
+    private StateScheduler stateScheduler;
+    private StartTimeProvider startTimeProvider;
+    private Supplier<ZonedDateTime> currentTime;
+    private Supplier<Integer> retryDelay;
+
+    public HueScheduler() {
+        lightStates = new HashMap<>();
+    }
 
     public HueScheduler(HueApi hueApi, StateScheduler stateScheduler, StartTimeProvider startTimeProvider,
                         Supplier<ZonedDateTime> currentTime, Supplier<Integer> retryDelayInMs, int confirmDelayInSeconds) {
+        this();
         this.hueApi = hueApi;
         this.stateScheduler = stateScheduler;
         this.startTimeProvider = startTimeProvider;
         this.currentTime = currentTime;
-        lightStates = new HashMap<>();
         this.retryDelay = retryDelayInMs;
-        this.confirmDelay = confirmDelayInSeconds * 1000;
+        this.confirmDelayInSeconds = confirmDelayInSeconds;
     }
 
-    public static void main(String[] args) throws IOException {
-        System.out.println("HueScheduler "+ VERSION);
-        if (args.length == 3) {
-            System.out.println(createStartTimeProvider(args[0], args[1], args[2]).toDebugString(ZonedDateTime.now()));
-            System.exit(0);
+    public static void main(String[] args) {
+        int execute = new CommandLine(new HueScheduler()).execute(args);
+        if (execute != 0) {
+            System.exit(execute);
         }
-        if (args.length != 7) {
-            System.out.println("Usage: hue-scheduler bridgeIp bridgeUsername latitude longitude elevation maxRetryDelayInSeconds inputFilePath");
-            System.exit(1);
-        }
-        HueApi hueApi = new HueApiImpl(new HttpResourceProviderImpl(), args[0], args[1]);
-        int maxRetryDelayInSeconds = parseInt(args[5], "Failed to parse retryDelay");
-        LOG.info("Max retry delay: {} s", maxRetryDelayInSeconds);
-        HueScheduler scheduler = new HueScheduler(hueApi, createStateScheduler(), createStartTimeProvider(args[2], args[3], args[4]), ZonedDateTime::now,
-                () -> getRandomRetryDelayMs(maxRetryDelayInSeconds), DEFAULT_CONFIRM_DELAY);
-        Path inputPath = getPathAndAssertReadable(args[6]);
-        Files.lines(inputPath)
-             .filter(s -> !s.isEmpty())
-             .filter(s -> !s.startsWith("//") && !s.startsWith("#"))
-             .forEachOrdered(scheduler::addState);
-        scheduler.start();
     }
 
-    private static StateSchedulerImpl createStateScheduler() {
+    @Override
+    public void run() {
+        hueApi = new HueApiImpl(new HttpResourceProviderImpl(), ip, username);
+        startTimeProvider = createStartTimeProvider(latitude, longitude, elevation);
+        stateScheduler = createStateScheduler();
+        currentTime = ZonedDateTime::now;
+        retryDelay = this::getRandomRetryDelayMs;
+        assertInputIsReadable();
+        parseInput();
+        start();
+    }
+
+    private StartTimeProviderImpl createStartTimeProvider(double latitude, double longitude, double elevation) {
+        return new StartTimeProviderImpl(new SunTimesProviderImpl(latitude, longitude, elevation));
+    }
+
+    private StateSchedulerImpl createStateScheduler() {
         return new StateSchedulerImpl(Executors.newSingleThreadScheduledExecutor(), ZonedDateTime::now);
     }
 
-    private static StartTimeProviderImpl createStartTimeProvider(String latitude, String longitude, String elevation) {
-        double lat = parseDouble(latitude, "Failed to parse latitude");
-        double lng = parseDouble(longitude, "Failed to parse longitude");
-        double e = parseDouble(elevation, "Failed to parse elevation");
-        LOG.info("Lat: {}, Long: {}, Elevation: {} m", lat, lng, e);
-        return new StartTimeProviderImpl(new SunTimesProviderImpl(lat, lng, e));
+    private void assertInputIsReadable() {
+        if (!Files.isReadable(inputFile)) {
+            System.err.println("Given input file '" + inputFile.toAbsolutePath() + "' does not exist or is not readable!");
+            System.exit(1);
+        }
     }
 
-    private static double parseDouble(String arg, String errorMessage) {
+    private void parseInput() {
         try {
-            return Double.parseDouble(arg);
-        } catch (NumberFormatException e) {
-            System.err.println(errorMessage + ": " + e.getLocalizedMessage());
-            System.exit(1);
-            return -1;
+            Files.lines(inputFile)
+                 .filter(s -> !s.isEmpty())
+                 .filter(s -> !s.startsWith("//") && !s.startsWith("#"))
+                 .forEachOrdered(this::addState);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
     }
 
-    private static int parseInt(String arg, String errorMessage) {
-        try {
-            return Integer.parseInt(arg);
-        } catch (NumberFormatException e) {
-            System.err.println(errorMessage + ": " + e.getLocalizedMessage());
-            System.exit(1);
-            return -1;
-        }
-    }
-
-    private static int getRandomRetryDelayMs(int maxRetryDelaySeconds) {
-        return ThreadLocalRandom.current().nextInt(1000, maxRetryDelaySeconds * 1000 + 1);
-    }
-
-    private static Path getPathAndAssertReadable(String arg) {
-        Path path = Paths.get(arg);
-        if (!Files.isReadable(path)) {
-            System.err.println("Given input file '" + path.toAbsolutePath() + "' does not exist or is not readable!");
-            System.exit(1);
-        }
-        LOG.info("Input file: {}", path.toAbsolutePath());
-        return path;
+    private int getRandomRetryDelayMs() {
+        return ThreadLocalRandom.current().nextInt(1000, maxRetryDelayInSeconds * 1000 + 1);
     }
 
     public void addState(String input) {
@@ -293,7 +299,7 @@ public final class HueScheduler {
 
     private void schedule(ScheduledState state, long delayInMs) {
         if (state.isNullState()) return;
-        if (delayInMs == 0 || delayInMs > Math.max(5000, confirmDelay)) {
+        if (delayInMs == 0 || delayInMs > Math.max(5000, confirmDelayInSeconds * 1000)) {
             LOG.debug("Schedule {} in {}", state, Duration.ofMillis(delayInMs));
         }
         stateScheduler.schedule(() -> {
@@ -326,7 +332,7 @@ public final class HueScheduler {
                 } else if (state.getConfirmCounter() % 5 == 0) {
                     LOG.debug("Confirmed {} ({})", state, state.getConfirmDebugString());
                 }
-                schedule(state, confirmDelay);
+                schedule(state, confirmDelayInSeconds * 1000L);
             } else {
                 LOG.debug("{} fully confirmed", state);
                 scheduleNextDay(state);
