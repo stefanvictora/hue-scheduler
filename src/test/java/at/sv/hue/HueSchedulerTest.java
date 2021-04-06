@@ -591,6 +591,28 @@ class HueSchedulerTest {
     }
 
     @Test
+    void parse_canHandleColorInput_viaHexRGB_setsXAndYAndBrightness() {
+        addKnownLightIds(1);
+        String hex = "#5eba7d";
+        addState("1\t" + nowTimeString + "\thex:" + hex);
+
+        startScheduler();
+
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(1);
+
+        int bri = 94;
+        double x = 0.2318731647393379;
+        double y = 0.4675382426015799;
+        advanceTimeAndRunAndAssertApiCalls(scheduledRunnables.get(0), true, true, bri,
+                null, x, y, null, null, null, null, false);
+
+        runAndAssertConfirmations(true, true, bri, null, x, y,
+                null, null, null, null, false);
+
+        ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
     void parse_canHandleColorTemperatureInKelvin_correctlyTranslatedToMired() {
         addKnownLightIds(1);
         int kelvin = 6500;

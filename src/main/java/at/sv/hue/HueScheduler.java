@@ -170,6 +170,12 @@ public final class HueScheduler {
                     case "sat":
                         sat = Integer.valueOf(typeAndValue[1]);
                         break;
+                    case "hex":
+                        RBGToXYConverter.XYColor xyColor = RBGToXYConverter.convert(typeAndValue[1]);
+                        x = xyColor.getX();
+                        y = xyColor.getY();
+                        bri = xyColor.getBrightness();
+                        break;
                     default:
                         throw new UnknownStateProperty("Unknown state property '" + typeAndValue[0] + "' with value '" + typeAndValue[1] + "'");
                 }
