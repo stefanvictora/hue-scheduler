@@ -1,6 +1,5 @@
 package at.sv.hue.api;
 
-import at.sv.hue.LightState;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

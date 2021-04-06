@@ -1,6 +1,5 @@
 package at.sv.hue.api;
 
-import at.sv.hue.LightState;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;

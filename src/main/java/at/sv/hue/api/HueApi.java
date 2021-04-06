@@ -1,7 +1,5 @@
 package at.sv.hue.api;
 
-import at.sv.hue.LightState;
-
 import java.util.List;
 
 public interface HueApi {

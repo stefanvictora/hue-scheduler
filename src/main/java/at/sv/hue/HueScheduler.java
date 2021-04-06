@@ -1,9 +1,6 @@
 package at.sv.hue;
 
-import at.sv.hue.api.GroupNotFoundException;
-import at.sv.hue.api.HttpResourceProviderImpl;
-import at.sv.hue.api.HueApi;
-import at.sv.hue.api.HueApiImpl;
+import at.sv.hue.api.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
