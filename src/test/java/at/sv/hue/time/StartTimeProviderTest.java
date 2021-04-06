@@ -49,7 +49,7 @@ class StartTimeProviderTest {
         civilEnd = LocalTime.of(17, 26);
         nauticalEnd = LocalTime.of(18, 4);
         astronomicalEnd = LocalTime.of(19, 10);
-        provider = new StartTimeProviderImpl(new SunDataProvider() {
+        provider = new StartTimeProviderImpl(new SunTimesProvider() {
             @Override
             public LocalTime getSunrise(ZonedDateTime dateTime) {
                 if (dateTime.equals(nextDay)) {

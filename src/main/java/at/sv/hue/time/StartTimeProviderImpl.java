@@ -6,10 +6,10 @@ import java.util.Locale;
 
 public final class StartTimeProviderImpl implements StartTimeProvider {
 
-    private final SunDataProvider sunDataProvider;
+    private final SunTimesProvider sunTimesProvider;
 
-    public StartTimeProviderImpl(SunDataProvider sunDataProvider) {
-        this.sunDataProvider = sunDataProvider;
+    public StartTimeProviderImpl(SunTimesProvider sunTimesProvider) {
+        this.sunTimesProvider = sunTimesProvider;
     }
 
     @Override
@@ -53,29 +53,29 @@ public final class StartTimeProviderImpl implements StartTimeProvider {
     private LocalTime parseSunKeywords(String input, ZonedDateTime dateTime) {
         switch (input.toLowerCase(Locale.ENGLISH)) {
             case "sunrise":
-                return sunDataProvider.getSunrise(dateTime);
+                return sunTimesProvider.getSunrise(dateTime);
             case "golden_hour":
-                return sunDataProvider.getGoldenHour(dateTime);
+                return sunTimesProvider.getGoldenHour(dateTime);
             case "sunset":
-                return sunDataProvider.getSunset(dateTime);
+                return sunTimesProvider.getSunset(dateTime);
             case "nautical_start":
-                return sunDataProvider.getNauticalStart(dateTime);
+                return sunTimesProvider.getNauticalStart(dateTime);
             case "nautical_end":
-                return sunDataProvider.getNauticalEnd(dateTime);
+                return sunTimesProvider.getNauticalEnd(dateTime);
             case "civil_start":
-                return sunDataProvider.getCivilStart(dateTime);
+                return sunTimesProvider.getCivilStart(dateTime);
             case "civil_end":
-                return sunDataProvider.getCivilEnd(dateTime);
+                return sunTimesProvider.getCivilEnd(dateTime);
             case "astronomical_start":
-                return sunDataProvider.getAstronomicalStart(dateTime);
+                return sunTimesProvider.getAstronomicalStart(dateTime);
             case "astronomical_end":
-                return sunDataProvider.getAstronomicalEnd(dateTime);
+                return sunTimesProvider.getAstronomicalEnd(dateTime);
         }
         throw new IllegalArgumentException("Invalid sun keyword: '" + input + "'");
     }
 
     @Override
     public String toDebugString(ZonedDateTime dateTime) {
-        return sunDataProvider.toDebugString(dateTime);
+        return sunTimesProvider.toDebugString(dateTime);
     }
 }

@@ -3,7 +3,7 @@ package at.sv.hue;
 import at.sv.hue.api.*;
 import at.sv.hue.time.StartTimeProvider;
 import at.sv.hue.time.StartTimeProviderImpl;
-import at.sv.hue.time.SunDataProviderImpl;
+import at.sv.hue.time.SunTimesProviderImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,7 +54,7 @@ public final class HueScheduler {
         HueApi hueApi = new HueApiImpl(new HttpResourceProviderImpl(), args[0], args[1]);
         double lat = parseDouble(args[2], "Failed to parse latitude");
         double lng = parseDouble(args[3], "Failed to parse longitude");
-        StartTimeProviderImpl startTimeProvider = new StartTimeProviderImpl(new SunDataProviderImpl(lat, lng));
+        StartTimeProviderImpl startTimeProvider = new StartTimeProviderImpl(new SunTimesProviderImpl(lat, lng));
         StateScheduler stateScheduler = new StateSchedulerImpl(Executors.newSingleThreadScheduledExecutor(), ZonedDateTime::now);
         int retryMaxValue = parseInt(args[4], "Failed to parse retryDelay");
         int confirmDelay = parseInt(args[5], "Failed to parse confirmDelay");

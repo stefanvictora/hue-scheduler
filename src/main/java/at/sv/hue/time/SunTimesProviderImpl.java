@@ -6,13 +6,13 @@ import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 
-public class SunDataProviderImpl implements SunDataProvider {
+public class SunTimesProviderImpl implements SunTimesProvider {
 
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
 
     private final SunTimes.Parameters parameters;
 
-    public SunDataProviderImpl(double lat, double lng) {
+    public SunTimesProviderImpl(double lat, double lng) {
         parameters = SunTimes.compute().at(lat, lng);
     }
 

@@ -10,10 +10,10 @@ import java.time.ZonedDateTime;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.core.Is.is;
 
-class SunDataProviderTest {
+class SunTimesProviderTest {
 
     private ZonedDateTime dateTime;
-    private SunDataProviderImpl provider;
+    private SunTimesProviderImpl provider;
 
     private void assertTime(LocalTime time, int hour, int minute, int second) {
         assertThat("Time differ", time, is(LocalTime.of(hour, minute, second)));
@@ -22,7 +22,7 @@ class SunDataProviderTest {
     @BeforeEach
     void setUp() {
         dateTime = ZonedDateTime.of(2021, 1, 1, 0, 0, 0, 0, ZoneId.of("Europe/Vienna"));
-        provider = new SunDataProviderImpl(48.20, 16.39);
+        provider = new SunTimesProviderImpl(48.20, 16.39);
     }
 
     @Test

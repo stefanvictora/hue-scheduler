@@ -3,7 +3,7 @@ package at.sv.hue.time;
 import java.time.LocalTime;
 import java.time.ZonedDateTime;
 
-public interface SunDataProvider {
+public interface SunTimesProvider {
 
     LocalTime getSunrise(ZonedDateTime dateTime);
 
