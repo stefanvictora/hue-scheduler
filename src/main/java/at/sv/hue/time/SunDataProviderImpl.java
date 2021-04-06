@@ -1,4 +1,4 @@
-package at.sv.hue;
+package at.sv.hue.time;
 
 import org.shredzone.commons.suncalc.SunTimes;
 

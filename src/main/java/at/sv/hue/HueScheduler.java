@@ -1,6 +1,9 @@
 package at.sv.hue;
 
 import at.sv.hue.api.*;
+import at.sv.hue.time.StartTimeProvider;
+import at.sv.hue.time.StartTimeProviderImpl;
+import at.sv.hue.time.SunDataProviderImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

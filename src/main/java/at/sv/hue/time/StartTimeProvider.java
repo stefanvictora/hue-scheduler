@@ -1,4 +1,4 @@
-package at.sv.hue;
+package at.sv.hue.time;
 
 import java.time.LocalTime;
 import java.time.ZonedDateTime;
