@@ -173,7 +173,7 @@ public final class HueScheduler implements Runnable {
                         on = Boolean.valueOf(typeAndValue[1]);
                         break;
                     case "tr":
-                        transitionTime = Integer.valueOf(typeAndValue[1]);
+                        transitionTime = parseTransitionTime(typeAndValue[1]);
                         break;
                     case "x":
                         x = Double.parseDouble(typeAndValue[1]);
@@ -204,6 +204,19 @@ public final class HueScheduler implements Runnable {
                 addState(name, id, start, bri, ct, x, y, hue, sat, on, transitionTime);
             }
         }
+    }
+
+    private Integer parseTransitionTime(String s) {
+        String value = s;
+        int modifier = 1;
+        if (s.endsWith("s")) {
+            value = s.substring(0, s.length() - 1);
+            modifier = 10;
+        } else if (s.endsWith("min")) {
+            value = s.substring(0, s.length() - 3);
+            modifier = 600;
+        }
+        return Integer.parseInt(value.trim()) * modifier;
     }
 
     private Integer convertToMiredCt(Integer kelvin) {

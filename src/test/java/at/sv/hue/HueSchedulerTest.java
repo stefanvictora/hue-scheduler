@@ -324,6 +324,17 @@ class HueSchedulerTest {
         knownGroupIds.addAll(Arrays.asList(ids));
     }
 
+    private void advanceTimeAndRunAndAssertApiCallsWithConfirmations(ScheduledRunnable state, Integer putBrightness,
+                                                                     Integer putCt, Double putX, Double putY,
+                                                                     Integer putHue, Integer putSat,
+                                                                     Boolean putOn, Integer putTransitionTime, boolean groupState) {
+        advanceTimeAndRunAndAssertApiCalls(state, true, true, putBrightness, putCt, putX, putY,
+                putHue, putSat, putOn, putTransitionTime, groupState);
+
+        runAndAssertConfirmations(true, true, putBrightness, putCt, putX, putY, putHue, putSat,
+                putOn, putTransitionTime, groupState);
+    }
+
     @BeforeEach
     void setUp() {
         apiPutSuccessful = true;
@@ -521,11 +532,39 @@ class HueSchedulerTest {
 
         List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(1);
 
-        advanceTimeAndRunAndAssertApiCalls(scheduledRunnables.get(0), true, true, defaultBrightness,
-                null, null, null, null, null, null, 5, false);
-
-        runAndAssertConfirmations(true, true, defaultBrightness, null, null, null,
+        advanceTimeAndRunAndAssertApiCallsWithConfirmations(scheduledRunnables.get(0), defaultBrightness, null, null, null,
                 null, null, null, 5, false);
+
+        ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
+    void parse_canParseTransitionTimeWithTimeUnits() {
+        addKnownLightIds(1);
+        addState("1\t" + nowTimeString + "\tbri:" + defaultBrightness + "\ttr:5s");
+
+        startScheduler();
+
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(1);
+
+        advanceTimeAndRunAndAssertApiCallsWithConfirmations(scheduledRunnables.get(0), defaultBrightness, null, null, null,
+                null, null, null, 50, false);
+
+        ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
+    void parse_canParseTransitionTimeWithTimeUnits_minutes() {
+        addKnownLightIds(1);
+        addState("1\t" + nowTimeString + "\tbri:" + defaultBrightness + "\ttr:109 min");
+
+        startScheduler();
+
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(1);
+
+        advanceTimeAndRunAndAssertApiCallsWithConfirmations(scheduledRunnables.get(0), defaultBrightness, null, null, null,
+                null, null, null, 65400, false);
+
 
         ensureRunnable(initialNow.plusDays(1));
     }
@@ -541,11 +580,8 @@ class HueSchedulerTest {
 
         List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(1);
 
-        advanceTimeAndRunAndAssertApiCalls(scheduledRunnables.get(0), true, true, null,
-                null, x, y, null, null, null, null, false);
-
-        runAndAssertConfirmations(true, true, null, null, x, y,
-                null, null, null, null, false);
+        advanceTimeAndRunAndAssertApiCallsWithConfirmations(scheduledRunnables.get(0), null, null,
+                x, y, null, null, null, null, false);
 
         ensureRunnable(initialNow.plusDays(1));
     }
@@ -562,10 +598,7 @@ class HueSchedulerTest {
 
         List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(1);
 
-        advanceTimeAndRunAndAssertApiCalls(scheduledRunnables.get(0), true, true, null,
-                null, x, y, null, null, null, null, true);
-
-        runAndAssertConfirmations(true, true, null, null, x, y,
+        advanceTimeAndRunAndAssertApiCallsWithConfirmations(scheduledRunnables.get(0), null, null, x, y,
                 null, null, null, null, true);
 
         ensureRunnable(initialNow.plusDays(1));
@@ -582,11 +615,8 @@ class HueSchedulerTest {
 
         List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(1);
 
-        advanceTimeAndRunAndAssertApiCalls(scheduledRunnables.get(0), true, true, null,
-                null, null, null, hue, saturation, null, null, false);
-
-        runAndAssertConfirmations(true, true, null, null, null, null,
-                hue, saturation, null, null, false);
+        advanceTimeAndRunAndAssertApiCallsWithConfirmations(scheduledRunnables.get(0), null, null, null,
+                null, hue, saturation, null, null, false);
 
         ensureRunnable(initialNow.plusDays(1));
     }
@@ -604,11 +634,8 @@ class HueSchedulerTest {
         int bri = 94;
         double x = 0.2318731647393379;
         double y = 0.4675382426015799;
-        advanceTimeAndRunAndAssertApiCalls(scheduledRunnables.get(0), true, true, bri,
-                null, x, y, null, null, null, null, false);
-
-        runAndAssertConfirmations(true, true, bri, null, x, y,
-                null, null, null, null, false);
+        advanceTimeAndRunAndAssertApiCallsWithConfirmations(scheduledRunnables.get(0), bri, null, x, y, null,
+                null, null, null, false);
 
         ensureRunnable(initialNow.plusDays(1));
     }
@@ -623,11 +650,8 @@ class HueSchedulerTest {
 
         List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(1);
 
-        advanceTimeAndRunAndAssertApiCalls(scheduledRunnables.get(0), true, true, null,
-                153, null, null, null, null, null, null, false);
-
-        runAndAssertConfirmations(true, true, null, 153, null, null,
-                null, null, null, null, false);
+        advanceTimeAndRunAndAssertApiCallsWithConfirmations(scheduledRunnables.get(0), null, 153, null,
+                null, null, null, null, null, false);
 
         ensureRunnable(initialNow.plusDays(1));
     }
@@ -787,6 +811,18 @@ class HueSchedulerTest {
     void parse_invalidXAndYValue_tooLow_exception() {
         addKnownLightIds(1);
         assertThrows(InvalidXAndYValue.class, () -> addState("1\t" + nowTimeString + "\ty:" + -0.1));
+    }
+
+    @Test
+    void parse_invalidTransitionTime_tooLow_exception() {
+        addKnownLightIds(1);
+        assertThrows(InvalidTransitionTime.class, () -> addState("1\t" + nowTimeString + "\ttr:" + -1));
+    }
+
+    @Test
+    void parse_invalidTransitionTime_tooHigh_exception() {
+        addKnownLightIds(1);
+        assertThrows(InvalidTransitionTime.class, () -> addState("1\t" + nowTimeString + "\ttr:" + 65536));
     }
 
     @Test

@@ -49,7 +49,7 @@ final class ScheduledState {
         this.hue = assertValidHueValue(hue);
         this.sat = assertValidSaturationValue(sat);
         this.on = on;
-        this.transitionTime = transitionTime;
+        this.transitionTime = assertValidTransitionTime(transitionTime);
         this.startTimeProvider = startTimeProvider;
         this.groupState = groupState;
         confirmCounter = 0;
@@ -98,6 +98,13 @@ final class ScheduledState {
             throw new InvalidSaturationValue("Invalid saturation value '" + sat + "'. Allowed integer range: 0-254");
         }
         return sat;
+    }
+
+    private Integer assertValidTransitionTime(Integer transitionTime) {
+        if (transitionTime != null && (transitionTime > 65535 || transitionTime < 0)) {
+            throw new InvalidTransitionTime("Invalid transition time '" + transitionTime + ". Allowed integer range: 0-65535");
+        }
+        return transitionTime;
     }
 
     public long getDelayInSeconds(ZonedDateTime now) {
