@@ -52,23 +52,33 @@ public final class StartTimeProviderImpl implements StartTimeProvider {
 
     private LocalTime parseSunKeywords(String input, ZonedDateTime dateTime) {
         switch (input.toLowerCase(Locale.ENGLISH)) {
+            case "astronomical_start":
+            case "astronomical_dawn":
+                return sunTimesProvider.getAstronomicalStart(dateTime);
+            case "nautical_start":
+            case "nautical_dawn":
+                return sunTimesProvider.getNauticalStart(dateTime);
+            case "civil_start":
+            case "civil_dawn":
+                return sunTimesProvider.getCivilStart(dateTime);
             case "sunrise":
                 return sunTimesProvider.getSunrise(dateTime);
             case "golden_hour":
                 return sunTimesProvider.getGoldenHour(dateTime);
             case "sunset":
                 return sunTimesProvider.getSunset(dateTime);
-            case "nautical_start":
-                return sunTimesProvider.getNauticalStart(dateTime);
-            case "nautical_end":
-                return sunTimesProvider.getNauticalEnd(dateTime);
-            case "civil_start":
-                return sunTimesProvider.getCivilStart(dateTime);
+            case "blue_hour":
+                return sunTimesProvider.getBlueHour(dateTime);
             case "civil_end":
+            case "civil_dusk":
                 return sunTimesProvider.getCivilEnd(dateTime);
-            case "astronomical_start":
-                return sunTimesProvider.getAstronomicalStart(dateTime);
+            case "night_hour":
+                return sunTimesProvider.getNightHour(dateTime);
+            case "nautical_end":
+            case "nautical_dusk":
+                return sunTimesProvider.getNauticalEnd(dateTime);
             case "astronomical_end":
+            case "astronomical_dusk":
                 return sunTimesProvider.getAstronomicalEnd(dateTime);
         }
         throw new IllegalArgumentException("Invalid sun keyword: '" + input + "'");

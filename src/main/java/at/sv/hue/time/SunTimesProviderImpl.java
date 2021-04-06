@@ -12,8 +12,8 @@ public final class SunTimesProviderImpl implements SunTimesProvider {
 
     private final SunTimes.Parameters parameters;
 
-    public SunTimesProviderImpl(double lat, double lng) {
-        parameters = SunTimes.compute().at(lat, lng);
+    public SunTimesProviderImpl(double lat, double lng, double height) {
+        parameters = SunTimes.compute().at(lat, lng).height(height);
     }
 
     @Override
@@ -52,6 +52,16 @@ public final class SunTimesProviderImpl implements SunTimesProvider {
     }
 
     @Override
+    public LocalTime getBlueHour(ZonedDateTime dateTime) {
+        return sunTimesFor(dateTime, SunTimes.Twilight.BLUE_HOUR).getSet().toLocalTime();
+    }
+
+    @Override
+    public LocalTime getNightHour(ZonedDateTime dateTime) {
+        return sunTimesFor(dateTime, SunTimes.Twilight.NIGHT_HOUR).getSet().toLocalTime();
+    }
+
+    @Override
     public LocalTime getAstronomicalEnd(ZonedDateTime dateTime) {
         return sunTimesFor(dateTime, SunTimes.Twilight.ASTRONOMICAL).getSet().toLocalTime();
     }
@@ -75,15 +85,17 @@ public final class SunTimesProviderImpl implements SunTimesProvider {
 
     @Override
     public String toDebugString(ZonedDateTime dateTime) {
-        return "astronomical start: " + format(getAstronomicalStart(dateTime)) +
-                "\nnautical start: " + format(getNauticalStart(dateTime)) +
-                "\ncivil start: " + format(getCivilStart(dateTime)) +
+        return "astronomical dawn: " + format(getAstronomicalStart(dateTime)) +
+                "\nnautical dawn: " + format(getNauticalStart(dateTime)) +
+                "\ncivil dawn: " + format(getCivilStart(dateTime)) +
                 "\nsunrise: " + format(getSunrise(dateTime)) +
                 "\ngolden hour: " + format(getGoldenHour(dateTime)) +
                 "\nsunset: " + format(getSunset(dateTime)) +
-                "\ncivil end: " + format(getCivilEnd(dateTime)) +
-                "\nnautical end: " + format(getNauticalEnd(dateTime)) +
-                "\nastronomical end: " + format(getAstronomicalEnd(dateTime)) +
+                "\nblue hour: " + format(getBlueHour(dateTime)) +
+                "\ncivil dusk: " + format(getCivilEnd(dateTime)) +
+                "\nnight hour: " + format(getNightHour(dateTime)) +
+                "\nnautical dusk: " + format(getNauticalEnd(dateTime)) +
+                "\nastronomical dusk: " + format(getAstronomicalEnd(dateTime)) +
                 "";
     }
 

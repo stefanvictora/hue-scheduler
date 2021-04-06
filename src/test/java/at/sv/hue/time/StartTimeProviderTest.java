@@ -21,6 +21,8 @@ class StartTimeProviderTest {
     private LocalTime civilStart;
     private LocalTime civilEnd;
     private LocalTime goldenHour;
+    private LocalTime blueHour;
+    private LocalTime nightHour;
     private LocalTime astronomicalStart;
     private LocalTime astronomicalEnd;
     private ZonedDateTime now;
@@ -46,7 +48,9 @@ class StartTimeProviderTest {
         nextDaySunrise = LocalTime.of(7, 10);
         goldenHour = LocalTime.of(15, 0);
         sunset = LocalTime.of(16, 0);
+        blueHour = LocalTime.of(16, 15);
         civilEnd = LocalTime.of(17, 26);
+        nightHour = LocalTime.of(17, 45);
         nauticalEnd = LocalTime.of(18, 4);
         astronomicalEnd = LocalTime.of(19, 10);
         provider = new StartTimeProviderImpl(new SunTimesProvider() {
@@ -90,6 +94,16 @@ class StartTimeProviderTest {
             }
 
             @Override
+            public LocalTime getBlueHour(ZonedDateTime dateTime) {
+                return blueHour;
+            }
+
+            @Override
+            public LocalTime getNightHour(ZonedDateTime dateTime) {
+                return nightHour;
+            }
+
+            @Override
             public LocalTime getAstronomicalEnd(ZonedDateTime dateTime) {
                 return astronomicalEnd;
             }
@@ -112,12 +126,20 @@ class StartTimeProviderTest {
         assertStart("sunrise", sunrise);
         assertStart("sunset", sunset);
         assertStart("nautical_start", nauticalStart);
+        assertStart("nautical_dawn", nauticalStart);
         assertStart("nautical_end", nauticalEnd);
+        assertStart("nautical_dusk", nauticalEnd);
         assertStart("civil_start", civilStart);
+        assertStart("civil_dawn", civilStart);
         assertStart("civil_end", civilEnd);
+        assertStart("civil_dusk", civilEnd);
         assertStart("golden_hour", goldenHour);
+        assertStart("blue_hour", blueHour);
+        assertStart("night_hour", nightHour);
         assertStart("astronomical_start", astronomicalStart);
+        assertStart("astronomical_dawn", astronomicalStart);
         assertStart("astronomical_end", astronomicalEnd);
+        assertStart("astronomical_dusk", astronomicalEnd);
     }
 
     @Test

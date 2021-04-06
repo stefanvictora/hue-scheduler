@@ -49,20 +49,20 @@ public final class HueScheduler {
 
     public static void main(String[] args) throws IOException {
         System.out.println("HueScheduler "+ VERSION);
-        if (args.length == 2) {
-            System.out.println(createStartTimeProvider(args[0], args[1]).toDebugString(ZonedDateTime.now()));
+        if (args.length == 3) {
+            System.out.println(createStartTimeProvider(args[0], args[1], args[2]).toDebugString(ZonedDateTime.now()));
             System.exit(0);
         }
-        if (args.length != 6) {
-            System.out.println("Usage: hue-scheduler bridgeIp bridgeUsername latitude longitude maxRetryDelayInSeconds inputFilePath");
+        if (args.length != 7) {
+            System.out.println("Usage: hue-scheduler bridgeIp bridgeUsername latitude longitude elevation maxRetryDelayInSeconds inputFilePath");
             System.exit(1);
         }
         HueApi hueApi = new HueApiImpl(new HttpResourceProviderImpl(), args[0], args[1]);
-        int maxRetryDelayInSeconds = parseInt(args[4], "Failed to parse retryDelay");
+        int maxRetryDelayInSeconds = parseInt(args[5], "Failed to parse retryDelay");
         LOG.info("Max retry delay: {} s", maxRetryDelayInSeconds);
-        HueScheduler scheduler = new HueScheduler(hueApi, createStateScheduler(), createStartTimeProvider(args[2], args[3]), ZonedDateTime::now,
+        HueScheduler scheduler = new HueScheduler(hueApi, createStateScheduler(), createStartTimeProvider(args[2], args[3], args[4]), ZonedDateTime::now,
                 () -> getRandomRetryDelayMs(maxRetryDelayInSeconds), DEFAULT_CONFIRM_DELAY);
-        Path inputPath = getPathAndAssertReadable(args[5]);
+        Path inputPath = getPathAndAssertReadable(args[6]);
         Files.lines(inputPath)
              .filter(s -> !s.isEmpty())
              .filter(s -> !s.startsWith("//") && !s.startsWith("#"))
@@ -74,11 +74,12 @@ public final class HueScheduler {
         return new StateSchedulerImpl(Executors.newSingleThreadScheduledExecutor(), ZonedDateTime::now);
     }
 
-    private static StartTimeProviderImpl createStartTimeProvider(String latitude, String longitude) {
+    private static StartTimeProviderImpl createStartTimeProvider(String latitude, String longitude, String elevation) {
         double lat = parseDouble(latitude, "Failed to parse latitude");
         double lng = parseDouble(longitude, "Failed to parse longitude");
-        LOG.info("Lat: {}, Long: {}", lat, lng);
-        return new StartTimeProviderImpl(new SunTimesProviderImpl(lat, lng));
+        double e = parseDouble(elevation, "Failed to parse elevation");
+        LOG.info("Lat: {}, Long: {}, Elevation: {} m", lat, lng, e);
+        return new StartTimeProviderImpl(new SunTimesProviderImpl(lat, lng, e));
     }
 
     private static double parseDouble(String arg, String errorMessage) {

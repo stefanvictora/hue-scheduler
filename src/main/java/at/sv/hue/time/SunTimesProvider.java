@@ -19,6 +19,10 @@ public interface SunTimesProvider {
 
     LocalTime getGoldenHour(ZonedDateTime dateTime);
 
+    LocalTime getBlueHour(ZonedDateTime dateTime);
+
+    LocalTime getNightHour(ZonedDateTime dateTime);
+
     LocalTime getAstronomicalEnd(ZonedDateTime dateTime);
 
     LocalTime getAstronomicalStart(ZonedDateTime dateTime);
