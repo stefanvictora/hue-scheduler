@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import java.net.URL;
 import java.util.List;
 
+import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.core.Is.is;
 import static org.junit.jupiter.api.Assertions.*;
@@ -76,6 +77,13 @@ class HueApiTest {
 
     private List<Integer> getGroupLights(int groupId) {
         return api.getGroupLights(groupId);
+    }
+
+    private void assertCapabilities(LightCapabilities capabilities, boolean colorSupported, Double[][] colorGamut, boolean ctSupported) {
+        assertThat("No capabilities returned", capabilities, notNullValue());
+        assertThat("Color support differs", capabilities.isColorSupported(), is(colorSupported));
+        assertThat("Color gamut differs", capabilities.getColorGamut(), is(colorGamut));
+        assertThat("CT support differs", capabilities.isCtSupported(), is(ctSupported));
     }
 
     @BeforeEach
@@ -308,6 +316,71 @@ class HueApiTest {
         setGetResponse("/lights", "{}");
 
         assertThrows(LightNotFoundException.class, () -> api.getLightName(1234));
+    }
+
+    @Test
+    void getCapabilities_hasColorAndCtSupport() {
+        setGetResponse("/lights", "{\n" +
+                "\"22\": {\n" +
+                "\"type\": \"Extended color light\",\n" +
+                "\"capabilities\": {\n" +
+                "\"control\": {\n" +
+                "\"mindimlevel\": 200,\n" +
+                "\"maxlumen\": 800,\n" +
+                "\"colorgamuttype\": \"C\",\n" +
+                "\"colorgamut\": [\n" +
+                "[\n" +
+                "0.6915,\n" +
+                "0.3083\n" +
+                "],\n" +
+                "[\n" +
+                "0.17,\n" +
+                "0.7\n" +
+                "],\n" +
+                "[\n" +
+                "0.1532,\n" +
+                "0.0475\n" +
+                "]\n" +
+                "],\n" +
+                "\"ct\": {\n" +
+                "\"min\": 153,\n" +
+                "\"max\": 500\n" +
+                "}\n" +
+                "}\n" +
+                "}\n" +
+                "}\n" +
+                "}");
+
+        LightCapabilities capabilities = api.getLightCapabilities(22);
+
+        Double[][] gamut = {{0.6915, 0.3083}, {0.17, 0.7}, {0.1532, 0.0475}};
+        assertCapabilities(capabilities, true, gamut, true);
+    }
+
+    @Test
+    void getCapabilities_hasNoColorAndNoCTSupport() {
+        setGetResponse("/lights", "{\n" +
+                "\"7\": {\n" +
+                "\"type\": \"Dimmable light\",\n" +
+                "\"capabilities\": {\n" +
+                "\"control\": {\n" +
+                "\"mindimlevel\": 5000,\n" +
+                "\"maxlumen\": 1600\n" +
+                "}\n" +
+                "}\n" +
+                "}\n" +
+                "}");
+
+        LightCapabilities capabilities = api.getLightCapabilities(7);
+
+        assertCapabilities(capabilities, false, null, false);
+    }
+
+    @Test
+    void getCapabilities_unknownId_exception() {
+        setGetResponse("/lights", "{}");
+
+        assertThrows(LightNotFoundException.class, () -> api.getLightCapabilities(1234));
     }
 
     @Test

@@ -35,4 +35,10 @@ public interface HueApi {
      * @throws LightNotFoundException if no light with given id was found
      */
     String getLightName(int id);
+
+    /**
+     * @throws LightNotFoundException if no light with given id was found
+     * @return the light capabilities, or {@link LightCapabilities#NO_CAPABILITIES} if no capabilities were found. Not null.
+     */
+    LightCapabilities getLightCapabilities(int id);
 }

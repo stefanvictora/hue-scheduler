@@ -201,7 +201,8 @@ public final class HueScheduler implements Runnable {
             if (groupState) {
                 addGroupState(name, id, start, bri, ct, x, y, hue, sat, on, transitionTime);
             } else {
-                addState(name, id, start, bri, ct, x, y, hue, sat, on, transitionTime);
+                LightCapabilities capabilities = hueApi.getLightCapabilities(id);
+                addState(name, id, start, bri, ct, x, y, hue, sat, on, transitionTime, capabilities);
             }
         }
     }
@@ -224,16 +225,17 @@ public final class HueScheduler implements Runnable {
     }
 
     public void addState(String name, int lampId, String start, Integer brightness, Integer ct, Double x, Double y,
-                         Integer hue, Integer sat, Boolean on, Integer transitionTime) {
+                         Integer hue, Integer sat, Boolean on, Integer transitionTime, LightCapabilities capabilities) {
         lightStates.computeIfAbsent(lampId, ArrayList::new)
-                   .add(new ScheduledState(name, lampId, start, brightness, ct, x, y, hue, sat, on, transitionTime, startTimeProvider));
+                   .add(new ScheduledState(name, lampId, start, brightness, ct, x, y, hue, sat, on, transitionTime,
+                           startTimeProvider, capabilities));
     }
 
     public void addGroupState(String name, int groupId, String start, Integer brightness, Integer ct, Double x, Double y,
                               Integer hue, Integer sat, Boolean on, Integer transitionTime) {
         lightStates.computeIfAbsent(getGroupId(groupId), ArrayList::new)
                    .add(new ScheduledState(name, groupId, getGroupLights(groupId).get(0), start, brightness, ct, x, y,
-                           hue, sat, on, transitionTime, startTimeProvider, true));
+                           hue, sat, on, transitionTime, startTimeProvider, true, LightCapabilities.NO_CAPABILITIES));
     }
 
     private int getGroupId(int id) {

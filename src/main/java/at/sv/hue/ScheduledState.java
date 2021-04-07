@@ -1,5 +1,6 @@
 package at.sv.hue;
 
+import at.sv.hue.api.LightCapabilities;
 import at.sv.hue.time.StartTimeProvider;
 
 import java.time.Duration;
@@ -26,18 +27,21 @@ final class ScheduledState {
     private final Integer transitionTime;
     private final StartTimeProvider startTimeProvider;
     private final boolean groupState;
+    private final LightCapabilities capabilities;
     private int confirmCounter;
     private ZonedDateTime end;
     private ZonedDateTime lastStart;
     private boolean temporary;
 
     public ScheduledState(String name, int id, String start, Integer brightness, Integer ct, Double x, Double y,
-                          Integer hue, Integer sat, Boolean on, Integer transitionTime, StartTimeProvider startTimeProvider) {
-        this(name, id, id, start, brightness, ct, x, y, hue, sat, on, transitionTime, startTimeProvider, false);
+                          Integer hue, Integer sat, Boolean on, Integer transitionTime, StartTimeProvider startTimeProvider,
+                          LightCapabilities capabilities) {
+        this(name, id, id, start, brightness, ct, x, y, hue, sat, on, transitionTime, startTimeProvider, false, capabilities);
     }
 
     public ScheduledState(String name, int updateId, int statusId, String start, Integer brightness, Integer ct, Double x, Double y,
-                          Integer hue, Integer sat, Boolean on, Integer transitionTime, StartTimeProvider startTimeProvider, boolean groupState) {
+                          Integer hue, Integer sat, Boolean on, Integer transitionTime, StartTimeProvider startTimeProvider,
+                          boolean groupState, LightCapabilities capabilities) {
         this.name = name;
         this.updateId = updateId;
         this.statusId = statusId;
@@ -52,13 +56,16 @@ final class ScheduledState {
         this.transitionTime = assertValidTransitionTime(transitionTime);
         this.startTimeProvider = startTimeProvider;
         this.groupState = groupState;
+        this.capabilities = capabilities;
         confirmCounter = 0;
         temporary = false;
+        assertCapabilities(capabilities);
     }
 
     public static ScheduledState createTemporaryCopy(ScheduledState state, ZonedDateTime start, ZonedDateTime end) {
         ScheduledState copy = new ScheduledState(state.name, state.updateId, state.statusId, start.toLocalTime().toString(),
-                state.brightness, state.ct, state.x, state.y, state.hue, state.sat, state.on, state.transitionTime, state.startTimeProvider, state.groupState);
+                state.brightness, state.ct, state.x, state.y, state.hue, state.sat, state.on, state.transitionTime,
+                state.startTimeProvider, state.groupState, state.capabilities);
         copy.end = end;
         copy.temporary = true;
         copy.lastStart = start;
@@ -105,6 +112,24 @@ final class ScheduledState {
             throw new InvalidTransitionTime("Invalid transition time '" + transitionTime + ". Allowed integer range: 0-65535");
         }
         return transitionTime;
+    }
+
+    private void assertCapabilities(LightCapabilities capabilities) {
+        if (isGroupState()) return;
+        if (isCtState() && !capabilities.isCtSupported()) {
+            throw new ColorTemperatureNotSupported("Light '" + getName() + "' does not support setting color temperature!");
+        }
+        if (isColorState() && !capabilities.isColorSupported()) {
+            throw new ColorNotSupported("Light '" + getName() + "' does not support setting color!");
+        }
+    }
+
+    private boolean isCtState() {
+        return getCt() != null;
+    }
+
+    private boolean isColorState() {
+        return x != null || y != null || hue != null || sat != null;
     }
 
     public long getDelayInSeconds(ZonedDateTime now) {
@@ -245,6 +270,7 @@ final class ScheduledState {
     public String toString() {
         return "State{" +
                 getFormattedName() +
+                ", id=" + getUpdateId() +
                 (temporary ? ", temporary" : "") +
                 ", start=" + getFormattedStart() +
                 ", end=" + getFormattedEnd() +

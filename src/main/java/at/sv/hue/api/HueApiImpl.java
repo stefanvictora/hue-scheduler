@@ -184,11 +184,34 @@ public final class HueApiImpl implements HueApi {
 
     @Override
     public String getLightName(int id) {
+        Light light = getAndAssertLight(id);
+        return light.name;
+    }
+
+    private Light getAndAssertLight(int id) {
         Light light = getOrLookupLights().get(id);
         if (light == null) {
             throw new LightNotFoundException("Light with id '" + id + "' not found!");
         }
-        return light.name;
+        return light;
+    }
+
+    @Override
+    public LightCapabilities getLightCapabilities(int id) {
+        Light light = getAndAssertLight(id);
+        if (light.capabilities == null || light.capabilities.control == null) return LightCapabilities.NO_CAPABILITIES;
+        Control control = light.capabilities.control;
+        return new LightCapabilities(control.colorgamut, getMinCtOrNull(control), getMaxCtOrNull(control));
+    }
+
+    private Integer getMinCtOrNull(Control control) {
+        if (control.ct == null) return null;
+        return control.ct.min;
+    }
+
+    private Integer getMaxCtOrNull(Control control) {
+        if (control.ct == null) return null;
+        return control.ct.max;
     }
 
     private URL getLightsUrl() {
@@ -213,10 +236,15 @@ public final class HueApiImpl implements HueApi {
 
     private static final class Light {
         State state;
+        Capabilities capabilities;
         String name;
 
         public void setState(State state) {
             this.state = state;
+        }
+
+        public void setCapabilities(Capabilities capabilities) {
+            this.capabilities = capabilities;
         }
 
         public void setName(String name) {
@@ -324,8 +352,46 @@ public final class HueApiImpl implements HueApi {
         }
     }
 
-    private static final class Group {
+    private static final class Capabilities {
+        Control control;
 
+        public void setControl(Control control) {
+            this.control = control;
+        }
+    }
+
+    private static final class Control {
+        String colorgamuttype;
+        Double[][] colorgamut;
+        Ct ct;
+
+        public void setColorgamuttype(String colorgamuttype) {
+            this.colorgamuttype = colorgamuttype;
+        }
+
+        public void setColorgamut(Double[][] colorgamut) {
+            this.colorgamut = colorgamut;
+        }
+
+        public void setCt(Ct ct) {
+            this.ct = ct;
+        }
+    }
+
+    private static final class Ct {
+        int min;
+        int max;
+
+        public void setMin(int min) {
+            this.min = min;
+        }
+
+        public void setMax(int max) {
+            this.max = max;
+        }
+    }
+
+    private static final class Group {
         String name;
         Integer[] lights = new Integer[0];
 
