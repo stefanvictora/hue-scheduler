@@ -198,7 +198,18 @@ public final class HueScheduler implements Runnable {
                         RGBToXYConverter.XYColor xyColor = RGBToXYConverter.convert(typeAndValue[1], capabilities.getColorGamut());
                         x = xyColor.getX();
                         y = xyColor.getY();
-                        bri = xyColor.getBrightness();
+                        if (bri == null) {
+                            bri = xyColor.getBrightness();
+                        }
+                        break;
+                    case "rgb":
+                        String[] rgb = typeAndValue[1].split(",");
+                        RGBToXYConverter.XYColor xy = RGBToXYConverter.convert(rgb[0], rgb[1], rgb[2], capabilities.getColorGamut());
+                        x = xy.getX();
+                        y = xy.getY();
+                        if (bri == null) {
+                            bri = xy.getBrightness();
+                        }
                         break;
                     default:
                         throw new UnknownStateProperty("Unknown state property '" + typeAndValue[0] + "' with value '" + typeAndValue[1] + "'");

@@ -46,6 +46,8 @@ class HueSchedulerTest {
     private int retryDelay;
     private int confirmDelay;
     private String nowTimeString;
+    private double defaultX;
+    private double defaultY;
 
     private void setCurrentTimeTo(ZonedDateTime newTime) {
         if (now != null && newTime.isBefore(now)) {
@@ -390,6 +392,8 @@ class HueSchedulerTest {
         Double[][] gamut = {{0.6915, 0.3083}, {0.17, 0.7}, {0.1532, 0.0475}};
         defaultCapabilities = new LightCapabilities(gamut, 153, 500);
         create();
+        defaultX = 0.2318731647393379;
+        defaultY = 0.4675382426015799;
     }
 
     @AfterEach
@@ -644,8 +648,7 @@ class HueSchedulerTest {
     @Test
     void parse_canHandleColorInput_viaHexRGB_setsXAndYAndBrightness() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        String hex = "#5eba7d";
-        addStateNow("1", "hex:" + hex);
+        addStateNow("1", "hex:#5eba7d");
 
         startScheduler();
 
@@ -656,6 +659,48 @@ class HueSchedulerTest {
         double y = 0.4675382426015799;
         advanceTimeAndRunAndAssertApiCallsWithConfirmations(scheduledRunnables.get(0), bri, null, x, y, null,
                 null, null, null, false);
+    }
+
+    @Test
+    void parse_canHandleColorInput_viaHexRGB_setsXAndYAndBrightness_brightnessCanBeOverridden() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        int customBrightness = 100;
+        addStateNow("1", "bri:" + customBrightness + "\thex:#5eba7d");
+
+        startScheduler();
+
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(1);
+
+        advanceTimeAndRunAndAssertApiCallsWithConfirmations(scheduledRunnables.get(0), customBrightness, null,
+                defaultX, defaultY, null, null, null, null, false);
+    }
+
+    @Test
+    void parse_canHandleColorInput_viaDirectRGB_setsXAndYAndBrightness() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addStateNow("1", "rgb: 94, 186, 125");
+
+        startScheduler();
+
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(1);
+
+        int bri = 94;
+        advanceTimeAndRunAndAssertApiCallsWithConfirmations(scheduledRunnables.get(0), bri, null, defaultX, defaultY,
+                null, null, null, null, false);
+    }
+
+    @Test
+    void parse_canHandleColorInput_viaDirectRGB_brightnessCanBeOverridden() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        int customBrightness = 200;
+        addStateNow("1", "bri:" + customBrightness + "\trgb:94,186,125");
+
+        startScheduler();
+
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(1);
+
+        advanceTimeAndRunAndAssertApiCallsWithConfirmations(scheduledRunnables.get(0), customBrightness, null,
+                defaultX, defaultY, null, null, null, null, false);
     }
 
     @Test

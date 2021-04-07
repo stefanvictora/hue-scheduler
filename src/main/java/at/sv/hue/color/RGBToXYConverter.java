@@ -15,10 +15,18 @@ public final class RGBToXYConverter {
         return convert(color.getRed(), color.getGreen(), color.getBlue(), gamut);
     }
 
-    public static XYColor convert(double red, double green, double blue, Double[][] gamut) {
-        red = gammaCorrect((float) (red / 255f));
-        green = gammaCorrect((float) (green / 255f));
-        blue = gammaCorrect((float) (blue / 255f));
+    public static XYColor convert(String r, String g, String b, Double[][] gamut) {
+        return convert(parseInt(r), parseInt(g), parseInt(b), gamut);
+    }
+
+    private static int parseInt(String s) {
+        return Integer.parseInt(s.trim());
+    }
+
+    public static XYColor convert(int r, int g, int b, Double[][] gamut) {
+        double red = gammaCorrect(r / 255f);
+        double green = gammaCorrect(g / 255f);
+        double blue = gammaCorrect(b / 255f);
         double X = red * 0.664511f + green * 0.154324f + blue * 0.162028f;
         double Y = red * 0.283881f + green * 0.668433f + blue * 0.047685f;
         double Z = red * 0.000088f + green * 0.072310f + blue * 0.986039f;
