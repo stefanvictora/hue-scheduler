@@ -1,6 +1,7 @@
 package at.sv.hue;
 
 import at.sv.hue.api.*;
+import at.sv.hue.color.RGBToXYConverter;
 import at.sv.hue.time.StartTimeProvider;
 import at.sv.hue.time.StartTimeProviderImpl;
 import at.sv.hue.time.SunTimesProviderImpl;
@@ -148,6 +149,12 @@ public final class HueScheduler implements Runnable {
                     groupState = false;
                 }
             }
+            LightCapabilities capabilities;
+            if (!groupState) {
+                capabilities = hueApi.getLightCapabilities(id);
+            } else {
+                capabilities = LightCapabilities.NO_CAPABILITIES;
+            }
             Integer bri = null;
             Integer ct = null;
             Boolean on = null;
@@ -188,7 +195,7 @@ public final class HueScheduler implements Runnable {
                         sat = Integer.valueOf(typeAndValue[1]);
                         break;
                     case "hex":
-                        RBGToXYConverter.XYColor xyColor = RBGToXYConverter.convert(typeAndValue[1]);
+                        RGBToXYConverter.XYColor xyColor = RGBToXYConverter.convert(typeAndValue[1], capabilities.getColorGamut());
                         x = xyColor.getX();
                         y = xyColor.getY();
                         bri = xyColor.getBrightness();
@@ -201,7 +208,6 @@ public final class HueScheduler implements Runnable {
             if (groupState) {
                 addGroupState(name, id, start, bri, ct, x, y, hue, sat, on, transitionTime);
             } else {
-                LightCapabilities capabilities = hueApi.getLightCapabilities(id);
                 addState(name, id, start, bri, ct, x, y, hue, sat, on, transitionTime, capabilities);
             }
         }

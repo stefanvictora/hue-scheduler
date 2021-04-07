@@ -1,25 +1,42 @@
-package at.sv.hue;
+package at.sv.hue.color;
 
 import java.awt.*;
 
 /**
  * See: https://developers.meethue.com/develop/application-design-guidance/color-conversion-formulas-rgb-to-xy-and-back/
  */
-final class RBGToXYConverter {
+public final class RGBToXYConverter {
 
-    private RBGToXYConverter() {
+    private RGBToXYConverter() {
     }
 
-    public static XYColor convert(String hex) {
+    public static XYColor convert(String hex, Double[][] gamut) {
         Color color = Color.decode(hex);
-        double red = gammaCorrect(color.getRed() / 255f);
-        double green = gammaCorrect(color.getGreen() / 255f);
-        double blue = gammaCorrect(color.getBlue() / 255f);
+        return convert(color.getRed(), color.getGreen(), color.getBlue(), gamut);
+    }
+
+    public static XYColor convert(double red, double green, double blue, Double[][] gamut) {
+        red = gammaCorrect((float) (red / 255f));
+        green = gammaCorrect((float) (green / 255f));
+        blue = gammaCorrect((float) (blue / 255f));
         double X = red * 0.664511f + green * 0.154324f + blue * 0.162028f;
         double Y = red * 0.283881f + green * 0.668433f + blue * 0.047685f;
         double Z = red * 0.000088f + green * 0.072310f + blue * 0.986039f;
-        double x = X / (X + Y + Z);
-        double y = Y / (X + Y + Z);
+        double sum = X + Y + Z;
+        double x;
+        double y;
+        if (sum == 0.0) {
+            x = 0.0;
+            y = 0.0;
+        } else {
+            x = X / sum;
+            y = Y / sum;
+        }
+        if (gamut != null) {
+            Point point = new XYColorGamutCorrection(x, y, gamut).adjustIfNeeded();
+            x = point.x;
+            y = point.y;
+        }
         return new XYColor(x, y, (int) (Y * 255f));
     }
 

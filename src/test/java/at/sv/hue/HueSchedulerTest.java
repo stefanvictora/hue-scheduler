@@ -537,13 +537,13 @@ class HueSchedulerTest {
 
     @Test
     void parse_missingParts_atLeastIdAndTimeNeedsToBeSet() {
-        addKnownLightIds(1);
+        addKnownLightIdsWithDefaultCapabilities(1);
         assertThrows(InvalidConfigurationLine.class, () -> addState("1\t"));
     }
 
     @Test
     void parse_unknownFlag_exception() {
-        addKnownLightIds(1);
+        addKnownLightIdsWithDefaultCapabilities(1);
         assertThrows(UnknownStateProperty.class, () -> addState("1\t10:00\tUNKNOWN:1"));
     }
 
