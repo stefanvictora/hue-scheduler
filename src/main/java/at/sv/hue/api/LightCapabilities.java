@@ -22,6 +22,14 @@ public final class LightCapabilities {
         return ctMin != null && ctMax != null;
     }
 
+    public Integer getCtMin() {
+        return ctMin;
+    }
+
+    public Integer getCtMax() {
+        return ctMax;
+    }
+
     public Double[][] getColorGamut() {
         return gamut;
     }

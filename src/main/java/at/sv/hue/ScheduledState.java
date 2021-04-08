@@ -48,8 +48,10 @@ final class ScheduledState {
         this.updateId = updateId;
         this.statusId = statusId;
         this.start = start;
+        this.groupState = groupState;
+        this.capabilities = capabilities;
         this.brightness = assertValidBrightnessValue(brightness);
-        this.ct = assertValidCtValue(ct);
+        this.ct = assertCtSupportAndValue(ct);
         this.x = assertValidXAndY(x);
         this.y = assertValidXAndY(y);
         this.hue = assertValidHueValue(hue);
@@ -58,11 +60,9 @@ final class ScheduledState {
         this.transitionTime = assertValidTransitionTime(transitionTime);
         this.transitionTimeBefore = assertValidTransitionTime(transitionTimeBefore);
         this.startTimeProvider = startTimeProvider;
-        this.groupState = groupState;
-        this.capabilities = capabilities;
         confirmCounter = 0;
         temporary = false;
-        assertCapabilities(capabilities);
+        assertColorCapabilities();
     }
 
     public static ScheduledState createTemporaryCopy(ScheduledState state, ZonedDateTime start, ZonedDateTime end) {
@@ -82,11 +82,20 @@ final class ScheduledState {
         return brightness;
     }
 
-    private Integer assertValidCtValue(Integer ct) {
-        if (ct != null && (ct > 500 || ct < 153)) {
-            throw new InvalidColorTemperatureValue("Invalid ct value '" + ct + "'. Allowed integer range: 153-500");
+    private Integer assertCtSupportAndValue(Integer ct) {
+        if (ct == null || isGroupState()) return ct;
+        assertCtSupported();
+        if (ct > capabilities.getCtMax() || ct < capabilities.getCtMin()) {
+            throw new InvalidColorTemperatureValue("Invalid ct value '" + ct + "'. Support integer range for light model: "
+                    + capabilities.getCtMin() + "-" + capabilities.getCtMax());
         }
         return ct;
+    }
+
+    private void assertCtSupported() {
+        if (!capabilities.isCtSupported()) {
+            throw new ColorTemperatureNotSupported("Light '" + getName() + "' does not support setting color temperature!");
+        }
     }
 
     private Double assertValidXAndY(Double xOrY) {
@@ -117,11 +126,8 @@ final class ScheduledState {
         return transitionTime;
     }
 
-    private void assertCapabilities(LightCapabilities capabilities) {
+    private void assertColorCapabilities() {
         if (isGroupState()) return;
-        if (isCtState() && !capabilities.isCtSupported()) {
-            throw new ColorTemperatureNotSupported("Light '" + getName() + "' does not support setting color temperature!");
-        }
         if (isColorState() && !capabilities.isColorSupported()) {
             throw new ColorNotSupported("Light '" + getName() + "' does not support setting color!");
         }

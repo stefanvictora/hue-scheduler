@@ -939,6 +939,30 @@ class HueSchedulerTest {
     }
 
     @Test
+    void parse_ctValueValidationUsesCapabilities_lowerThanDefault_noException() {
+        addKnownLightIds(1);
+        setCapabilities(1, new LightCapabilities(null, 100, 200));
+
+        addStateNow("1", "ct:100");
+
+        startScheduler();
+
+        ensureScheduledStates(1);
+    }
+
+    @Test
+    void parse_ctValueValidationUsesCapabilities_higherThanDefault_noException() {
+        addKnownLightIds(1);
+        setCapabilities(1, new LightCapabilities(null, 100, 1000));
+
+        addStateNow("1", "ct:1000");
+
+        startScheduler();
+
+        ensureScheduledStates(1);
+    }
+
+    @Test
     void parse_invalidCtValue_tooHigh_exception() {
         assertThrows(InvalidColorTemperatureValue.class, () -> addState(1, now, null, 501));
     }
