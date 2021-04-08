@@ -25,6 +25,7 @@ import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 @Command(name = "HueScheduler", version = "1.0-SNAPSHOT", mixinStandardHelpOptions = true, sortOptions = false)
@@ -113,7 +114,14 @@ public final class HueScheduler implements Runnable {
             Files.lines(inputFile)
                  .filter(s -> !s.isEmpty())
                  .filter(s -> !s.startsWith("//") && !s.startsWith("#"))
-                 .forEachOrdered(this::addState);
+                 .forEachOrdered(input -> {
+                     try {
+                         addState(input);
+                     } catch (Exception e) {
+                         System.err.println("Failed to parse configuration line '" + input + "':\n" + e.getClass().getSimpleName() + ": " + e.getLocalizedMessage());
+                         System.exit(2);
+                     }
+                 });
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -126,7 +134,7 @@ public final class HueScheduler implements Runnable {
     public void addState(String input) {
         String[] parts = input.split("\\t|\\s{4}");
         if (parts.length < 2)
-            throw new InvalidConfigurationLine("Invalid configuration line '" + input + "': at least id and start time have to be set!");
+            throw new InvalidConfigurationLine("Invalid configuration line '" + Arrays.toString(parts) + "': at least id and start time have to be set!");
         for (String idPart : parts[0].split(",")) {
             int id;
             boolean groupState;
@@ -167,39 +175,41 @@ public final class HueScheduler implements Runnable {
             for (int i = 2; i < parts.length; i++) {
                 String part = parts[i];
                 String[] typeAndValue = part.split(":");
-                switch (typeAndValue[0]) {
+                String parameter = typeAndValue[0];
+                String value = typeAndValue[1];
+                switch (parameter) {
                     case "bri":
-                        bri = Integer.valueOf(typeAndValue[1]);
+                        bri = parseInteger(value, parameter);
                         break;
                     case "ct":
-                        ct = Integer.valueOf(typeAndValue[1]);
+                        ct = parseInteger(value, parameter);
                         break;
                     case "k":
-                        ct = convertToMiredCt(Integer.valueOf(typeAndValue[1]));
+                        ct = convertToMiredCt(parseInteger(value, parameter));
                         break;
                     case "on":
-                        on = Boolean.valueOf(typeAndValue[1]);
+                        on = Boolean.valueOf(value);
                         break;
                     case "tr":
-                        transitionTime = parseTransitionTime(typeAndValue[1]);
+                        transitionTime = parseTransitionTime(parameter, value);
                         break;
                     case "tr-before":
-                        transitionTimeBefore = parseTransitionTime(typeAndValue[1]);
+                        transitionTimeBefore = parseTransitionTime(parameter, value);
                         break;
                     case "x":
-                        x = Double.parseDouble(typeAndValue[1]);
+                        x = parseDouble(value, parameter);
                         break;
                     case "y":
-                        y = Double.parseDouble(typeAndValue[1]);
+                        y = parseDouble(value, parameter);
                         break;
                     case "hue":
-                        hue = Integer.valueOf(typeAndValue[1]);
+                        hue = parseInteger(value, parameter);
                         break;
                     case "sat":
-                        sat = Integer.valueOf(typeAndValue[1]);
+                        sat = parseInteger(value, parameter);
                         break;
                     case "hex":
-                        RGBToXYConverter.XYColor xyColor = RGBToXYConverter.convert(typeAndValue[1], capabilities.getColorGamut());
+                        RGBToXYConverter.XYColor xyColor = RGBToXYConverter.convert(value, capabilities.getColorGamut());
                         x = xyColor.getX();
                         y = xyColor.getY();
                         if (bri == null) {
@@ -207,7 +217,10 @@ public final class HueScheduler implements Runnable {
                         }
                         break;
                     case "rgb":
-                        String[] rgb = typeAndValue[1].split(",");
+                        String[] rgb = value.split(",");
+                        if (rgb.length != 3) {
+                            throw new InvalidPropertyValue("Invalid RGB value '" + value + "'. Make sure to separate the colors with ','.");
+                        }
                         RGBToXYConverter.XYColor xy = RGBToXYConverter.convert(rgb[0], rgb[1], rgb[2], capabilities.getColorGamut());
                         x = xy.getX();
                         y = xy.getY();
@@ -216,7 +229,7 @@ public final class HueScheduler implements Runnable {
                         }
                         break;
                     default:
-                        throw new UnknownStateProperty("Unknown state property '" + typeAndValue[0] + "' with value '" + typeAndValue[1] + "'");
+                        throw new UnknownStateProperty("Unknown state property '" + parameter + "' with value '" + value + "'");
                 }
             }
             String start = parts[1];
@@ -228,7 +241,23 @@ public final class HueScheduler implements Runnable {
         }
     }
 
-    private Integer parseTransitionTime(String s) {
+    private Integer parseInteger(String value, String parameter) {
+        return parseValueWithErrorHandling(value, parameter, "integer", Integer::valueOf);
+    }
+
+    private Double parseDouble(String value, String parameter) {
+        return parseValueWithErrorHandling(value, parameter, "double", Double::parseDouble);
+    }
+
+    private <T> T parseValueWithErrorHandling(String value, String parameter, String type, Function<String, T> function) {
+        try {
+            return function.apply(value);
+        } catch (Exception e) {
+            throw new InvalidPropertyValue("Invalid " + type + " value '" + value + " for property '" + parameter + "'.");
+        }
+    }
+
+    private Integer parseTransitionTime(String parameter, String s) {
         String value = s;
         int modifier = 1;
         if (s.endsWith("s")) {
@@ -238,7 +267,7 @@ public final class HueScheduler implements Runnable {
             value = s.substring(0, s.length() - 3);
             modifier = 600;
         }
-        return Integer.parseInt(value.trim()) * modifier;
+        return parseInteger(value.trim(), parameter) * modifier;
     }
 
     private Integer convertToMiredCt(Integer kelvin) {

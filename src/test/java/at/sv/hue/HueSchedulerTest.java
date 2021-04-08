@@ -353,8 +353,8 @@ class HueSchedulerTest {
         ensureRunnable(initialNow.plusDays(1));
     }
 
-    private void addStateNow(String name, String state) {
-        addState(name + "\t" + nowTimeString + "\t" + state);
+    private void addStateNow(String name, String... properties) {
+        addState(name + "\t" + nowTimeString + "\t" + String.join("\t", properties));
     }
 
     private void setCapabilities(int id, LightCapabilities capabilities) {
@@ -562,7 +562,7 @@ class HueSchedulerTest {
     @Test
     void parse_setsTransitionTime() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        addStateNow("1", "bri:" + defaultBrightness + "\ttr:" + 5);
+        addStateNow("1", "bri:" + defaultBrightness, "tr:" + 5);
 
         startScheduler();
 
@@ -575,7 +575,7 @@ class HueSchedulerTest {
     @Test
     void parse_canParseTransitionTimeWithTimeUnits() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        addStateNow("1", "bri:" + defaultBrightness + "\ttr:5s");
+        addStateNow("1", "bri:" + defaultBrightness, "tr:5s");
 
         startScheduler();
 
@@ -588,7 +588,7 @@ class HueSchedulerTest {
     @Test
     void parse_canParseTransitionTimeWithTimeUnits_minutes() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        addStateNow("1", "bri:" + defaultBrightness + "\ttr:109min");
+        addStateNow("1", "bri:" + defaultBrightness, "tr:109min");
 
         startScheduler();
 
@@ -680,7 +680,7 @@ class HueSchedulerTest {
         addKnownLightIdsWithDefaultCapabilities(1);
         double x = 0.6075;
         double y = 0.3525;
-        addStateNow("1", "x:" + x + "\ty:" + y);
+        addStateNow("1", "x:" + x, "y:" + y);
 
         startScheduler();
 
@@ -696,7 +696,7 @@ class HueSchedulerTest {
         addGroupLightsForId(1, id);
         double x = 0.5043;
         double y = 0.6079;
-        addStateNow("g1", "x:" + x + "\ty:" + y);
+        addStateNow("g1", "x:" + x, "y:" + y);
 
         startScheduler();
 
@@ -711,7 +711,7 @@ class HueSchedulerTest {
         addKnownLightIdsWithDefaultCapabilities(1);
         int hue = 65535;
         int saturation = 254;
-        addStateNow("1", "hue:" + hue + "\tsat:" + saturation);
+        addStateNow("1", "hue:" + hue, "sat:" + saturation);
 
         startScheduler();
 
@@ -741,7 +741,7 @@ class HueSchedulerTest {
     void parse_canHandleColorInput_viaHexRGB_setsXAndYAndBrightness_brightnessCanBeOverridden() {
         addKnownLightIdsWithDefaultCapabilities(1);
         int customBrightness = 100;
-        addStateNow("1", "bri:" + customBrightness + "\thex:#5eba7d");
+        addStateNow("1", "bri:" + customBrightness, "hex:#5eba7d");
 
         startScheduler();
 
@@ -769,7 +769,7 @@ class HueSchedulerTest {
     void parse_canHandleColorInput_viaDirectRGB_brightnessCanBeOverridden() {
         addKnownLightIdsWithDefaultCapabilities(1);
         int customBrightness = 200;
-        addStateNow("1", "bri:" + customBrightness + "\trgb:94,186,125");
+        addStateNow("1", "bri:" + customBrightness, "rgb:94,186,125");
 
         startScheduler();
 
@@ -970,49 +970,73 @@ class HueSchedulerTest {
     @Test
     void parse_invalidHueValue_tooHigh_exception() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        assertThrows(InvalidHueValue.class, () -> addState("1\t" + nowTimeString + "\thue:" + 65536));
+        assertThrows(InvalidHueValue.class, () -> addStateNow("1", "hue:" + 65536));
     }
 
     @Test
     void parse_invalidHueValue_tooLow_exception() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        assertThrows(InvalidHueValue.class, () -> addState("1\t" + nowTimeString + "\thue:" + -1));
+        assertThrows(InvalidHueValue.class, () -> addStateNow("1", "hue:" + -1));
     }
 
     @Test
     void parse_invalidSaturationValue_tooHigh_exception() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        assertThrows(InvalidSaturationValue.class, () -> addState("1\t" + nowTimeString + "\tsat:" + 255));
+        assertThrows(InvalidSaturationValue.class, () -> addStateNow("1", "sat:" + 255));
     }
 
     @Test
     void parse_invalidSaturationValue_tooLow_exception() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        assertThrows(InvalidSaturationValue.class, () -> addState("1\t" + nowTimeString + "\tsat:" + -1));
+        assertThrows(InvalidSaturationValue.class, () -> addStateNow("1", "sat:" + -1));
     }
 
     @Test
     void parse_invalidXAndYValue_tooHigh_exception() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        assertThrows(InvalidXAndYValue.class, () -> addState("1\t" + nowTimeString + "\tx:" + 1.1));
+        assertThrows(InvalidXAndYValue.class, () -> addStateNow("1", "x:" + 1.1));
     }
 
     @Test
     void parse_invalidXAndYValue_tooLow_exception() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        assertThrows(InvalidXAndYValue.class, () -> addState("1\t" + nowTimeString + "\ty:" + -0.1));
+        assertThrows(InvalidXAndYValue.class, () -> addStateNow("1", "y:" + -0.1));
     }
 
     @Test
     void parse_invalidTransitionTime_tooLow_exception() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        assertThrows(InvalidTransitionTime.class, () -> addState("1\t" + nowTimeString + "\ttr:" + -1));
+        assertThrows(InvalidTransitionTime.class, () -> addStateNow("1", "tr:" + -1));
     }
 
     @Test
     void parse_invalidTransitionTime_tooHigh_exception() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        assertThrows(InvalidTransitionTime.class, () -> addState("1\t" + nowTimeString + "\ttr:" + 65536));
+        assertThrows(InvalidTransitionTime.class, () -> addStateNow("1", "tr:" + 65536));
+    }
+
+    @Test
+    void parse_invalidPropertyValue_ct_exception() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        assertThrows(InvalidPropertyValue.class, () -> addStateNow("1", "ct:INVALID"));
+    }
+
+    @Test
+    void parse_invalidPropertyValue_tr_exception() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        assertThrows(InvalidPropertyValue.class, () -> addStateNow("1", "tr:INVALIDs"));
+    }
+
+    @Test
+    void parse_invalidPropertyValue_x_exception() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        assertThrows(InvalidPropertyValue.class, () -> addStateNow("1", "x:INVALID"));
+    }
+
+    @Test
+    void parse_invalidPropertyValue_rgb_exception() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        assertThrows(InvalidPropertyValue.class, () -> addStateNow("1", "rgb:INVALID"));
     }
 
     @Test
