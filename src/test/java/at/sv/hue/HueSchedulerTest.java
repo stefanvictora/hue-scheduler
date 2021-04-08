@@ -156,7 +156,7 @@ class HueSchedulerTest {
 
     private void addState(int id, ZonedDateTime startTime, Integer brightness, Integer ct, Boolean on) {
         scheduler.addState("Name", id, startTime.toLocalTime().toString(), brightness, ct, null, null,
-                null, null, on, null, defaultCapabilities);
+                null, null, on, null, null, defaultCapabilities);
     }
 
     private void addState(String input) {
@@ -166,7 +166,7 @@ class HueSchedulerTest {
     private void addGroupState(int groupId, ZonedDateTime start, Integer... lights) {
         addGroupLightsForId(groupId, lights);
         scheduler.addGroupState("Name", groupId, start.toLocalTime().toString(), defaultBrightness, defaultCt,
-                null, null, null, null, null, null);
+                null, null, null, null, null, null, null);
     }
 
     private void startScheduler() {
@@ -350,7 +350,6 @@ class HueSchedulerTest {
 
         runAndAssertConfirmations(true, true, putBrightness, putCt, putX, putY, putHue, putSat,
                 putOn, putTransitionTime, groupState);
-
         ensureRunnable(initialNow.plusDays(1));
     }
 
@@ -597,6 +596,83 @@ class HueSchedulerTest {
 
         advanceTimeAndRunAndAssertApiCallsWithConfirmations(scheduledRunnables.get(0), defaultBrightness, null,
                 null, null, null, null, null, 65400, false);
+    }
+
+    @Test
+    void parse_transitionTime_beforeStart_shiftsGivenStartByThatTime() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        ZonedDateTime actualStart = now;
+        ZonedDateTime start = actualStart.plusMinutes(10);
+        addState("1\t" + start.toLocalTime() + "\tbri:" + defaultBrightness + "\ttr-before:10min");
+
+        startScheduler();
+
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(1);
+        assertScheduleStart(scheduledRunnables.get(0), actualStart);
+
+        runAndAssertApiCalls(scheduledRunnables.get(0), true, true, defaultBrightness, null,
+                null, null, null, null, null, 6000, false);
+
+        runAndAssertConfirmations(state -> {
+            setCurrentTimeTo(state.getStart());
+            runAndAssertApiCalls(state, true, true, defaultBrightness, null,
+                    null, null, null, null, null, getAdjustedTransitionTime(start), false);
+        });
+
+        ensureRunnable(actualStart.plusDays(1));
+    }
+
+    private Integer getAdjustedTransitionTime(ZonedDateTime start) {
+        return (int) Duration.between(now, start).toMillis() / 100;
+    }
+
+    @Test
+    void parse_transitionTimeBefore_group_lightTurnedOnLater_stillBeforeStart_transitionTimeIsShortenedToRemainingTimeBefore() {
+        addKnownGroupIds(1);
+        addGroupLightsForId(1, 1);
+        addKnownLightIdsWithDefaultCapabilities(1);
+        ZonedDateTime actualStart = now;
+        ZonedDateTime start = actualStart.plusMinutes(10);
+        addState("g1\t" + start.toLocalTime() + "\tbri:" + defaultBrightness + "\ttr-before:10min");
+
+        startScheduler();
+
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(1);
+
+        advanceCurrentTime(Duration.ofMinutes(5));
+
+        runAndAssertApiCalls(scheduledRunnables.get(0), true, true, defaultBrightness, null,
+                null, null, null, null, null, 3000, true);
+
+        runAndAssertConfirmations(state -> {
+            setCurrentTimeTo(state.getStart());
+            runAndAssertApiCalls(state, true, true, defaultBrightness, null,
+                    null, null, null, null, null, getAdjustedTransitionTime(start), true);
+        });
+
+        ensureRunnable(actualStart.plusDays(1));
+    }
+
+    @Test
+    void parse_transitionTimeBefore_lightTurnedAfterStart_beforeTransitionTimeIgnored_normalTransitionTimeUsed() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        ZonedDateTime actualStart = now;
+        ZonedDateTime start = actualStart.plusMinutes(10);
+        addState("1\t" + start.toLocalTime() + "\tbri:" + defaultBrightness + "\ttr-before:10min\ttr:3s");
+
+        startScheduler();
+
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(1);
+
+        advanceCurrentTime(Duration.ofMinutes(10));
+
+        runAndAssertApiCalls(scheduledRunnables.get(0), true, true, defaultBrightness, null,
+                null, null, null, null, null, 30, false);
+
+        runAndAssertConfirmations(true, true, defaultBrightness, null,
+                null, null, null, null, null, 30, false);
+
+        ensureRunnable(actualStart.plusDays(1));
     }
 
     @Test

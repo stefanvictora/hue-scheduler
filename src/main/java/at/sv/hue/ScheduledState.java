@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 
 final class ScheduledState {
     static final int CONFIRM_AMOUNT = 30;
@@ -25,6 +26,7 @@ final class ScheduledState {
     private final Integer sat;
     private final Boolean on;
     private final Integer transitionTime;
+    private final Integer transitionTimeBefore;
     private final StartTimeProvider startTimeProvider;
     private final boolean groupState;
     private final LightCapabilities capabilities;
@@ -34,14 +36,14 @@ final class ScheduledState {
     private boolean temporary;
 
     public ScheduledState(String name, int id, String start, Integer brightness, Integer ct, Double x, Double y,
-                          Integer hue, Integer sat, Boolean on, Integer transitionTime, StartTimeProvider startTimeProvider,
-                          LightCapabilities capabilities) {
-        this(name, id, id, start, brightness, ct, x, y, hue, sat, on, transitionTime, startTimeProvider, false, capabilities);
+                          Integer hue, Integer sat, Boolean on, Integer transitionTimeBefore, Integer transitionTime,
+                          StartTimeProvider startTimeProvider, LightCapabilities capabilities) {
+        this(name, id, id, start, brightness, ct, x, y, hue, sat, on, transitionTimeBefore, transitionTime, startTimeProvider, false, capabilities);
     }
 
     public ScheduledState(String name, int updateId, int statusId, String start, Integer brightness, Integer ct, Double x, Double y,
-                          Integer hue, Integer sat, Boolean on, Integer transitionTime, StartTimeProvider startTimeProvider,
-                          boolean groupState, LightCapabilities capabilities) {
+                          Integer hue, Integer sat, Boolean on, Integer transitionTimeBefore, Integer transitionTime,
+                          StartTimeProvider startTimeProvider, boolean groupState, LightCapabilities capabilities) {
         this.name = name;
         this.updateId = updateId;
         this.statusId = statusId;
@@ -54,6 +56,7 @@ final class ScheduledState {
         this.sat = assertValidSaturationValue(sat);
         this.on = on;
         this.transitionTime = assertValidTransitionTime(transitionTime);
+        this.transitionTimeBefore = assertValidTransitionTime(transitionTimeBefore);
         this.startTimeProvider = startTimeProvider;
         this.groupState = groupState;
         this.capabilities = capabilities;
@@ -64,7 +67,7 @@ final class ScheduledState {
 
     public static ScheduledState createTemporaryCopy(ScheduledState state, ZonedDateTime start, ZonedDateTime end) {
         ScheduledState copy = new ScheduledState(state.name, state.updateId, state.statusId, start.toLocalTime().toString(),
-                state.brightness, state.ct, state.x, state.y, state.hue, state.sat, state.on, state.transitionTime,
+                state.brightness, state.ct, state.x, state.y, state.hue, state.sat, state.on, state.transitionTimeBefore, state.transitionTime,
                 state.startTimeProvider, state.groupState, state.capabilities);
         copy.end = end;
         copy.temporary = true;
@@ -167,7 +170,15 @@ final class ScheduledState {
     }
 
     public LocalTime getStart(ZonedDateTime dateTime) {
-        return startTimeProvider.getStart(start, dateTime);
+        LocalTime start = startTimeProvider.getStart(this.start, dateTime);
+        if (transitionTimeBefore != null) {
+            start = start.minus(transitionTimeBefore * 100, ChronoUnit.MILLIS);
+        }
+        return start;
+    }
+
+    private ZonedDateTime getDefinedStart(ZonedDateTime now) {
+        return getZonedStart(now, startTimeProvider.getStart(this.start, now));
     }
 
     public String getName() {
@@ -212,6 +223,14 @@ final class ScheduledState {
 
     public Integer getTransitionTime() {
         return transitionTime;
+    }
+
+    public Integer getTransitionTime(ZonedDateTime now) {
+        if (transitionTimeBefore == null) return transitionTime;
+        ZonedDateTime definedStart = getDefinedStart(now);
+        Duration between = Duration.between(now, definedStart);
+        if (between.isZero() || between.isNegative()) return transitionTime;
+        return (int) between.toMillis() / 100;
     }
 
     public boolean isFullyConfirmed() {
@@ -281,7 +300,8 @@ final class ScheduledState {
                 getFormattedPropertyIfSet("y", y) +
                 getFormattedPropertyIfSet("hue", hue) +
                 getFormattedPropertyIfSet("sat", sat) +
-                getFormattedTransitionTimeIfSet() +
+                getFormattedTransitionTimeIfSet("transitionTimeBefore", transitionTimeBefore) +
+                getFormattedTransitionTimeIfSet("transitionTime", transitionTime) +
                 '}';
     }
 
@@ -319,8 +339,8 @@ final class ScheduledState {
         return ", " + name + "=";
     }
 
-    private String getFormattedTransitionTimeIfSet() {
+    private String getFormattedTransitionTimeIfSet(String name, Integer transitionTime) {
         if (transitionTime == null) return "";
-        return formatPropertyName("transitionTime") + Duration.ofMillis(transitionTime * 100).toString();
+        return formatPropertyName(name) + Duration.ofMillis(transitionTime * 100).toString();
     }
 }
