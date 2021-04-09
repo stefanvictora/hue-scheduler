@@ -387,9 +387,10 @@ public final class HueScheduler implements Runnable {
                 return;
             }
             if (!success || lightState.isUnreachableOrOff()) {
-                LOG.trace("'{}' not reachable or off, try again", state.getName());
+                Integer delay = retryDelay.get();
+                LOG.trace("'{}' not reachable or off, try again in {}", state.getName(), Duration.ofMillis(delay));
                 state.resetConfirmations();
-                schedule(state, retryDelay.get());
+                schedule(state, delay);
                 return;
             }
             if (!state.isFullyConfirmed()) {
