@@ -5,6 +5,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -14,6 +16,8 @@ import java.util.List;
 import java.util.Map;
 
 public final class HueApiImpl implements HueApi {
+
+    private static final Logger LOG = LoggerFactory.getLogger(HueApiImpl.class);
 
     private final HttpResourceProvider resourceProvider;
     private final ObjectMapper mapper;
@@ -82,6 +86,9 @@ public final class HueApiImpl implements HueApi {
                 getBody(new State(bri, ct, x, y, hue, sat, on, transitionTime)));
         if (response == null) {
             return false;
+        }
+        if (response.contains("error")) {
+            LOG.error("Put API call returned with an error: {}", response.trim());
         }
         return !response.contains("error") && response.contains("success");
     }
