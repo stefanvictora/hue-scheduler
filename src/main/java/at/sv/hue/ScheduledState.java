@@ -233,7 +233,7 @@ final class ScheduledState {
 
     public Integer getTransitionTime(ZonedDateTime now) {
         if (transitionTimeBefore == null) return transitionTime;
-        ZonedDateTime definedStart = getDefinedStart(now);
+        ZonedDateTime definedStart = getDefinedStart(lastStart);
         Duration between = Duration.between(now, definedStart);
         if (between.isZero() || between.isNegative()) return transitionTime;
         return (int) between.toMillis() / 100;

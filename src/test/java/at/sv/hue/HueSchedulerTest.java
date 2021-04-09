@@ -599,24 +599,24 @@ class HueSchedulerTest {
     }
 
     @Test
-    void parse_transitionTime_beforeStart_shiftsGivenStartByThatTime() {
+    void parse_transitionTimeBefore_shiftsGivenStartByThatTime() {
         addKnownLightIdsWithDefaultCapabilities(1);
         ZonedDateTime actualStart = now;
-        ZonedDateTime start = actualStart.plusMinutes(10);
-        addState("1\t" + start.toLocalTime() + "\tbri:" + defaultBrightness + "\ttr-before:10min");
+        ZonedDateTime definedStart = actualStart.plusMinutes(10);
+        addState("1\t" + definedStart.toLocalTime() + "\tbri:" + defaultBrightness + "\ttr-before:10min");
 
         startScheduler();
 
         List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(1);
         assertScheduleStart(scheduledRunnables.get(0), actualStart);
 
-        runAndAssertApiCalls(scheduledRunnables.get(0), true, true, defaultBrightness, null,
+        advanceTimeAndRunAndAssertApiCalls(scheduledRunnables.get(0), true, true, defaultBrightness, null,
                 null, null, null, null, null, 6000, false);
 
         runAndAssertConfirmations(state -> {
             setCurrentTimeTo(state.getStart());
             runAndAssertApiCalls(state, true, true, defaultBrightness, null,
-                    null, null, null, null, null, getAdjustedTransitionTime(start), false);
+                    null, null, null, null, null, getAdjustedTransitionTime(definedStart), false);
         });
 
         ensureRunnable(actualStart.plusDays(1));
@@ -627,13 +627,40 @@ class HueSchedulerTest {
     }
 
     @Test
+    void parse_transitionTimeBefore_overNight_doesNotOverAdjustTransitionTime_returnsNullInstead() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        setCurrentTimeTo(now.withHour(23).withMinute(50));
+        ZonedDateTime actualStart = now;
+        ZonedDateTime definedStart = actualStart.plusMinutes(5);
+        addState("1\t" + definedStart.toLocalTime() + "\tbri:" + defaultBrightness + "\ttr-before:5min");
+
+        startScheduler();
+
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(1);
+        assertScheduleStart(scheduledRunnables.get(0), actualStart);
+
+        advanceCurrentTime(Duration.ofMinutes(10)); // here we cross over to tomorrow
+
+        runAndAssertApiCalls(scheduledRunnables.get(0), true, true, defaultBrightness, null,
+                null, null, null, null, null, null, false);
+
+        runAndAssertConfirmations(state -> {
+            setCurrentTimeTo(state.getStart());
+            runAndAssertApiCalls(state, true, true, defaultBrightness, null,
+                    null, null, null, null, null, null, false);
+        });
+
+        ensureRunnable(actualStart.plusDays(1));
+    }
+
+    @Test
     void parse_transitionTimeBefore_group_lightTurnedOnLater_stillBeforeStart_transitionTimeIsShortenedToRemainingTimeBefore() {
         addKnownGroupIds(1);
         addGroupLightsForId(1, 1);
         addKnownLightIdsWithDefaultCapabilities(1);
         ZonedDateTime actualStart = now;
-        ZonedDateTime start = actualStart.plusMinutes(10);
-        addState("g1\t" + start.toLocalTime() + "\tbri:" + defaultBrightness + "\ttr-before:10min");
+        ZonedDateTime definedStart = actualStart.plusMinutes(10);
+        addState("g1\t" + definedStart.toLocalTime() + "\tbri:" + defaultBrightness + "\ttr-before:10min");
 
         startScheduler();
 
@@ -647,7 +674,7 @@ class HueSchedulerTest {
         runAndAssertConfirmations(state -> {
             setCurrentTimeTo(state.getStart());
             runAndAssertApiCalls(state, true, true, defaultBrightness, null,
-                    null, null, null, null, null, getAdjustedTransitionTime(start), true);
+                    null, null, null, null, null, getAdjustedTransitionTime(definedStart), true);
         });
 
         ensureRunnable(actualStart.plusDays(1));
@@ -657,8 +684,8 @@ class HueSchedulerTest {
     void parse_transitionTimeBefore_lightTurnedAfterStart_beforeTransitionTimeIgnored_normalTransitionTimeUsed() {
         addKnownLightIdsWithDefaultCapabilities(1);
         ZonedDateTime actualStart = now;
-        ZonedDateTime start = actualStart.plusMinutes(10);
-        addState("1\t" + start.toLocalTime() + "\tbri:" + defaultBrightness + "\ttr-before:10min\ttr:3s");
+        ZonedDateTime definedStart = actualStart.plusMinutes(10);
+        addState("1\t" + definedStart.toLocalTime() + "\tbri:" + defaultBrightness + "\ttr-before:10min\ttr:3s");
 
         startScheduler();
 
