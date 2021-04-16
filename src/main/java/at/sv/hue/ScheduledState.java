@@ -143,10 +143,6 @@ final class ScheduledState {
         }
     }
 
-    private boolean isCtState() {
-        return getCt() != null;
-    }
-
     private boolean isColorState() {
         return x != null || y != null || hue != null || sat != null || effect != null;
     }
