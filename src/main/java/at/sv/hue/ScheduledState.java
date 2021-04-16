@@ -227,10 +227,6 @@ final class ScheduledState {
         return on;
     }
 
-    public Integer getTransitionTime() {
-        return transitionTime;
-    }
-
     public Integer getTransitionTime(ZonedDateTime now) {
         if (transitionTimeBefore == null) return transitionTime;
         ZonedDateTime definedStart = getDefinedStart(lastStart);
