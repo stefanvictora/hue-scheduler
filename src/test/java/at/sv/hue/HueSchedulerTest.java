@@ -796,7 +796,7 @@ class HueSchedulerTest {
     @Test
     void parse_canHandleColorInput_viaHexRGB_setsXAndYAndBrightness() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        addStateNow("1", "hex:#5eba7d");
+        addStateNow("1", "color:#5eba7d");
 
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
@@ -811,7 +811,7 @@ class HueSchedulerTest {
     void parse_canHandleColorInput_viaHexRGB_setsXAndYAndBrightness_brightnessCanBeOverridden() {
         addKnownLightIdsWithDefaultCapabilities(1);
         int customBrightness = 100;
-        addStateNow("1", "bri:" + customBrightness, "hex:#5eba7d");
+        addStateNow("1", "bri:" + customBrightness, "color:#5eba7d");
 
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
@@ -822,7 +822,7 @@ class HueSchedulerTest {
     @Test
     void parse_canHandleColorInput_viaDirectRGB_setsXAndYAndBrightness() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        addStateNow("1", "rgb: 94, 186, 125");
+        addStateNow("1", "color: 94, 186, 125");
 
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
@@ -835,7 +835,7 @@ class HueSchedulerTest {
     void parse_canHandleColorInput_viaDirectRGB_brightnessCanBeOverridden() {
         addKnownLightIdsWithDefaultCapabilities(1);
         int customBrightness = 200;
-        addStateNow("1", "bri:" + customBrightness, "rgb:94,186,125");
+        addStateNow("1", "bri:" + customBrightness, "color:94,186,125");
 
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
@@ -847,7 +847,7 @@ class HueSchedulerTest {
     void parse_colorInput_x_y_butLightDoesNotSupportColor_exception() {
         addKnownLightIds(1);
         setCapabilities(1, LightCapabilities.NO_CAPABILITIES);
-        assertThrows(ColorNotSupported.class, () -> addStateNow("1", "hex:#ffbaff"));
+        assertThrows(ColorNotSupported.class, () -> addStateNow("1", "color:#ffbaff"));
     }
 
     @Test
@@ -1094,7 +1094,7 @@ class HueSchedulerTest {
     @Test
     void parse_invalidPropertyValue_rgb_exception() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        assertThrows(InvalidPropertyValue.class, () -> addStateNow("1", "rgb:INVALID"));
+        assertThrows(InvalidPropertyValue.class, () -> addStateNow("1", "color:12,13"));
     }
 
     @Test

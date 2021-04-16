@@ -235,24 +235,21 @@ public final class HueScheduler implements Runnable {
                     case "sat":
                         sat = parseInteger(value, parameter);
                         break;
-                    case "hex":
-                        RGBToXYConverter.XYColor xyColor = RGBToXYConverter.convert(value, capabilities.getColorGamut());
+                    case "color":
+                        RGBToXYConverter.XYColor xyColor;
+                        if (value.contains(",")) {
+                            String[] rgb = value.split(",");
+                            if (rgb.length != 3) {
+                                throw new InvalidPropertyValue("Invalid RGB value '" + value + "'. Make sure to separate the color values with ','.");
+                            }
+                            xyColor = RGBToXYConverter.convert(rgb[0], rgb[1], rgb[2], capabilities.getColorGamut());
+                        } else {
+                            xyColor = RGBToXYConverter.convert(value, capabilities.getColorGamut());
+                        }
                         x = xyColor.getX();
                         y = xyColor.getY();
                         if (bri == null) {
                             bri = xyColor.getBrightness();
-                        }
-                        break;
-                    case "rgb":
-                        String[] rgb = value.split(",");
-                        if (rgb.length != 3) {
-                            throw new InvalidPropertyValue("Invalid RGB value '" + value + "'. Make sure to separate the colors with ','.");
-                        }
-                        RGBToXYConverter.XYColor xy = RGBToXYConverter.convert(rgb[0], rgb[1], rgb[2], capabilities.getColorGamut());
-                        x = xy.getX();
-                        y = xy.getY();
-                        if (bri == null) {
-                            bri = xy.getBrightness();
                         }
                         break;
                     default:
