@@ -582,7 +582,7 @@ class HueSchedulerTest {
         addGroupLightsForId(groupId, 77);
         addKnownLightIdsWithDefaultCapabilities(1, 2);
         addKnownGroupIds(groupId);
-        addStateNow("1,2,g" + groupId, "bri:" + defaultBrightness, "ct:" + defaultCt);
+        addStateNow("1, 2,g" + groupId, "bri:" + defaultBrightness, "ct:" + defaultCt);
 
         startScheduler();
 

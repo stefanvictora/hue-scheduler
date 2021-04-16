@@ -163,6 +163,7 @@ public final class HueScheduler implements Runnable {
         if (parts.length < 2)
             throw new InvalidConfigurationLine("Invalid configuration line '" + Arrays.toString(parts) + "': at least id and start time have to be set!");
         for (String idPart : parts[0].split(",")) {
+            idPart = idPart.trim();
             int id;
             boolean groupState;
             String name = "";
