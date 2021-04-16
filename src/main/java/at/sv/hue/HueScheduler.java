@@ -282,7 +282,7 @@ public final class HueScheduler implements Runnable {
         try {
             return function.apply(value);
         } catch (Exception e) {
-            throw new InvalidPropertyValue("Invalid " + type + " value '" + value + " for property '" + parameter + "'.");
+            throw new InvalidPropertyValue("Invalid " + type + " '" + value + "' for property '" + parameter + "'.");
         }
     }
 
