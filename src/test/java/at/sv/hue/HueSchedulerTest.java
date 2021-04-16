@@ -868,7 +868,7 @@ class HueSchedulerTest {
     void parse_canHandleColorTemperatureInKelvin_correctlyTranslatedToMired() {
         addKnownLightIdsWithDefaultCapabilities(1);
         int kelvin = 6500;
-        addStateNow("1", "k:" + kelvin);
+        addStateNow("1", "ct:" + kelvin);
 
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 

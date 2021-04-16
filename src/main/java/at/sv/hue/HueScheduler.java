@@ -210,9 +210,9 @@ public final class HueScheduler implements Runnable {
                         break;
                     case "ct":
                         ct = parseInteger(value, parameter);
-                        break;
-                    case "k":
-                        ct = convertToMiredCt(parseInteger(value, parameter));
+                        if (ct >= 1_000) {
+                            ct = convertToMiredCt(ct);
+                        }
                         break;
                     case "on":
                         on = Boolean.valueOf(value);
