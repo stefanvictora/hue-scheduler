@@ -54,6 +54,8 @@ public final class HueScheduler implements Runnable {
     int maxRetryDelayInSeconds;
     @Option(names = "--confirm-delay", hidden = true, defaultValue = "6")
     int confirmDelayInSeconds;
+    @Option(names = "--bridge-failure-delay", hidden = true, defaultValue = "10")
+    int bridgeFailureRetryDelayInSeconds;
     private HueApi hueApi;
     private StateScheduler stateScheduler;
     private StartTimeProvider startTimeProvider;
@@ -65,7 +67,8 @@ public final class HueScheduler implements Runnable {
     }
 
     public HueScheduler(HueApi hueApi, StateScheduler stateScheduler, StartTimeProvider startTimeProvider,
-                        Supplier<ZonedDateTime> currentTime, Supplier<Integer> retryDelayInMs, int confirmDelayInSeconds) {
+                        Supplier<ZonedDateTime> currentTime, Supplier<Integer> retryDelayInMs, int confirmDelayInSeconds,
+                        int bridgeFailureRetryDelayInSeconds) {
         this();
         this.hueApi = hueApi;
         this.stateScheduler = stateScheduler;
@@ -73,6 +76,7 @@ public final class HueScheduler implements Runnable {
         this.currentTime = currentTime;
         this.retryDelay = retryDelayInMs;
         this.confirmDelayInSeconds = confirmDelayInSeconds;
+        this.bridgeFailureRetryDelayInSeconds = bridgeFailureRetryDelayInSeconds;
     }
 
     public static void main(String[] args) {
@@ -90,8 +94,31 @@ public final class HueScheduler implements Runnable {
         currentTime = ZonedDateTime::now;
         retryDelay = this::getRandomRetryDelayMs;
         assertInputIsReadable();
-        parseInput();
-        start();
+        assertConnectionAndStart();
+    }
+
+    private void assertConnectionAndStart() {
+        if (!assertConnection()) {
+            stateScheduler.schedule(this::assertConnectionAndStart, currentTime.get().plusSeconds(5));
+        } else {
+            parseInput();
+            start();
+        }
+    }
+
+    private boolean assertConnection() {
+        try {
+            hueApi.assertConnection();
+            LOG.info("Connected to bridge at {}.", ip);
+        } catch (BridgeConnectionFailure e) {
+            LOG.warn("Bridge not reachable: '" + e.getCause().getLocalizedMessage() + "'. Retrying in 5s.");
+            return false;
+        } catch (BridgeAuthenticationFailure e) {
+            System.err.println("Bridge connection rejected: 'Unauthorized user'. Please make sure you use the correct username from the setup process," +
+                    " or try to generate a new one.");
+            System.exit(3);
+        }
+        return true;
     }
 
     private StartTimeProviderImpl createStartTimeProvider(double latitude, double longitude, double elevation) {
@@ -274,16 +301,16 @@ public final class HueScheduler implements Runnable {
         return 1_000_000 / kelvin;
     }
 
-    public void addState(String name, int lampId, String start, Integer brightness, Integer ct, Double x, Double y,
-                         Integer hue, Integer sat, Boolean on, Integer transitionTimeBefore, Integer transitionTime,
-                         LightCapabilities capabilities) {
+    private void addState(String name, int lampId, String start, Integer brightness, Integer ct, Double x, Double y,
+                          Integer hue, Integer sat, Boolean on, Integer transitionTimeBefore, Integer transitionTime,
+                          LightCapabilities capabilities) {
         lightStates.computeIfAbsent(lampId, ArrayList::new)
                    .add(new ScheduledState(name, lampId, start, brightness, ct, x, y, hue, sat, on, transitionTimeBefore,
                            transitionTime, startTimeProvider, capabilities));
     }
 
-    public void addGroupState(String name, int groupId, String start, Integer brightness, Integer ct, Double x, Double y,
-                              Integer hue, Integer sat, Boolean on, Integer transitionTimeBefore, Integer transitionTime) {
+    private void addGroupState(String name, int groupId, String start, Integer brightness, Integer ct, Double x, Double y,
+                               Integer hue, Integer sat, Boolean on, Integer transitionTimeBefore, Integer transitionTime) {
         lightStates.computeIfAbsent(getGroupId(groupId), ArrayList::new)
                    .add(new ScheduledState(name, groupId, getGroupLights(groupId).get(0), start, brightness, ct, x, y,
                            hue, sat, on, transitionTimeBefore, transitionTime, startTimeProvider, true,
@@ -361,12 +388,12 @@ public final class HueScheduler implements Runnable {
 
     private void schedule(ScheduledState state, ZonedDateTime now) {
         state.updateLastStart(now);
-        schedule(state, state.getDelayInSeconds(now) * 1000L);
+        schedule(state, getMs(state.getDelayInSeconds(now)));
     }
 
     private void schedule(ScheduledState state, long delayInMs) {
         if (state.isNullState()) return;
-        if (delayInMs == 0 || delayInMs > Math.max(5000, confirmDelayInSeconds * 1000)) {
+        if (delayInMs == 0 || delayInMs > Math.max(5000, getMs(confirmDelayInSeconds)) && delayInMs != getMs(bridgeFailureRetryDelayInSeconds)) {
             LOG.debug("Schedule {} in {}", state, Duration.ofMillis(delayInMs));
         }
         stateScheduler.schedule(() -> {
@@ -375,37 +402,60 @@ public final class HueScheduler implements Runnable {
                 scheduleNextDay(state);
                 return;
             }
-            boolean success = hueApi.putState(state.getUpdateId(), state.getBrightness(), state.getCt(), state.getX(), state.getY(),
-                    state.getHue(), state.getSat(), state.getOn(), state.getTransitionTime(currentTime.get()), state.isGroupState());
+            boolean success;
             LightState lightState = null;
-            if (success) {
-                lightState = hueApi.getLightState(state.getStatusId());
+            try {
+                success = putState(state);
+                if (success) {
+                    lightState = hueApi.getLightState(state.getStatusId());
+                }
+            } catch (BridgeConnectionFailure e) {
+                LOG.warn("Bridge not reachable, retrying in {}s.", bridgeFailureRetryDelayInSeconds);
+                retry(state, getMs(bridgeFailureRetryDelayInSeconds));
+                return;
+            } catch (HueApiFailure e) {
+                LOG.error("Hue api call failed: '{}'. Retrying in {}s.", e.getLocalizedMessage(), bridgeFailureRetryDelayInSeconds);
+                retry(state, getMs(bridgeFailureRetryDelayInSeconds));
+                return;
             }
             if (success && state.isOff() && lightState.isUnreachableOrOff()) {
-                LOG.debug("{} turned off or already off", state);
+                LOG.info("Turned off {} or is already off", state);
                 scheduleNextDay(state);
                 return;
             }
             if (!success || lightState.isUnreachableOrOff()) {
                 Integer delay = retryDelay.get();
-                LOG.trace("'{}' not reachable or off, try again in {}", state.getName(), Duration.ofMillis(delay));
-                state.resetConfirmations();
-                schedule(state, delay);
+                LOG.trace("'{}' not reachable or off, retrying in {}", state.getName(), Duration.ofMillis(delay));
+                retry(state, delay);
                 return;
             }
             if (!state.isFullyConfirmed()) {
                 state.addConfirmation();
                 if (state.getConfirmCounter() == 1) {
-                    LOG.debug("Set {}", state);
+                    LOG.info("Set {}", state);
                 } else if (state.getConfirmCounter() % 5 == 0) {
-                    LOG.debug("Confirmed {} ({})", state, state.getConfirmDebugString());
+                    LOG.info("Confirmed ({}) {}", state.getConfirmDebugString(), state);
                 }
-                schedule(state, confirmDelayInSeconds * 1000L);
+                schedule(state, getMs(confirmDelayInSeconds));
             } else {
-                LOG.debug("{} fully confirmed", state);
+                LOG.info("Fully confirmed {}", state);
                 scheduleNextDay(state);
             }
         }, currentTime.get().plus(delayInMs, ChronoUnit.MILLIS));
+    }
+
+    private long getMs(long seconds) {
+        return seconds * 1000L;
+    }
+
+    private boolean putState(ScheduledState state) {
+        return hueApi.putState(state.getUpdateId(), state.getBrightness(), state.getCt(), state.getX(), state.getY(),
+                state.getHue(), state.getSat(), state.getOn(), state.getTransitionTime(currentTime.get()), state.isGroupState());
+    }
+
+    private void retry(ScheduledState state, long delayInMs) {
+        state.resetConfirmations();
+        schedule(state, delayInMs);
     }
 
     private boolean hasMorePastStates(List<ScheduledState> states, int i) {
@@ -428,7 +478,7 @@ public final class HueScheduler implements Runnable {
         if (state.isTemporary()) return;
         state.resetConfirmations();
         recalculateEnd(state, now);
-        schedule(state, state.secondsUntilNextDayFromStart(now) * 1000L);
+        schedule(state, getMs(state.secondsUntilNextDayFromStart(now)));
         state.updateLastStart(now);
     }
 

@@ -8,6 +8,7 @@ import java.net.URL;
 
 import static org.hamcrest.CoreMatchers.*;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class HttpResourceProviderSystemTest {
 
@@ -39,9 +40,7 @@ public class HttpResourceProviderSystemTest {
     }
 
     @Test
-    public void getResource_invalidUrl_null() {
-        String resource = provider.getResource(invalidUrl);
-
-        assertThat(resource, nullValue());
+    public void getResource_invalidUrl_exception() {
+        assertThrows(BridgeConnectionFailure.class, () -> provider.getResource(invalidUrl));
     }
 }

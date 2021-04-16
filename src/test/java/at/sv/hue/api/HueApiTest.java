@@ -12,7 +12,6 @@ import static org.hamcrest.core.Is.is;
 import static org.junit.jupiter.api.Assertions.*;
 
 class HueApiTest {
-    private final String transitionTime = "\"transitiontime\":2";
     private HueApi api;
     private String baseUrl;
     private String expectedUrl;
@@ -102,7 +101,7 @@ class HueApiTest {
                     clearResponse();
                     return result;
                 }
-                return null;
+                throw new BridgeConnectionFailure("GET failure for '" + url + "'.");
             }
 
             @Override
@@ -116,11 +115,76 @@ class HueApiTest {
                     clearResponse();
                     return result;
                 }
-                return null;
+                throw new BridgeConnectionFailure("PUT failure for '" + url + "' with '" + body + "'.");
             }
         };
         api = new HueApiImpl(resourceProvider, ip, username);
         baseUrl = "http://" + ip + "/api/" + username;
+    }
+
+    @Test
+    void checkConnection_unauthorizedUser_exception() {
+        setGetResponse("/lights", "[\n" +
+                "{\n" +
+                "\"error\": {\n" +
+                "\"type\": 1,\n" +
+                "\"address\": \"/lights\",\n" +
+                "\"description\": \"unauthorized user\"\n" +
+                "}\n" +
+                "}\n" +
+                "]");
+
+        assertThrows(BridgeAuthenticationFailure.class, () -> api.assertConnection());
+    }
+
+    @Test
+    void getState_networkFailure_exception() {
+        assertResponseMatch = false;
+        assertThrows(BridgeConnectionFailure.class, () -> getLightState(1));
+    }
+
+    @Test
+    void getState_unknownResourceError_exception() {
+        setGetResponse("/lights/1", "[\n" +
+                "{\n" +
+                "\"error\": {\n" +
+                "\"type\": 3,\n" +
+                "\"address\": \"/lights/1/state\",\n" +
+                "\"description\": \"resource, /lights/1/state, not available\"\n" +
+                "}\n" +
+                "}\n" +
+                "]");
+
+        assertThrows(HueApiFailure.class, () -> getLightState(1), "resource, /lights/1/state, not available");
+    }
+
+    @Test
+    void getState_anyOtherError_exception() {
+        setGetResponse("/lights/1", "[\n" +
+                "{\n" +
+                "\"error\": {\n" +
+                "\"type\": 1000,\n" +
+                "\"address\": \"/lights/1/state\",\n" +
+                "\"description\": \"any other error\"\n" +
+                "}\n" +
+                "}\n" +
+                "]");
+
+        assertThrows(HueApiFailure.class, () -> getLightState(1), "any other error");
+    }
+
+    @Test
+    void getState_emptyResponse_exception() {
+        setGetResponse("/lights/1", "");
+
+        assertThrows(HueApiFailure.class, () -> getLightState(1));
+    }
+
+    @Test
+    void getState_emptyJSON_exception() {
+        setGetResponse("/lights/1", "{}");
+
+        assertThrows(HueApiFailure.class, () -> getLightState(1));
     }
 
     @Test
@@ -203,6 +267,13 @@ class HueApiTest {
     }
 
     @Test
+    void getGroupLights_emptyResponse_exception() {
+        setGetResponse("/groups", "");
+
+        assertThrows(HueApiFailure.class, () -> api.getGroupLights(1));
+    }
+
+    @Test
     void getGroupName_returnsNameForGroupId() {
         setGetResponse("/groups", "{\n" +
                 "\"1\": {\n" +
@@ -236,6 +307,13 @@ class HueApiTest {
     }
 
     @Test
+    void getGroupName_emptyResponse_exception() {
+        setGetResponse("/groups", "");
+
+        assertThrows(HueApiFailure.class, () -> api.getGroupName(1));
+    }
+
+    @Test
     void getLightId_returnsIdForLightName_reusesResponseForMultipleRequest() {
         setGetResponse("/lights", "{\n" +
                 "\"7\": {\n" +
@@ -258,6 +336,13 @@ class HueApiTest {
         setGetResponse("/lights", "{}");
 
         assertThrows(LightNotFoundException.class, () -> api.getLightId("Lamp"));
+    }
+
+    @Test
+    void getLightId_emptyResponse_exception() {
+        setGetResponse("/lights", "");
+
+        assertThrows(HueApiFailure.class, () -> api.getLightId("Lamp"));
     }
 
     @Test
@@ -294,6 +379,13 @@ class HueApiTest {
     }
 
     @Test
+    void getGroupId_emptyResponse_exception() {
+        setGetResponse("/groups", "");
+
+        assertThrows(HueApiFailure.class, () -> api.getGroupId("Group"));
+    }
+
+    @Test
     void getLightName_returnsNameForLightId() {
         setGetResponse("/lights", "{\n" +
                 "\"7\": {\n" +
@@ -316,6 +408,13 @@ class HueApiTest {
         setGetResponse("/lights", "{}");
 
         assertThrows(LightNotFoundException.class, () -> api.getLightName(1234));
+    }
+
+    @Test
+    void getLightName_emptyResponse_exception() {
+        setGetResponse("/lights", "");
+
+        assertThrows(HueApiFailure.class, () -> api.getLightName(2));
     }
 
     @Test
@@ -474,27 +573,72 @@ class HueApiTest {
     }
 
     @Test
-    void putState_noResponse_failure() {
-        assertResponseMatch = false;
+    void putState_unauthorized_throwsException() {
+        setPutResponse("/lights/" + 10 + "/state", "{\"bri\":100}", "[\n" +
+                "{\n" +
+                "\"error\": {\n" +
+                "\"type\": 1,\n" +
+                "\"address\": \"/lights\",\n" +
+                "\"description\": \"unauthorized user\"\n" +
+                "}\n" +
+                "}\n" +
+                "]");
 
-        boolean success = putState(123, 100);
-
-        assertFalse(success, "Put did not fail");
+        assertThrows(BridgeAuthenticationFailure.class, () -> putState(10, 100));
     }
 
     @Test
-    void putState_emptyResponse_failure() {
+    void putState_lights_resourceNotAvailable_exception() {
+        setPutResponse("/lights/" + 1 + "/state", "{\"bri\":100}", "[\n" +
+                "{\n" +
+                "\"error\": {\n" +
+                "\"type\": 3,\n" +
+                "\"address\": \"/lights/1/state\",\n" +
+                "\"description\": \"resource, /lights/1/state, not available\"\n" +
+                "}\n" +
+                "}\n" +
+                "]");
+
+        HueApiFailure hueApiFailure = assertThrows(HueApiFailure.class, () -> putState(1, 100));
+        assertThat(hueApiFailure.getMessage(), is("resource, /lights/1/state, not available"));
+    }
+
+    @Test
+    void putState_groups_resourceNotAvailable_exception() {
+        setPutResponse("/groups/" + 1 + "/action", "{\"bri\":100}", "[\n" +
+                "{\n" +
+                "\"error\": {\n" +
+                "\"type\": 3,\n" +
+                "\"address\": \"/groups/1/action\",\n" +
+                "\"description\": \"resource, /groups/11/action, not available\"\n" +
+                "}\n" +
+                "}\n" +
+                "]");
+
+        HueApiFailure hueApiFailure = assertThrows(HueApiFailure.class, () -> putState(1, 100, true));
+        assertThat(hueApiFailure.getMessage(), is("resource, /groups/11/action, not available"));
+    }
+
+    @Test
+    void putState_connectionFailure_exception() {
+        assertResponseMatch = false;
+
+        assertThrows(BridgeConnectionFailure.class, () -> putState(123, 100));
+    }
+
+    @Test
+    void putState_emptyResponse_treatedAsSuccess() {
         setPutResponse("/lights/" + 123 + "/state", "{\"bri\":100}",
                 "[\n" +
                         "]");
 
         boolean success = putState(123, 100);
 
-        assertFalse(success, "Put did not fail");
+        assertTrue(success, "Put did fail");
     }
 
     @Test
-    void putState_failure_returnsCorrectResult() {
+    void putState_fakedInvalidParameterValueResponse_exception() {
         setPutResponse("/lights/" + 777 + "/state", "{\"bri\":300}",
                 "[\n" +
                         "{\"success\":{\"/lights/22/state/transitiontime\":2}}," +
@@ -507,8 +651,24 @@ class HueApiTest {
                         "}\n" +
                         "]");
 
-        boolean success = putState(777, 300);
+        HueApiFailure hueApiFailure = assertThrows(HueApiFailure.class, () -> putState(777, 300));
+        assertThat(hueApiFailure.getMessage(), is("invalid value, 300}, for parameter, bri"));
+    }
 
-        assertFalse(success, "Put did not fail");
+    @Test
+    void putState_parameterNotModifiable_becauseLightIsOff_returnsFalse() {
+        setPutResponse("/lights/" + 777 + "/state", "{\"bri\":200}", "[\n" +
+                "{\n" +
+                "\"error\": {\n" +
+                "\"type\": 201,\n" +
+                "\"address\": \"/lights/777/state/bri\",\n" +
+                "\"description\": \"parameter, bri, is not modifiable. Device is set to off.\"\n" +
+                "}\n" +
+                "}\n" +
+                "]");
+
+        boolean reachable = putState(777, 200);
+
+        assertFalse(reachable, "Light is reachable");
     }
 }

@@ -5,19 +5,13 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public final class HueApiImpl implements HueApi {
-
-    private static final Logger LOG = LoggerFactory.getLogger(HueApiImpl.class);
 
     private final HttpResourceProvider resourceProvider;
     private final ObjectMapper mapper;
@@ -39,9 +33,53 @@ public final class HueApiImpl implements HueApi {
 
     @Override
     public LightState getLightState(int id) {
-        Light light = readValue(resourceProvider.getResource(getLightStateUrl(id)), Light.class);
-        State state = light.state;
-        return new LightState(state.bri, state.ct, getX(state), getY(state), state.reachable, state.on);
+        String response = getResourceAndAssertNoErrors(getLightStateUrl(id));
+        try {
+            Light light = mapper.readValue(response, Light.class);
+            State state = light.state;
+            return new LightState(state.bri, state.ct, getX(state), getY(state), state.reachable, state.on);
+        } catch (JsonProcessingException | NullPointerException e) {
+            throw new HueApiFailure("Failed to parse light state response '" + response + "' for id " + id + ": " + e.getLocalizedMessage());
+        }
+    }
+
+    private String getResourceAndAssertNoErrors(URL url) {
+        return assertNoErrors(resourceProvider.getResource(url));
+    }
+
+    private String assertNoErrors(String resource) {
+        if (resource.contains("\"error\"")) {
+            throwFirstError(getErrors(resource));
+        }
+        return resource;
+    }
+
+    private List<HueApiResponse> getErrors(String resource) {
+        return parseErrors(resource).stream()
+                                    .filter(error -> error.error != null)
+                                    .collect(Collectors.toList());
+    }
+
+    private List<HueApiResponse> parseErrors(String resource) {
+        try {
+            return mapper.readValue(resource, mapper.getTypeFactory().constructCollectionType(List.class, HueApiResponse.class));
+        } catch (JsonProcessingException ignore) {
+        }
+        return Collections.emptyList();
+    }
+
+    private void throwFirstError(List<HueApiResponse> errorResponses) {
+        for (HueApiResponse errorResponse : errorResponses) {
+            String description = errorResponse.error.description;
+            switch (errorResponse.error.type) {
+                case 1:
+                    throw new BridgeAuthenticationFailure();
+                case 201:
+                    throw new LightIsOff();
+                default:
+                    throw new HueApiFailure(description);
+            }
+        }
     }
 
     private Double getX(State state) {
@@ -71,26 +109,28 @@ public final class HueApiImpl implements HueApi {
         }
     }
 
-    private <T> T readValue(String resource, Class<T> clazz) {
-        try {
-            return mapper.readValue(resource, clazz);
-        } catch (JsonProcessingException e) {
-            throw new IllegalArgumentException("Failed to parse result JSON for type: " + clazz.getSimpleName(), e);
-        }
-    }
-
     @Override
     public boolean putState(int id, Integer bri, Integer ct, Double x, Double y, Integer hue, Integer sat, Boolean on, Integer transitionTime,
                             boolean groupState) {
-        String response = resourceProvider.putResource(getUpdateUrl(id, groupState),
-                getBody(new State(bri, ct, x, y, hue, sat, on, transitionTime)));
-        if (response == null) {
+        return assertNoPutErrors(resourceProvider.putResource(getUpdateUrl(id, groupState),
+                getBody(new State(bri, ct, x, y, hue, sat, on, transitionTime))));
+    }
+
+    private boolean assertNoPutErrors(String putResource) {
+        try {
+            assertNoErrors(putResource);
+            return true;
+        } catch (LightIsOff e) {
             return false;
         }
-        if (response.contains("error")) {
-            LOG.error("Put API call returned with an error: {}", response.trim());
+    }
+
+    private String getBody(State state) {
+        try {
+            return mapper.writeValueAsString(state);
+        } catch (JsonProcessingException e) {
+            throw new IllegalArgumentException("Failed to create state body", e);
         }
-        return !response.contains("error") && response.contains("success");
     }
 
     @Override
@@ -112,11 +152,12 @@ public final class HueApiImpl implements HueApi {
     }
 
     private Map<Integer, Group> lookupGroups() {
+        String response = getResourceAndAssertNoErrors(getGroupsUrl());
         try {
-            return mapper.readValue(resourceProvider.getResource(getGroupsUrl()), new TypeReference<Map<Integer, Group>>() {
+            return mapper.readValue(response, new TypeReference<Map<Integer, Group>>() {
             });
         } catch (JsonProcessingException e) {
-            throw new IllegalArgumentException("Failed to parse groups response", e);
+            throw new HueApiFailure("Failed to parse groups response '" + response + "': " + e.getLocalizedMessage());
         }
     }
 
@@ -181,11 +222,12 @@ public final class HueApiImpl implements HueApi {
     }
 
     private Map<Integer, Light> lookupLights() {
+        String response = getResourceAndAssertNoErrors(getLightsUrl());
         try {
-            return mapper.readValue(resourceProvider.getResource(getLightsUrl()), new TypeReference<Map<Integer, Light>>() {
+            return mapper.readValue(response, new TypeReference<Map<Integer, Light>>() {
             });
         } catch (JsonProcessingException e) {
-            throw new IllegalArgumentException("Failed to parse lights response", e);
+            throw new HueApiFailure("Failed to parse lights response '" + response + "': " + e.getLocalizedMessage());
         }
     }
 
@@ -211,6 +253,11 @@ public final class HueApiImpl implements HueApi {
         return new LightCapabilities(control.colorgamut, getMinCtOrNull(control), getMaxCtOrNull(control));
     }
 
+    @Override
+    public void assertConnection() {
+        getOrLookupLights();
+    }
+
     private Integer getMinCtOrNull(Control control) {
         if (control.ct == null) return null;
         return control.ct.min;
@@ -223,14 +270,6 @@ public final class HueApiImpl implements HueApi {
 
     private URL getLightsUrl() {
         return createUrl("/lights");
-    }
-
-    private String getBody(State state) {
-        try {
-            return mapper.writeValueAsString(state);
-        } catch (JsonProcessingException e) {
-            throw new IllegalArgumentException("Failed to create state body", e);
-        }
     }
 
     private URL getUpdateUrl(int id, boolean groupState) {
@@ -408,6 +447,37 @@ public final class HueApiImpl implements HueApi {
 
         public void setLights(Integer[] lights) {
             this.lights = lights;
+        }
+    }
+
+    private static class HueApiResponse {
+        private Error error;
+
+        public void setError(Error error) {
+            this.error = error;
+        }
+    }
+
+    private static class Error {
+        int type;
+        String address;
+        String description;
+
+        public void setType(int type) {
+            this.type = type;
+        }
+
+        public void setAddress(String address) {
+            this.address = address;
+        }
+
+        public void setDescription(String description) {
+            this.description = description;
+        }
+    }
+
+    private static final class LightIsOff extends RuntimeException {
+        private LightIsOff() {
         }
     }
 }

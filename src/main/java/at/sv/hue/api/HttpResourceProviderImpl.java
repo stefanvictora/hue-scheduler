@@ -15,31 +15,14 @@ public final class HttpResourceProviderImpl implements HttpResourceProvider {
     @Override
     public String getResource(URL url) {
         try (BufferedReader reader = getResourceReader(url)) {
-            if (reader == null) {
-                return null;
-            }
             return read(reader);
         } catch (IOException e) {
-            LOG.warn("Failed to get resource from url '{}'", url, e);
+            throw new BridgeConnectionFailure("Failed to GET '" + url + "'", e);
         }
-        return null;
     }
 
-    private BufferedReader getResourceReader(URL url) {
-        InputStream resourceStream = getResourceStream(url);
-        if (resourceStream == null) {
-            return null;
-        }
-        return warpInBufferedReader(resourceStream);
-    }
-
-    public InputStream getResourceStream(URL url) {
-        try {
-            return url.openStream();
-        } catch (IOException e) {
-            LOG.warn("Failed to create connection reader for '{}'", url, e);
-            return null;
-        }
+    private BufferedReader getResourceReader(URL url) throws IOException {
+        return warpInBufferedReader(url.openStream());
     }
 
     private BufferedReader warpInBufferedReader(InputStream inputStream) {
@@ -57,6 +40,7 @@ public final class HttpResourceProviderImpl implements HttpResourceProvider {
 
     @Override
     public String putResource(URL url, String body) {
+        LOG.trace("Put: {}: {}", url, body);
         try {
             HttpURLConnection http = (HttpURLConnection) url.openConnection();
             http.setRequestMethod("PUT");
@@ -70,8 +54,7 @@ public final class HttpResourceProviderImpl implements HttpResourceProvider {
             }
             return read(warpInBufferedReader(http.getInputStream()));
         } catch (IOException e) {
-            LOG.warn("Failed to put resource to url '{}'", url, e);
+            throw new BridgeConnectionFailure("Failed to PUT '" + url + "'", e);
         }
-        return null;
     }
 }
