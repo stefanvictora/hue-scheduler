@@ -176,15 +176,15 @@ final class ScheduledState {
     }
 
     public LocalTime getStart(ZonedDateTime dateTime) {
-        LocalTime start = startTimeProvider.getStart(this.start, dateTime);
+        LocalTime start = getStartTime(dateTime);
         if (transitionTimeBefore != null) {
             start = start.minus(transitionTimeBefore * 100, ChronoUnit.MILLIS);
         }
         return start;
     }
 
-    private ZonedDateTime getDefinedStart(ZonedDateTime now) {
-        return getZonedStart(now, startTimeProvider.getStart(this.start, now));
+    private LocalTime getStartTime(ZonedDateTime now) {
+        return startTimeProvider.getStart(this.start, now);
     }
 
     public String getName() {
@@ -237,6 +237,10 @@ final class ScheduledState {
         Duration between = Duration.between(now, definedStart);
         if (between.isZero() || between.isNegative()) return transitionTime;
         return (int) between.toMillis() / 100;
+    }
+
+    private ZonedDateTime getDefinedStart(ZonedDateTime now) {
+        return getZonedStart(now, getStartTime(now));
     }
 
     public boolean isFullyConfirmed() {
