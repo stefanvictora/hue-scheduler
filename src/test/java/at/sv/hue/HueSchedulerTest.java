@@ -85,11 +85,11 @@ class HueSchedulerTest {
 
             @Override
             public boolean putState(int id, Integer bri, Integer ct, Double x, Double y, Integer hue, Integer sat,
-                                    Boolean on, Integer transitionTime, boolean groupState) {
+                                    String effect, Boolean on, Integer transitionTime, boolean groupState) {
                 if (apiPutThrowable != null) {
                     throw apiPutThrowable.get();
                 }
-                putStates.add(new PutState(id, bri, ct, x, y, hue, sat, on, transitionTime, groupState));
+                putStates.add(new PutState(id, bri, ct, x, y, hue, sat, effect, on, transitionTime, groupState));
                 return apiPutReturnValue;
             }
 
@@ -198,7 +198,7 @@ class HueSchedulerTest {
         addState("g" + groupId, start, "bri:" + defaultBrightness, "ct:" + defaultCt);
     }
 
-    private void addStateNow(String id, String... properties) {
+    private void addStateNow(Object id, String... properties) {
         addState(id, now, properties);
     }
 
@@ -229,7 +229,7 @@ class HueSchedulerTest {
     }
 
     private void assertPutState(int id, Integer bri, Double x, Double y, Integer ct, Integer putHue, Integer putSat,
-                                Boolean on, Integer transitionTime, boolean groupState) {
+                                String putEffect, Boolean on, Integer transitionTime, boolean groupState) {
         assertTrue(putStates.size() > 0, "No PUT API calls happened");
         PutState putState = putStates.remove(0);
         assertThat("Brightness differs", putState.bri, is(bri));
@@ -238,6 +238,7 @@ class HueSchedulerTest {
         assertThat("Y differs", putState.y, is(y));
         assertThat("Hue differs", putState.hue, is(putHue));
         assertThat("Sat differs", putState.sat, is(putSat));
+        assertThat("Effect differs", putState.effect, is(putEffect));
         assertThat("On differs", putState.on, is(on));
         assertThat("TransitionTime differs", putState.transitionTime, is(transitionTime));
         assertThat("isGroupState differs", putState.groupState, is(groupState));
@@ -265,15 +266,15 @@ class HueSchedulerTest {
 
     private void runAndAssertConfirmations(int brightness, int ct, boolean groupState) {
         runAndAssertConfirmations(true, true, brightness, ct, null, null, null,
-                null, null, null, groupState);
+                null, null, null, null, groupState);
     }
 
     private void runAndAssertConfirmations(boolean reachable, boolean onState, Integer putBrightness, Integer putCt,
-                                           Double putX, Double putY, Integer putHue, Integer putSat, Boolean putOn,
+                                           Double putX, Double putY, Integer putHue, Integer putSat, String putEffect, Boolean putOn,
                                            Integer putTransitionTime, boolean groupState) {
         runAndAssertConfirmations(state ->
                 advanceTimeAndRunAndAssertApiCalls(state, reachable, onState, putBrightness, putCt, putX, putY, putHue,
-                        putSat, putOn, putTransitionTime, groupState));
+                        putSat, putEffect, putOn, putTransitionTime, groupState));
     }
 
     private void runAndAssertConfirmations(Consumer<ScheduledRunnable> repeatedState) {
@@ -303,22 +304,22 @@ class HueSchedulerTest {
     private void advanceTimeAndRunAndAssertApiCalls(ScheduledRunnable state, boolean reachable, boolean onState,
                                                     Integer putBrightness, Integer putCt, boolean groupState) {
         advanceTimeAndRunAndAssertApiCalls(state, reachable, onState, putBrightness, putCt, null, null, null,
-                null, null, null, groupState);
+                null, null, null, null, groupState);
     }
 
     private void advanceTimeAndRunAndAssertApiCalls(ScheduledRunnable state, boolean reachable, boolean onState, Integer putBrightness,
                                                     Integer putCt, Double putX, Double putY, Integer putHue, Integer putSat,
-                                                    Boolean putOn, Integer putTransitionTime, boolean groupState) {
+                                                    String putEffect, Boolean putOn, Integer putTransitionTime, boolean groupState) {
         setCurrentTimeTo(state.getStart());
-        runAndAssertApiCalls(state, reachable, onState, putBrightness, putCt, putX, putY, putHue, putSat, putOn,
+        runAndAssertApiCalls(state, reachable, onState, putBrightness, putCt, putX, putY, putHue, putSat, putEffect, putOn,
                 putTransitionTime, groupState);
     }
 
     private void runAndAssertApiCalls(ScheduledRunnable state, boolean reachable, boolean onState, Integer putBrightness,
-                                      Integer putCt, Double putX, Double putY, Integer putHue, Integer putSat, Boolean putOn,
-                                      Integer putTransitionTime, boolean groupState) {
+                                      Integer putCt, Double putX, Double putY, Integer putHue, Integer putSat, String putEffect,
+                                      Boolean putOn, Integer putTransitionTime, boolean groupState) {
         addLightStateResponse(id, reachable, onState);
-        runAndAssertPutCall(state, putBrightness, putCt, putX, putY, putHue, putSat, putOn, putTransitionTime, groupState);
+        runAndAssertPutCall(state, putBrightness, putCt, putX, putY, putHue, putSat, putEffect, putOn, putTransitionTime, groupState);
     }
 
     private void addLightStateResponse(int id, boolean reachable, boolean on) {
@@ -326,26 +327,26 @@ class HueSchedulerTest {
     }
 
     private void runAndAssertPutCall(ScheduledRunnable state, Integer putBrightness, Integer putCt, Double putX, Double putY,
-                                     Integer putHue, Integer putSat, Boolean putOn, Integer putTransitionTime, boolean groupState) {
+                                     Integer putHue, Integer putSat, String putEffect, Boolean putOn, Integer putTransitionTime, boolean groupState) {
         state.run();
 
-        assertPutState(id, putBrightness, putX, putY, putCt, putHue, putSat, putOn, putTransitionTime, groupState);
+        assertPutState(id, putBrightness, putX, putY, putCt, putHue, putSat, putEffect, putOn, putTransitionTime, groupState);
     }
 
     private void advanceTimeAndRunAndAssertTurnOffApiCall(boolean reachable, ScheduledRunnable state, boolean onState) {
         advanceTimeAndRunAndAssertApiCalls(state, reachable, onState, null, null, null, null,
-                null, null, false, null, false);
+                null, null, null, false, null, false);
     }
 
     private void advanceTimeAndRunAndAssertTurnOnApiCall(ScheduledRunnable state) {
         advanceTimeAndRunAndAssertApiCalls(state, true, true, null, null, null,
-                null, null, null, true, null, false);
+                null, null, null, null, true, null, false);
     }
 
     private void advanceTimeAndRunAndAssertPutCall(ScheduledRunnable state, Integer brightness, Integer ct,
                                                    boolean groupState, Boolean on, Integer transitionTime) {
         setCurrentTimeTo(state.getStart());
-        runAndAssertPutCall(state, brightness, ct, null, null, null, null, on, transitionTime, groupState);
+        runAndAssertPutCall(state, brightness, ct, null, null, null, null, null, on, transitionTime, groupState);
     }
 
     private ScheduledRunnable ensureRunnable(ZonedDateTime scheduleStart) {
@@ -396,12 +397,12 @@ class HueSchedulerTest {
 
     private void advanceTimeAndRunAndAssertApiCallsWithConfirmations(ScheduledRunnable state, Integer putBrightness,
                                                                      Integer putCt, Double putX, Double putY,
-                                                                     Integer putHue, Integer putSat,
+                                                                     Integer putHue, Integer putSat, String putEffect,
                                                                      Boolean putOn, Integer putTransitionTime, boolean groupState) {
         advanceTimeAndRunAndAssertApiCalls(state, true, true, putBrightness, putCt, putX, putY,
-                putHue, putSat, putOn, putTransitionTime, groupState);
+                putHue, putSat, putEffect, putOn, putTransitionTime, groupState);
 
-        runAndAssertConfirmations(true, true, putBrightness, putCt, putX, putY, putHue, putSat,
+        runAndAssertConfirmations(true, true, putBrightness, putCt, putX, putY, putHue, putSat, putEffect,
                 putOn, putTransitionTime, groupState);
         ensureRunnable(initialNow.plusDays(1));
     }
@@ -632,7 +633,7 @@ class HueSchedulerTest {
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
         advanceTimeAndRunAndAssertApiCallsWithConfirmations(scheduledRunnable, defaultBrightness, null,
-                null, null, null, null, null, 5, false);
+                null, null, null, null, null, null, 5, false);
     }
 
     @Test
@@ -643,7 +644,7 @@ class HueSchedulerTest {
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
         advanceTimeAndRunAndAssertApiCallsWithConfirmations(scheduledRunnable, defaultBrightness, null,
-                null, null, null, null, null, 50, false);
+                null, null, null, null, null, null, 50, false);
     }
 
     @Test
@@ -654,7 +655,7 @@ class HueSchedulerTest {
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
         advanceTimeAndRunAndAssertApiCallsWithConfirmations(scheduledRunnable, defaultBrightness, null,
-                null, null, null, null, null, 65400, false);
+                null, null, null, null, null, null, 65400, false);
     }
 
     @Test
@@ -668,12 +669,12 @@ class HueSchedulerTest {
         assertScheduleStart(scheduledRunnable, actualStart);
 
         advanceTimeAndRunAndAssertApiCalls(scheduledRunnable, true, true, defaultBrightness, null,
-                null, null, null, null, null, 6000, false);
+                null, null, null, null, null, null, 6000, false);
 
         runAndAssertConfirmations(state -> {
             setCurrentTimeTo(state.getStart());
             runAndAssertApiCalls(state, true, true, defaultBrightness, null,
-                    null, null, null, null, null, getAdjustedTransitionTime(definedStart), false);
+                    null, null, null, null, null, null, getAdjustedTransitionTime(definedStart), false);
         });
 
         ensureRunnable(actualStart.plusDays(1));
@@ -697,12 +698,12 @@ class HueSchedulerTest {
         advanceCurrentTime(Duration.ofMinutes(10)); // here we cross over to tomorrow
 
         runAndAssertApiCalls(scheduledRunnable, true, true, defaultBrightness, null,
-                null, null, null, null, null, null, false);
+                null, null, null, null, null, null, null, false);
 
         runAndAssertConfirmations(state -> {
             setCurrentTimeTo(state.getStart());
             runAndAssertApiCalls(state, true, true, defaultBrightness, null,
-                    null, null, null, null, null, null, false);
+                    null, null, null, null, null, null, null, false);
         });
 
         ensureRunnable(actualStart.plusDays(1));
@@ -722,12 +723,12 @@ class HueSchedulerTest {
         advanceCurrentTime(Duration.ofMinutes(5));
 
         runAndAssertApiCalls(scheduledRunnable, true, true, defaultBrightness, null,
-                null, null, null, null, null, 3000, true);
+                null, null, null, null, null, null, 3000, true);
 
         runAndAssertConfirmations(state -> {
             setCurrentTimeTo(state.getStart());
             runAndAssertApiCalls(state, true, true, defaultBrightness, null,
-                    null, null, null, null, null, getAdjustedTransitionTime(definedStart), true);
+                    null, null, null, null, null, null, getAdjustedTransitionTime(definedStart), true);
         });
 
         ensureRunnable(actualStart.plusDays(1));
@@ -745,10 +746,10 @@ class HueSchedulerTest {
         advanceCurrentTime(Duration.ofMinutes(10));
 
         runAndAssertApiCalls(scheduledRunnable, true, true, defaultBrightness, null,
-                null, null, null, null, null, 30, false);
+                null, null, null, null, null, null, 30, false);
 
         runAndAssertConfirmations(true, true, defaultBrightness, null,
-                null, null, null, null, null, 30, false);
+                null, null, null, null, null, null, 30, false);
 
         ensureRunnable(actualStart.plusDays(1));
     }
@@ -763,7 +764,7 @@ class HueSchedulerTest {
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
         advanceTimeAndRunAndAssertApiCallsWithConfirmations(scheduledRunnable, null, null,
-                x, y, null, null, null, null, false);
+                x, y, null, null, null, null, null, false);
     }
 
     @Test
@@ -777,7 +778,7 @@ class HueSchedulerTest {
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
         advanceTimeAndRunAndAssertApiCallsWithConfirmations(scheduledRunnable, null, null, x, y,
-                null, null, null, null, true);
+                null, null, null, null, null, true);
     }
 
     @Test
@@ -790,7 +791,7 @@ class HueSchedulerTest {
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
         advanceTimeAndRunAndAssertApiCallsWithConfirmations(scheduledRunnable, null, null, null,
-                null, hue, saturation, null, null, false);
+                null, hue, saturation, null, null, null, false);
     }
 
     @Test
@@ -804,7 +805,7 @@ class HueSchedulerTest {
         double x = 0.2318731647393379;
         double y = 0.4675382426015799;
         advanceTimeAndRunAndAssertApiCallsWithConfirmations(scheduledRunnable, bri, null, x, y, null,
-                null, null, null, false);
+                null, null, null, null, false);
     }
 
     @Test
@@ -816,7 +817,7 @@ class HueSchedulerTest {
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
         advanceTimeAndRunAndAssertApiCallsWithConfirmations(scheduledRunnable, customBrightness, null,
-                defaultX, defaultY, null, null, null, null, false);
+                defaultX, defaultY, null, null, null, null, null, false);
     }
 
     @Test
@@ -828,7 +829,7 @@ class HueSchedulerTest {
 
         int bri = 94;
         advanceTimeAndRunAndAssertApiCallsWithConfirmations(scheduledRunnable, bri, null, defaultX, defaultY,
-                null, null, null, null, false);
+                null, null, null, null, null, false);
     }
 
     @Test
@@ -840,7 +841,41 @@ class HueSchedulerTest {
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
         advanceTimeAndRunAndAssertApiCallsWithConfirmations(scheduledRunnable, customBrightness, null,
-                defaultX, defaultY, null, null, null, null, false);
+                defaultX, defaultY, null, null, null, null, null, false);
+    }
+
+    @Test
+    void parse_canHandleEffect_colorLoop() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addStateNow(1, "effect:colorloop");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        advanceTimeAndRunAndAssertApiCallsWithConfirmations(scheduledRunnable, null, null, null,
+                null, null, null, "colorloop", null, null, false);
+    }
+
+    @Test
+    void parse_canHandleEffect_colorLoop_group() {
+        addKnownGroupIds(1);
+        addGroupLightsForId(1, 1);
+        addStateNow("g1", "effect:colorloop");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        advanceTimeAndRunAndAssertApiCallsWithConfirmations(scheduledRunnable, null, null, null,
+                null, null, null, "colorloop", null, null, true);
+    }
+
+    @Test
+    void parse_canHandleEffect_none() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addStateNow(1, "effect:none");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        advanceTimeAndRunAndAssertApiCallsWithConfirmations(scheduledRunnable, null, null, null,
+                null, null, null, "none", null, null, false);
     }
 
     @Test
@@ -865,6 +900,13 @@ class HueSchedulerTest {
     }
 
     @Test
+    void parse_colorInput_effect_butLightDoesNotSupportColor_exception() {
+        addKnownLightIds(1);
+        setCapabilities(1, LightCapabilities.NO_CAPABILITIES);
+        assertThrows(ColorNotSupported.class, () -> addStateNow("1", "effect:colorloop"));
+    }
+
+    @Test
     void parse_canHandleColorTemperatureInKelvin_correctlyTranslatedToMired() {
         addKnownLightIdsWithDefaultCapabilities(1);
         int kelvin = 6500;
@@ -873,7 +915,7 @@ class HueSchedulerTest {
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
         advanceTimeAndRunAndAssertApiCallsWithConfirmations(scheduledRunnable, null, 153, null,
-                null, null, null, null, null, false);
+                null, null, null, null, null, null, false);
     }
 
     @Test
@@ -927,7 +969,7 @@ class HueSchedulerTest {
         setCurrentTimeTo(initialNow.plusDays(1).with(nextDaySunrise).minusMinutes(5));
 
         runAndAssertApiCalls(scheduledRunnable, true, true, defaultBrightness, defaultCt,
-                null, null, null, null, null, null, false);
+                null, null, null, null, null, null, null, false);
         runAndAssertConfirmations();
 
         ScheduledRunnable nextDayState = ensureRunnable(initialNow.plusDays(2).with(nextNextDaysSunrises));
@@ -935,7 +977,7 @@ class HueSchedulerTest {
         setCurrentTimeTo(initialNow.plusDays(2).with(nextNextDaysSunrises).minusMinutes(5));
 
         runAndAssertApiCalls(nextDayState, true, true, defaultBrightness, defaultCt, null,
-                null, null, null, null, null, false);
+                null, null, null, null, null, null, false);
         runAndAssertConfirmations();
 
         ensureRunnable(initialNow.plusDays(3).with(nextNextDaysSunrises));
@@ -1095,6 +1137,12 @@ class HueSchedulerTest {
     void parse_invalidPropertyValue_rgb_exception() {
         addKnownLightIdsWithDefaultCapabilities(1);
         assertThrows(InvalidPropertyValue.class, () -> addStateNow("1", "color:12,13"));
+    }
+
+    @Test
+    void parse_invalidPropertyValue_invalidValue_exception() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        assertThrows(InvalidPropertyValue.class, () -> addStateNow("1", "effect:INVALID"));
     }
 
     @Test
@@ -1413,10 +1461,12 @@ class HueSchedulerTest {
         Integer hue;
         Integer sat;
         Boolean on;
+        String effect;
         Integer transitionTime;
         boolean groupState;
 
-        public PutState(int id, Integer bri, Integer ct, Double x, Double y, Integer hue, Integer sat, Boolean on, Integer transitionTime, boolean groupState) {
+        public PutState(int id, Integer bri, Integer ct, Double x, Double y, Integer hue, Integer sat, String effect,
+                        Boolean on, Integer transitionTime, boolean groupState) {
             this.id = id;
             this.bri = bri;
             this.x = x;
@@ -1424,6 +1474,7 @@ class HueSchedulerTest {
             this.hue = hue;
             this.sat = sat;
             this.ct = ct;
+            this.effect = effect;
             this.on = on;
             this.transitionTime = transitionTime;
             this.groupState = groupState;

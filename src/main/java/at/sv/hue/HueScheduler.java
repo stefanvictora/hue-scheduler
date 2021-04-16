@@ -199,6 +199,7 @@ public final class HueScheduler implements Runnable {
             Integer sat = null;
             Integer transitionTimeBefore = null;
             Integer transitionTime = null;
+            String effect = null;
             for (int i = 2; i < parts.length; i++) {
                 String part = parts[i];
                 String[] typeAndValue = part.split(":");
@@ -252,15 +253,18 @@ public final class HueScheduler implements Runnable {
                             bri = xyColor.getBrightness();
                         }
                         break;
+                    case "effect":
+                        effect = value;
+                        break;
                     default:
                         throw new UnknownStateProperty("Unknown state property '" + parameter + "' with value '" + value + "'");
                 }
             }
             String start = parts[1];
             if (groupState) {
-                addGroupState(name, id, start, bri, ct, x, y, hue, sat, on, transitionTimeBefore, transitionTime);
+                addGroupState(name, id, start, bri, ct, x, y, hue, sat, effect, on, transitionTimeBefore, transitionTime);
             } else {
-                addState(name, id, start, bri, ct, x, y, hue, sat, on, transitionTimeBefore, transitionTime, capabilities);
+                addState(name, id, start, bri, ct, x, y, hue, sat, effect, on, transitionTimeBefore, transitionTime, capabilities);
             }
         }
     }
@@ -299,18 +303,18 @@ public final class HueScheduler implements Runnable {
     }
 
     private void addState(String name, int lampId, String start, Integer brightness, Integer ct, Double x, Double y,
-                          Integer hue, Integer sat, Boolean on, Integer transitionTimeBefore, Integer transitionTime,
+                          Integer hue, Integer sat, String effect, Boolean on, Integer transitionTimeBefore, Integer transitionTime,
                           LightCapabilities capabilities) {
         lightStates.computeIfAbsent(lampId, ArrayList::new)
-                   .add(new ScheduledState(name, lampId, start, brightness, ct, x, y, hue, sat, on, transitionTimeBefore,
+                   .add(new ScheduledState(name, lampId, start, brightness, ct, x, y, hue, sat, effect, on, transitionTimeBefore,
                            transitionTime, startTimeProvider, capabilities));
     }
 
     private void addGroupState(String name, int groupId, String start, Integer brightness, Integer ct, Double x, Double y,
-                               Integer hue, Integer sat, Boolean on, Integer transitionTimeBefore, Integer transitionTime) {
+                               Integer hue, Integer sat, String effect, Boolean on, Integer transitionTimeBefore, Integer transitionTime) {
         lightStates.computeIfAbsent(getGroupId(groupId), ArrayList::new)
                    .add(new ScheduledState(name, groupId, getGroupLights(groupId).get(0), start, brightness, ct, x, y,
-                           hue, sat, on, transitionTimeBefore, transitionTime, startTimeProvider, true,
+                           hue, sat, effect, on, transitionTimeBefore, transitionTime, startTimeProvider, true,
                            LightCapabilities.NO_CAPABILITIES));
     }
 
@@ -447,7 +451,8 @@ public final class HueScheduler implements Runnable {
 
     private boolean putState(ScheduledState state) {
         return hueApi.putState(state.getUpdateId(), state.getBrightness(), state.getCt(), state.getX(), state.getY(),
-                state.getHue(), state.getSat(), state.getOn(), state.getTransitionTime(currentTime.get()), state.isGroupState());
+                state.getHue(), state.getSat(), state.getEffect(), state.getOn(), state.getTransitionTime(currentTime.get()),
+                state.isGroupState());
     }
 
     private void retry(ScheduledState state, long delayInMs) {

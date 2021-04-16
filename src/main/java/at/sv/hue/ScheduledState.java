@@ -28,6 +28,7 @@ final class ScheduledState {
     private final Integer transitionTime;
     private final Integer transitionTimeBefore;
     private final StartTimeProvider startTimeProvider;
+    private final String effect;
     private final boolean groupState;
     private final LightCapabilities capabilities;
     private int confirmCounter;
@@ -36,13 +37,14 @@ final class ScheduledState {
     private boolean temporary;
 
     public ScheduledState(String name, int id, String start, Integer brightness, Integer ct, Double x, Double y,
-                          Integer hue, Integer sat, Boolean on, Integer transitionTimeBefore, Integer transitionTime,
+                          Integer hue, Integer sat, String effect, Boolean on, Integer transitionTimeBefore, Integer transitionTime,
                           StartTimeProvider startTimeProvider, LightCapabilities capabilities) {
-        this(name, id, id, start, brightness, ct, x, y, hue, sat, on, transitionTimeBefore, transitionTime, startTimeProvider, false, capabilities);
+        this(name, id, id, start, brightness, ct, x, y, hue, sat, effect, on, transitionTimeBefore, transitionTime, startTimeProvider,
+                false, capabilities);
     }
 
     public ScheduledState(String name, int updateId, int statusId, String start, Integer brightness, Integer ct, Double x, Double y,
-                          Integer hue, Integer sat, Boolean on, Integer transitionTimeBefore, Integer transitionTime,
+                          Integer hue, Integer sat, String effect, Boolean on, Integer transitionTimeBefore, Integer transitionTime,
                           StartTimeProvider startTimeProvider, boolean groupState, LightCapabilities capabilities) {
         this.name = name;
         this.updateId = updateId;
@@ -50,6 +52,7 @@ final class ScheduledState {
         this.start = start;
         this.groupState = groupState;
         this.capabilities = capabilities;
+        this.effect = assertValidEffectValue(effect);
         this.brightness = assertValidBrightnessValue(brightness);
         this.ct = assertCtSupportAndValue(ct);
         this.x = assertValidXAndY(x);
@@ -67,12 +70,19 @@ final class ScheduledState {
 
     public static ScheduledState createTemporaryCopy(ScheduledState state, ZonedDateTime start, ZonedDateTime end) {
         ScheduledState copy = new ScheduledState(state.name, state.updateId, state.statusId, start.toLocalTime().toString(),
-                state.brightness, state.ct, state.x, state.y, state.hue, state.sat, state.on, state.transitionTimeBefore, state.transitionTime,
-                state.startTimeProvider, state.groupState, state.capabilities);
+                state.brightness, state.ct, state.x, state.y, state.hue, state.sat, state.effect, state.on, state.transitionTimeBefore,
+                state.transitionTime, state.startTimeProvider, state.groupState, state.capabilities);
         copy.end = end;
         copy.temporary = true;
         copy.lastStart = start;
         return copy;
+    }
+
+    private String assertValidEffectValue(String effect) {
+        if (effect != null && !"none".equals(effect) && !"colorloop".equals(effect)) {
+            throw new InvalidPropertyValue("Unsupported value for effect property: '" + effect + "'");
+        }
+        return effect;
     }
 
     private Integer assertValidBrightnessValue(Integer brightness) {
@@ -138,7 +148,7 @@ final class ScheduledState {
     }
 
     private boolean isColorState() {
-        return x != null || y != null || hue != null || sat != null;
+        return x != null || y != null || hue != null || sat != null || effect != null;
     }
 
     public long getDelayInSeconds(ZonedDateTime now) {
@@ -223,6 +233,10 @@ final class ScheduledState {
         return sat;
     }
 
+    public String getEffect() {
+        return effect;
+    }
+
     public Boolean getOn() {
         return on;
     }
@@ -272,7 +286,7 @@ final class ScheduledState {
     }
 
     public boolean isNullState() {
-        return brightness == null && ct == null && on == null && x == null && y == null && hue == null && sat == null;
+        return brightness == null && ct == null && on == null && x == null && y == null && hue == null && sat == null && effect == null;
     }
 
     public boolean isOff() {
@@ -306,6 +320,7 @@ final class ScheduledState {
                 getFormattedPropertyIfSet("y", y) +
                 getFormattedPropertyIfSet("hue", hue) +
                 getFormattedPropertyIfSet("sat", sat) +
+                getFormattedPropertyIfSet("effect", effect) +
                 getFormattedTransitionTimeIfSet("transitionTimeBefore", transitionTimeBefore) +
                 getFormattedTransitionTimeIfSet("transitionTime", transitionTime) +
                 '}';

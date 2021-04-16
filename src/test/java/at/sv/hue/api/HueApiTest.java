@@ -71,7 +71,7 @@ class HueApiTest {
     }
 
     private boolean putState(int id, int bri, boolean groupState) {
-        return api.putState(id, bri, null, null, null, null, null, null, null, groupState);
+        return api.putState(id, bri, null, null, null, null, null, null, null, null, groupState);
     }
 
     private List<Integer> getGroupLights(int groupId) {
@@ -518,7 +518,7 @@ class HueApiTest {
     void putState_ct_correctBody() {
         setPutResponse("/lights/" + 16 + "/state", "{\"ct\":100}", "[success]");
 
-        boolean success = api.putState(16, null, 100, null, null, null, null, null, null, false);
+        boolean success = api.putState(16, null, 100, null, null, null, null, null, null, null, false);
 
         assertTrue(success, "Put not successful");
     }
@@ -529,7 +529,7 @@ class HueApiTest {
         double y = 0.3525;
         setPutResponse("/lights/" + 16 + "/state", "{\"xy\":[" + x + "," + y + "]}", "[success]");
 
-        boolean success = api.putState(16, null, null, x, y, null, null, null, null, false);
+        boolean success = api.putState(16, null, null, x, y, null, null, null, null, null, false);
 
         assertTrue(success, "Put not successful");
     }
@@ -540,7 +540,7 @@ class HueApiTest {
         int sat = 254;
         setPutResponse("/lights/" + 16 + "/state", "{\"hue\":" + hue + ",\"sat\":" + sat + "}", "[success]");
 
-        boolean success = api.putState(16, null, null, null, null, hue, sat, null, null, false);
+        boolean success = api.putState(16, null, null, null, null, hue, sat, null, null, null, false);
 
         assertTrue(success, "Put not successful");
     }
@@ -549,7 +549,7 @@ class HueApiTest {
     void putState_on_setsFlagCorrectly() {
         setPutResponse("/lights/" + 16 + "/state", "{\"on\":true}", "[success]");
 
-        boolean success = api.putState(16, null, null, null, null, null, null, true, null, false);
+        boolean success = api.putState(16, null, null, null, null, null, null, null, true, null, false);
 
         assertTrue(success, "Put not successful");
     }
@@ -558,7 +558,7 @@ class HueApiTest {
     void putState_transitionTime_setsTimeCorrectly() {
         setPutResponse("/lights/" + 16 + "/state", "{\"transitiontime\":2}", "[success]");
 
-        boolean success = api.putState(16, null, null, null, null, null, null, null, 2, false);
+        boolean success = api.putState(16, null, null, null, null, null, null, null, null, 2, false);
 
         assertTrue(success, "Put not successful");
     }
@@ -567,7 +567,16 @@ class HueApiTest {
     void putState_transitionTime_defaultValueOfFour_isIgnored() {
         setPutResponse("/lights/" + 16 + "/state", "{}", "[success]");
 
-        boolean success = api.putState(16, null, null, null, null, null, null, null, 4, false);
+        boolean success = api.putState(16, null, null, null, null, null, null, null, null, 4, false);
+
+        assertTrue(success, "Put not successful");
+    }
+
+    @Test
+    void putState_effect_correctlySet() {
+        setPutResponse("/lights/" + 1 + "/state", "{\"effect\":\"colorloop\"}", "[success]");
+
+        boolean success = api.putState(1, null, null, null, null, null, null, "colorloop", null, null, false);
 
         assertTrue(success, "Put not successful");
     }

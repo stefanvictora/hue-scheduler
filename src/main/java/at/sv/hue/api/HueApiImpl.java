@@ -110,10 +110,10 @@ public final class HueApiImpl implements HueApi {
     }
 
     @Override
-    public boolean putState(int id, Integer bri, Integer ct, Double x, Double y, Integer hue, Integer sat, Boolean on, Integer transitionTime,
-                            boolean groupState) {
+    public boolean putState(int id, Integer bri, Integer ct, Double x, Double y, Integer hue, Integer sat, String effect,
+                            Boolean on, Integer transitionTime, boolean groupState) {
         return assertNoPutErrors(resourceProvider.putResource(getUpdateUrl(id, groupState),
-                getBody(new State(bri, ct, x, y, hue, sat, on, transitionTime))));
+                getBody(new State(bri, ct, x, y, hue, sat, effect, on, transitionTime))));
     }
 
     private boolean assertNoPutErrors(String putResource) {
@@ -304,6 +304,7 @@ public final class HueApiImpl implements HueApi {
         Double[] xy;
         Integer hue;
         Integer sat;
+        String effect;
         Boolean on;
         Boolean reachable;
         Integer transitiontime;
@@ -311,11 +312,12 @@ public final class HueApiImpl implements HueApi {
         public State() {
         }
 
-        public State(Integer bri, Integer ct, Double x, Double y, Integer hue, Integer sat, Boolean on, Integer transitiontime) {
+        public State(Integer bri, Integer ct, Double x, Double y, Integer hue, Integer sat, String effect, Boolean on, Integer transitiontime) {
             this.ct = ct;
             this.bri = bri;
             this.hue = hue;
             this.sat = sat;
+            this.effect = effect;
             this.on = on;
             if (isNotDefaultValue(transitiontime)) {
                 this.transitiontime = transitiontime;
@@ -367,6 +369,14 @@ public final class HueApiImpl implements HueApi {
 
         public void setSat(Integer sat) {
             this.sat = sat;
+        }
+
+        public String getEffect() {
+            return effect;
+        }
+
+        public void setEffect(String effect) {
+            this.effect = effect;
         }
 
         public Boolean getOn() {

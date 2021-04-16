@@ -22,7 +22,7 @@ public interface HueApi {
      * All other error cases are thrown as {@link HueApiFailure} exceptions.
      * @throws HueApiFailure if the api call failed
      */
-    boolean putState(int id, Integer bri, Integer ct, Double x, Double y, Integer hue, Integer sat, Boolean on,
+    boolean putState(int id, Integer bri, Integer ct, Double x, Double y, Integer hue, Integer sat, String effect, Boolean on,
                      Integer transitionTime, boolean groupState);
 
     /**
