@@ -101,6 +101,8 @@ class HueSchedulerTest {
                 List<Integer> lights = groupLightsForId.remove(groupId);
                 if (lights == null)
                     throw new GroupNotFoundException("Not lights for group with id " + groupId + " found!");
+                if (lights.isEmpty())
+                    throw new EmptyGroupException("Group is empty!");
                 return lights;
             }
 
@@ -574,6 +576,14 @@ class HueSchedulerTest {
     @Test
     void parse_unknownGroupId_exception() {
         assertThrows(GroupNotFoundException.class, () -> addStateNow("g1"));
+    }
+
+    @Test
+    void parse_emptyGroup_exception() {
+        addKnownGroupIds(1);
+        addGroupLightsForId(1);
+
+        assertThrows(EmptyGroupException.class, () -> addStateNow("g1"));
     }
 
     @Test

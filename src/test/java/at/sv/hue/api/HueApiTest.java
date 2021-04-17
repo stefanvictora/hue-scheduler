@@ -260,6 +260,19 @@ class HueApiTest {
     }
 
     @Test
+    void getGroupLights_emptyLights_exception() {
+        setGetResponse("/groups", "{\n" +
+                "\"1\": {\n" +
+                "\"name\": \"Group 1\",\n" +
+                "\"lights\": [\n" +
+                "]\n" +
+                "}\n" +
+                "}}");
+
+        assertThrows(EmptyGroupException.class, () -> getGroupLights(1));
+    }
+
+    @Test
     void getGroupLights_unknownId_exception() {
         setGetResponse("/groups", "{}");
 

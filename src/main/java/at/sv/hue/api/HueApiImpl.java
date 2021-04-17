@@ -139,7 +139,11 @@ public final class HueApiImpl implements HueApi {
         if (group == null) {
             throw new GroupNotFoundException("Group with id '" + groupId + "' not found!");
         }
-        return Arrays.asList(group.lights);
+        Integer[] lights = group.lights;
+        if (lights.length == 0) {
+            throw new EmptyGroupException("Group with id '" + groupId + "' has no lights to control!");
+        }
+        return Arrays.asList(lights);
     }
 
     private Map<Integer, Group> getOrLookupGroups() {

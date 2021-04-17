@@ -28,6 +28,7 @@ public interface HueApi {
     /**
      * @return the lights associated with the group of the given id. Not null.
      * @throws GroupNotFoundException if no group with given id was found
+     * @throws EmptyGroupException    if the group has no lights associated
      * @throws HueApiFailure          if the api call failed
      */
     List<Integer> getGroupLights(int groupId);
