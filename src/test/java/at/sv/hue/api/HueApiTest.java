@@ -120,7 +120,7 @@ class HueApiTest {
                 throw new BridgeConnectionFailure("PUT failure for '" + url + "' with '" + body + "'.");
             }
         };
-        api = new HueApiImpl(resourceProvider, ip, username);
+        api = new HueApiImpl(resourceProvider, ip, username, permits -> {});
         baseUrl = "http://" + ip + "/api/" + username;
     }
 

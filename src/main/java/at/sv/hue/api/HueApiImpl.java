@@ -18,17 +18,19 @@ public final class HueApiImpl implements HueApi {
     private final String baseApi;
     private final Object lightMapLock = new Object();
     private final Object groupMapLock = new Object();
+    private final RateLimiter rateLimiter;
     private Map<Integer, Light> availableLights;
     private Map<Integer, Group> availableGroups;
     private Map<String, Integer> lightNameToIdMap;
     private Map<String, Integer> groupNameToIdMap;
 
-    public HueApiImpl(HttpResourceProvider resourceProvider, String ip, String username) {
+    public HueApiImpl(HttpResourceProvider resourceProvider, String ip, String username, RateLimiter rateLimiter) {
         this.resourceProvider = resourceProvider;
         mapper = new ObjectMapper();
         mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
         baseApi = "http://" + ip + "/api/" + username;
+        this.rateLimiter = rateLimiter;
     }
 
     @Override
@@ -112,6 +114,11 @@ public final class HueApiImpl implements HueApi {
     @Override
     public boolean putState(int id, Integer bri, Integer ct, Double x, Double y, Integer hue, Integer sat, String effect,
                             Boolean on, Integer transitionTime, boolean groupState) {
+        if (groupState) {
+            rateLimiter.acquire(10);
+        } else {
+            rateLimiter.acquire(1);
+        }
         return assertNoPutErrors(resourceProvider.putResource(getUpdateUrl(id, groupState),
                 getBody(new State(bri, ct, x, y, hue, sat, effect, on, transitionTime))));
     }

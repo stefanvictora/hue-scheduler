@@ -91,7 +91,7 @@ public final class HueScheduler implements Runnable {
 
     @Override
     public void run() {
-        hueApi = new HueApiImpl(new HttpResourceProviderImpl(), ip, username);
+        hueApi = new HueApiImpl(new HttpResourceProviderImpl(), ip, username, RateLimiter.create(10.0));
         startTimeProvider = createStartTimeProvider(latitude, longitude, elevation);
         stateScheduler = createStateScheduler();
         currentTime = ZonedDateTime::now;
@@ -129,7 +129,7 @@ public final class HueScheduler implements Runnable {
     }
 
     private StateSchedulerImpl createStateScheduler() {
-        return new StateSchedulerImpl(Executors.newSingleThreadScheduledExecutor(), ZonedDateTime::now);
+        return new StateSchedulerImpl(Executors.newScheduledThreadPool(Runtime.getRuntime().availableProcessors()), ZonedDateTime::now);
     }
 
     private void assertInputIsReadable() {
