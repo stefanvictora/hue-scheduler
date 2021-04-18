@@ -3,6 +3,7 @@ package at.sv.hue;
 import at.sv.hue.api.*;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,6 +13,7 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -34,7 +36,7 @@ class HueSchedulerTest {
     private Set<Integer> knownLightIds;
     private Map<String, Integer> lightIdsForName;
     private Map<String, Integer> groupIdsForName;
-    private Map<Integer, LightState> lightStatesForId;
+    private Map<Integer, List<LightState>> lightStatesForId;
     private Map<Integer, List<Integer>> groupLightsForId;
     private Map<Integer, LightCapabilities> capabilitiesForId;
     private LightCapabilities defaultCapabilities;
@@ -53,6 +55,16 @@ class HueSchedulerTest {
     private double defaultX;
     private double defaultY;
     private int connectionFailureRetryDelay;
+    private int multiColorAdjustmentDelay;
+
+    private void setCurrentTimeToAndRun(ScheduledRunnable scheduledRunnable) {
+        setCurrentTimeTo(scheduledRunnable);
+        scheduledRunnable.run();
+    }
+
+    private void setCurrentTimeTo(ScheduledRunnable scheduledRunnable) {
+        setCurrentTimeTo(scheduledRunnable.getStart());
+    }
 
     private void setCurrentTimeTo(ZonedDateTime newTime) {
         if (now != null && newTime.isBefore(now)) {
@@ -78,8 +90,12 @@ class HueSchedulerTest {
                 if (apiGetThrowable != null) {
                     throw apiGetThrowable.get();
                 }
-                LightState lightState = lightStatesForId.remove(id);
-                assertNotNull(lightState, "No light state call expected with id " + id + "!");
+                List<LightState> lightStates = lightStatesForId.get(id);
+                assertNotNull(lightStates, "No light state call expected with id " + id + "!");
+                LightState lightState = lightStates.remove(0);
+                if (lightStates.isEmpty()) {
+                    lightStatesForId.remove(id);
+                }
                 return lightState;
             }
 
@@ -178,7 +194,7 @@ class HueSchedulerTest {
             } else {
                 return LocalTime.parse(input);
             }
-        }, () -> now, () -> retryDelay * 1000, confirmDelay, connectionFailureRetryDelay);
+        }, () -> now, () -> retryDelay * 1000, confirmDelay, connectionFailureRetryDelay, multiColorAdjustmentDelay);
     }
 
     private void addState(int id, ZonedDateTime startTime) {
@@ -312,7 +328,7 @@ class HueSchedulerTest {
     private void advanceTimeAndRunAndAssertApiCalls(ScheduledRunnable state, boolean reachable, boolean onState, Integer putBrightness,
                                                     Integer putCt, Double putX, Double putY, Integer putHue, Integer putSat,
                                                     String putEffect, Boolean putOn, Integer putTransitionTime, boolean groupState) {
-        setCurrentTimeTo(state.getStart());
+        setCurrentTimeTo(state);
         runAndAssertApiCalls(state, reachable, onState, putBrightness, putCt, putX, putY, putHue, putSat, putEffect, putOn,
                 putTransitionTime, groupState);
     }
@@ -320,12 +336,12 @@ class HueSchedulerTest {
     private void runAndAssertApiCalls(ScheduledRunnable state, boolean reachable, boolean onState, Integer putBrightness,
                                       Integer putCt, Double putX, Double putY, Integer putHue, Integer putSat, String putEffect,
                                       Boolean putOn, Integer putTransitionTime, boolean groupState) {
-        addLightStateResponse(id, reachable, onState);
+        addLightStateResponse(id, reachable, onState, null);
         runAndAssertPutCall(state, putBrightness, putCt, putX, putY, putHue, putSat, putEffect, putOn, putTransitionTime, groupState);
     }
 
-    private void addLightStateResponse(int id, boolean reachable, boolean on) {
-        lightStatesForId.put(id, new LightState(defaultBrightness, defaultCt, null, null, reachable, on));
+    private void addLightStateResponse(int id, boolean reachable, boolean on, String effect) {
+        lightStatesForId.computeIfAbsent(id, i -> new ArrayList<>()).add(new LightState(defaultBrightness, defaultCt, null, null, effect, reachable, on));
     }
 
     private void runAndAssertPutCall(ScheduledRunnable state, Integer putBrightness, Integer putCt, Double putX, Double putY,
@@ -347,7 +363,7 @@ class HueSchedulerTest {
 
     private void advanceTimeAndRunAndAssertPutCall(ScheduledRunnable state, Integer brightness, Integer ct,
                                                    boolean groupState, Boolean on, Integer transitionTime) {
-        setCurrentTimeTo(state.getStart());
+        setCurrentTimeTo(state);
         runAndAssertPutCall(state, brightness, ct, null, null, null, null, null, on, transitionTime, groupState);
     }
 
@@ -465,9 +481,10 @@ class HueSchedulerTest {
         id = 1;
         Double[][] gamut = {{0.6915, 0.3083}, {0.17, 0.7}, {0.1532, 0.0475}};
         defaultCapabilities = new LightCapabilities(gamut, 153, 500);
-        create();
+        multiColorAdjustmentDelay = 4;
         defaultX = 0.2318731647393379;
         defaultY = 0.4675382426015799;
+        create();
     }
 
     @AfterEach
@@ -682,7 +699,7 @@ class HueSchedulerTest {
                 null, null, null, null, null, null, 6000, false);
 
         runAndAssertConfirmations(state -> {
-            setCurrentTimeTo(state.getStart());
+            setCurrentTimeTo(state);
             runAndAssertApiCalls(state, true, true, defaultBrightness, null,
                     null, null, null, null, null, null, getAdjustedTransitionTime(definedStart), false);
         });
@@ -711,7 +728,7 @@ class HueSchedulerTest {
                 null, null, null, null, null, null, null, false);
 
         runAndAssertConfirmations(state -> {
-            setCurrentTimeTo(state.getStart());
+            setCurrentTimeTo(state);
             runAndAssertApiCalls(state, true, true, defaultBrightness, null,
                     null, null, null, null, null, null, null, false);
         });
@@ -736,7 +753,7 @@ class HueSchedulerTest {
                 null, null, null, null, null, null, 3000, true);
 
         runAndAssertConfirmations(state -> {
-            setCurrentTimeTo(state.getStart());
+            setCurrentTimeTo(state);
             runAndAssertApiCalls(state, true, true, defaultBrightness, null,
                     null, null, null, null, null, null, getAdjustedTransitionTime(definedStart), true);
         });
@@ -878,6 +895,71 @@ class HueSchedulerTest {
     }
 
     @Test
+    void parse_multiColorLoopEffect_group_withMultipleLights() {
+        addKnownGroupIds(1);
+        addGroupLightsForId(1, 1, 2, 3, 4, 5, 6);
+        addStateNow("g1", "effect:multi_colorloop");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        addLightStateResponse(1, true, true, null);
+        addLightStateResponse(2, true, true, "colorloop");
+        addLightStateResponse(3, true, false, "colorloop"); // ignored, because off
+        addLightStateResponse(4, true, true, null); // ignored because no support for colorloop
+        addLightStateResponse(5, true, true, "colorloop");
+        addLightStateResponse(6, false, false, "colorloop"); // ignored, because unreachable and off
+        setCurrentTimeTo(scheduledRunnable);
+        runAndAssertPutCall(scheduledRunnable, null, null, null, null, null, null, "colorloop",
+                null, null, true);
+
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(2);
+        assertScheduleStart(scheduledRunnables.get(0), now.plusSeconds(confirmDelay));
+        assertScheduleStart(scheduledRunnables.get(1), now.plusSeconds(multiColorAdjustmentDelay)); // first adjustment
+
+        setCurrentTimeToAndRun(scheduledRunnables.get(1)); // turns off light 2
+
+        assertPutState(2, null, null, null, null, null, null, null, false, null, false);
+        List<ScheduledRunnable> round2 = ensureScheduledStates(2);
+        assertScheduleStart(round2.get(0), now.plus(300, ChronoUnit.MILLIS)); // turn on again
+        assertScheduleStart(round2.get(1), now.plusSeconds(multiColorAdjustmentDelay)); // next adjustment
+
+        setCurrentTimeToAndRun(round2.get(0)); // turns on light 2
+
+        assertPutState(2, null, null, null, null, null, null, "colorloop", true, null, false);
+
+        setCurrentTimeToAndRun(round2.get(1)); // turns off light 5
+
+        assertPutState(5, null, null, null, null, null, null, null, false, null, false);
+        List<ScheduledRunnable> round3 = ensureScheduledStates(2);
+        assertScheduleStart(round3.get(0), now.plus(300, ChronoUnit.MILLIS)); // turn on again
+        assertScheduleStart(round3.get(1), now.plusSeconds(multiColorAdjustmentDelay)); // next adjustment
+
+        setCurrentTimeToAndRun(round3.get(0)); // turns on light 5
+
+        assertPutState(5, null, null, null, null, null, null, "colorloop", true, null, false);
+
+        setCurrentTimeToAndRun(round3.get(1)); // next adjustment, no action needed
+    }
+
+    @Test
+    void parse_multiColorLoopEffect_justOneLightInGroup_skipsAdjustment() {
+        addKnownGroupIds(1);
+        addGroupLightsForId(1, 1);
+        addStateNow("g1", "effect:multi_colorloop");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        advanceTimeAndRunAndAssertApiCallsWithConfirmations(scheduledRunnable, null, null, null,
+                null, null, null, "colorloop", null, null, true);
+    }
+
+    @Test
+    void parse_multiColorLoopEffect_noGroup_exception() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        assertThrows(InvalidPropertyValue.class, () -> addStateNow(1, "effect:multi_colorloop"));
+    }
+
+    @Test
     void parse_canHandleEffect_none() {
         addKnownLightIdsWithDefaultCapabilities(1);
         addStateNow(1, "effect:none");
@@ -914,6 +996,14 @@ class HueSchedulerTest {
         addKnownLightIds(1);
         setCapabilities(1, LightCapabilities.NO_CAPABILITIES);
         assertThrows(ColorNotSupported.class, () -> addStateNow("1", "effect:colorloop"));
+    }
+
+    @Disabled
+    @Test
+    void parse_multiColorLoop_noGroup_exception() {
+        addKnownGroupIds(1);
+        addGroupLightsForId(1, 1);
+//        addStateNow();
     }
 
     @Test
@@ -1355,8 +1445,7 @@ class HueSchedulerTest {
         ScheduledRunnable scheduledRunnable = startWithDefaultState();
 
         apiPutThrowable = () -> new BridgeConnectionFailure("Failed test connection");
-        setCurrentTimeTo(scheduledRunnable.getStart());
-        scheduledRunnable.run(); // fails but retries
+        setCurrentTimeToAndRun(scheduledRunnable); // fails but retries
 
         ScheduledRunnable retryState = ensureConnectionFailureRetryState();
 
@@ -1369,8 +1458,7 @@ class HueSchedulerTest {
         ScheduledRunnable scheduledRunnable = startWithDefaultState();
 
         apiPutThrowable = () -> new HueApiFailure("Invalid response");
-        setCurrentTimeTo(scheduledRunnable.getStart());
-        scheduledRunnable.run(); // fails but retries
+        setCurrentTimeToAndRun(scheduledRunnable); // failes but retries
 
         ScheduledRunnable retryState = ensureConnectionFailureRetryState();
 
@@ -1383,7 +1471,7 @@ class HueSchedulerTest {
         ScheduledRunnable scheduledRunnable = startWithDefaultState();
 
         apiGetThrowable = () -> new BridgeConnectionFailure("Failed test connection");
-        setCurrentTimeTo(scheduledRunnable.getStart());
+        setCurrentTimeTo(scheduledRunnable);
         advanceTimeAndRunAndAssertPutCall(scheduledRunnable, defaultBrightness, defaultCt, false, null, null); // fails on GET, retries
 
         ScheduledRunnable retryState = ensureConnectionFailureRetryState();

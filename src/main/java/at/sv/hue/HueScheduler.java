@@ -56,6 +56,8 @@ public final class HueScheduler implements Runnable {
     int confirmDelayInSeconds;
     @Option(names = "--bridge-failure-delay", hidden = true, defaultValue = "10")
     int bridgeFailureRetryDelayInSeconds;
+    @Option(names = "--multi-color-delay", hidden = true, defaultValue = "4")
+    int multiColorAdjustmentDelay;
     private HueApi hueApi;
     private StateScheduler stateScheduler;
     private StartTimeProvider startTimeProvider;
@@ -68,7 +70,7 @@ public final class HueScheduler implements Runnable {
 
     public HueScheduler(HueApi hueApi, StateScheduler stateScheduler, StartTimeProvider startTimeProvider,
                         Supplier<ZonedDateTime> currentTime, Supplier<Integer> retryDelayInMs, int confirmDelayInSeconds,
-                        int bridgeFailureRetryDelayInSeconds) {
+                        int bridgeFailureRetryDelayInSeconds, int multiColorAdjustmentDelay) {
         this();
         this.hueApi = hueApi;
         this.stateScheduler = stateScheduler;
@@ -77,6 +79,7 @@ public final class HueScheduler implements Runnable {
         this.retryDelay = retryDelayInMs;
         this.confirmDelayInSeconds = confirmDelayInSeconds;
         this.bridgeFailureRetryDelayInSeconds = bridgeFailureRetryDelayInSeconds;
+        this.multiColorAdjustmentDelay = multiColorAdjustmentDelay;
     }
 
     public static void main(String[] args) {
@@ -314,9 +317,9 @@ public final class HueScheduler implements Runnable {
     private void addGroupState(String name, int groupId, String start, Integer brightness, Integer ct, Double x, Double y,
                                Integer hue, Integer sat, String effect, Boolean on, Integer transitionTimeBefore, Integer transitionTime) {
         lightStates.computeIfAbsent(getGroupId(groupId), ArrayList::new)
-                   .add(new ScheduledState(name, groupId, getGroupLights(groupId).get(0), start, brightness, ct, x, y,
+                   .add(new ScheduledState(name, groupId, start, brightness, ct, x, y,
                            hue, sat, effect, on, transitionTimeBefore, transitionTime, startTimeProvider, true,
-                           LightCapabilities.NO_CAPABILITIES));
+                           getGroupLights(groupId), LightCapabilities.NO_CAPABILITIES));
     }
 
     private int getGroupId(int id) {
@@ -439,6 +442,9 @@ public final class HueScheduler implements Runnable {
                     LOG.info("Confirmed ({}) {}", state.getConfirmDebugString(), state);
                 }
                 schedule(state, getMs(confirmDelayInSeconds));
+                if (shouldAdjustMultiColorLoopOffset(state)) {
+                    scheduleMultiColorLoopOffsetAdjustments(state.getGroupLights(), 1);
+                }
             } else {
                 LOG.info("Fully confirmed {}", state);
                 scheduleNextDay(state);
@@ -459,6 +465,35 @@ public final class HueScheduler implements Runnable {
     private void retry(ScheduledState state, long delayInMs) {
         state.resetConfirmations();
         schedule(state, delayInMs);
+    }
+
+    private boolean shouldAdjustMultiColorLoopOffset(ScheduledState state) {
+        return state.getConfirmCounter() == 1 && state.isMultiColorLoop() && state.getGroupLights().size() > 1;
+    }
+
+    private void scheduleMultiColorLoopOffsetAdjustments(List<Integer> groupLights, int i) {
+        stateScheduler.schedule(() -> offsetMultiColorLoopForLight(groupLights, i), currentTime.get().plusSeconds(multiColorAdjustmentDelay));
+    }
+
+    private void offsetMultiColorLoopForLight(List<Integer> groupLights, int i) {
+        Integer light = groupLights.get(i);
+        LightState lightState = hueApi.getLightState(light);
+        boolean delayNext = false;
+        if (lightState.isOn() && lightState.isColorLoopEffect()) {
+            putOnState(light, false, null);
+            stateScheduler.schedule(() -> putOnState(light, true, "colorloop"), currentTime.get().plus(300, ChronoUnit.MILLIS));
+            delayNext = true;
+        }
+        if (i + 1 >= groupLights.size()) return;
+        if (delayNext) {
+            scheduleMultiColorLoopOffsetAdjustments(groupLights, i + 1);
+        } else {
+            offsetMultiColorLoopForLight(groupLights, i + 1);
+        }
+    }
+
+    private void putOnState(int light, boolean on, String effect) {
+        hueApi.putState(light, null, null, null, null, null, null, effect, on, null, false);
     }
 
     private boolean hasMorePastStates(List<ScheduledState> states, int i) {

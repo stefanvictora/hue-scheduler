@@ -8,14 +8,16 @@ public final class LightState {
     private final Double x;
     private final Double y;
     private final boolean on;
+    private final String effect;
 
-    public LightState(int brightness, Integer colorTemperature, Double x, Double y, boolean reachable, boolean on) {
+    public LightState(int brightness, Integer colorTemperature, Double x, Double y, String effect, boolean reachable, boolean on) {
         this.reachable = reachable;
         this.on = on;
         this.brightness = brightness;
         this.colorTemperature = colorTemperature;
         this.x = x;
         this.y = y;
+        this.effect = effect;
     }
 
     public int getBrightness() {
@@ -44,5 +46,13 @@ public final class LightState {
 
     public boolean isUnreachableOrOff() {
         return !reachable || !on;
+    }
+
+    public String getEffect() {
+        return effect;
+    }
+
+    public boolean isColorLoopEffect() {
+        return "colorloop".equals(effect);
     }
 }

@@ -9,14 +9,17 @@ import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
 
 final class ScheduledState {
     static final int CONFIRM_AMOUNT = 30;
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
+    private static final String MULTI_COLOR_LOOP = "multi_colorloop";
+    private static final String COLOR_LOOP = "colorloop";
 
     private final String name;
     private final int updateId;
-    private final int statusId;
     private final String start;
     private final Integer brightness;
     private final Integer ct;
@@ -30,6 +33,7 @@ final class ScheduledState {
     private final StartTimeProvider startTimeProvider;
     private final String effect;
     private final boolean groupState;
+    private final List<Integer> groupLights;
     private final LightCapabilities capabilities;
     private int confirmCounter;
     private ZonedDateTime end;
@@ -39,18 +43,18 @@ final class ScheduledState {
     public ScheduledState(String name, int id, String start, Integer brightness, Integer ct, Double x, Double y,
                           Integer hue, Integer sat, String effect, Boolean on, Integer transitionTimeBefore, Integer transitionTime,
                           StartTimeProvider startTimeProvider, LightCapabilities capabilities) {
-        this(name, id, id, start, brightness, ct, x, y, hue, sat, effect, on, transitionTimeBefore, transitionTime, startTimeProvider,
-                false, capabilities);
+        this(name, id, start, brightness, ct, x, y, hue, sat, effect, on, transitionTimeBefore, transitionTime, startTimeProvider,
+                false, null, capabilities);
     }
 
-    public ScheduledState(String name, int updateId, int statusId, String start, Integer brightness, Integer ct, Double x, Double y,
+    public ScheduledState(String name, int updateId, String start, Integer brightness, Integer ct, Double x, Double y,
                           Integer hue, Integer sat, String effect, Boolean on, Integer transitionTimeBefore, Integer transitionTime,
-                          StartTimeProvider startTimeProvider, boolean groupState, LightCapabilities capabilities) {
+                          StartTimeProvider startTimeProvider, boolean groupState, List<Integer> groupLights, LightCapabilities capabilities) {
         this.name = name;
         this.updateId = updateId;
-        this.statusId = statusId;
         this.start = start;
         this.groupState = groupState;
+        this.groupLights = groupLights;
         this.capabilities = capabilities;
         this.effect = assertValidEffectValue(effect);
         this.brightness = assertValidBrightnessValue(brightness);
@@ -69,9 +73,9 @@ final class ScheduledState {
     }
 
     public static ScheduledState createTemporaryCopy(ScheduledState state, ZonedDateTime start, ZonedDateTime end) {
-        ScheduledState copy = new ScheduledState(state.name, state.updateId, state.statusId, start.toLocalTime().toString(),
+        ScheduledState copy = new ScheduledState(state.name, state.updateId, start.toLocalTime().toString(),
                 state.brightness, state.ct, state.x, state.y, state.hue, state.sat, state.effect, state.on, state.transitionTimeBefore,
-                state.transitionTime, state.startTimeProvider, state.groupState, state.capabilities);
+                state.transitionTime, state.startTimeProvider, state.groupState, state.groupLights, state.capabilities);
         copy.end = end;
         copy.temporary = true;
         copy.lastStart = start;
@@ -79,8 +83,11 @@ final class ScheduledState {
     }
 
     private String assertValidEffectValue(String effect) {
-        if (effect != null && !"none".equals(effect) && !"colorloop".equals(effect)) {
+        if (effect != null && !"none".equals(effect) && !COLOR_LOOP.equals(effect) && !MULTI_COLOR_LOOP.equals(effect)) {
             throw new InvalidPropertyValue("Unsupported value for effect property: '" + effect + "'");
+        }
+        if (!isGroupState() && MULTI_COLOR_LOOP.equals(effect)) {
+            throw new InvalidPropertyValue("Multi color loop is only supported for groups.");
         }
         return effect;
     }
@@ -202,7 +209,10 @@ final class ScheduledState {
     }
 
     public int getStatusId() {
-        return statusId;
+        if (groupState) {
+            return groupLights.get(0);
+        }
+        return updateId;
     }
 
     public Integer getBrightness() {
@@ -230,7 +240,14 @@ final class ScheduledState {
     }
 
     public String getEffect() {
+        if (isMultiColorLoop()) {
+            return COLOR_LOOP;
+        }
         return effect;
+    }
+
+    public boolean isMultiColorLoop() {
+        return MULTI_COLOR_LOOP.equals(effect);
     }
 
     public Boolean getOn() {
@@ -279,6 +296,10 @@ final class ScheduledState {
 
     public boolean isGroupState() {
         return groupState;
+    }
+
+    public List<Integer> getGroupLights() {
+        return new ArrayList<>(groupLights);
     }
 
     public boolean isNullState() {

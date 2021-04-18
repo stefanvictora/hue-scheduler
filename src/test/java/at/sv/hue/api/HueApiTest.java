@@ -36,13 +36,14 @@ class HueApiTest {
         response = null;
     }
 
-    private String createApiStateResponse(double x, double y, int ct, int bri, boolean reachable, boolean on) {
+    private String createApiStateResponse(double x, double y, int ct, int bri, boolean reachable, boolean on, String effect) {
         return "{\n" +
                 "\"state\": {\n" +
                 "\"on\": " + on + ",\n" +
                 "\"bri\": " + bri + ",\n" +
                 "\"hue\": 979,\n" +
                 "\"sat\": 254,\n" +
+                "\"effect\": \"" + effect + "\",\n" +
                 "\"xy\": [\n" +
                 "" + x + ",\n" +
                 "" + y + "\n" +
@@ -56,7 +57,7 @@ class HueApiTest {
         return api.getLightState(lightId);
     }
 
-    private void assertLightState(LightState lightState, boolean reachable, boolean on, Double x, Double y, Integer ct, int brightness) {
+    private void assertLightState(LightState lightState, boolean reachable, boolean on, Double x, Double y, Integer ct, int brightness, String effect) {
         assertNotNull(lightState, "Light state is null");
         assertThat("Reachable differs", lightState.isReachable(), is(reachable));
         assertThat("On differs", lightState.isOn(), is(on));
@@ -64,6 +65,7 @@ class HueApiTest {
         assertThat("Y differs", lightState.getY(), is(y));
         assertThat("Brightness differs", lightState.getBrightness(), is(brightness));
         assertThat("Color temperature differs", lightState.getColorTemperature(), is(ct));
+        assertThat("Effect differs", lightState.getEffect(), is(effect));
     }
 
     private boolean putState(int id, int bri) {
@@ -194,11 +196,11 @@ class HueApiTest {
         double y = 0.3233;
         int ct = 153;
         int bri = 100;
-        setGetResponse("/lights/" + lightId, createApiStateResponse(x, y, ct, bri, true, true));
+        setGetResponse("/lights/" + lightId, createApiStateResponse(x, y, ct, bri, true, true, "colorloop"));
 
         LightState lightState = getLightState(lightId);
 
-        assertLightState(lightState, true, true, x, y, ct, bri);
+        assertLightState(lightState, true, true, x, y, ct, bri, "colorloop");
     }
 
     @Test
@@ -208,11 +210,11 @@ class HueApiTest {
         double y = 0.1132;
         int ct = 100;
         int bri = 41;
-        setGetResponse("/lights/" + lightId, createApiStateResponse(x, y, ct, bri, false, false));
+        setGetResponse("/lights/" + lightId, createApiStateResponse(x, y, ct, bri, false, false, "none"));
 
         LightState lightState = getLightState(lightId);
 
-        assertLightState(lightState, false, false, x, y, ct, bri);
+        assertLightState(lightState, false, false, x, y, ct, bri, "none");
     }
 
     @Test
@@ -229,7 +231,7 @@ class HueApiTest {
 
         LightState lightState = getLightState(lightId);
 
-        assertLightState(lightState, true, true, null, null, null, bri);
+        assertLightState(lightState, true, true, null, null, null, bri, null);
     }
 
     @Test

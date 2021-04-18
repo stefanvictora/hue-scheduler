@@ -37,7 +37,7 @@ public final class HueApiImpl implements HueApi {
         try {
             Light light = mapper.readValue(response, Light.class);
             State state = light.state;
-            return new LightState(state.bri, state.ct, getX(state), getY(state), state.reachable, state.on);
+            return new LightState(state.bri, state.ct, getX(state), getY(state), state.effect, state.reachable, state.on);
         } catch (JsonProcessingException | NullPointerException e) {
             throw new HueApiFailure("Failed to parse light state response '" + response + "' for id " + id + ": " + e.getLocalizedMessage());
         }
