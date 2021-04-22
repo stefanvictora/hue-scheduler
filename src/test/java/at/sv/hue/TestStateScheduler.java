@@ -15,8 +15,8 @@ final class TestStateScheduler implements StateScheduler {
     }
 
     @Override
-    public void schedule(Runnable runnable, ZonedDateTime start) {
-        scheduledRunnables.add(new ScheduledRunnable(start, runnable));
+    public void schedule(Runnable runnable, ZonedDateTime start, ZonedDateTime end) {
+        scheduledRunnables.add(new ScheduledRunnable(start, end, runnable));
     }
 
     @Override

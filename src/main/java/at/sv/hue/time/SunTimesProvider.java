@@ -1,31 +1,30 @@
 package at.sv.hue.time;
 
-import java.time.LocalTime;
 import java.time.ZonedDateTime;
 
 public interface SunTimesProvider {
 
-    LocalTime getSunrise(ZonedDateTime dateTime);
+    ZonedDateTime getSunrise(ZonedDateTime dateTime);
 
-    LocalTime getSunset(ZonedDateTime dateTime);
+    ZonedDateTime getSunset(ZonedDateTime dateTime);
 
-    LocalTime getNauticalStart(ZonedDateTime dateTime);
+    ZonedDateTime getNauticalStart(ZonedDateTime dateTime);
 
-    LocalTime getNauticalEnd(ZonedDateTime dateTime);
+    ZonedDateTime getNauticalEnd(ZonedDateTime dateTime);
 
-    LocalTime getCivilStart(ZonedDateTime dateTime);
+    ZonedDateTime getCivilStart(ZonedDateTime dateTime);
 
-    LocalTime getCivilEnd(ZonedDateTime dateTime);
+    ZonedDateTime getCivilEnd(ZonedDateTime dateTime);
 
-    LocalTime getGoldenHour(ZonedDateTime dateTime);
+    ZonedDateTime getGoldenHour(ZonedDateTime dateTime);
 
-    LocalTime getBlueHour(ZonedDateTime dateTime);
+    ZonedDateTime getBlueHour(ZonedDateTime dateTime);
 
-    LocalTime getNightHour(ZonedDateTime dateTime);
+    ZonedDateTime getNightHour(ZonedDateTime dateTime);
 
-    LocalTime getAstronomicalEnd(ZonedDateTime dateTime);
+    ZonedDateTime getAstronomicalEnd(ZonedDateTime dateTime);
 
-    LocalTime getAstronomicalStart(ZonedDateTime dateTime);
+    ZonedDateTime getAstronomicalStart(ZonedDateTime dateTime);
 
     default String toDebugString(ZonedDateTime dateTime) {
         return null;

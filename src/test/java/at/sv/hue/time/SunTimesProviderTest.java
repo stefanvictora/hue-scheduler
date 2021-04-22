@@ -3,6 +3,7 @@ package at.sv.hue.time;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -15,13 +16,14 @@ class SunTimesProviderTest {
     private ZonedDateTime dateTime;
     private SunTimesProviderImpl provider;
 
-    private void assertTime(LocalTime time, int hour, int minute, int second) {
-        assertThat("Time differs", time, is(LocalTime.of(hour, minute, second)));
+    private void assertTime(ZonedDateTime time, int hour, int minute, int second) {
+        assertThat("Time differs", time.toLocalTime(), is(LocalTime.of(hour, minute, second)));
     }
 
     @BeforeEach
     void setUp() {
-        dateTime = ZonedDateTime.of(2021, 1, 1, 0, 0, 0, 0, ZoneId.of("Europe/Vienna"));
+        ZoneId zone = ZoneId.of("Europe/Vienna");
+        dateTime = ZonedDateTime.of(2021, 1, 1, 0, 0, 0, 0, zone);
         provider = new SunTimesProviderImpl(48.20, 16.39, 165);
     }
 
@@ -50,5 +52,21 @@ class SunTimesProviderTest {
         assertTime(provider.getNightHour(dateTime), 17, 38, 52);
         assertTime(provider.getNauticalEnd(dateTime), 18, 3, 35);
         assertTime(provider.getAstronomicalEnd(dateTime), 18, 40, 13);
+    }
+
+    @Test
+    void returnsCorrectTime_doesNotDependOnTimeOfDay() {
+        assertTime(provider.getSunset(dateTime), 16, 14, 29);
+        assertTime(provider.getSunset(dateTime.withHour(16).withMinute(14).withSecond(30)), 16, 14, 29);
+    }
+
+    @Test
+    void doesNotReturnNull_evenIfSunNeverSetsAtLocation_returnsDateAFewMonthsInTheFuture() {
+        provider = new SunTimesProviderImpl(78.614803, 15.895517, 0); // Somewhere in Svalbard (Norway)
+        ZonedDateTime nextSunset = dateTime.with(LocalDateTime.of(2021, 8, 26, 0, 24, 23));
+
+        ZonedDateTime sunset = provider.getSunset(dateTime.withMonth(5));
+
+        assertThat(sunset, is(nextSunset));
     }
 }

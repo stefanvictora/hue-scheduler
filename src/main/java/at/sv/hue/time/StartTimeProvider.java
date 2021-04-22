@@ -1,6 +1,5 @@
 package at.sv.hue.time;
 
-import java.time.LocalTime;
 import java.time.ZonedDateTime;
 
 public interface StartTimeProvider {
@@ -11,7 +10,7 @@ public interface StartTimeProvider {
      * @throws InvalidStartTimeExpression if the input is neither a valid {@link java.time.format.DateTimeFormatter#ISO_LOCAL_TIME}
      *                                    or a supported sun keyword with optional offset.
      */
-    LocalTime getStart(String input, ZonedDateTime dateTime);
+    ZonedDateTime getStart(String input, ZonedDateTime dateTime);
 
     default String toDebugString(ZonedDateTime dateTime) {
         return null;

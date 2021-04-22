@@ -13,9 +13,9 @@ public final class StartTimeProviderImpl implements StartTimeProvider {
     }
 
     @Override
-    public LocalTime getStart(String input, ZonedDateTime dateTime) {
+    public ZonedDateTime getStart(String input, ZonedDateTime dateTime) {
         LocalTime time = tryParseTimeString(input);
-        if (time != null) return time;
+        if (time != null) return dateTime.with(time);
         try {
             if (isOffsetExpression(input)) {
                 return parseOffsetExpresion(input, dateTime);
@@ -39,18 +39,18 @@ public final class StartTimeProviderImpl implements StartTimeProvider {
         return input.contains("+") || input.contains("-");
     }
 
-    private LocalTime parseOffsetExpresion(String input, ZonedDateTime dateTime) {
+    private ZonedDateTime parseOffsetExpresion(String input, ZonedDateTime dateTime) {
         String[] parts = input.split("[+-]");
-        LocalTime localTime = parseSunKeywords(parts[0].trim(), dateTime);
+        ZonedDateTime startTime = parseSunKeywords(parts[0].trim(), dateTime);
         int offset = Integer.parseInt(parts[1].trim());
         if (input.contains("+")) {
-            return localTime.plusMinutes(offset);
+            return startTime.plusMinutes(offset);
         } else {
-            return localTime.minusMinutes(offset);
+            return startTime.minusMinutes(offset);
         }
     }
 
-    private LocalTime parseSunKeywords(String input, ZonedDateTime dateTime) {
+    private ZonedDateTime parseSunKeywords(String input, ZonedDateTime dateTime) {
         switch (input.toLowerCase(Locale.ENGLISH)) {
             case "astronomical_start":
             case "astronomical_dawn":

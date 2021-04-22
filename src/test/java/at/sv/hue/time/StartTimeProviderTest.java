@@ -13,27 +13,27 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class StartTimeProviderTest {
 
-    private LocalTime sunrise;
-    private LocalTime sunset;
+    private ZonedDateTime sunrise;
+    private ZonedDateTime sunset;
     private StartTimeProvider provider;
-    private LocalTime nauticalStart;
-    private LocalTime nauticalEnd;
-    private LocalTime civilStart;
-    private LocalTime civilEnd;
-    private LocalTime goldenHour;
-    private LocalTime blueHour;
-    private LocalTime nightHour;
-    private LocalTime astronomicalStart;
-    private LocalTime astronomicalEnd;
+    private ZonedDateTime nauticalStart;
+    private ZonedDateTime nauticalEnd;
+    private ZonedDateTime civilStart;
+    private ZonedDateTime civilEnd;
+    private ZonedDateTime goldenHour;
+    private ZonedDateTime blueHour;
+    private ZonedDateTime nightHour;
+    private ZonedDateTime astronomicalStart;
+    private ZonedDateTime astronomicalEnd;
     private ZonedDateTime now;
     private ZonedDateTime nextDay;
-    private LocalTime nextDaySunrise;
+    private ZonedDateTime nextDaySunrise;
 
-    private void assertStart(String input, LocalTime time) {
+    private void assertStart(String input, ZonedDateTime time) {
         assertStart(input, now, time);
     }
 
-    private void assertStart(String input, ZonedDateTime dateTime, LocalTime time) {
+    private void assertStart(String input, ZonedDateTime dateTime, ZonedDateTime time) {
         assertThat("Start differs", provider.getStart(input, dateTime), is(time));
     }
 
@@ -41,21 +41,21 @@ class StartTimeProviderTest {
     void setUp() {
         now = ZonedDateTime.of(2021, 1, 1, 0, 0, 0, 0, ZoneId.of("Europe/Vienna"));
         nextDay = now.plusDays(1);
-        astronomicalStart = LocalTime.of(5, 0);
-        nauticalStart = LocalTime.of(6, 13);
-        civilStart = LocalTime.of(6, 50);
-        sunrise = LocalTime.of(7, 0);
-        nextDaySunrise = LocalTime.of(7, 10);
-        goldenHour = LocalTime.of(15, 0);
-        sunset = LocalTime.of(16, 0);
-        blueHour = LocalTime.of(16, 15);
-        civilEnd = LocalTime.of(17, 26);
-        nightHour = LocalTime.of(17, 45);
-        nauticalEnd = LocalTime.of(18, 4);
-        astronomicalEnd = LocalTime.of(19, 10);
+        astronomicalStart = now.with(LocalTime.of(5, 0));
+        nauticalStart = now.with(LocalTime.of(6, 13));
+        civilStart = now.with(LocalTime.of(6, 50));
+        sunrise = now.with(LocalTime.of(7, 0));
+        nextDaySunrise = now.with(LocalTime.of(7, 10));
+        goldenHour = now.with(LocalTime.of(15, 0));
+        sunset = now.with(LocalTime.of(16, 0));
+        blueHour = now.with(LocalTime.of(16, 15));
+        civilEnd = now.with(LocalTime.of(17, 26));
+        nightHour = now.with(LocalTime.of(17, 45));
+        nauticalEnd = now.with(LocalTime.of(18, 4));
+        astronomicalEnd = now.with(LocalTime.of(19, 10));
         provider = new StartTimeProviderImpl(new SunTimesProvider() {
             @Override
-            public LocalTime getSunrise(ZonedDateTime dateTime) {
+            public ZonedDateTime getSunrise(ZonedDateTime dateTime) {
                 if (dateTime.equals(nextDay)) {
                     return nextDaySunrise;
                 } else {
@@ -64,52 +64,52 @@ class StartTimeProviderTest {
             }
 
             @Override
-            public LocalTime getSunset(ZonedDateTime dateTime) {
+            public ZonedDateTime getSunset(ZonedDateTime dateTime) {
                 return sunset;
             }
 
             @Override
-            public LocalTime getNauticalStart(ZonedDateTime dateTime) {
+            public ZonedDateTime getNauticalStart(ZonedDateTime dateTime) {
                 return nauticalStart;
             }
 
             @Override
-            public LocalTime getNauticalEnd(ZonedDateTime dateTime) {
+            public ZonedDateTime getNauticalEnd(ZonedDateTime dateTime) {
                 return nauticalEnd;
             }
 
             @Override
-            public LocalTime getCivilStart(ZonedDateTime dateTime) {
+            public ZonedDateTime getCivilStart(ZonedDateTime dateTime) {
                 return civilStart;
             }
 
             @Override
-            public LocalTime getCivilEnd(ZonedDateTime dateTime) {
+            public ZonedDateTime getCivilEnd(ZonedDateTime dateTime) {
                 return civilEnd;
             }
 
             @Override
-            public LocalTime getGoldenHour(ZonedDateTime dateTime) {
+            public ZonedDateTime getGoldenHour(ZonedDateTime dateTime) {
                 return goldenHour;
             }
 
             @Override
-            public LocalTime getBlueHour(ZonedDateTime dateTime) {
+            public ZonedDateTime getBlueHour(ZonedDateTime dateTime) {
                 return blueHour;
             }
 
             @Override
-            public LocalTime getNightHour(ZonedDateTime dateTime) {
+            public ZonedDateTime getNightHour(ZonedDateTime dateTime) {
                 return nightHour;
             }
 
             @Override
-            public LocalTime getAstronomicalEnd(ZonedDateTime dateTime) {
+            public ZonedDateTime getAstronomicalEnd(ZonedDateTime dateTime) {
                 return astronomicalEnd;
             }
 
             @Override
-            public LocalTime getAstronomicalStart(ZonedDateTime dateTime) {
+            public ZonedDateTime getAstronomicalStart(ZonedDateTime dateTime) {
                 return astronomicalStart;
             }
         });
@@ -117,8 +117,8 @@ class StartTimeProviderTest {
 
     @Test
     void parse_simpleDateTime_returnsLocalTime() {
-        assertStart("07:00", LocalTime.of(7, 0));
-        assertStart("08:00", LocalTime.of(8, 0));
+        assertStart("07:00", now.with(LocalTime.of(7, 0)));
+        assertStart("08:00", now.with(LocalTime.of(8, 0)));
     }
 
     @Test
