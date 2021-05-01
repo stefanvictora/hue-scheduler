@@ -55,7 +55,8 @@ public final class HueScheduler implements Runnable {
     int confirmDelayInSeconds;
     @Option(names = "--bridge-failure-delay", hidden = true, defaultValue = "10")
     int bridgeFailureRetryDelayInSeconds;
-    @Option(names = "--multi-color-delay", hidden = true, defaultValue = "4")
+    @Option(names = "--multi-color-delay", paramLabel = "<delay>", defaultValue = "4",
+            description = "The adjustment delay in seconds for each light in a group when using the multi_color effect. Adjust to change the hue values of 'neighboring' lights.")
     int multiColorAdjustmentDelay;
     private HueApi hueApi;
     private StateScheduler stateScheduler;
