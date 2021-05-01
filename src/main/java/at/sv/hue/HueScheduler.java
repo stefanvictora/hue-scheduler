@@ -337,7 +337,7 @@ public final class HueScheduler implements Runnable {
                 return;
             }
             if (success && state.isOff() && lightState.isUnreachableOrOff()) {
-                LOG.info("Turned off {} or is already off", state);
+                LOG.info("Turned off {}, or was already off", state);
                 scheduleNextDay(state);
                 return;
             }
