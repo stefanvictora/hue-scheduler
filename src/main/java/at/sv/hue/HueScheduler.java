@@ -1,7 +1,6 @@
 package at.sv.hue;
 
 import at.sv.hue.api.*;
-import at.sv.hue.color.RGBToXYConverter;
 import at.sv.hue.time.StartTimeProvider;
 import at.sv.hue.time.StartTimeProviderImpl;
 import at.sv.hue.time.SunTimesProviderImpl;
@@ -25,7 +24,6 @@ import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -163,174 +161,19 @@ public final class HueScheduler implements Runnable {
     }
 
     public void addState(String input) {
-        String[] parts = input.split("\\t|\\s{2,}");
-        if (parts.length < 2)
-            throw new InvalidConfigurationLine("Invalid configuration line format '" + Arrays.toString(parts) + "': at least id and start time have to be set." +
-                                                       " Make sure to use either tabs or at least two spaces to separate the different configuration parts.");
-        for (String idPart : parts[0].split(",")) {
-            idPart = idPart.trim();
-            int id;
-            boolean groupState;
-            String name = "";
-            if (idPart.matches("g\\d+")) {
-                id = Integer.parseInt(idPart.substring(1));
-                name = hueApi.getGroupName(id);
-                groupState = true;
-            } else if (idPart.matches("\\d+")) {
-                id = Integer.parseInt(idPart);
-                name = hueApi.getLightName(id);
-                groupState = false;
+        new InputConfigurationParser(startTimeProvider, hueApi).parse(input).forEach(state -> {
+            int updateId;
+            if (state.isGroupState()) {
+                updateId = getGroupId(state.getUpdateId());
             } else {
-                name = idPart;
-                try {
-                    id = hueApi.getGroupId(idPart);
-                    groupState = true;
-                } catch (GroupNotFoundException e) {
-                    id = hueApi.getLightId(idPart);
-                    groupState = false;
-                }
+                updateId = state.getUpdateId();
             }
-            LightCapabilities capabilities;
-            if (!groupState) {
-                capabilities = hueApi.getLightCapabilities(id);
-            } else {
-                capabilities = LightCapabilities.NO_CAPABILITIES;
-            }
-            Integer bri = null;
-            Integer ct = null;
-            Boolean on = null;
-            Double x = null;
-            Double y = null;
-            Integer hue = null;
-            Integer sat = null;
-            Integer transitionTimeBefore = null;
-            Integer transitionTime = null;
-            String effect = null;
-            EnumSet<DayOfWeek> dayOfWeeks = EnumSet.noneOf(DayOfWeek.class);
-            for (int i = 2; i < parts.length; i++) {
-                String part = parts[i];
-                String[] typeAndValue = part.split(":");
-                String parameter = typeAndValue[0];
-                String value = typeAndValue[1];
-                switch (parameter) {
-                    case "bri":
-                        bri = parseInteger(value, parameter);
-                        break;
-                    case "ct":
-                        ct = parseInteger(value, parameter);
-                        if (ct >= 1_000) {
-                            ct = convertToMiredCt(ct);
-                        }
-                        break;
-                    case "on":
-                        on = Boolean.valueOf(value);
-                        break;
-                    case "tr":
-                        transitionTime = parseTransitionTime(parameter, value);
-                        break;
-                    case "tr-before":
-                        transitionTimeBefore = parseTransitionTime(parameter, value);
-                        break;
-                    case "x":
-                        x = parseDouble(value, parameter);
-                        break;
-                    case "y":
-                        y = parseDouble(value, parameter);
-                        break;
-                    case "hue":
-                        hue = parseInteger(value, parameter);
-                        break;
-                    case "sat":
-                        sat = parseInteger(value, parameter);
-                        break;
-                    case "color":
-                        RGBToXYConverter.XYColor xyColor;
-                        if (value.contains(",")) {
-                            String[] rgb = value.split(",");
-                            if (rgb.length != 3) {
-                                throw new InvalidPropertyValue("Invalid RGB value '" + value + "'. Make sure to separate the color values with ','.");
-                            }
-                            xyColor = RGBToXYConverter.convert(rgb[0], rgb[1], rgb[2], capabilities.getColorGamut());
-                        } else {
-                            xyColor = RGBToXYConverter.convert(value, capabilities.getColorGamut());
-                        }
-                        x = xyColor.getX();
-                        y = xyColor.getY();
-                        if (bri == null) {
-                            bri = xyColor.getBrightness();
-                        }
-                        break;
-                    case "effect":
-                        effect = value;
-                        break;
-                    case "days":
-                        DayOfWeeksParser.parseDayOfWeeks(value, dayOfWeeks);
-                        break;
-                    default:
-                        throw new UnknownStateProperty("Unknown state property '" + parameter + "' with value '" + value + "'");
-                }
-            }
-            String start = parts[1];
-            addState(name, id, start, bri, ct, x, y, hue, sat, effect, on, transitionTimeBefore, transitionTime, dayOfWeeks, capabilities, groupState);
-        }
-    }
-
-    private Integer parseInteger(String value, String parameter) {
-        return parseValueWithErrorHandling(value, parameter, "integer", Integer::valueOf);
-    }
-
-    private Double parseDouble(String value, String parameter) {
-        return parseValueWithErrorHandling(value, parameter, "double", Double::parseDouble);
-    }
-
-    private <T> T parseValueWithErrorHandling(String value, String parameter, String type, Function<String, T> function) {
-        try {
-            return function.apply(value);
-        } catch (Exception e) {
-            throw new InvalidPropertyValue("Invalid " + type + " '" + value + "' for property '" + parameter + "'.");
-        }
-    }
-
-    private Integer parseTransitionTime(String parameter, String s) {
-        String value = s;
-        int modifier = 1;
-        if (s.endsWith("s")) {
-            value = s.substring(0, s.length() - 1);
-            modifier = 10;
-        } else if (s.endsWith("min")) {
-            value = s.substring(0, s.length() - 3);
-            modifier = 600;
-        }
-        return parseInteger(value.trim(), parameter) * modifier;
-    }
-
-    private Integer convertToMiredCt(Integer kelvin) {
-        return 1_000_000 / kelvin;
-    }
-
-    private void addState(String name, int id, String start, Integer brightness, Integer ct, Double x, Double y,
-                          Integer hue, Integer sat, String effect, Boolean on, Integer transitionTimeBefore, Integer transitionTime,
-                          EnumSet<DayOfWeek> dayOfWeeks, LightCapabilities capabilities, boolean groupState) {
-        int updateId;
-        List<Integer> groupLights;
-        if (groupState) {
-            updateId = getGroupId(id);
-            groupLights = getGroupLights(id);
-        } else {
-            updateId = id;
-            groupLights = null;
-        }
-        lightStates.computeIfAbsent(updateId, ArrayList::new)
-                   .add(new ScheduledState(name, id, start, brightness, ct, x, y, hue, sat, effect, on, transitionTimeBefore,
-                                           transitionTime, dayOfWeeks, startTimeProvider, groupState, groupLights, capabilities));
+            lightStates.computeIfAbsent(updateId, ArrayList::new).add(state);
+        });
     }
 
     private int getGroupId(int id) {
         return id + 1000;
-    }
-
-    private List<Integer> getGroupLights(int groupId) {
-        return hueApi.getGroupLights(groupId);
     }
 
     public void start() {
