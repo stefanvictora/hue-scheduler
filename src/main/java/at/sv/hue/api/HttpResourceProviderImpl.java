@@ -14,6 +14,7 @@ public final class HttpResourceProviderImpl implements HttpResourceProvider {
 
     @Override
     public String getResource(URL url) {
+        LOG.trace("Get: {}", url);
         try (BufferedReader reader = getResourceReader(url)) {
             return read(reader);
         } catch (IOException e) {

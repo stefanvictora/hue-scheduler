@@ -352,14 +352,14 @@ public final class HueScheduler implements Runnable {
                 if (state.getConfirmCounter() == 1) {
                     LOG.info("Set {}", state);
                 } else if (state.getConfirmCounter() % 5 == 0) {
-                    LOG.info("Confirmed ({}) {}", state.getConfirmDebugString(), state);
+                    LOG.debug("Confirmed ({}) {}", state.getConfirmDebugString(), state);
                 }
                 schedule(state, getMs(confirmDelayInSeconds));
                 if (shouldAdjustMultiColorLoopOffset(state)) {
                     scheduleMultiColorLoopOffsetAdjustments(state.getGroupLights(), 1);
                 }
             } else {
-                LOG.info("Fully confirmed {}", state);
+                LOG.debug("Fully confirmed {}", state);
                 scheduleNextDay(state);
             }
         }, currentTime.get().plus(delayInMs, ChronoUnit.MILLIS), state.getEnd());

@@ -14,6 +14,10 @@
 
 package at.sv.hue.api;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.time.Duration;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -25,6 +29,9 @@ import static java.util.concurrent.TimeUnit.SECONDS;
  * License: Apache-2.0 License
  */
 final class RateLimiterImpl implements RateLimiter {
+
+    private static final Logger LOG = LoggerFactory.getLogger(RateLimiterImpl.class);
+
     private final double permitsPerSecond;
     private final Supplier<Long> nanoTime;
     private final Consumer<Long> sleep;
@@ -59,6 +66,9 @@ final class RateLimiterImpl implements RateLimiter {
             pointInTime = reserveEarliestAvailable(permits);
         }
         long waitLength = Math.max(pointInTime - nanoTime.get(), 0);
+        if (waitLength > 0) {
+            LOG.trace("Waiting for {}", Duration.ofNanos(waitLength));
+        }
         sleep.accept(waitLength);
     }
 
