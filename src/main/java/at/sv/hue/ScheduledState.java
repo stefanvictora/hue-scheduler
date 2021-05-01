@@ -358,9 +358,8 @@ final class ScheduledState {
 
     @Override
     public String toString() {
-        return "State{" +
-                getFormattedName() +
-                ", id=" + getUpdateId() +
+        return  getFormattedName() + "{" +
+                "id=" + getUpdateId() +
                 (temporary ? ", temporary" : "") +
                 ", start=" + getFormattedStart() +
                 ", end=" + getFormattedEnd() +
@@ -380,17 +379,14 @@ final class ScheduledState {
 
     private String getFormattedName() {
         if (groupState) {
-            return "group=" + name;
+            return "Group '" + name + "' ";
         }
-        return "light=" + name;
+        return "Light '" + name + "' ";
     }
 
     private String getFormattedStart() {
         if (lastStart != null) {
-            ZonedDateTime parsedStart = getStart(lastStart);
-//            if (!parsedStart.equals(lastStart)) {
-            return start + " (" + getFormattedTime(parsedStart) + ")";
-//            }
+            return start + " (" + getFormattedTime(getStart(lastStart)) + ")";
         }
         return start;
     }
