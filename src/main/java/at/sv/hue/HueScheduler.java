@@ -341,13 +341,13 @@ public final class HueScheduler implements Runnable {
                 return;
             }
             if (success && state.isOff() && lightState.isUnreachableOrOff()) {
-                LOG.info("Turned off {}, or was already off", state);
+                LOG.info("Turned off {}, or was already off", state.getFormattedName());
                 scheduleNextDay(state);
                 return;
             }
             if (!success || lightState.isUnreachableOrOff()) {
                 Integer delay = retryDelay.get();
-                LOG.trace("'{}' not reachable or off, retrying in {}", state.getName(), Duration.ofMillis(delay));
+                LOG.trace("{} not reachable or off, retrying in {}", state.getFormattedName(), Duration.ofMillis(delay));
                 retry(state, delay);
                 return;
             }
@@ -356,14 +356,14 @@ public final class HueScheduler implements Runnable {
                 if (state.getConfirmCounter() == 1) {
                     LOG.info("Set {}", state);
                 } else if (state.getConfirmCounter() % 5 == 0) {
-                    LOG.debug("Confirmed ({}) {}", state.getConfirmDebugString(), state);
+                    LOG.debug("Confirmed {} ({})", state.getFormattedName(), state.getConfirmDebugString());
                 }
                 schedule(state, getMs(confirmDelayInSeconds));
                 if (shouldAdjustMultiColorLoopOffset(state)) {
                     scheduleMultiColorLoopOffsetAdjustments(state.getGroupLights(), 1);
                 }
             } else {
-                LOG.debug("Fully confirmed {}", state);
+                LOG.debug("Fully confirmed {}", state.getFormattedName());
                 scheduleNextDay(state);
             }
         }, currentTime.get().plus(delayInMs, ChronoUnit.MILLIS), state.getEnd());

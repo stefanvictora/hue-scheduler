@@ -358,7 +358,7 @@ final class ScheduledState {
 
     @Override
     public String toString() {
-        return  getFormattedName() + "{" +
+        return  getFormattedName() + " {" +
                 "id=" + getUpdateId() +
                 (temporary ? ", temporary" : "") +
                 ", start=" + getFormattedStart() +
@@ -377,11 +377,11 @@ final class ScheduledState {
                 '}';
     }
 
-    private String getFormattedName() {
+    public String getFormattedName() {
         if (groupState) {
-            return "Group '" + name + "' ";
+            return "Group '" + name + "'";
         }
-        return "Light '" + name + "' ";
+        return "Light '" + name + "'";
     }
 
     private String getFormattedStart() {
