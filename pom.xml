@@ -74,35 +74,6 @@
         <pluginManagement>
             <plugins>
                 <plugin>
-                    <groupId>org.codehaus.mojo</groupId>
-                    <artifactId>appassembler-maven-plugin</artifactId>
-                    <version>2.1.0</version>
-                    <configuration>
-                        <assembleDirectory>${project.build.directory}/${project.artifactId}</assembleDirectory>
-                        <platforms>
-                            <platform>windows</platform>
-                            <platform>unix</platform>
-                        </platforms>
-                        <repositoryName>lib</repositoryName>
-                        <repositoryLayout>flat</repositoryLayout>
-                        <programs>
-                            <program>
-                                <mainClass>${mainClass}</mainClass>
-                                <id>hue-scheduler</id>
-                            </program>
-                        </programs>
-                    </configuration>
-                    <executions>
-                        <execution>
-                            <id>assembly</id>
-                            <phase>package</phase>
-                            <goals>
-                                <goal>assemble</goal>
-                            </goals>
-                        </execution>
-                    </executions>
-                </plugin>
-                <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-assembly-plugin</artifactId>
                     <version>3.3.0</version>
