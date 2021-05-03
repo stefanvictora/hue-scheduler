@@ -43,32 +43,33 @@ public final class HueScheduler implements Runnable {
     double latitude;
     @Option(names = "--long", required = true, description = "The longitude of your location.")
     double longitude;
-    @Option(names = "--elevation", description = "The optional elevation (in meters) of your location, " +
-            "used to provide more accurate sunrise and sunset times.", defaultValue = "0.0")
+    @Option(names = "--elevation", defaultValue = "0.0", description = "The optional elevation (in meters) of your location, " +
+            "used to provide more accurate sunrise and sunset times.")
     double elevation;
-    @Option(names = "--retry-delay", paramLabel = "<delay>",
+    @Option(names = "--retry-delay", paramLabel = "<delay>", defaultValue = "5",
             description = "The maximum number of seconds to wait before trying again to control a light that was unreachable." +
-                    " Default: ${DEFAULT-VALUE} seconds.", defaultValue = "5")
+                    " Default: ${DEFAULT-VALUE} seconds.")
     int maxRetryDelayInSeconds;
-    @Option(names = "--max-requests-per-second", description = "The maximum number of PUT API requests to perform per second." +
-            " Default and recommended: ${DEFAULT-VALUE} requests per second", defaultValue = "10.0")
+    @Option(names = "--max-requests-per-second", paramLabel = "<requests>", defaultValue = "10.0",
+            description = "The maximum number of PUT API requests to perform per second. Default and recommended: " +
+                    "${DEFAULT-VALUE} requests per second.")
     double requestsPerSecond;
     @Option(names = "--confirm-all", defaultValue = "true",
-            description = "If all states should be confirmed by default. Default: ${DEFAULT-VALUE}")
+            description = "If all states should be confirmed by default. Default: ${DEFAULT-VALUE}.")
     boolean confirmAll;
     @Option(names = "--confirm-count", paramLabel = "<count>", defaultValue = "20",
             description = "The number of confirmations to send. Default: ${DEFAULT-VALUE} confirmations.")
     int confirmationCount;
     @Option(names = "--confirm-delay", paramLabel = "<delay>", defaultValue = "6",
-            description = "The delay in seconds between each confirmation. Default: ${DEFAULT-VALUE} seconds")
+            description = "The delay in seconds between each confirmation. Default: ${DEFAULT-VALUE} seconds.")
     int confirmDelayInSeconds;
-    @Option(names = "--bridge-failure-retry-delay", hidden = true, defaultValue = "10",
+    @Option(names = "--bridge-failure-retry-delay", paramLabel = "<delay>", defaultValue = "10",
             description = "The delay in seconds for retrying an API call, if the bridge could not be reached due to " +
-                    "network failure, or if it returned an API error code. Default: ${DEFAULT-VALUE} seconds")
+                    "network failure, or if it returned an API error code. Default: ${DEFAULT-VALUE} seconds.")
     int bridgeFailureRetryDelayInSeconds;
     @Option(names = "--multi-color-adjustment-delay", paramLabel = "<delay>", defaultValue = "4",
             description = "The adjustment delay in seconds for each light in a group when using the multi_color effect." +
-                    " Adjust to change the hue values of 'neighboring' lights. Default: ${DEFAULT-VALUE} seconds")
+                    " Adjust to change the hue values of 'neighboring' lights. Default: ${DEFAULT-VALUE} seconds.")
     int multiColorAdjustmentDelay;
     private HueApi hueApi;
     private StateScheduler stateScheduler;
