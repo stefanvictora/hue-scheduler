@@ -56,7 +56,9 @@ public final class HueScheduler implements Runnable {
     double requestsPerSecond;
     @Option(names = "--confirm-delay", hidden = true, defaultValue = "6")
     int confirmDelayInSeconds;
-    @Option(names = "--bridge-failure-delay", hidden = true, defaultValue = "10")
+    @Option(names = "--bridge-failure-retry-delay", hidden = true, defaultValue = "10",
+            description = "The delay in seconds for retrying an API call, if the bridge could not be reached due to " +
+                    "network failure, or if it returned an API error code. Default: ${DEFAULT-VALUE} seconds")
     int bridgeFailureRetryDelayInSeconds;
     @Option(names = "--multi-color-adjustment-delay", paramLabel = "<delay>", defaultValue = "4",
             description = "The adjustment delay in seconds for each light in a group when using the multi_color effect." +
