@@ -43,13 +43,12 @@ public final class HueScheduler implements Runnable {
     double latitude;
     @Option(names = "--long", required = true, description = "The longitude of your location.")
     double longitude;
-    @Option(names = "--elevation", description = "The optional elevation (in meters) of your location, used to provide more accurate sunrise and sunset times.",
-            defaultValue = "0.0")
+    @Option(names = "--elevation", description = "The optional elevation (in meters) of your location, " +
+            "used to provide more accurate sunrise and sunset times.", defaultValue = "0.0")
     double elevation;
     @Option(names = "--retry-delay", paramLabel = "<delay>",
-            description = "The maximum amount of seconds Hue Scheduler should wait before retrying to control a light that was not reachable." +
-                    " Default: ${DEFAULT-VALUE} seconds.",
-            defaultValue = "5")
+            description = "The maximum number of seconds to wait before trying again to control a light that was unreachable." +
+                    " Default: ${DEFAULT-VALUE} seconds.", defaultValue = "5")
     int maxRetryDelayInSeconds;
     @Option(names = "--max-requests-per-second", description = "The maximum number of PUT API requests to perform per second." +
             " Default and recommended: ${DEFAULT-VALUE} requests per second", defaultValue = "10.0")
