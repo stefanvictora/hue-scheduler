@@ -184,7 +184,7 @@ class HueSchedulerTest {
             }
         };
         scheduler = new HueScheduler(hueApi, stateScheduler, startTimeProvider,
-                () -> now, () -> retryDelay * 1000, confirmDelay, connectionFailureRetryDelay, multiColorAdjustmentDelay);
+                () -> now, 10.0, () -> retryDelay * 1000, confirmDelay, connectionFailureRetryDelay, multiColorAdjustmentDelay);
     }
 
     private void addState(int id, ZonedDateTime startTime) {

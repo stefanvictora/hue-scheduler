@@ -51,6 +51,9 @@ public final class HueScheduler implements Runnable {
                     " Default: ${DEFAULT-VALUE} seconds.",
             defaultValue = "5")
     int maxRetryDelayInSeconds;
+    @Option(names = "--max-requests-per-second", description = "The maximum number of PUT API requests to perform per second." +
+            " Default and recommended: ${DEFAULT-VALUE} requests per second", defaultValue = "10.0")
+    double requestsPerSecond;
     @Option(names = "--confirm-delay", hidden = true, defaultValue = "6")
     int confirmDelayInSeconds;
     @Option(names = "--bridge-failure-delay", hidden = true, defaultValue = "10")
@@ -69,13 +72,14 @@ public final class HueScheduler implements Runnable {
     }
 
     public HueScheduler(HueApi hueApi, StateScheduler stateScheduler, StartTimeProvider startTimeProvider,
-                        Supplier<ZonedDateTime> currentTime, Supplier<Integer> retryDelayInMs, int confirmDelayInSeconds,
-                        int bridgeFailureRetryDelayInSeconds, int multiColorAdjustmentDelay) {
+                        Supplier<ZonedDateTime> currentTime, double requestsPerSecond, Supplier<Integer> retryDelayInMs,
+                        int confirmDelayInSeconds, int bridgeFailureRetryDelayInSeconds, int multiColorAdjustmentDelay) {
         this();
         this.hueApi = hueApi;
         this.stateScheduler = stateScheduler;
         this.startTimeProvider = startTimeProvider;
         this.currentTime = currentTime;
+        this.requestsPerSecond = requestsPerSecond;
         this.retryDelay = retryDelayInMs;
         this.confirmDelayInSeconds = confirmDelayInSeconds;
         this.bridgeFailureRetryDelayInSeconds = bridgeFailureRetryDelayInSeconds;
@@ -91,7 +95,7 @@ public final class HueScheduler implements Runnable {
 
     @Override
     public void run() {
-        hueApi = new HueApiImpl(new HttpResourceProviderImpl(), ip, username, RateLimiter.create(10.0));
+        hueApi = new HueApiImpl(new HttpResourceProviderImpl(), ip, username, RateLimiter.create(requestsPerSecond));
         startTimeProvider = createStartTimeProvider(latitude, longitude, elevation);
         stateScheduler = createStateScheduler();
         currentTime = ZonedDateTime::now;
