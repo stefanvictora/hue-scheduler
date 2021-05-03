@@ -69,6 +69,7 @@ public final class InputConfigurationParser {
             Integer transitionTime = null;
             String effect = null;
             EnumSet<DayOfWeek> dayOfWeeks = EnumSet.noneOf(DayOfWeek.class);
+            Boolean confirm = null;
             for (int i = 2; i < parts.length; i++) {
                 String part = parts[i];
                 String[] typeAndValue = part.split(":");
@@ -128,12 +129,16 @@ public final class InputConfigurationParser {
                     case "days":
                         DayOfWeeksParser.parseDayOfWeeks(value, dayOfWeeks);
                         break;
+                    case "confirm":
+                        confirm = parseBoolean(value, parameter);
+                        break;
                     default:
                         throw new UnknownStateProperty("Unknown state property '" + parameter + "' with value '" + value + "'");
                 }
             }
             String start = parts[1];
-            states.add(createState(name, id, start, bri, ct, x, y, hue, sat, effect, on, transitionTimeBefore, transitionTime, dayOfWeeks, capabilities, groupState));
+            states.add(createState(name, id, start, bri, ct, x, y, hue, sat, effect, on, transitionTimeBefore,
+                    transitionTime, dayOfWeeks, confirm, capabilities, groupState));
         }
         return states;
     }
@@ -144,6 +149,10 @@ public final class InputConfigurationParser {
 
     private Double parseDouble(String value, String parameter) {
         return parseValueWithErrorHandling(value, parameter, "double", Double::parseDouble);
+    }
+
+    private Boolean parseBoolean(String value, String parameter) {
+        return parseValueWithErrorHandling(value, parameter, "boolean", Boolean::parseBoolean);
     }
 
     private <T> T parseValueWithErrorHandling(String value, String parameter, String type, Function<String, T> function) {
@@ -173,7 +182,7 @@ public final class InputConfigurationParser {
 
     private ScheduledState createState(String name, int id, String start, Integer brightness, Integer ct, Double x, Double y,
                                        Integer hue, Integer sat, String effect, Boolean on, Integer transitionTimeBefore, Integer transitionTime,
-                                       EnumSet<DayOfWeek> dayOfWeeks, LightCapabilities capabilities, boolean groupState) {
+                                       EnumSet<DayOfWeek> dayOfWeeks, Boolean confirm, LightCapabilities capabilities, boolean groupState) {
         List<Integer> groupLights;
         if (groupState) {
             groupLights = getGroupLights(id);
@@ -181,7 +190,7 @@ public final class InputConfigurationParser {
             groupLights = null;
         }
         return new ScheduledState(name, id, start, brightness, ct, x, y, hue, sat, effect, on, transitionTimeBefore,
-                transitionTime, dayOfWeeks, startTimeProvider, groupState, groupLights, capabilities);
+                transitionTime, dayOfWeeks, confirm, startTimeProvider, groupState, groupLights, capabilities);
     }
 
     private List<Integer> getGroupLights(int groupId) {

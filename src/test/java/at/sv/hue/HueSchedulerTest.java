@@ -46,6 +46,8 @@ class HueSchedulerTest {
     private Supplier<RuntimeException> apiPutThrowable;
     private Supplier<RuntimeException> apiGetThrowable;
     private int retryDelay;
+    private boolean confirmAll;
+    private int confirmCount;
     private int confirmDelay;
     private String nowTimeString;
     private double defaultX;
@@ -184,7 +186,8 @@ class HueSchedulerTest {
             }
         };
         scheduler = new HueScheduler(hueApi, stateScheduler, startTimeProvider,
-                () -> now, 10.0, () -> retryDelay * 1000, confirmDelay, connectionFailureRetryDelay, multiColorAdjustmentDelay);
+                () -> now, 10.0, () -> retryDelay * 1000, confirmAll, confirmCount, confirmDelay,
+                connectionFailureRetryDelay, multiColorAdjustmentDelay);
     }
 
     private void addState(int id, ZonedDateTime startTime) {
@@ -286,9 +289,9 @@ class HueSchedulerTest {
     }
 
     private void runAndAssertConfirmations(Consumer<ScheduledRunnable> repeatedState) {
-        for (int i = 0; i < ScheduledState.CONFIRM_AMOUNT; i++) {
+        for (int i = 0; i < confirmCount; i++) {
             ScheduledRunnable confirmRunnable = ensureConfirmRunnable();
-            LOG.info("Confirming state {} [{}/{}]", id, i + 1, ScheduledState.CONFIRM_AMOUNT);
+            LOG.info("Confirming state {} [{}/{}]", id, i + 1, confirmCount);
             repeatedState.accept(confirmRunnable);
         }
     }
@@ -479,6 +482,11 @@ class HueSchedulerTest {
         return ensureScheduledStates(1).get(0);
     }
 
+    private void disableConfirms() {
+        confirmAll = false;
+        create();
+    }
+
     @BeforeEach
     void setUp() {
         apiPutReturnValue = true;
@@ -498,6 +506,8 @@ class HueSchedulerTest {
         knownGroupIds = new HashSet<>();
         knownLightIds = new HashSet<>();
         retryDelay = 1;
+        confirmAll = true;
+        confirmCount = 20;
         confirmDelay = 2;
         connectionFailureRetryDelay = 5;
         defaultCt = 500;
@@ -1199,6 +1209,35 @@ class HueSchedulerTest {
     }
 
     @Test
+    void parse_multiColorLoopEffect_group_withMultipleLights_confirmDisabled_stillAdjustment() {
+        addKnownGroupIds(1);
+        addGroupLightsForId(1, 1, 2);
+        addStateNow("g1", "effect:multi_colorloop", "confirm:false");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        addLightStateResponse(1, true, true, null);
+        addLightStateResponse(2, true, true, "colorloop");
+        setCurrentTimeTo(scheduledRunnable);
+        runAndAssertPutCall(scheduledRunnable, null, null, null, null, null, null, "colorloop",
+                null, null, true);
+
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(2);
+        assertScheduleStart(scheduledRunnables.get(0), now.plusSeconds(multiColorAdjustmentDelay)); // first adjustment
+        assertScheduleStart(scheduledRunnables.get(1), now.plusDays(1)); // next day
+
+        setCurrentTimeToAndRun(scheduledRunnables.get(0)); // turns off light 2
+
+        assertPutState(2, null, null, null, null, null, null, null, false, null, false);
+        List<ScheduledRunnable> round2 = ensureScheduledStates(1);
+        assertScheduleStart(round2.get(0), now.plus(300, ChronoUnit.MILLIS)); // turn on again
+
+        setCurrentTimeToAndRun(round2.get(0)); // turns on light 2
+
+        assertPutState(2, null, null, null, null, null, null, "colorloop", true, null, false);
+    }
+
+    @Test
     void parse_multiColorLoopEffect_justOneLightInGroup_skipsAdjustment() {
         addKnownGroupIds(1);
         addGroupLightsForId(1, 1);
@@ -1552,6 +1591,42 @@ class HueSchedulerTest {
         runAndAssertConfirmations();
 
         ensureRunnable(initialNow.plusDays(2));
+    }
+
+    @Test
+    void run_execution_confirmAllDisabled_noConfirmation() {
+        disableConfirms();
+        ScheduledRunnable scheduledRunnable = startWithDefaultState();
+
+        advanceTimeAndRunAndAssertApiCalls(scheduledRunnable, true);
+
+        ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
+    void run_execution_confirmAllDisabled_withExplicitConfirmForState_runsConfirmations() {
+        disableConfirms();
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now, "ct:" + defaultCt, "bri:" + defaultBrightness, "confirm:true");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        advanceTimeAndRunAndAssertApiCalls(scheduledRunnable, true);
+        runAndAssertConfirmations();
+
+        ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
+    void run_execution_confirmAllEnabled_butDisabledForState_noConfirmation() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now, "ct:" + defaultCt, "bri:" + defaultBrightness, "confirm:false");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        advanceTimeAndRunAndAssertApiCalls(scheduledRunnable, true);
+
+        ensureRunnable(initialNow.plusDays(1));
     }
 
     @Test

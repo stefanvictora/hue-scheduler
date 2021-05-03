@@ -53,7 +53,14 @@ public final class HueScheduler implements Runnable {
     @Option(names = "--max-requests-per-second", description = "The maximum number of PUT API requests to perform per second." +
             " Default and recommended: ${DEFAULT-VALUE} requests per second", defaultValue = "10.0")
     double requestsPerSecond;
-    @Option(names = "--confirm-delay", hidden = true, defaultValue = "6")
+    @Option(names = "--confirm-all", defaultValue = "true",
+            description = "If all states should be confirmed by default. Default: ${DEFAULT-VALUE}")
+    boolean confirmAll;
+    @Option(names = "--confirm-count", paramLabel = "<count>", defaultValue = "20",
+            description = "The number of confirmations to send. Default: ${DEFAULT-VALUE} confirmations.")
+    int confirmationCount;
+    @Option(names = "--confirm-delay", paramLabel = "<delay>", defaultValue = "6",
+            description = "The delay in seconds between each confirmation. Default: ${DEFAULT-VALUE} seconds")
     int confirmDelayInSeconds;
     @Option(names = "--bridge-failure-retry-delay", hidden = true, defaultValue = "10",
             description = "The delay in seconds for retrying an API call, if the bridge could not be reached due to " +
@@ -75,7 +82,8 @@ public final class HueScheduler implements Runnable {
 
     public HueScheduler(HueApi hueApi, StateScheduler stateScheduler, StartTimeProvider startTimeProvider,
                         Supplier<ZonedDateTime> currentTime, double requestsPerSecond, Supplier<Integer> retryDelayInMs,
-                        int confirmDelayInSeconds, int bridgeFailureRetryDelayInSeconds, int multiColorAdjustmentDelay) {
+                        boolean confirmAll, int confirmationCount, int confirmDelayInSeconds, int bridgeFailureRetryDelayInSeconds,
+                        int multiColorAdjustmentDelay) {
         this();
         this.hueApi = hueApi;
         this.stateScheduler = stateScheduler;
@@ -83,6 +91,8 @@ public final class HueScheduler implements Runnable {
         this.currentTime = currentTime;
         this.requestsPerSecond = requestsPerSecond;
         this.retryDelay = retryDelayInMs;
+        this.confirmAll = confirmAll;
+        this.confirmationCount = confirmationCount;
         this.confirmDelayInSeconds = confirmDelayInSeconds;
         this.bridgeFailureRetryDelayInSeconds = bridgeFailureRetryDelayInSeconds;
         this.multiColorAdjustmentDelay = multiColorAdjustmentDelay;
@@ -353,22 +363,33 @@ public final class HueScheduler implements Runnable {
                 retry(state, delay);
                 return;
             }
-            if (!state.isFullyConfirmed()) {
-                state.addConfirmation();
-                if (state.getConfirmCounter() == 1) {
-                    LOG.info("Set {}", state);
-                } else if (state.getConfirmCounter() % 5 == 0) {
-                    LOG.debug("Confirmed {} ({})", state.getFormattedName(), state.getConfirmDebugString());
-                }
-                schedule(state, getMs(confirmDelayInSeconds));
+            if (state.getConfirmCounter() == 0) {
+                LOG.info("Set {}", state);
                 if (shouldAdjustMultiColorLoopOffset(state)) {
                     scheduleMultiColorLoopOffsetAdjustments(state.getGroupLights(), 1);
                 }
+            }
+            if (shouldAndIsNotFullyConfirmed(state)) {
+                state.addConfirmation();
+                if (state.getConfirmCounter() % 5 == 0) {
+                    LOG.debug("Confirmed {} ({})", state.getFormattedName(), state.getConfirmDebugString(confirmationCount));
+                }
+                schedule(state, getMs(confirmDelayInSeconds));
             } else {
-                LOG.debug("Fully confirmed {}", state.getFormattedName());
+                if (isFullyConfirmed(state)) {
+                    LOG.debug("Fully confirmed {}", state.getFormattedName());
+                }
                 scheduleNextDay(state);
             }
         }, currentTime.get().plus(delayInMs, ChronoUnit.MILLIS), state.getEnd());
+    }
+
+    private boolean shouldAndIsNotFullyConfirmed(ScheduledState state) {
+        return state.shouldConfirm(confirmAll) && !isFullyConfirmed(state);
+    }
+
+    private boolean isFullyConfirmed(ScheduledState state) {
+        return state.isFullyConfirmed(confirmationCount);
     }
 
     private long getMs(long seconds) {
@@ -387,7 +408,7 @@ public final class HueScheduler implements Runnable {
     }
 
     private boolean shouldAdjustMultiColorLoopOffset(ScheduledState state) {
-        return state.getConfirmCounter() == 1 && state.isMultiColorLoop() && state.getGroupLights().size() > 1;
+        return state.isMultiColorLoop() && state.getGroupLights().size() > 1;
     }
 
     private void scheduleMultiColorLoopOffsetAdjustments(List<Integer> groupLights, int i) {
