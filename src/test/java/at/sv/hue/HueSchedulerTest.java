@@ -239,10 +239,11 @@ class HueSchedulerTest {
         return scheduledRunnables;
     }
 
-    private void assertPutState(int id, Integer bri, Double x, Double y, Integer ct, Integer putHue, Integer putSat,
+    private void assertPutState(int id, Integer bri, Integer ct, Double x, Double y, Integer putHue, Integer putSat,
                                 String putEffect, Boolean on, Integer transitionTime, boolean groupState) {
         assertTrue(putStates.size() > 0, "No PUT API calls happened");
         PutState putState = putStates.remove(0);
+        assertThat("ID differs", putState.id, is(id));
         assertThat("Brightness differs", putState.bri, is(bri));
         assertThat("CT differs", putState.ct, is(ct));
         assertThat("X differs", putState.x, is(x));
@@ -341,7 +342,7 @@ class HueSchedulerTest {
                                      Integer putHue, Integer putSat, String putEffect, Boolean putOn, Integer putTransitionTime, boolean groupState) {
         state.run();
 
-        assertPutState(id, putBrightness, putX, putY, putCt, putHue, putSat, putEffect, putOn, putTransitionTime, groupState);
+        assertPutState(id, putBrightness, putCt, putX, putY, putHue, putSat, putEffect, putOn, putTransitionTime, groupState);
     }
 
     private void advanceTimeAndRunAndAssertTurnOffApiCall(boolean reachable, ScheduledRunnable state, boolean onState) {
