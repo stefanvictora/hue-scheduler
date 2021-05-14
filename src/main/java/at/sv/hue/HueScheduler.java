@@ -214,27 +214,8 @@ public final class HueScheduler implements Runnable {
         }
     }
 
-    private List<ScheduledState> getStatesOnDay(List<ScheduledState> states, Set<ScheduledState> alreadyProcessedStates,
-                                                ZonedDateTime now, DayOfWeek... days) {
-        return states.stream()
-                     .filter(state -> state.isScheduledOn(days))
-                     .filter(state -> !alreadyProcessedStates.contains(state))
-                     .sorted(Comparator.comparing(scheduledState -> scheduledState.getStart(now)))
-                     .collect(Collectors.toList());
-    }
-
     private void calculateAndSetEndTime(ScheduledState state, List<ScheduledState> states, ZonedDateTime start) {
-        List<ScheduledState> statesOnDay = getStatesOnDay(states, start);
-        int index = statesOnDay.indexOf(state);
-        if (isLastState(statesOnDay, index)) {
-            if (isAlsoScheduledTheDayAfter(state, start)) {
-                setEndToStartOfFirstStateTheDayAfter(state, states, start);
-            } else {
-                setEndToEndOfDay(state, start);
-            }
-        } else {
-            setEndToStartOfFollowingState(state, statesOnDay.get(index + 1), start);
-        }
+        new EndTimeAdjuster(state, start, (day) -> getStatesOnDay(states, day)).calculateAndSetEndTime();
     }
 
     private List<ScheduledState> getStatesOnDay(List<ScheduledState> states, ZonedDateTime now) {
@@ -245,25 +226,13 @@ public final class HueScheduler implements Runnable {
         return getStatesOnDay(states, Collections.emptySet(), now, days);
     }
 
-    private boolean isLastState(List<ScheduledState> states, int index) {
-        return index + 1 >= states.size();
-    }
-
-    private boolean isAlsoScheduledTheDayAfter(ScheduledState state, ZonedDateTime start) {
-        return state.isScheduledOn(start.plusDays(1));
-    }
-
-    private void setEndToStartOfFirstStateTheDayAfter(ScheduledState state, List<ScheduledState> states, ZonedDateTime start) {
-        List<ScheduledState> statesTheDayAfter = getStatesOnDay(states, start.plusDays(1));
-        state.setEnd(statesTheDayAfter.get(0).getStart(start.plusDays(1)).minusSeconds(1));
-    }
-
-    private void setEndToEndOfDay(ScheduledState state, ZonedDateTime day) {
-        state.setEnd(day.with(LocalTime.MIDNIGHT.minusSeconds(1)));
-    }
-
-    private void setEndToStartOfFollowingState(ScheduledState state, ScheduledState followingState, ZonedDateTime day) {
-        state.setEnd(followingState.getStart(day).minusSeconds(1));
+    private List<ScheduledState> getStatesOnDay(List<ScheduledState> states, Set<ScheduledState> alreadyProcessedStates,
+                                                ZonedDateTime now, DayOfWeek... days) {
+        return states.stream()
+                     .filter(state -> state.isScheduledOn(days))
+                     .filter(state -> !alreadyProcessedStates.contains(state))
+                     .sorted(Comparator.comparing(scheduledState -> scheduledState.getStart(now)))
+                     .collect(Collectors.toList());
     }
 
     private void scheduleStates(ZonedDateTime now, List<ScheduledState> states) {
