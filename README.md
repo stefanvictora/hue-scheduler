@@ -335,7 +335,7 @@ To still benefit from the ease of use of groups, while improving overall system 
 
 **Default and recommended**: `10` requests per second
 
-### --control-group-lights-individually
+#### --control-group-lights-individually
 
 *Experimental*
 
