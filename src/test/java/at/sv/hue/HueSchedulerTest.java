@@ -55,6 +55,7 @@ class HueSchedulerTest {
     private int connectionFailureRetryDelay;
     private int multiColorAdjustmentDelay;
     private StartTimeProviderImpl startTimeProvider;
+    private boolean controlGroupLightsIndividually;
 
     private void setCurrentTimeToAndRun(ScheduledRunnable scheduledRunnable) {
         setCurrentTimeTo(scheduledRunnable);
@@ -186,7 +187,7 @@ class HueSchedulerTest {
             }
         };
         scheduler = new HueScheduler(hueApi, stateScheduler, startTimeProvider,
-                () -> now, 10.0, () -> retryDelay * 1000, confirmAll, confirmCount, confirmDelay,
+                () -> now, 10.0, controlGroupLightsIndividually, () -> retryDelay * 1000, confirmAll, confirmCount, confirmDelay,
                 connectionFailureRetryDelay, multiColorAdjustmentDelay);
     }
 
@@ -519,6 +520,7 @@ class HueSchedulerTest {
         multiColorAdjustmentDelay = 4;
         defaultX = 0.2318731647393379;
         defaultY = 0.4675382426015799;
+        controlGroupLightsIndividually = false;
         create();
     }
 
@@ -1639,6 +1641,24 @@ class HueSchedulerTest {
         runAndAssertConfirmations(true);
 
         ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
+    void run_execution_groupState_controlIndividuallyFlagSet_multipleSinglePutCalls() {
+        confirmAll = false;
+        controlGroupLightsIndividually = true;
+        create();
+        addGroupState(10, now, 1, 2, 3);
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        addLightStateResponse(1, true, true, null);
+        scheduledRunnable.run();
+        assertPutState(1, defaultBrightness, defaultCt, null, null, null, null, null, null, null, false);
+        assertPutState(2, defaultBrightness, defaultCt, null, null, null, null, null, null, null, false);
+        assertPutState(3, defaultBrightness, defaultCt, null, null, null, null, null, null, null, false);
+
+        ensureRunnable(now.plusDays(1));
     }
 
     @Test

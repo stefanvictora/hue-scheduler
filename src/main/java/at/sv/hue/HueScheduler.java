@@ -54,6 +54,10 @@ public final class HueScheduler implements Runnable {
             description = "The maximum number of PUT API requests to perform per second. Default and recommended: " +
                     "${DEFAULT-VALUE} requests per second.")
     double requestsPerSecond;
+    @Option(names = "--control-group-lights-individually", defaultValue = "false",
+            description = "Experimental: If the lights in a group should be controlled individually instead of using broadcast messages." +
+                    " This might improve performance. Default: ${DEFAULT-VALUE}")
+    boolean controlGroupLightsIndividually;
     @Option(names = "--confirm-all", defaultValue = "true",
             description = "If all states should be confirmed by default. Default: ${DEFAULT-VALUE}.")
     boolean confirmAll;
@@ -82,15 +86,16 @@ public final class HueScheduler implements Runnable {
     }
 
     public HueScheduler(HueApi hueApi, StateScheduler stateScheduler, StartTimeProvider startTimeProvider,
-                        Supplier<ZonedDateTime> currentTime, double requestsPerSecond, Supplier<Integer> retryDelayInMs,
-                        boolean confirmAll, int confirmationCount, int confirmDelayInSeconds, int bridgeFailureRetryDelayInSeconds,
-                        int multiColorAdjustmentDelay) {
+                        Supplier<ZonedDateTime> currentTime, double requestsPerSecond, boolean controlGroupLightsIndividually,
+                        Supplier<Integer> retryDelayInMs, boolean confirmAll, int confirmationCount, int confirmDelayInSeconds,
+                        int bridgeFailureRetryDelayInSeconds, int multiColorAdjustmentDelay) {
         this();
         this.hueApi = hueApi;
         this.stateScheduler = stateScheduler;
         this.startTimeProvider = startTimeProvider;
         this.currentTime = currentTime;
         this.requestsPerSecond = requestsPerSecond;
+        this.controlGroupLightsIndividually = controlGroupLightsIndividually;
         this.retryDelay = retryDelayInMs;
         this.confirmAll = confirmAll;
         this.confirmationCount = confirmationCount;
@@ -356,9 +361,26 @@ public final class HueScheduler implements Runnable {
     }
 
     private boolean putState(ScheduledState state) {
-        return hueApi.putState(state.getUpdateId(), state.getBrightness(), state.getCt(), state.getX(), state.getY(),
+        if (state.isGroupState() && controlGroupLightsIndividually) {
+            for (Integer id : state.getGroupLights()) {
+                try {
+                    if (!putState(id, state, false)) {
+                        LOG.trace("Group light with id {} is off, could not update state", id);
+                    }
+                } catch (HueApiFailure e) {
+                    LOG.trace("Unsupported api call for light id {}: {}", id, e.getLocalizedMessage());
+                }
+            }
+            return true;
+        } else {
+            return putState(state.getUpdateId(), state, state.isGroupState());
+        }
+    }
+
+    private boolean putState(int updateId, ScheduledState state, boolean groupState) {
+        return hueApi.putState(updateId, state.getBrightness(), state.getCt(), state.getX(), state.getY(),
                 state.getHue(), state.getSat(), state.getEffect(), state.getOn(), state.getTransitionTime(currentTime.get()),
-                state.isGroupState());
+                groupState);
     }
 
     private void retry(ScheduledState state, long delayInMs) {
