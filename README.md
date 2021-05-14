@@ -411,9 +411,9 @@ No, Hue Scheduler does not access the Internet. It only communicates with your l
 
 The dynamic sun times are also calculated locally using the [shred/commons-suncalc](https://github.com/shred/commons-suncalc) library, with no data ever leaving your device.
 
-### How Can I Lookup The IDs Of My Lights?
+### How Can I Lookup the IDs of My Lights?
 
-If you don't want to use light or group names in your configuration file, you can lookup their respective IDs by sending a GET request to either the `/api/<username>/lights` or `/api/<username>/groups` endpoint of your Philips Hue Bridge. Either by navigating to `http://<BRIDGE_IP_ADDRESS>/debug/clip.html` in your browser, which conveniently formats the returned JSON automatically, or by simply accessing the URL directly, i.e. `http://<BRIDGE_IP_ADDRESS>/api/<username>/lights`.
+If you don't want to use light or group names in your configuration file, you can lookup their respective IDs by sending a GET request to either the `/api/<username>/lights` or `/api/<username>/groups` endpoint of your Philips Hue Bridge.
 
 ### Why Does Hue Scheduler Confirm Requests?
 
