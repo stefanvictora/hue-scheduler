@@ -1,3 +1,5 @@
+<img align="right" width="160" height="160" src="https://raw.githubusercontent.com/stefanvictora/hue-scheduler/main/logo.png">
+
 # Hue Scheduler
 
 [![build](https://github.com/stefanvictora/hue-scheduler/actions/workflows/maven.yml/badge.svg)](https://github.com/stefanvictora/hue-scheduler)
