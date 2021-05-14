@@ -117,6 +117,25 @@ public final class HueScheduler implements Runnable {
         assertConnectionAndStart();
     }
 
+    private StartTimeProviderImpl createStartTimeProvider(double latitude, double longitude, double elevation) {
+        return new StartTimeProviderImpl(new SunTimesProviderImpl(latitude, longitude, elevation));
+    }
+
+    private StateSchedulerImpl createStateScheduler() {
+        return new StateSchedulerImpl(Executors.newScheduledThreadPool(Runtime.getRuntime().availableProcessors()), ZonedDateTime::now);
+    }
+
+    private int getRandomRetryDelayMs() {
+        return ThreadLocalRandom.current().nextInt(1000, maxRetryDelayInSeconds * 1000 + 1);
+    }
+
+    private void assertInputIsReadable() {
+        if (!Files.isReadable(inputFile)) {
+            System.err.println("Given input file '" + inputFile.toAbsolutePath() + "' does not exist or is not readable!");
+            System.exit(1);
+        }
+    }
+
     private void assertConnectionAndStart() {
         if (!assertConnection()) {
             stateScheduler.schedule(this::assertConnectionAndStart, currentTime.get().plusSeconds(5), null);
@@ -141,21 +160,6 @@ public final class HueScheduler implements Runnable {
         return true;
     }
 
-    private StartTimeProviderImpl createStartTimeProvider(double latitude, double longitude, double elevation) {
-        return new StartTimeProviderImpl(new SunTimesProviderImpl(latitude, longitude, elevation));
-    }
-
-    private StateSchedulerImpl createStateScheduler() {
-        return new StateSchedulerImpl(Executors.newScheduledThreadPool(Runtime.getRuntime().availableProcessors()), ZonedDateTime::now);
-    }
-
-    private void assertInputIsReadable() {
-        if (!Files.isReadable(inputFile)) {
-            System.err.println("Given input file '" + inputFile.toAbsolutePath() + "' does not exist or is not readable!");
-            System.exit(1);
-        }
-    }
-
     private void parseInput() {
         try {
             Files.lines(inputFile)
@@ -172,10 +176,6 @@ public final class HueScheduler implements Runnable {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
-    }
-
-    private int getRandomRetryDelayMs() {
-        return ThreadLocalRandom.current().nextInt(1000, maxRetryDelayInSeconds * 1000 + 1);
     }
 
     public void addState(String input) {
@@ -297,7 +297,7 @@ public final class HueScheduler implements Runnable {
 
     private void schedule(ScheduledState state, long delayInMs) {
         if (state.isNullState()) return;
-        if (delayInMs == 0 || delayInMs > Math.max(5000, getMs(confirmDelayInSeconds)) && delayInMs != getMs(bridgeFailureRetryDelayInSeconds)) {
+        if (shouldLogScheduleDebugMessage(delayInMs)) {
             LOG.debug("Schedule {} in {}", state, Duration.ofMillis(delayInMs));
         }
         stateScheduler.schedule(() -> {
@@ -352,6 +352,39 @@ public final class HueScheduler implements Runnable {
                 scheduleNextDay(state);
             }
         }, currentTime.get().plus(delayInMs, ChronoUnit.MILLIS), state.getEnd());
+    }
+
+    private boolean shouldLogScheduleDebugMessage(long delayInMs) {
+        return delayInMs == 0 || delayInMs > Math.max(5000, getMs(confirmDelayInSeconds)) && delayInMs != getMs(bridgeFailureRetryDelayInSeconds);
+    }
+
+    private void scheduleNextDay(ScheduledState state) {
+        scheduleNextDay(state, currentTime.get());
+    }
+
+    private void scheduleNextDay(ScheduledState state, ZonedDateTime now) {
+        if (state.isTemporary()) return;
+        state.resetConfirmations();
+        recalculateNextEnd(state, now);
+        long delay = state.secondsUntilNextDayFromStart(now);
+        state.updateLastStart(now);
+        schedule(state, getMs(delay));
+    }
+
+    private void recalculateNextEnd(ScheduledState state, ZonedDateTime now) {
+        calculateAndSetEndTime(state, getLightStatesForId(state), state.getNextStart(now));
+    }
+
+    private List<ScheduledState> getLightStatesForId(ScheduledState state) {
+        return lightStates.get(getLightId(state));
+    }
+
+    private int getLightId(ScheduledState state) {
+        if (state.isGroupState()) {
+            return getGroupId(state.getUpdateId());
+        } else {
+            return state.getUpdateId();
+        }
     }
 
     private boolean shouldAndIsNotFullyConfirmed(ScheduledState state) {
@@ -416,35 +449,6 @@ public final class HueScheduler implements Runnable {
 
     private void addRemainingStatesTheNextDay(List<ScheduledState> remainingStates, ZonedDateTime now) {
         remainingStates.forEach(state -> scheduleNextDay(state, now));
-    }
-
-    private void scheduleNextDay(ScheduledState state) {
-        scheduleNextDay(state, currentTime.get());
-    }
-
-    private void scheduleNextDay(ScheduledState state, ZonedDateTime now) {
-        if (state.isTemporary()) return;
-        state.resetConfirmations();
-        recalculateNextEnd(state, now);
-        long delay = state.secondsUntilNextDayFromStart(now);
-        state.updateLastStart(now);
-        schedule(state, getMs(delay));
-    }
-
-    private void recalculateNextEnd(ScheduledState state, ZonedDateTime now) {
-        calculateAndSetEndTime(state, getLightStatesForId(state), state.getNextStart(now));
-    }
-
-    private List<ScheduledState> getLightStatesForId(ScheduledState state) {
-        return lightStates.get(getLightId(state));
-    }
-
-    private int getLightId(ScheduledState state) {
-        if (state.isGroupState()) {
-            return getGroupId(state.getUpdateId());
-        } else {
-            return state.getUpdateId();
-        }
     }
 
     private void scheduleSunDataInfoLog() {
