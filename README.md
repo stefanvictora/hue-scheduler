@@ -1,6 +1,6 @@
 # Hue Scheduler
 
-![build](https://github.com/stefanvictora/hue-scheduler/actions/workflows/maven.yml/badge.svg)
+[![build](https://github.com/stefanvictora/hue-scheduler/actions/workflows/maven.yml/badge.svg)](https://github.com/stefanvictora/hue-scheduler)
 
 > Hue Scheduler lets you improve your alertness during the day and unwind in the evening by automatically adjusting your Philips Hue lights according to the time of day, the position of the sun, and the day of week.
 
