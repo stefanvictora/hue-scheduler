@@ -423,8 +423,8 @@ public final class HueScheduler implements Runnable {
         LightState lightState = hueApi.getLightState(light);
         boolean delayNext = false;
         if (lightState.isOn() && lightState.isColorLoopEffect()) {
-            putOnState(light, false, null);
-            stateScheduler.schedule(() -> putOnState(light, true, "colorloop"), currentTime.get().plus(300, ChronoUnit.MILLIS), null);
+            turnOff(light);
+            scheduleOn(light);
             delayNext = true;
         }
         if (i + 1 >= groupLights.size()) return;
@@ -433,6 +433,14 @@ public final class HueScheduler implements Runnable {
         } else {
             offsetMultiColorLoopForLight(groupLights, i + 1);
         }
+    }
+
+    private void turnOff(Integer light) {
+        putOnState(light, false, null);
+    }
+
+    private void scheduleOn(Integer light) {
+        stateScheduler.schedule(() -> putOnState(light, true, "colorloop"), currentTime.get().plus(300, ChronoUnit.MILLIS), null);
     }
 
     private void putOnState(int light, boolean on, String effect) {
