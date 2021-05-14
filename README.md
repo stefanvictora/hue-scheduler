@@ -131,7 +131,7 @@ Each line contains the following parts, separated either by a tab character or a
   Hallway  10:00
   ~~~
 
-  In this case only the interval `07:00`--`10:00` is created. If you would turn your lights on after `10:00` or before `7:00`, Hue Scheduler would not enforce any sate for the light.
+  In this case only the interval `07:00`--`10:00` is created. If you turn your lights on after `10:00` or before `7:00`, Hue Scheduler would not enforce any sate for the light.
 
   The following dynamic **sun time constants** are available, sorted in their chronological order:
 
@@ -319,9 +319,9 @@ The maximum number of seconds to wait before trying again to control a light tha
 
 #### --max-requests-per-second
 
-The maximum number of PUT API requests Hue Scheduler is allowed to perform per second. The official Hue API Documentation recommends to keep this at 10 requests per second, or else the bridge might drop some requests.
+The maximum number of PUT API requests Hue Scheduler is allowed to perform per second. The official Hue API Documentation recommends keeping this at 10 requests per second, or else the bridge might drop some requests.
 
-Note: The bridge controls groups by using more computationally expensive broadcast messages, which is why the the official recommendation is to limit group updates to one per second. Hue Scheduler automatically rate limits lights and groups updates accordingly.
+Note: The bridge controls groups by using more computationally expensive broadcast messages, which is why the official recommendation is to limit group updates to one per second. Hue Scheduler automatically rate limits lights and groups updates accordingly.
 
 > As a general guideline we always recommend to our developers to stay at roughly 10 commands per second to the /lights resource with a 100ms gap between each API call. For /groups commands you should keep to a maximum of 1 per second.
 >
@@ -389,7 +389,7 @@ java -Dlog.level=TRACE -jar hue-scheduler.jar ...
 
 ## Developing
 
-To build Hue Scheduler from source, simply run:
+To build Hue Scheduler from its source, simply run:
 
 ~~~shell
 git clone https://github.com/stefanvictora/hue-scheduler.git
@@ -415,7 +415,7 @@ If you don't want to use light or group names in your configuration file, you ca
 
 In short, to fully support dumb wall switches that physically turn off your lights. In such cases the bridge might take up to two minutes to update a lights reachable status. If you would now turn off a light around the time a state change is scheduled, the update will be missed by the light because the bridge will report the light as still reachable, and therefore Hue Scheduler will not retry to set the state.
 
-If you don't use dumb wall switches, or would like to set the confirm behavior manually for each affected lights, you can configure the default behavior via the `--confirm-*` command line arguments and the `confirm` state property.
+If you don't use dumb wall switches, or would like to set the confirmation behavior manually for each affected lights, you can configure the default behavior via the `--confirm-*` command line arguments and the `confirm` state property.
 
 ### Does Hue Scheduler Work With Motion Sensors?
 
