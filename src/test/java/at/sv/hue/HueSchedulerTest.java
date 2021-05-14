@@ -1632,7 +1632,7 @@ class HueSchedulerTest {
 
     @Test
     void run_execution_groupState_correctPutCall() {
-        addGroupState(10, now, 1, 2, 3);
+        addGroupState(1, now, 1, 2, 3);
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
         advanceTimeAndRunAndAssertApiCalls(scheduledRunnable, true, true);
