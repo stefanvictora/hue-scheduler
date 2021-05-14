@@ -387,7 +387,7 @@ public final class HueScheduler implements Runnable {
         boolean delayNext = false;
         if (lightState.isOn() && lightState.isColorLoopEffect()) {
             turnOff(light);
-            scheduleOn(light);
+            scheduleTurnOn(light);
             delayNext = true;
         }
         if (i + 1 >= groupLights.size()) return;
@@ -402,7 +402,7 @@ public final class HueScheduler implements Runnable {
         putOnState(light, false, null);
     }
 
-    private void scheduleOn(Integer light) {
+    private void scheduleTurnOn(Integer light) {
         stateScheduler.schedule(() -> putOnState(light, true, "colorloop"), currentTime.get().plus(300, ChronoUnit.MILLIS), null);
     }
 
