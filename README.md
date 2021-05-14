@@ -1,5 +1,7 @@
 # Hue Scheduler
 
+![build](https://github.com/stefanvictora/hue-scheduler/actions/workflows/maven.yml/badge.svg)
+
 > Hue Scheduler lets you improve your alertness during the day and unwind in the evening by automatically adjusting your Philips Hue lights according to the time of day, the position of the sun, and the day of week.
 
 Compared to other approaches, such as Apple's Adaptive Lighting, Hue Scheduler lets you additionally control the brightness, color, and even the on-state of your lights, with smooth transitions between each state. Furthermore, Hue Scheduler was designed to work well with dumb wall switches that physically turn off your lights, as it will keep trying to set their preferred state until they are reachable again. However, unlike Adaptive Lighting, Hue Scheduler does not continuously update the color temperature of your lights throughout the day, but instead follows your defined schedule, giving you more flexibility and control over your lights' behavior.
@@ -66,7 +68,7 @@ If you get the  error message ``"link button not pressed"``, try to repeat the p
 
 ## Using Hue Scheduler
 
-You can download the latest release of Hue Scheduler from GitHub here.
+You can download the latest release of Hue Scheduler from GitHub [here](https://github.com/stefanvictora/hue-scheduler/releases/latest).
 
 To run Hue Scheduler, the following arguments are required:
 
@@ -245,7 +247,7 @@ The main steps are:
     sudo apt update && sudo apt install default-jdk
 
     # Download the latest Hue Scheduler release to /opt/hue-scheduler
-    wget https://github.com/stefanvictora/hue-scheduler/releases/download/v0.7.0/hue-scheduler.jar -O /opt/hue-scheduler/hue-scheduler.jar
+    wget https://github.com/stefanvictora/hue-scheduler/releases/latest/download/hue-scheduler.jar -O /opt/hue-scheduler/hue-scheduler.jar
     ~~~
 
 1. Copy your Hue Scheduler configuration file to `/etc/hue-scheduler/input.txt`.
@@ -456,5 +458,4 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ```
-
 
