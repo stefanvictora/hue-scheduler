@@ -197,17 +197,17 @@ public final class HueScheduler implements Runnable {
     public void start() {
         ZonedDateTime now = currentTime.get();
         lightStates.forEach((id, states) -> {
-            calculateAndSetNextEndTimes(now, states);
-            scheduleStates(now, states);
+            calculateAndSetEndTimes(states, now);
+            scheduleInitialStartup(states, now);
         });
         scheduleSunDataInfoLog();
     }
 
-    private void calculateAndSetNextEndTimes(ZonedDateTime now, List<ScheduledState> states) {
+    private void calculateAndSetEndTimes(List<ScheduledState> states, ZonedDateTime now) {
         HashSet<ScheduledState> alreadyUpdatedStates = new HashSet<>();
         for (int i = 0; i < 7; i++) {
             ZonedDateTime day = now.plusDays(i);
-            List<ScheduledState> unprocessedStates = getStatesOnDay(states, alreadyUpdatedStates, day, DayOfWeek.from(day));
+            List<ScheduledState> unprocessedStates = getStatesStartingOnDay(states, alreadyUpdatedStates, day, DayOfWeek.from(day));
             if (unprocessedStates.isEmpty()) continue;
             unprocessedStates.forEach(state -> calculateAndSetEndTime(state, states, state.getStart(now)));
             alreadyUpdatedStates.addAll(unprocessedStates);
@@ -215,19 +215,15 @@ public final class HueScheduler implements Runnable {
     }
 
     private void calculateAndSetEndTime(ScheduledState state, List<ScheduledState> states, ZonedDateTime start) {
-        new EndTimeAdjuster(state, start, (day) -> getStatesOnDay(states, day)).calculateAndSetEndTime();
+        new EndTimeAdjuster(state, start, (day, dayOfWeeks) -> getStatesStartingOnDay(states, day, dayOfWeeks)).calculateAndSetEndTime();
     }
 
-    private List<ScheduledState> getStatesOnDay(List<ScheduledState> states, ZonedDateTime now) {
-        return getStatesOnDay(states, now, DayOfWeek.from(now));
+    private List<ScheduledState> getStatesStartingOnDay(List<ScheduledState> states, ZonedDateTime now, DayOfWeek... days) {
+        return getStatesStartingOnDay(states, Collections.emptySet(), now, days);
     }
 
-    private List<ScheduledState> getStatesOnDay(List<ScheduledState> states, ZonedDateTime now, DayOfWeek... days) {
-        return getStatesOnDay(states, Collections.emptySet(), now, days);
-    }
-
-    private List<ScheduledState> getStatesOnDay(List<ScheduledState> states, Set<ScheduledState> alreadyProcessedStates,
-                                                ZonedDateTime now, DayOfWeek... days) {
+    private List<ScheduledState> getStatesStartingOnDay(List<ScheduledState> states, Set<ScheduledState> alreadyProcessedStates,
+                                                        ZonedDateTime now, DayOfWeek... days) {
         return states.stream()
                      .filter(state -> state.isScheduledOn(days))
                      .filter(state -> !alreadyProcessedStates.contains(state))
@@ -235,62 +231,29 @@ public final class HueScheduler implements Runnable {
                      .collect(Collectors.toList());
     }
 
-    private void scheduleStates(ZonedDateTime now, List<ScheduledState> states) {
-        List<ScheduledState> todaysStates = sortByLastFirst(getStatesOnDay(states, now), now);
-        if (!todaysStates.isEmpty()) {
-            if (allInTheFuture(todaysStates, now)) {
-                ZonedDateTime startOfFirst = getRightBeforeStartOfState(todaysStates.get(todaysStates.size() - 1), now);
-                scheduleTemporaryCopyOfPreviousStateImmediately(states, now, startOfFirst);
-            }
-            for (int i = 0; i < todaysStates.size(); i++) {
-                ScheduledState state = todaysStates.get(i);
-                schedule(state, now);
-                if (state.isInThePast(now) && hasMorePastStates(todaysStates, i)) {
-                    addRemainingStatesTheNextDay(getRemaining(todaysStates, i), now);
-                    break;
-                }
-            }
-        }
-        scheduleRemainingFutureStates(states, now);
+    private void scheduleInitialStartup(List<ScheduledState> states, ZonedDateTime now) {
+        scheduleStatesStartingToday(states, now);
+        scheduleStatesNotStartingToday(states, now);
     }
 
-    private List<ScheduledState> sortByLastFirst(List<ScheduledState> states, ZonedDateTime now) {
-        states.sort(Comparator.comparing(scheduledState -> scheduledState.getStart(now), Comparator.reverseOrder()));
-        return states;
+    private void scheduleStatesStartingToday(List<ScheduledState> states, ZonedDateTime now) {
+        new InitialTodayScheduler(now, (day, dayOfWeeks) -> getStatesStartingOnDay(states, day, dayOfWeeks), this::schedule,
+                this::scheduleNextDay).scheduleStatesStartingToday();
     }
 
-    private boolean allInTheFuture(List<ScheduledState> states, ZonedDateTime now) {
-        return !states.get(states.size() - 1).isInThePast(now);
-    }
-
-    private void scheduleTemporaryCopyOfPreviousStateImmediately(List<ScheduledState> states, ZonedDateTime now,
-                                                                 ZonedDateTime startOfFirst) {
-        List<ScheduledState> statesBothTodayAndYesterday = sortByLastFirst(getStatesScheduledBothTodayAndYesterday(states, now), now);
-        if (statesBothTodayAndYesterday.isEmpty()) return;
-        schedule(ScheduledState.createTemporaryCopy(statesBothTodayAndYesterday.get(0), now, startOfFirst), 0);
-    }
-
-    private List<ScheduledState> getStatesScheduledBothTodayAndYesterday(List<ScheduledState> states, ZonedDateTime now) {
-        DayOfWeek today = DayOfWeek.from(now);
-        return getStatesOnDay(states, now, today, today.minus(1));
-    }
-
-    private ZonedDateTime getRightBeforeStartOfState(ScheduledState state, ZonedDateTime dateTime) {
-        return state.getStart(dateTime).minusSeconds(1);
-    }
-
-    private void scheduleRemainingFutureStates(List<ScheduledState> states, ZonedDateTime now) {
+    private void scheduleStatesNotStartingToday(List<ScheduledState> states, ZonedDateTime now) {
         states.stream()
               .filter(state -> doesNotStartToday(state, now))
               .sorted(Comparator.comparing(state -> state.getStart(now)))
-              .forEach(state -> schedule(state, now));
+              .forEach(this::schedule);
     }
 
     private boolean doesNotStartToday(ScheduledState state, ZonedDateTime now) {
         return !DayOfWeek.from(state.getStart(now)).equals(DayOfWeek.from(now));
     }
 
-    private void schedule(ScheduledState state, ZonedDateTime now) {
+    private void schedule(ScheduledState state) {
+        ZonedDateTime now = currentTime.get();
         state.updateLastStart(now);
         schedule(state, getMs(state.getDelayInSeconds(now)));
     }
@@ -445,18 +408,6 @@ public final class HueScheduler implements Runnable {
 
     private void putOnState(int light, boolean on, String effect) {
         hueApi.putState(light, null, null, null, null, null, null, effect, on, null, false);
-    }
-
-    private boolean hasMorePastStates(List<ScheduledState> states, int i) {
-        return states.size() > i + 1;
-    }
-
-    private List<ScheduledState> getRemaining(List<ScheduledState> states, int i) {
-        return states.subList(i + 1, states.size());
-    }
-
-    private void addRemainingStatesTheNextDay(List<ScheduledState> remainingStates, ZonedDateTime now) {
-        remainingStates.forEach(state -> scheduleNextDay(state, now));
     }
 
     private void scheduleSunDataInfoLog() {

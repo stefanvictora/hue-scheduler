@@ -6,14 +6,14 @@ import java.util.List;
 
 public final class EndTimeAdjuster {
 
-    private final StatesOfDayProvider statesOfDayProvider;
+    private final StatesForDayProvider statesForDayProvider;
     private final ScheduledState state;
     private final ZonedDateTime day;
 
-    public EndTimeAdjuster(ScheduledState state, ZonedDateTime day, StatesOfDayProvider statesOnDayProvider) {
+    public EndTimeAdjuster(ScheduledState state, ZonedDateTime day, StatesForDayProvider statesOnDayProvider) {
         this.state = state;
         this.day = day;
-        this.statesOfDayProvider = statesOnDayProvider;
+        this.statesForDayProvider = statesOnDayProvider;
     }
 
     public void calculateAndSetEndTime() {
@@ -35,7 +35,7 @@ public final class EndTimeAdjuster {
     }
 
     private List<ScheduledState> getStatesOnDay(ZonedDateTime day) {
-        return statesOfDayProvider.getStatesOnDay(day);
+        return statesForDayProvider.getStatesOnDay(day);
     }
 
     private boolean isLastState(List<ScheduledState> states, int index) {
@@ -57,9 +57,5 @@ public final class EndTimeAdjuster {
 
     private void setEndToStartOfFollowingState(ScheduledState followingState) {
         state.setEnd(followingState.getStart(day).minusSeconds(1));
-    }
-
-    public interface StatesOfDayProvider {
-        List<ScheduledState> getStatesOnDay(ZonedDateTime day);
     }
 }
