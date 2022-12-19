@@ -10,10 +10,14 @@ public final class SunTimesProviderImpl implements SunTimesProvider {
 
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
 
-    private final SunTimes.Parameters parameters;
+    private final double lat;
+    private final double lng;
+    private final double height;
 
     public SunTimesProviderImpl(double lat, double lng, double height) {
-        parameters = SunTimes.compute().at(lat, lng).height(height);
+        this.lat = lat;
+        this.lng = lng;
+        this.height = height;
     }
 
     @Override
@@ -80,7 +84,7 @@ public final class SunTimesProviderImpl implements SunTimesProvider {
     }
 
     private SunTimes.Parameters getProviderFor(ZonedDateTime dateTime) {
-        return parameters.on(dateTime.with(LocalTime.MIDNIGHT));
+        return SunTimes.compute().at(lat, lng).height(height).on(dateTime.with(LocalTime.MIDNIGHT));
     }
 
     @Override
