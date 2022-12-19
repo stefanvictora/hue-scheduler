@@ -2,7 +2,7 @@
 
 ## [Unreleased]
    
-## [0.7.1] - 2022-12-19
+## [0.7.1.1] - 2022-12-19
 
 - Fixes NullPointerException in SunTimesProvider
 - Updates dependencies
