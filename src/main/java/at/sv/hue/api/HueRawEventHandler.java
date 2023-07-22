@@ -2,6 +2,7 @@ package at.sv.hue.api;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.launchdarkly.eventsource.MessageEvent;
 import com.launchdarkly.eventsource.background.BackgroundEventHandler;
@@ -70,15 +71,22 @@ public final class HueRawEventHandler implements BackgroundEventHandler {
         private String id;
         private String id_v1;
         private On on;
-        private String status;
+        private JsonNode status;
         private String type;
 
+        private String getStatus() {
+            if (status.isTextual()) {
+                return status.asText();
+            }
+            return null;
+        }
+
         public boolean isOffEvent() {
-            return on != null && !on.isOn() || "zigbee_connectivity".equals(type) && "connectivity_issue".equals(status);
+            return on != null && !on.isOn() || "zigbee_connectivity".equals(type) && "connectivity_issue".equals(getStatus());
         }
 
         public boolean isOnEvent() {
-            return on != null && on.isOn() || "zigbee_connectivity".equals(type) && "connected".equals(status);
+            return on != null && on.isOn() || "zigbee_connectivity".equals(type) && "connected".equals(getStatus());
         }
 
         public boolean isLight() {

@@ -85,6 +85,37 @@ class HueRawEventHandlerTest {
     }
 
     @Test
+    void onMessage_sceneEvents_noErrorIsThrown() throws Exception {
+        handler.onMessage("", new MessageEvent("[\n" +
+                "  {\n" +
+                "    \"creationtime\": \"2023-07-22T18:57:03Z\",\n" +
+                "    \"data\": [\n" +
+                "      {\n" +
+                "        \"id\": \"b3ac88cb-4590-4b0a-a267-c8473250e955\",\n" +
+                "        \"id_v1\": \"/scenes/WKgxJj8-o8y3pH8\",\n" +
+                "        \"status\": {\n" +
+                "          \"active\": \"inactive\"\n" +
+                "        },\n" +
+                "        \"type\": \"scene\"\n" +
+                "      },\n" +
+                "      {\n" +
+                "        \"id\": \"f9b4085b-1409-4b12-ae0d-4ffe2be28b79\",\n" +
+                "        \"id_v1\": \"/scenes/IaVm23klVFrfDGQ\",\n" +
+                "        \"status\": {\n" +
+                "          \"active\": \"static\"\n" +
+                "        },\n" +
+                "        \"type\": \"scene\"\n" +
+                "      }\n" +
+                "    ],\n" +
+                "    \"id\": \"5cf1f272-c33c-4c6c-9e74-9366cac5d969\",\n" +
+                "    \"type\": \"update\"\n" +
+                "  }\n" +
+                "]\n"));
+
+        verifyNoInteractions(hueEventListener);
+    }
+
+    @Test
     void onMessage_onEvent_triggersLightOn() throws Exception {
         handler.onMessage("", new MessageEvent("[\n" +
                 "  {\n" +
