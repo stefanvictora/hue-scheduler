@@ -1,6 +1,7 @@
 package at.sv.hue;
 
 import at.sv.hue.api.LightCapabilities;
+import at.sv.hue.api.LightState;
 import at.sv.hue.time.StartTimeProvider;
 import lombok.Getter;
 import lombok.Setter;
@@ -11,10 +12,7 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.EnumSet;
-import java.util.List;
+import java.util.*;
 
 @Getter
 @Setter
@@ -46,6 +44,7 @@ final class ScheduledState {
     private ZonedDateTime end;
     private ZonedDateTime lastStart;
     private boolean temporary;
+    private ZonedDateTime lastSeen;
 
     public ScheduledState(String name, int updateId, String start, Integer brightness, Integer ct, Double x, Double y,
                           Integer hue, Integer sat, String effect, Boolean on, Integer transitionTimeBefore, Integer transitionTime,
@@ -257,6 +256,15 @@ final class ScheduledState {
         return effect;
     }
 
+    public String getColorMode() {
+        if (ct != null) {
+            return "ct";
+        } else if (x != null) {
+            return "xy";
+        }
+        return "hs";
+    }
+
     public boolean isMultiColorLoop() {
         return MULTI_COLOR_LOOP.equals(effect);
     }
@@ -310,9 +318,18 @@ final class ScheduledState {
         return confirm;
     }
 
+    public boolean lightStateDiffers(LightState lightState) {
+        return brightness != null && !brightness.equals(lightState.getBrightness()) ||
+                ct != null && !ct.equals(lightState.getColorTemperature()) ||
+                x != null && !x.equals(lightState.getX()) ||
+                y != null && !y.equals(lightState.getY()) ||
+                getEffect() != null && !getEffect().equals(lightState.getEffect()) ||
+                !getColorMode().equals(lightState.getColormode());
+    }
+
     @Override
     public String toString() {
-        return  getFormattedName() + " {" +
+        return getFormattedName() + " {" +
                 "id=" + getUpdateId() +
                 (temporary ? ", temporary" : "") +
                 ", start=" + getFormattedStart() +
@@ -328,6 +345,7 @@ final class ScheduledState {
                 getFormattedDaysOfWeek() +
                 getFormattedTransitionTimeIfSet("transitionTimeBefore", transitionTimeBefore) +
                 getFormattedTransitionTimeIfSet("transitionTime", transitionTime) +
+                getFormattedPropertyIfSet("lastSeen", getFormattedTime(lastSeen)) +
                 '}';
     }
 
@@ -346,6 +364,9 @@ final class ScheduledState {
     }
 
     private String getFormattedTime(ZonedDateTime zonedDateTime) {
+        if (zonedDateTime == null) {
+            return null;
+        }
         return TIME_FORMATTER.format(zonedDateTime);
     }
 

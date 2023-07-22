@@ -27,6 +27,7 @@ class HueSchedulerTest {
     private static final Logger LOG = LoggerFactory.getLogger(HueSchedulerTest.class);
 
     private TestStateScheduler stateScheduler;
+    private ManualOverrideTracker manualOverrideTracker;
     private HueScheduler scheduler;
     private ZonedDateTime now;
     private ZonedDateTime initialNow;
@@ -56,6 +57,7 @@ class HueSchedulerTest {
     private int multiColorAdjustmentDelay;
     private StartTimeProviderImpl startTimeProvider;
     private boolean controlGroupLightsIndividually;
+    private boolean trackerUserModifications;
 
     private void setCurrentTimeToAndRun(ScheduledRunnable scheduledRunnable) {
         setCurrentTimeTo(scheduledRunnable);
@@ -186,8 +188,8 @@ class HueSchedulerTest {
             public void assertConnection() {
             }
         };
-        scheduler = new HueScheduler(hueApi, stateScheduler, startTimeProvider,
-                () -> now, 10.0, controlGroupLightsIndividually, () -> retryDelay * 1000, confirmAll, confirmCount, confirmDelay,
+        scheduler = new HueScheduler(hueApi, stateScheduler, manualOverrideTracker, startTimeProvider,
+                () -> now, 10.0, controlGroupLightsIndividually, trackerUserModifications, () -> retryDelay * 1000, confirmAll, confirmCount, confirmDelay,
                 connectionFailureRetryDelay, multiColorAdjustmentDelay);
     }
 
@@ -336,7 +338,18 @@ class HueSchedulerTest {
     }
 
     private void addLightStateResponse(int id, boolean reachable, boolean on, String effect) {
-        lightStatesForId.computeIfAbsent(id, i -> new ArrayList<>()).add(new LightState(defaultBrightness, defaultCt, null, null, effect, reachable, on));
+        LightState lightState = LightState.builder()
+                                          .brightness(defaultBrightness)
+                                          .colorTemperature(defaultCt)
+                                          .effect(effect)
+                                          .reachable(reachable)
+                                          .on(on)
+                                          .build();
+        addLightStateResponse(id, lightState);
+    }
+
+    private void addLightStateResponse(int id, LightState lightState) {
+        lightStatesForId.computeIfAbsent(id, i -> new ArrayList<>()).add(lightState);
     }
 
     private void runAndAssertPutCall(ScheduledRunnable state, Integer putBrightness, Integer putCt, Double putX, Double putY,
@@ -521,6 +534,8 @@ class HueSchedulerTest {
         defaultX = 0.2318731647393379;
         defaultY = 0.4675382426015799;
         controlGroupLightsIndividually = false;
+        trackerUserModifications = false;
+        manualOverrideTracker = new ManualOverrideTrackerImpl();
         create();
     }
 
@@ -1940,6 +1955,71 @@ class HueSchedulerTest {
         ScheduledRunnable retryState = ensureRetryState();
         apiPutReturnValue = true;
         advanceTimeAndRunAndAssertTurnOffApiCall(false, retryState, true);
+
+        ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
+    void run_execution_multipleStates_userChangedStateManuallyBetweenStates_secondStateIsNotApplied() {
+        trackerUserModifications = true;
+        confirmAll = false;
+        create();
+
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now, defaultBrightness, defaultCt);
+        addState(1, now.plusHours(1), defaultBrightness + 10, defaultCt);
+
+        startScheduler();
+
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(2);
+        ScheduledRunnable firstState = scheduledRunnables.get(0);
+        ScheduledRunnable secondState = scheduledRunnables.get(1);
+        
+        // first state is set normally
+        advanceTimeAndRunAndAssertApiCalls(firstState, true);
+        ensureRunnable(initialNow.plusDays(1)); // for next day
+
+        // user modified light state between first and second state -> update skipped and retry scheduled
+        LightState userModifiedLightState = LightState.builder()
+                                                      .brightness(defaultBrightness + 5)
+                                                      .colorTemperature(defaultCt)
+                                                      .reachable(true)
+                                                      .on(true)
+                                                      .build();
+        addLightStateResponse(1, userModifiedLightState);
+        setCurrentTimeTo(secondState);
+        secondState.run();
+
+        ScheduledRunnable firstRetry = ensureRetryState();
+
+        // run first retry, manual override active -> directly retry
+        setCurrentTimeTo(firstRetry);
+        firstRetry.run();
+
+        ScheduledRunnable secondRetry = ensureRetryState();
+
+        // reset override -> retry should now perform update and not even check current light state
+        manualOverrideTracker.onLightTurnedOff(1);
+
+        advanceTimeAndRunAndAssertApiCalls(secondRetry, true, true, defaultBrightness + 10, defaultCt, false);
+
+        ensureRunnable(initialNow.plusHours(1).plusDays(1)); // for next day
+    }
+
+    @Test
+    void run_execution_multipleStates_manualOverride_offState_isNotRetriedButSkippedAllTogether() {
+        trackerUserModifications = true;
+        confirmAll = false;
+        create();
+
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addOffState();
+        manualOverrideTracker.onManuallyOverridden(1); // start directly with overridden state
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        setCurrentTimeTo(scheduledRunnable);
+        scheduledRunnable.run();
 
         ensureRunnable(initialNow.plusDays(1));
     }

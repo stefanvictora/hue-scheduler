@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.Data;
 
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -39,7 +40,7 @@ public final class HueApiImpl implements HueApi {
         try {
             Light light = mapper.readValue(response, Light.class);
             State state = light.state;
-            return new LightState(state.bri, state.ct, getX(state), getY(state), state.effect, state.reachable, state.on);
+            return new LightState(state.bri, state.ct, getX(state), getY(state), state.effect, state.colormode, state.reachable, state.on);
         } catch (JsonProcessingException | NullPointerException e) {
             throw new HueApiFailure("Failed to parse light state response '" + response + "' for id " + id + ": " + e.getLocalizedMessage());
         }
@@ -291,24 +292,14 @@ public final class HueApiImpl implements HueApi {
         }
     }
 
+    @Data
     private static final class Light {
         State state;
         Capabilities capabilities;
         String name;
-
-        public void setState(State state) {
-            this.state = state;
-        }
-
-        public void setCapabilities(Capabilities capabilities) {
-            this.capabilities = capabilities;
-        }
-
-        public void setName(String name) {
-            this.name = name;
-        }
     }
 
+    @Data
     private static final class State {
         Integer bri;
         Integer ct;
@@ -316,6 +307,7 @@ public final class HueApiImpl implements HueApi {
         Integer hue;
         Integer sat;
         String effect;
+        String colormode;
         Boolean on;
         Boolean reachable;
         Integer transitiontime;
@@ -341,160 +333,42 @@ public final class HueApiImpl implements HueApi {
         private boolean isNotDefaultValue(Integer transitiontime) {
             return transitiontime != null && transitiontime != 4;
         }
-
-        public Integer getBri() {
-            return bri;
-        }
-
-        public void setBri(Integer bri) {
-            this.bri = bri;
-        }
-
-        public Integer getCt() {
-            return ct;
-        }
-
-        public void setCt(Integer ct) {
-            this.ct = ct;
-        }
-
-        public Double[] getXy() {
-            return xy;
-        }
-
-        public void setXy(Double[] xy) {
-            this.xy = xy;
-        }
-
-        public Integer getHue() {
-            return hue;
-        }
-
-        public void setHue(Integer hue) {
-            this.hue = hue;
-        }
-
-        public Integer getSat() {
-            return sat;
-        }
-
-        public void setSat(Integer sat) {
-            this.sat = sat;
-        }
-
-        public String getEffect() {
-            return effect;
-        }
-
-        public void setEffect(String effect) {
-            this.effect = effect;
-        }
-
-        public Boolean getOn() {
-            return on;
-        }
-
-        public void setOn(Boolean on) {
-            this.on = on;
-        }
-
-        public Integer getTransitiontime() {
-            return transitiontime;
-        }
-
-        public void setTransitiontime(Integer transitiontime) {
-            this.transitiontime = transitiontime;
-        }
-
-        public Boolean getReachable() {
-            return reachable;
-        }
-
-        public void setReachable(Boolean reachable) {
-            this.reachable = reachable;
-        }
-
-        public Boolean isReachable() {
-            return reachable;
-        }
     }
 
+    @Data
     private static final class Capabilities {
         Control control;
-
-        public void setControl(Control control) {
-            this.control = control;
-        }
     }
 
+    @Data
     private static final class Control {
         String colorgamuttype;
         Double[][] colorgamut;
         Ct ct;
-
-        public void setColorgamuttype(String colorgamuttype) {
-            this.colorgamuttype = colorgamuttype;
-        }
-
-        public void setColorgamut(Double[][] colorgamut) {
-            this.colorgamut = colorgamut;
-        }
-
-        public void setCt(Ct ct) {
-            this.ct = ct;
-        }
     }
 
+    @Data
     private static final class Ct {
         int min;
         int max;
-
-        public void setMin(int min) {
-            this.min = min;
-        }
-
-        public void setMax(int max) {
-            this.max = max;
-        }
     }
 
+    @Data
     private static final class Group {
         String name;
         Integer[] lights = new Integer[0];
-
-        public void setName(String name) {
-            this.name = name;
-        }
-
-        public void setLights(Integer[] lights) {
-            this.lights = lights;
-        }
     }
 
+    @Data
     private static class HueApiResponse {
         private Error error;
-
-        public void setError(Error error) {
-            this.error = error;
-        }
     }
 
+    @Data
     private static class Error {
         int type;
         String address;
         String description;
-
-        public void setType(int type) {
-            this.type = type;
-        }
-
-        public void setAddress(String address) {
-            this.address = address;
-        }
-
-        public void setDescription(String description) {
-            this.description = description;
-        }
     }
 
     private static final class LightIsOff extends RuntimeException {

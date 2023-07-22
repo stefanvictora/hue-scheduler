@@ -21,6 +21,7 @@ import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -33,6 +34,7 @@ public final class HueScheduler implements Runnable {
     private static final Logger LOG = LoggerFactory.getLogger(HueScheduler.class);
 
     private final Map<Integer, List<ScheduledState>> lightStates;
+    private final ConcurrentHashMap<Integer, List<Runnable>> onStateWaitingList;
     @Parameters(description = "The IP address of your Philips Hue Bridge.")
     String ip;
     @Parameters(description = "The Philips Hue Bridge username created for Hue Scheduler during setup.")
@@ -58,6 +60,10 @@ public final class HueScheduler implements Runnable {
             description = "Experimental: If the lights in a group should be controlled individually instead of using broadcast messages." +
                     " This might improve performance. Default: ${DEFAULT-VALUE}")
     boolean controlGroupLightsIndividually;
+    @Option(names = "--tracker-user-changes", defaultValue = "true",
+            description = "Experimental: TODO." +
+                    ". Default: ${DEFAULT-VALUE}")
+    boolean trackUserModifications;
     @Option(names = "--confirm-all", defaultValue = "true",
             description = "If all states should be confirmed by default. Default: ${DEFAULT-VALUE}.")
     boolean confirmAll;
@@ -77,25 +83,31 @@ public final class HueScheduler implements Runnable {
     int multiColorAdjustmentDelay;
     private HueApi hueApi;
     private StateScheduler stateScheduler;
+    private ManualOverrideTracker manualOverrideTracker;
     private StartTimeProvider startTimeProvider;
     private Supplier<ZonedDateTime> currentTime;
     private Supplier<Integer> retryDelay;
 
     public HueScheduler() {
         lightStates = new HashMap<>();
+        onStateWaitingList = new ConcurrentHashMap<>();
     }
 
-    public HueScheduler(HueApi hueApi, StateScheduler stateScheduler, StartTimeProvider startTimeProvider,
-                        Supplier<ZonedDateTime> currentTime, double requestsPerSecond, boolean controlGroupLightsIndividually,
-                        Supplier<Integer> retryDelayInMs, boolean confirmAll, int confirmationCount, int confirmDelayInSeconds,
+    public HueScheduler(HueApi hueApi, StateScheduler stateScheduler, ManualOverrideTracker manualOverrideTracker,
+                        StartTimeProvider startTimeProvider, Supplier<ZonedDateTime> currentTime,
+                        double requestsPerSecond, boolean controlGroupLightsIndividually,
+                        boolean trackUserModifications, Supplier<Integer> retryDelayInMs, boolean confirmAll,
+                        int confirmationCount, int confirmDelayInSeconds,
                         int bridgeFailureRetryDelayInSeconds, int multiColorAdjustmentDelay) {
         this();
         this.hueApi = hueApi;
         this.stateScheduler = stateScheduler;
         this.startTimeProvider = startTimeProvider;
+        this.manualOverrideTracker = manualOverrideTracker;
         this.currentTime = currentTime;
         this.requestsPerSecond = requestsPerSecond;
         this.controlGroupLightsIndividually = controlGroupLightsIndividually;
+        this.trackUserModifications = trackUserModifications;
         this.retryDelay = retryDelayInMs;
         this.confirmAll = confirmAll;
         this.confirmationCount = confirmationCount;
@@ -116,8 +128,26 @@ public final class HueScheduler implements Runnable {
         hueApi = new HueApiImpl(new HttpResourceProviderImpl(), ip, username, RateLimiter.create(requestsPerSecond));
         startTimeProvider = createStartTimeProvider(latitude, longitude, elevation);
         stateScheduler = createStateScheduler();
+        manualOverrideTracker = new ManualOverrideTrackerImpl();
         currentTime = ZonedDateTime::now;
         retryDelay = this::getRandomRetryDelayMs;
+        new LightStateEventTrackerImpl(ip, username, new HueRawEventHandler(new HueEventListener() {
+            @Override
+            public void onLightOff(int lightId, String uuid) {
+                LOG.trace("Received off-event for light {}", lightId);
+                manualOverrideTracker.onLightTurnedOff(lightId);
+            }
+
+            @Override
+            public void onLightOn(int lightId, String uuid) {
+                LOG.trace("Received on-event for light {}", lightId);
+                List<Runnable> waitingList = onStateWaitingList.remove(lightId);
+                if (waitingList != null) {
+                    LOG.trace("Run {} waiting states for light {}", waitingList.size(), lightId);
+                    waitingList.forEach(Runnable::run);
+                }
+            }
+        })).start();
         assertInputIsReadable();
         assertConnectionAndStart();
     }
@@ -267,9 +297,31 @@ public final class HueScheduler implements Runnable {
                 scheduleNextDay(state);
                 return;
             }
+            if (trackUserModifications && manualOverrideTracker.isManuallyOverridden(state.getStatusId())) {
+                if (state.isOff()) {
+                    LOG.debug("{} state has been manually overridden, skip off-state for this day: {}", state.getFormattedName(), state);
+                    scheduleNextDay(state);
+                } else {
+                    LOG.trace("{} state has been manually overridden, skip update and retry when back online", state.getFormattedName());
+                    retryWhenBackOn(state);
+                }
+                return;
+            }
             boolean success;
             LightState lightState = null;
             try {
+                if (trackUserModifications && !manualOverrideTracker.shouldEnforceSchedule(state.getStatusId())) {  // TODO: I think it would make sense to have a logic that also ENFORCES states regardless of user changes
+                    ScheduledState lastSeenState = getLastSeenState(state);
+                    if (lastSeenState != null) {
+                        LightState currentLightState = hueApi.getLightState(state.getStatusId());
+                        if (lastSeenState.lightStateDiffers(currentLightState)) {
+                            LOG.trace("{} state has been manually overridden since {} was scheduled, skip update and retry when back online", state.getFormattedName(), lastSeenState);
+                            manualOverrideTracker.onManuallyOverridden(state.getStatusId());
+                            retryWhenBackOn(state);
+                            return;
+                        }
+                    }
+                }
                 success = putState(state);
                 if (success) {
                     lightState = hueApi.getLightState(state.getStatusId());
@@ -289,9 +341,8 @@ public final class HueScheduler implements Runnable {
                 return;
             }
             if (!success || lightState.isUnreachableOrOff()) {
-                Integer delay = retryDelay.get();
-                LOG.trace("{} not reachable or off, retrying in {}", state.getFormattedName(), Duration.ofMillis(delay));
-                retry(state, delay);
+                LOG.trace("{} not reachable or off, retry when light turns back on", state.getFormattedName());
+                retryWhenBackOn(state);
                 return;
             }
             if (state.getConfirmCounter() == 0) {
@@ -302,6 +353,8 @@ public final class HueScheduler implements Runnable {
             }
             if (shouldAndIsNotFullyConfirmed(state)) {
                 state.addConfirmation();
+                state.setLastSeen(currentTime.get());
+                manualOverrideTracker.onAutomaticallyAssigned(state.getStatusId());
                 if (state.getConfirmCounter() % 5 == 0) {
                     LOG.debug("Confirmed {} ({})", state.getFormattedName(), state.getConfirmDebugString(confirmationCount));
                 }
@@ -310,9 +363,19 @@ public final class HueScheduler implements Runnable {
                 if (isFullyConfirmed(state)) {
                     LOG.debug("Fully confirmed {}", state.getFormattedName());
                 }
+                state.setLastSeen(currentTime.get());
+                manualOverrideTracker.onAutomaticallyAssigned(state.getStatusId());
                 scheduleNextDay(state);
             }
         }, currentTime.get().plus(delayInMs, ChronoUnit.MILLIS), state.getEnd());
+    }
+
+    private ScheduledState getLastSeenState(ScheduledState currentState) {
+        return getLightStatesForId(currentState).stream()
+                                                .sorted(Comparator.comparing(ScheduledState::getLastSeen, Comparator.nullsFirst(ZonedDateTime::compareTo).reversed()))
+                                                .filter(state -> state.getLastSeen() != null)
+                                                .findFirst()
+                                                .orElse(null);
     }
 
     private boolean shouldLogScheduleDebugMessage(long delayInMs) {
@@ -386,6 +449,11 @@ public final class HueScheduler implements Runnable {
     private void retry(ScheduledState state, long delayInMs) {
         state.resetConfirmations();
         schedule(state, delayInMs);
+    }
+
+    private void retryWhenBackOn(ScheduledState state) {
+        state.resetConfirmations();
+        onStateWaitingList.computeIfAbsent(state.getStatusId(), id -> new ArrayList<>()).add(() -> schedule(state, 500));
     }
 
     private boolean shouldAdjustMultiColorLoopOffset(ScheduledState state) {
