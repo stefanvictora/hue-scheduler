@@ -31,6 +31,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 final class RateLimiterImpl implements RateLimiter {
 
     private static final Logger LOG = LoggerFactory.getLogger(RateLimiterImpl.class);
+    private static final long ONE_SECOND_IN_NANOS = Duration.ofSeconds(1).toNanos();
 
     private final double permitsPerSecond;
     private final Supplier<Long> nanoTime;
@@ -66,7 +67,7 @@ final class RateLimiterImpl implements RateLimiter {
             pointInTime = reserveEarliestAvailable(permits);
         }
         long waitLength = Math.max(pointInTime - nanoTime.get(), 0);
-        if (waitLength > 0) {
+        if (waitLength > ONE_SECOND_IN_NANOS) {
             LOG.trace("Waiting for {}", Duration.ofNanos(waitLength));
         }
         sleep.accept(waitLength);

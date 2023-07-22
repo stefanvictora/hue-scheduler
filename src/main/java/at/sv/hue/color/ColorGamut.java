@@ -1,5 +1,8 @@
 package at.sv.hue.color;
 
+import lombok.Getter;
+
+@Getter
 final class ColorGamut {
 
     private final Point red;
@@ -10,18 +13,6 @@ final class ColorGamut {
         red = new Point(gamut[0][0], gamut[0][1]);
         green = new Point(gamut[1][0], gamut[1][1]);
         blue = new Point(gamut[2][0], gamut[2][1]);
-    }
-
-    public Point getRed() {
-        return red;
-    }
-
-    public Point getGreen() {
-        return green;
-    }
-
-    public Point getBlue() {
-        return blue;
     }
 
     @Override

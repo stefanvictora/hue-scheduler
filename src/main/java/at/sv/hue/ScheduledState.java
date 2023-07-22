@@ -2,6 +2,8 @@ package at.sv.hue;
 
 import at.sv.hue.api.LightCapabilities;
 import at.sv.hue.time.StartTimeProvider;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.time.DayOfWeek;
 import java.time.Duration;
@@ -14,6 +16,8 @@ import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
 
+@Getter
+@Setter
 final class ScheduledState {
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
     private static final String MULTI_COLOR_LOOP = "multi_colorloop";
@@ -239,43 +243,11 @@ final class ScheduledState {
         return getDaysOfWeek().containsAll(Arrays.asList(day));
     }
 
-    public String getName() {
-        return name;
-    }
-
-    public int getUpdateId() {
-        return updateId;
-    }
-
     public int getStatusId() {
         if (groupState) {
             return groupLights.get(0);
         }
         return updateId;
-    }
-
-    public Integer getBrightness() {
-        return brightness;
-    }
-
-    public Integer getCt() {
-        return ct;
-    }
-
-    public Double getX() {
-        return x;
-    }
-
-    public Double getY() {
-        return y;
-    }
-
-    public Integer getHue() {
-        return hue;
-    }
-
-    public Integer getSat() {
-        return sat;
     }
 
     public String getEffect() {
@@ -287,10 +259,6 @@ final class ScheduledState {
 
     public boolean isMultiColorLoop() {
         return MULTI_COLOR_LOOP.equals(effect);
-    }
-
-    public Boolean getOn() {
-        return on;
     }
 
     public Integer getTransitionTime(ZonedDateTime now) {
@@ -309,28 +277,12 @@ final class ScheduledState {
         confirmCounter++;
     }
 
-    public int getConfirmCounter() {
-        return confirmCounter;
-    }
-
     public void resetConfirmations() {
         confirmCounter = 0;
     }
 
     public boolean endsAfter(ZonedDateTime now) {
         return now.isAfter(end);
-    }
-
-    public ZonedDateTime getEnd() {
-        return end;
-    }
-
-    public void setEnd(ZonedDateTime end) {
-        this.end = end;
-    }
-
-    public boolean isGroupState() {
-        return groupState;
     }
 
     public List<Integer> getGroupLights() {
@@ -351,10 +303,6 @@ final class ScheduledState {
 
     public void updateLastStart(ZonedDateTime now) {
         this.lastStart = getStart(now);
-    }
-
-    public boolean isTemporary() {
-        return temporary;
     }
 
     public boolean shouldConfirm(boolean confirmAll) {
