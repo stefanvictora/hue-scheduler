@@ -6,6 +6,8 @@ import at.sv.hue.time.StartTimeProvider;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.ZonedDateTime;
@@ -321,10 +323,24 @@ final class ScheduledState {
     public boolean lightStateDiffers(LightState lightState) {
         return brightness != null && !brightness.equals(lightState.getBrightness()) ||
                 ct != null && !ct.equals(lightState.getColorTemperature()) ||
-                x != null && !x.equals(lightState.getX()) ||
-                y != null && !y.equals(lightState.getY()) ||
+                doubleValueDiffers(x, lightState.getX()) ||
+                doubleValueDiffers(y, lightState.getY()) ||
                 getEffect() != null && !getEffect().equals(lightState.getEffect()) ||
                 !getColorMode().equals(lightState.getColormode());
+    }
+
+    private boolean doubleValueDiffers(Double scheduled, Double current) {
+        if (scheduled == null && current == null) {
+            return false;
+        }
+        if (scheduled == null || current == null) {
+            return true;
+        }
+        return getBigDecimal(scheduled).compareTo(getBigDecimal(current)) != 0;
+    }
+
+    private static BigDecimal getBigDecimal(Double value) {
+        return new BigDecimal(value.toString()).setScale(3, RoundingMode.HALF_UP);
     }
 
     @Override

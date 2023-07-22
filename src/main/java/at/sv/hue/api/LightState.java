@@ -1,12 +1,10 @@
 package at.sv.hue.api;
 
 import lombok.Builder;
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
+import lombok.Data;
 
-@Getter
+@Data
 @Builder
-@RequiredArgsConstructor
 public final class LightState {
 
     private final int brightness;
