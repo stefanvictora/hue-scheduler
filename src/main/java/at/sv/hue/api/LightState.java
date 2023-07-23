@@ -11,6 +11,8 @@ public final class LightState {
     private final Integer colorTemperature;
     private final Double x;
     private final Double y;
+    private final Integer hue;
+    private final Integer sat;
     private final String effect;
     private final String colormode;
     private final boolean reachable;

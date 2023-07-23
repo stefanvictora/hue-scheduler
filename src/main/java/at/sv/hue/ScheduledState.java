@@ -3,6 +3,7 @@ package at.sv.hue;
 import at.sv.hue.api.LightCapabilities;
 import at.sv.hue.api.LightState;
 import at.sv.hue.time.StartTimeProvider;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -14,7 +15,10 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.EnumSet;
+import java.util.List;
 
 @Getter
 @Setter
@@ -48,6 +52,7 @@ final class ScheduledState {
     private boolean temporary;
     private ZonedDateTime lastSeen;
 
+    @Builder
     public ScheduledState(String name, int updateId, String start, Integer brightness, Integer ct, Double x, Double y,
                           Integer hue, Integer sat, String effect, Boolean on, Integer transitionTimeBefore, Integer transitionTime,
                           EnumSet<DayOfWeek> daysOfWeek, Boolean confirm, StartTimeProvider startTimeProvider, boolean groupState,
@@ -56,7 +61,7 @@ final class ScheduledState {
         this.updateId = updateId;
         this.start = start;
         this.confirm = confirm;
-        if (daysOfWeek.isEmpty()) {
+        if (daysOfWeek == null || daysOfWeek.isEmpty()) {
             this.daysOfWeek = EnumSet.allOf(DayOfWeek.class);
         } else {
             this.daysOfWeek = EnumSet.copyOf(daysOfWeek);
@@ -258,15 +263,6 @@ final class ScheduledState {
         return effect;
     }
 
-    public String getColorMode() {
-        if (ct != null) {
-            return "ct";
-        } else if (x != null) {
-            return "xy";
-        }
-        return "hs";
-    }
-
     public boolean isMultiColorLoop() {
         return MULTI_COLOR_LOOP.equals(effect);
     }
@@ -321,12 +317,52 @@ final class ScheduledState {
     }
 
     public boolean lightStateDiffers(LightState lightState) {
-        return brightness != null && !brightness.equals(lightState.getBrightness()) ||
-                ct != null && !ct.equals(lightState.getColorTemperature()) ||
-                doubleValueDiffers(x, lightState.getX()) ||
-                doubleValueDiffers(y, lightState.getY()) ||
-                getEffect() != null && !getEffect().equals(lightState.getEffect()) ||
-                !getColorMode().equals(lightState.getColormode());
+        return brightnessDiffers(lightState) ||
+                colorModeDiffers(lightState) ||
+                effectDiffers(lightState);
+    }
+
+    private boolean brightnessDiffers(LightState lightState) {
+        return brightness != null && !brightness.equals(lightState.getBrightness());
+    }
+
+    private boolean colorModeDiffers(LightState lightState) {
+        String colorMode = getColorMode();
+        if (colorMode == null) {
+            return false;
+        }
+        switch (colorMode) {
+            case "ct":
+                return ct != null && !ct.equals(lightState.getColorTemperature());
+            case "hs":
+                return hue != null && !hue.equals(lightState.getHue()) ||
+                        sat != null && !sat.equals(lightState.getSat());
+            case "xy":
+                return doubleValueDiffers(x, lightState.getX()) ||
+                        doubleValueDiffers(y, lightState.getY());
+        }
+        return true;
+    }
+
+    private String getColorMode() {
+        if (ct != null) {
+            return "ct";
+        } else if (x != null) {
+            return "xy";
+        } else if (hue != null || sat != null) {
+            return "hs";
+        }
+        return null;
+    }
+
+    private boolean effectDiffers(LightState lightState) {
+        if (getEffect() == null) {
+            return false; // if no effect scheduled, always treat as equal
+        } else if (lightState.getEffect() == null) {
+            return !"none".equals(getEffect()); // if effect scheduled, but none set, only consider "none" to be equal
+        } else {
+            return !getEffect().equals(lightState.getEffect()); // otherwise, effects have to be exactly the same
+        }
     }
 
     private boolean doubleValueDiffers(Double scheduled, Double current) {
