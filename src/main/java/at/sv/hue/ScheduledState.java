@@ -15,10 +15,7 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.EnumSet;
-import java.util.List;
+import java.util.*;
 
 @Getter
 @Setter
@@ -328,8 +325,11 @@ final class ScheduledState {
 
     private boolean colorModeDiffers(LightState lightState) {
         String colorMode = getColorMode();
-        if (colorMode == null) {
+        if (colorMode == null && lightState.getColormode() == null) {
             return false;
+        }
+        if (!Objects.equals(colorMode, lightState.getColormode())) {
+            return true;
         }
         switch (colorMode) {
             case "ct":
@@ -341,7 +341,7 @@ final class ScheduledState {
                 return doubleValueDiffers(x, lightState.getX()) ||
                         doubleValueDiffers(y, lightState.getY());
         }
-        return true;
+        return false; // should not happen, but as a fallback we just ignore unknown color modes
     }
 
     private String getColorMode() {

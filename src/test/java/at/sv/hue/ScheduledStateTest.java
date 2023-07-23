@@ -87,7 +87,7 @@ class ScheduledStateTest {
     }
 
     @Test
-    void lightStateDiffers_ct_sameColorTemperatureAndBrightness_withAdditionalPropertiesOnLightState_ignored_false() {
+    void lightStateDiffers_ct_sameColorTemperatureAndBrightness_withAdditionalPropertiesOnLightState_sameColorMode_false() {
         ScheduledState scheduledState = ScheduledState.builder()
                                                       .ct(100)
                                                       .brightness(200)
@@ -105,6 +105,27 @@ class ScheduledStateTest {
                                           .build();
 
         assertLightStateDiffers(scheduledState, lightState, false);
+    }
+
+    @Test
+    void lightStateDiffers_ct_sameColorTemperatureAndBrightness_differentColorMode_true() {
+        ScheduledState scheduledState = ScheduledState.builder()
+                                                      .ct(100)
+                                                      .brightness(200)
+                                                      .capabilities(defaultCapabilities)
+                                                      .build();
+        LightState lightState = LightState.builder()
+                                          .colorTemperature(100)
+                                          .brightness(200)
+                                          .x(0.568)
+                                          .y(0.889)
+                                          .hue(2000)
+                                          .sat(100)
+                                          .colormode("xy")
+                                          .effect("none")
+                                          .build();
+
+        assertLightStateDiffers(scheduledState, lightState, true);
     }
 
     @Test
@@ -126,6 +147,26 @@ class ScheduledStateTest {
                                           .build();
 
         assertLightStateDiffers(scheduledState, lightState, false);
+    }
+
+    @Test
+    void lightStateDiffers_xy_sameXAndY_differentColorMode_true() {
+        ScheduledState scheduledState = ScheduledState.builder()
+                                                      .x(0.123)
+                                                      .y(0.456)
+                                                      .capabilities(defaultCapabilities)
+                                                      .build();
+        LightState lightState = LightState.builder()
+                                          .x(0.123)
+                                          .y(0.456)
+                                          .hue(1000)
+                                          .sat(100)
+                                          .brightness(200)
+                                          .colorTemperature(30)
+                                          .colormode("hs")
+                                          .build();
+
+        assertLightStateDiffers(scheduledState, lightState, true);
     }
 
     @Test
@@ -211,7 +252,7 @@ class ScheduledStateTest {
     }
 
     @Test
-    void lightStateDiffers_hs_sameHueAndSaturation_ignoresOtherProperties_false() {
+    void lightStateDiffers_hs_sameHueAndSaturation_sameColorMode_ignoresOtherProperties_false() {
         ScheduledState scheduledState = ScheduledState.builder()
                                                       .hue(1000)
                                                       .sat(50)
@@ -229,6 +270,25 @@ class ScheduledStateTest {
                                           .build();
 
         assertLightStateDiffers(scheduledState, lightState, false);
+    }
+
+    @Test
+    void lightStateDiffers_hs_sameHueAndSaturation_differentColorMode_true() {
+        ScheduledState scheduledState = ScheduledState.builder()
+                                                      .hue(1000)
+                                                      .sat(50)
+                                                      .capabilities(defaultCapabilities)
+                                                      .build();
+        LightState lightState = LightState.builder()
+                                          .hue(1000)
+                                          .sat(50)
+                                          .brightness(200)
+                                          .colorTemperature(30)
+                                          .effect("none")
+                                          .colormode("ct")
+                                          .build();
+
+        assertLightStateDiffers(scheduledState, lightState, true);
     }
 
     @Test
@@ -396,7 +456,7 @@ class ScheduledStateTest {
     }
 
     @Test
-    void lightStateDiffers_noCapabilities_sameBrightness_ignoresAnyEffectAndOtherProperties_false() {
+    void lightStateDiffers_noCapabilities_sameBrightness_sameColorMode_ignoresAnyEffectAndOtherProperties_false() {
         ScheduledState scheduledState = ScheduledState.builder()
                                                       .brightness(10)
                                                       .capabilities(LightCapabilities.NO_CAPABILITIES)
@@ -412,6 +472,22 @@ class ScheduledStateTest {
                                           .build();
 
         assertLightStateDiffers(scheduledState, lightState, false);
+    }
+
+    @Test
+    void lightStateDiffers_noCapabilities_sameBrightness_differentColorMode_true() {
+        ScheduledState scheduledState = ScheduledState.builder()
+                                                      .brightness(10)
+                                                      .capabilities(LightCapabilities.NO_CAPABILITIES)
+                                                      .build();
+        LightState lightState = LightState.builder()
+                                          .brightness(10)
+                                          .x(0.123)
+                                          .y(0.456)
+                                          .colormode("xy")
+                                          .build();
+
+        assertLightStateDiffers(scheduledState, lightState, true);
     }
 
     @Test
