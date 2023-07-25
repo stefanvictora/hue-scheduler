@@ -2022,11 +2022,28 @@ class HueSchedulerTest {
     }
 
     @Test
-    void run_execution_multipleStates_manualOverride_offState_isNotRetriedButSkippedAllTogether() {
+    void run_execution_manualOverride_stateIsDirectlyScheduledWhenOn() {
         trackerUserModifications = true;
         disableConfirms();
 
-        addKnownLightIdsWithDefaultCapabilities(1);
+        addDefaultState();
+        manualOverrideTracker.onManuallyOverridden(id); // start directly with overridden state
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        setCurrentTimeTo(scheduledRunnable);
+        scheduledRunnable.run();
+
+        ensureScheduledStates(0);
+
+        simulateLightOnEventAndEnsureSingleScheduledState();
+    }
+
+    @Test
+    void run_execution_offState_manualOverride_isNotRescheduledWhenOnButSkippedAllTogether() {
+        trackerUserModifications = true;
+        disableConfirms();
+
         addOffState();
         manualOverrideTracker.onManuallyOverridden(1); // start directly with overridden state
 
