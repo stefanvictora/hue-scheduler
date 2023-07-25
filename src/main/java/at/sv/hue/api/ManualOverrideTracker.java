@@ -6,7 +6,7 @@ public interface ManualOverrideTracker {
 
     boolean isManuallyOverridden(long lightId);
 
-    void onLightTurnedOff(long lightId);
+    void onLightTurnedOn(long lightId);
 
     boolean shouldEnforceSchedule(long lightId);
 

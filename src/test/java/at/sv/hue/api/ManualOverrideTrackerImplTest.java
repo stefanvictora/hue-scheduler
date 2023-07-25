@@ -39,7 +39,7 @@ class ManualOverrideTrackerImplTest {
     }
 
     @Test
-    void shouldEnforceSchedule_onlyActiveAfterUserTurnsOffLights_eventAlsoResetsManualOverrideFlag() {
+    void shouldEnforceSchedule_onlyActiveAfterUserTTurnsOnLights_eventAlsoResetsManualOverrideFlag() {
         assertShouldEnforceSchedule(1, false);
         assertShouldEnforceSchedule(2, false);
 
@@ -49,7 +49,7 @@ class ManualOverrideTrackerImplTest {
         assertShouldEnforceSchedule(1, false);
         assertShouldEnforceSchedule(2, false);
 
-        tracker.onLightTurnedOff(1);
+        tracker.onLightTurnedOn(1);
 
         assertIsManuallyOverridden(1, false);
         assertIsManuallyOverridden(2, true); // light 2 remains unaffected
@@ -60,7 +60,7 @@ class ManualOverrideTrackerImplTest {
     @Test
     void shouldEnforceSchedule_resetAfterAutomaticallyAssigned() {
         tracker.onManuallyOverridden(1);
-        tracker.onLightTurnedOff(1);
+        tracker.onLightTurnedOn(1);
 
         tracker.onAutomaticallyAssigned(1);
 

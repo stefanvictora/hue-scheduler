@@ -1983,7 +1983,7 @@ class HueSchedulerTest {
     }
 
     @Test
-    void run_execution_multipleStates_userChangedStateManuallyBetweenStates_secondStateIsNotApplied() {
+    void run_execution_multipleStates_userChangedStateManuallyBetweenStates_secondStateIsNotApplied_untilPowerCycle() {
         trackerUserModifications = true;
         disableConfirms();
 
@@ -2014,20 +2014,11 @@ class HueSchedulerTest {
 
         ensureScheduledStates(0);
 
-        ScheduledRunnable firstPowerOnEvent = simulateLightOnEventAndEnsureSingleScheduledState();
+        ScheduledRunnable powerOnEvent = simulateLightOnEventAndEnsureSingleScheduledState();
 
-        // run first retry, manual override active -> directly retry
-        setCurrentTimeTo(firstPowerOnEvent);
-        firstPowerOnEvent.run();
+        advanceTimeAndRunAndAssertApiCalls(powerOnEvent, true, true, defaultBrightness + 10, defaultCt, false);
 
-        // reset override -> retry should now perform update and not even check current light state
-        scheduler.getHueEventListener().onLightOff(id, null);
-
-        ScheduledRunnable secondPowerOnEvent = simulateLightOnEventAndEnsureSingleScheduledState();
-
-        advanceTimeAndRunAndAssertApiCalls(secondPowerOnEvent, true, true, defaultBrightness + 10, defaultCt, false);
-
-        ensureRunnable(initialNow.plusHours(1).plusDays(1)); // for next day
+        ensureRunnable(initialNow.plusHours(1).plusDays(1), initialNow.plusDays(2)); // for next day
     }
 
     @Test

@@ -274,12 +274,12 @@ public final class HueScheduler implements Runnable {
                 scheduleNextDay(state);
                 return;
             }
-            if (trackUserModifications && manualOverrideTracker.isManuallyOverridden(state.getStatusId())) {
+            if (stateHasBeenManuallyOverriddenPreviously(state)) {
                 if (state.isOff()) {
-                    LOG.debug("{} state has been manually overridden, skip off-state for this day: {}", state.getFormattedName(), state);
+                    LOG.debug("{} state has been manually overridden before, skip off-state for this day: {}", state.getFormattedName(), state);
                     scheduleNextDay(state);
                 } else {
-                    LOG.debug("{} state has been manually overridden, skip update and retry when back online", state.getFormattedName());
+                    LOG.debug("{} state has been manually overridden before, skip update and retry when back online", state.getFormattedName());
                     retryWhenBackOn(state);
                 }
                 return;
@@ -287,12 +287,12 @@ public final class HueScheduler implements Runnable {
             boolean success;
             LightState lightState = null;
             try {
-                if (trackUserModifications && !manualOverrideTracker.shouldEnforceSchedule(state.getStatusId())) {  // TODO: I think it would make sense to have a logic that also ENFORCES states regardless of user changes
+                if (shouldCheckForManualOverrides(state)) {
                     ScheduledState lastSeenState = getLastSeenState(state);
                     if (lastSeenState != null) {
                         LightState currentLightState = hueApi.getLightState(state.getStatusId());
                         if (lastSeenState.lightStateDiffers(currentLightState)) {
-                            LOG.debug("{} state has been manually overridden, skip update and retry when back online", state.getFormattedName());
+                            LOG.debug("{} state has been manually overridden, pause update until light is turned off and on again", state.getFormattedName());
                             LOG.trace("Actual: {}", currentLightState);
                             LOG.trace("Expected: {}", lastSeenState);
                             manualOverrideTracker.onManuallyOverridden(state.getStatusId());
@@ -347,6 +347,14 @@ public final class HueScheduler implements Runnable {
                 scheduleNextDay(state);
             }
         }, currentTime.get().plus(delayInMs, ChronoUnit.MILLIS), state.getEnd());
+    }
+
+    private boolean stateHasBeenManuallyOverriddenPreviously(ScheduledState state) {
+        return trackUserModifications && manualOverrideTracker.isManuallyOverridden(state.getStatusId());
+    }
+
+    private boolean shouldCheckForManualOverrides(ScheduledState state) {
+        return trackUserModifications && !manualOverrideTracker.shouldEnforceSchedule(state.getStatusId()); // TODO: I think it would make sense to have a logic that also ENFORCES states regardless of user changes
     }
 
     private ScheduledState getLastSeenState(ScheduledState currentState) {
