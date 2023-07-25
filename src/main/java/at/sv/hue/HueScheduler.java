@@ -23,7 +23,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -48,10 +47,6 @@ public final class HueScheduler implements Runnable {
     @Option(names = "--elevation", defaultValue = "0.0", description = "The optional elevation (in meters) of your location, " +
             "used to provide more accurate sunrise and sunset times.")
     double elevation;
-    @Option(names = "--retry-delay", paramLabel = "<delay>", defaultValue = "5",
-            description = "The maximum number of seconds to wait before trying again to control a light that was unreachable." +
-                    " Default: ${DEFAULT-VALUE} seconds.")
-    int maxRetryDelayInSeconds;
     @Option(names = "--max-requests-per-second", paramLabel = "<requests>", defaultValue = "10.0",
             description = "The maximum number of PUT API requests to perform per second. Default and recommended: " +
                     "${DEFAULT-VALUE} requests per second.")
@@ -60,7 +55,7 @@ public final class HueScheduler implements Runnable {
             description = "Experimental: If the lights in a group should be controlled individually instead of using broadcast messages." +
                     " This might improve performance. Default: ${DEFAULT-VALUE}")
     boolean controlGroupLightsIndividually;
-    @Option(names = "--tracker-user-changes", defaultValue = "true",
+    @Option(names = "--track-user-changes", defaultValue = "true",
             description = "Experimental: TODO." +
                     ". Default: ${DEFAULT-VALUE}")
     boolean trackUserModifications;
@@ -73,6 +68,9 @@ public final class HueScheduler implements Runnable {
     @Option(names = "--confirm-delay", paramLabel = "<delay>", defaultValue = "6",
             description = "The delay in seconds between each confirmation. Default: ${DEFAULT-VALUE} seconds.")
     int confirmDelayInSeconds;
+    @Option(names = "--power-on-reschedule-delay", paramLabel = "<delay>", defaultValue = "150",
+            description = "The delay in ms after the light on-event was received between each confirmation. Default: ${DEFAULT-VALUE} ms.")
+    int powerOnRescheduleDelayInMs;
     @Option(names = "--bridge-failure-retry-delay", paramLabel = "<delay>", defaultValue = "10",
             description = "The delay in seconds for retrying an API call, if the bridge could not be reached due to " +
                     "network failure, or if it returned an API error code. Default: ${DEFAULT-VALUE} seconds.")
@@ -83,35 +81,36 @@ public final class HueScheduler implements Runnable {
     int multiColorAdjustmentDelay;
     private HueApi hueApi;
     private StateScheduler stateScheduler;
-    private ManualOverrideTracker manualOverrideTracker;
+    private final ManualOverrideTracker manualOverrideTracker;
+    private final HueEventListener hueEventListener;
     private StartTimeProvider startTimeProvider;
     private Supplier<ZonedDateTime> currentTime;
-    private Supplier<Integer> retryDelay;
 
     public HueScheduler() {
         lightStates = new HashMap<>();
         onStateWaitingList = new ConcurrentHashMap<>();
+        manualOverrideTracker = new ManualOverrideTrackerImpl();
+        hueEventListener = new HueEventListenerImpl(manualOverrideTracker, onStateWaitingList::remove);
     }
 
-    public HueScheduler(HueApi hueApi, StateScheduler stateScheduler, ManualOverrideTracker manualOverrideTracker,
+    public HueScheduler(HueApi hueApi, StateScheduler stateScheduler,
                         StartTimeProvider startTimeProvider, Supplier<ZonedDateTime> currentTime,
                         double requestsPerSecond, boolean controlGroupLightsIndividually,
-                        boolean trackUserModifications, Supplier<Integer> retryDelayInMs, boolean confirmAll,
+                        boolean trackUserModifications, boolean confirmAll,
                         int confirmationCount, int confirmDelayInSeconds,
-                        int bridgeFailureRetryDelayInSeconds, int multiColorAdjustmentDelay) {
+                        int powerOnRescheduleDelayInMs, int bridgeFailureRetryDelayInSeconds, int multiColorAdjustmentDelay) {
         this();
         this.hueApi = hueApi;
         this.stateScheduler = stateScheduler;
         this.startTimeProvider = startTimeProvider;
-        this.manualOverrideTracker = manualOverrideTracker;
         this.currentTime = currentTime;
         this.requestsPerSecond = requestsPerSecond;
         this.controlGroupLightsIndividually = controlGroupLightsIndividually;
         this.trackUserModifications = trackUserModifications;
-        this.retryDelay = retryDelayInMs;
         this.confirmAll = confirmAll;
         this.confirmationCount = confirmationCount;
         this.confirmDelayInSeconds = confirmDelayInSeconds;
+        this.powerOnRescheduleDelayInMs = powerOnRescheduleDelayInMs;
         this.bridgeFailureRetryDelayInSeconds = bridgeFailureRetryDelayInSeconds;
         this.multiColorAdjustmentDelay = multiColorAdjustmentDelay;
     }
@@ -128,26 +127,8 @@ public final class HueScheduler implements Runnable {
         hueApi = new HueApiImpl(new HttpResourceProviderImpl(), ip, username, RateLimiter.create(requestsPerSecond));
         startTimeProvider = createStartTimeProvider(latitude, longitude, elevation);
         stateScheduler = createStateScheduler();
-        manualOverrideTracker = new ManualOverrideTrackerImpl();
         currentTime = ZonedDateTime::now;
-        retryDelay = this::getRandomRetryDelayMs;
-        new LightStateEventTrackerImpl(ip, username, new HueRawEventHandler(new HueEventListener() {
-            @Override
-            public void onLightOff(int lightId, String uuid) {
-                LOG.trace("Received off-event for light {}", lightId);
-                manualOverrideTracker.onLightTurnedOff(lightId);
-            }
-
-            @Override
-            public void onLightOn(int lightId, String uuid) {
-                LOG.trace("Received on-event for light {}", lightId);
-                List<Runnable> waitingList = onStateWaitingList.remove(lightId);
-                if (waitingList != null) {
-                    LOG.trace("Run {} waiting states for light {}", waitingList.size(), lightId);
-                    waitingList.forEach(Runnable::run);
-                }
-            }
-        })).start();
+        new LightStateEventTrackerImpl(ip, username, new HueRawEventHandler(hueEventListener)).start();
         assertInputIsReadable();
         assertConnectionAndStart();
     }
@@ -158,10 +139,6 @@ public final class HueScheduler implements Runnable {
 
     private StateSchedulerImpl createStateScheduler() {
         return new StateSchedulerImpl(Executors.newScheduledThreadPool(Runtime.getRuntime().availableProcessors()), ZonedDateTime::now);
-    }
-
-    private int getRandomRetryDelayMs() {
-        return ThreadLocalRandom.current().nextInt(1000, maxRetryDelayInSeconds * 1000 + 1);
     }
 
     private void assertInputIsReadable() {
@@ -302,7 +279,7 @@ public final class HueScheduler implements Runnable {
                     LOG.debug("{} state has been manually overridden, skip off-state for this day: {}", state.getFormattedName(), state);
                     scheduleNextDay(state);
                 } else {
-                    LOG.trace("{} state has been manually overridden, skip update and retry when back online", state.getFormattedName());
+                    LOG.debug("{} state has been manually overridden, skip update and retry when back online", state.getFormattedName());
                     retryWhenBackOn(state);
                 }
                 return;
@@ -315,7 +292,9 @@ public final class HueScheduler implements Runnable {
                     if (lastSeenState != null) {
                         LightState currentLightState = hueApi.getLightState(state.getStatusId());
                         if (lastSeenState.lightStateDiffers(currentLightState)) {
-                            LOG.trace("{} state has been manually overridden since {} was scheduled, skip update and retry when back online", state.getFormattedName(), lastSeenState);
+                            LOG.debug("{} state has been manually overridden, skip update and retry when back online", state.getFormattedName());
+                            LOG.trace("Actual: {}", currentLightState);
+                            LOG.trace("Expected: {}", lastSeenState);
                             manualOverrideTracker.onManuallyOverridden(state.getStatusId());
                             retryWhenBackOn(state);
                             return;
@@ -453,7 +432,7 @@ public final class HueScheduler implements Runnable {
 
     private void retryWhenBackOn(ScheduledState state) {
         state.resetConfirmations();
-        onStateWaitingList.computeIfAbsent(state.getStatusId(), id -> new ArrayList<>()).add(() -> schedule(state, 500));
+        onStateWaitingList.computeIfAbsent(state.getStatusId(), id -> new ArrayList<>()).add(() -> schedule(state, powerOnRescheduleDelayInMs));
     }
 
     private boolean shouldAdjustMultiColorLoopOffset(ScheduledState state) {
@@ -503,5 +482,13 @@ public final class HueScheduler implements Runnable {
 
     private void logSunDataInfo() {
         LOG.info("Current sun times:\n{}", startTimeProvider.toDebugString(currentTime.get()));
+    }
+
+    HueEventListener getHueEventListener() {
+        return hueEventListener;
+    }
+
+    ManualOverrideTracker getManualOverrideTracker() {
+        return manualOverrideTracker;
     }
 }

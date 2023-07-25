@@ -188,9 +188,10 @@ class HueSchedulerTest {
             public void assertConnection() {
             }
         };
-        scheduler = new HueScheduler(hueApi, stateScheduler, manualOverrideTracker, startTimeProvider,
-                () -> now, 10.0, controlGroupLightsIndividually, trackerUserModifications, () -> retryDelay * 1000, confirmAll, confirmCount, confirmDelay,
-                connectionFailureRetryDelay, multiColorAdjustmentDelay);
+        scheduler = new HueScheduler(hueApi, stateScheduler, startTimeProvider,
+                () -> now, 10.0, controlGroupLightsIndividually, trackerUserModifications, confirmAll, confirmCount, confirmDelay,
+                0, connectionFailureRetryDelay, multiColorAdjustmentDelay);
+        manualOverrideTracker = scheduler.getManualOverrideTracker();
     }
 
     private void addState(int id, ZonedDateTime startTime) {
@@ -502,6 +503,15 @@ class HueSchedulerTest {
         create();
     }
 
+    private void simulateLightOnEvent() {
+        scheduler.getHueEventListener().onLightOn(id, null);
+    }
+
+    private ScheduledRunnable simulateLightOnEventAndEnsureSingleScheduledState() {
+        simulateLightOnEvent();
+        return ensureScheduledStates(1).get(0);
+    }
+
     @BeforeEach
     void setUp() {
         apiPutReturnValue = true;
@@ -535,7 +545,6 @@ class HueSchedulerTest {
         defaultY = 0.4675382426015799;
         controlGroupLightsIndividually = false;
         trackerUserModifications = false;
-        manualOverrideTracker = new ManualOverrideTrackerImpl();
         create();
     }
 
@@ -1737,14 +1746,16 @@ class HueSchedulerTest {
     }
 
     @Test
-    void run_execution_firstUnreachable_triesAgainOneSecondLater_secondTimeReachable_success() {
+    void run_execution_firstUnreachable_triesAgainAfterPowerOnEvent_secondTimeReachable_success() {
         ScheduledRunnable scheduledRunnable = startWithDefaultState();
 
         advanceTimeAndRunAndAssertApiCalls(scheduledRunnable, false);
 
-        ScheduledRunnable retryState = ensureRetryState();
+        ensureScheduledStates(0); // no retry, instead waiting on power on
 
-        runAndAssertNextDay(retryState);
+        ScheduledRunnable powerOnRunnable = simulateLightOnEventAndEnsureSingleScheduledState();
+
+        runAndAssertNextDay(powerOnRunnable);
     }
 
     @Test
@@ -1759,10 +1770,13 @@ class HueSchedulerTest {
 
         advanceTimeAndRunAndAssertApiCalls(initialStates.get(0), false);
 
-        ScheduledRunnable retryState = ensureRetryState();
+        ensureScheduledStates(0); // no retry, instead waiting on power on
+
         setCurrentTimeTo(secondStateStart);
 
-        retryState.run();  /* this aborts without any api calls, as the current state already ended */
+        ScheduledRunnable powerOnRunnable = simulateLightOnEventAndEnsureSingleScheduledState();
+
+        powerOnRunnable.run();  /* this aborts without any api calls, as the current state already ended */
 
         ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusSeconds(10));
 
@@ -1831,22 +1845,26 @@ class HueSchedulerTest {
         ensureAndRunSingleConfirmation(true);
         ensureAndRunSingleConfirmation(false);
 
-        ScheduledRunnable retryRunnable = ensureRetryState();
+        ensureScheduledStates(0); // no retry, instead waiting on power on
 
-        runAndAssertNextDay(retryRunnable);
+        ScheduledRunnable powerOnRunnable = simulateLightOnEventAndEnsureSingleScheduledState();
+
+        runAndAssertNextDay(powerOnRunnable);
     }
 
     @Test
-    void run_execution_putReturnsFalse_toSignalLightOff_butReachable_triesAgain_withoutCallingGetStatus() {
+    void run_execution_putReturnsFalse_toSignalLightOff_butReachable_triesAgainAfterPowerOn_withoutCallingGetStatus() {
         ScheduledRunnable scheduledRunnable = startWithDefaultState();
 
         apiPutReturnValue = false;
         advanceTimeAndRunAndAssertPutCall(scheduledRunnable, defaultBrightness, defaultCt, false, null, null);
 
-        ScheduledRunnable retryState = ensureRetryState();
+        ensureScheduledStates(0); // no retry, instead waiting on power on
+
+        ScheduledRunnable powerOnRunnable = simulateLightOnEventAndEnsureSingleScheduledState();
 
         apiPutReturnValue = true;
-        runAndAssertNextDay(retryState);
+        runAndAssertNextDay(powerOnRunnable);
     }
 
     @Test
@@ -1890,13 +1908,15 @@ class HueSchedulerTest {
     }
 
     @Test
-    void run_execution_putSuccessful_reachable_butOff_triesAgain() {
+    void run_execution_putSuccessful_reachable_butOff_triesAgainAfterPowerOn() {
         ScheduledRunnable scheduledRunnable = startWithDefaultState();
 
         advanceTimeAndRunAndAssertApiCalls(scheduledRunnable, true, false, defaultBrightness, defaultCt, false);
 
-        ScheduledRunnable retryState = ensureRetryState();
-        advanceTimeAndRunAndAssertApiCalls(retryState, true, true, defaultBrightness, defaultCt, false);
+        ensureScheduledStates(0); // no retry, waiting for light on
+
+        ScheduledRunnable powerOnRunnable = simulateLightOnEventAndEnsureSingleScheduledState();
+        advanceTimeAndRunAndAssertApiCalls(powerOnRunnable, true, true, defaultBrightness, defaultCt, false);
         runAndAssertConfirmations();
 
         ensureRunnable(initialNow.plusDays(1));
@@ -1945,16 +1965,19 @@ class HueSchedulerTest {
     }
 
     @Test
-    void run_execution_off_putReturnsFalse_retries_secondTimeSuccess_noConfirms() {
+    void run_execution_off_putReturnsFalse_retriesAfterPowerOn_secondTimeSuccess_noConfirms() {
         addOffState();
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
         apiPutReturnValue = false;
         advanceTimeAndRunAndAssertPutCall(scheduledRunnable, null, null, false, false, null);
 
-        ScheduledRunnable retryState = ensureRetryState();
+        ensureScheduledStates(0); // no retry, waiting for light on
+
+        ScheduledRunnable powerOnRunnable = simulateLightOnEventAndEnsureSingleScheduledState();
+
         apiPutReturnValue = true;
-        advanceTimeAndRunAndAssertTurnOffApiCall(false, retryState, true);
+        advanceTimeAndRunAndAssertTurnOffApiCall(false, powerOnRunnable, true);
 
         ensureRunnable(initialNow.plusDays(1));
     }
@@ -1962,8 +1985,7 @@ class HueSchedulerTest {
     @Test
     void run_execution_multipleStates_userChangedStateManuallyBetweenStates_secondStateIsNotApplied() {
         trackerUserModifications = true;
-        confirmAll = false;
-        create();
+        disableConfirms();
 
         addKnownLightIdsWithDefaultCapabilities(1);
         addState(1, now, defaultBrightness, defaultCt);
@@ -1990,18 +2012,20 @@ class HueSchedulerTest {
         setCurrentTimeTo(secondState);
         secondState.run();
 
-        ScheduledRunnable firstRetry = ensureRetryState();
+        ensureScheduledStates(0);
+
+        ScheduledRunnable firstPowerOnEvent = simulateLightOnEventAndEnsureSingleScheduledState();
 
         // run first retry, manual override active -> directly retry
-        setCurrentTimeTo(firstRetry);
-        firstRetry.run();
-
-        ScheduledRunnable secondRetry = ensureRetryState();
+        setCurrentTimeTo(firstPowerOnEvent);
+        firstPowerOnEvent.run();
 
         // reset override -> retry should now perform update and not even check current light state
-        manualOverrideTracker.onLightTurnedOff(1);
+        scheduler.getHueEventListener().onLightOff(id, null);
 
-        advanceTimeAndRunAndAssertApiCalls(secondRetry, true, true, defaultBrightness + 10, defaultCt, false);
+        ScheduledRunnable secondPowerOnEvent = simulateLightOnEventAndEnsureSingleScheduledState();
+
+        advanceTimeAndRunAndAssertApiCalls(secondPowerOnEvent, true, true, defaultBrightness + 10, defaultCt, false);
 
         ensureRunnable(initialNow.plusHours(1).plusDays(1)); // for next day
     }
@@ -2009,8 +2033,7 @@ class HueSchedulerTest {
     @Test
     void run_execution_multipleStates_manualOverride_offState_isNotRetriedButSkippedAllTogether() {
         trackerUserModifications = true;
-        confirmAll = false;
-        create();
+        disableConfirms();
 
         addKnownLightIdsWithDefaultCapabilities(1);
         addOffState();
