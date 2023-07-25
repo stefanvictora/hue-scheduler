@@ -82,7 +82,8 @@ public final class HueRawEventHandler implements BackgroundEventHandler {
         }
 
         public boolean isOffEvent() {
-            return on != null && !on.isOn() || "zigbee_connectivity".equals(type) && "connectivity_issue".equals(getStatus());
+            return on != null && !on.isOn() || "zigbee_connectivity".equals(type) &&
+                    ("connectivity_issue".equals(getStatus()) || "disconnected".equals(getStatus()));
         }
 
         public boolean isOnEvent() {

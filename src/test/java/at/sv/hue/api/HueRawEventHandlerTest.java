@@ -60,6 +60,31 @@ class HueRawEventHandlerTest {
     }
 
     @Test
+    void onMessage_zigbeeDisconnected_triggersLightOff() throws Exception {
+        handler.onMessage("", new MessageEvent("[\n" +
+                "  {\n" +
+                "    \"creationtime\": \"2023-07-22T15:07:28Z\",\n" +
+                "    \"data\": [\n" +
+                "      {\n" +
+                "        \"id\": \"69b2c6bd-48ff-4bab-9f06-37ccd9399f69\",\n" +
+                "        \"id_v1\": \"/lights/40\",\n" +
+                "        \"owner\": {\n" +
+                "          \"rid\": \"a3f0be40-e15f-40a2-a9a7-88bdd43b9c78\",\n" +
+                "          \"rtype\": \"device\"\n" +
+                "        },\n" +
+                "        \"status\": \"disconnected\",\n" +
+                "        \"type\": \"zigbee_connectivity\"\n" +
+                "      }\n" +
+                "    ],\n" +
+                "    \"id\": \"49b5e23d-d712-48f7-a46c-db5ca9c838fd\",\n" +
+                "    \"type\": \"update\"\n" +
+                "  }\n" +
+                "]"));
+
+        verify(hueEventListener).onLightOff(40, "69b2c6bd-48ff-4bab-9f06-37ccd9399f69");
+    }
+
+    @Test
     void onMessage_zigbeeConnectionEstablishedEvent_triggersLightOn() throws Exception {
         handler.onMessage("", new MessageEvent("[\n" +
                 "  {\n" +
