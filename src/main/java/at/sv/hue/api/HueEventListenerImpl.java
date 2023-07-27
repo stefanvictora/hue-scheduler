@@ -23,7 +23,7 @@ public class HueEventListenerImpl implements HueEventListener {
         manualOverrideTracker.onLightTurnedOn(lightId);
         List<Runnable> waitingList = waitingListProvider.apply(lightId);
         if (waitingList != null) {
-            log.debug("Received on-event for light {}. Reschedule {} waiting states.", waitingList.size(), lightId);
+            log.debug("Received on-event for light {}. Reschedule {} waiting states.", lightId, waitingList.size());
             waitingList.forEach(Runnable::run);
         }
     }

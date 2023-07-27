@@ -173,28 +173,7 @@ final class ScheduledState {
         }
     }
 
-    public long secondsUntilNextDayFromStart(ZonedDateTime now) {
-        return Duration.between(now, getNextStart(now)).getSeconds();
-    }
-
-    public ZonedDateTime getNextStart(ZonedDateTime now) {
-        if (shouldConsiderNextDayForStart(now)) {
-            return getStart(now.plusDays(1));
-        } else {
-            return getStart(now);
-        }
-    }
-
-    private boolean shouldConsiderNextDayForStart(ZonedDateTime now) {
-        ZonedDateTime start = getStart(now);
-        return !now.toLocalTime().isBefore(start.toLocalTime()) || startTimeHasChangedSinceLastTime(start);
-    }
-
-    private boolean startTimeHasChangedSinceLastTime(ZonedDateTime zonedStart) {
-        return lastStart != null && !zonedStart.toLocalTime().equals(lastStart.toLocalTime());
-    }
-
-    public boolean isInThePast(ZonedDateTime now) {
+    public boolean isInThePastOrNow(ZonedDateTime now) {
         return getDelayInSeconds(now) == 0;
     }
 

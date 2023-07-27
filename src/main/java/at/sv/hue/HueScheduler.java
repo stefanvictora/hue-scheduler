@@ -271,13 +271,13 @@ public final class HueScheduler implements Runnable {
         stateScheduler.schedule(() -> {
             if (state.endsAfter(currentTime.get())) {
                 LOG.debug("{} already ended", state);
-                scheduleNextDay(state);
+                reschedule(state);
                 return;
             }
             if (lightHasBeenManuallyOverriddenBefore(state)) {
                 if (state.isOff()) {
                     LOG.debug("{} state has been manually overridden before, skip off-state for this day: {}", state.getFormattedName(), state);
-                    scheduleNextDay(state);
+                    reschedule(state, true);
                 } else {
                     LOG.debug("{} state has been manually overridden before, skip update and retry when back online", state.getFormattedName());
                     retryWhenBackOn(state);
@@ -308,7 +308,8 @@ public final class HueScheduler implements Runnable {
             }
             if (success && state.isOff() && lightState.isUnreachableOrOff()) {
                 LOG.info("Turned off {}, or was already off", state.getFormattedName());
-                scheduleNextDay(state);
+                // todo: should we track the last seen here as well
+                reschedule(state, true);
                 return;
             }
             if (!success || lightState.isUnreachableOrOff()) {
@@ -336,7 +337,9 @@ public final class HueScheduler implements Runnable {
                 }
                 state.setLastSeen(currentTime.get());
                 manualOverrideTracker.onAutomaticallyAssigned(state.getStatusId());
-                scheduleNextDay(state);
+                retryWhenBackOn(ScheduledState.createTemporaryCopy(state, currentTime.get(), state.getEnd()));
+                boolean forceNextDay = currentTime.get().toLocalTime().isAfter(state.getLastStart().toLocalTime()) || currentTime.get().toLocalTime().equals(state.getLastStart().toLocalTime());
+                reschedule(state, forceNextDay);
             }
         }, currentTime.get().plus(delayInMs, ChronoUnit.MILLIS), state.getEnd());
     }
@@ -370,21 +373,63 @@ public final class HueScheduler implements Runnable {
         return delayInMs == 0 || delayInMs > Math.max(5000, getMs(confirmDelayInSeconds)) && delayInMs != getMs(bridgeFailureRetryDelayInSeconds);
     }
 
-    private void scheduleNextDay(ScheduledState state) {
-        scheduleNextDay(state, currentTime.get());
+    private void reschedule(ScheduledState state) {
+        reschedule(state, false);
     }
 
-    private void scheduleNextDay(ScheduledState state, ZonedDateTime now) {
+    private void reschedule(ScheduledState state, boolean forceNextDay) {
         if (state.isTemporary()) return;
+        ZonedDateTime now = currentTime.get();
         state.resetConfirmations();
-        recalculateNextEnd(state, now);
-        long delay = state.secondsUntilNextDayFromStart(now);
-        state.updateLastStart(now);
-        schedule(state, getMs(delay));
+        ZonedDateTime nextStart = getNextStart(state, now, forceNextDay);
+        state.updateLastStart(nextStart); // todo: we should write a test, that his value is now set to the next start instead of now
+        calculateAndSetEndTime(state, getLightStatesForId(state), nextStart);
+        schedule(state, getMs(getDelayInSeconds(now, nextStart)));
     }
 
-    private void recalculateNextEnd(ScheduledState state, ZonedDateTime now) {
-        calculateAndSetEndTime(state, getLightStatesForId(state), state.getNextStart(now));
+    private ZonedDateTime getNextStart(ScheduledState state, ZonedDateTime now, boolean forceNextDay) {
+        if (forceNextDay || shouldScheduleNextDay(state)) {
+            return state.getStart(now.plusDays(1));
+        } else {
+            return state.getStart(now);
+        }
+    }
+
+    private boolean shouldScheduleNextDay(ScheduledState state) {
+        List<ScheduledState> todaysStates = getStatesStartingToday(state);
+        if (isLastState(state, todaysStates)) {
+            return false;
+        }
+        return nextStateAlreadyStarted(state, todaysStates);
+    }
+
+    private List<ScheduledState> getStatesStartingToday(ScheduledState state) {
+        ZonedDateTime now = currentTime.get();
+        return getStatesStartingOnDay(getLightStatesForId(state), now, DayOfWeek.from(now))
+                .stream()
+                .sorted(Comparator.comparing(scheduledState -> scheduledState.getStart(now)))
+                .collect(Collectors.toList());
+    }
+
+    private boolean isLastState(ScheduledState state, List<ScheduledState> todaysStates) {
+        return todaysStates.indexOf(state) == todaysStates.size() - 1;
+    }
+
+    private boolean nextStateAlreadyStarted(ScheduledState state, List<ScheduledState> todaysStates) {
+        return todaysStates.get(todaysStates.indexOf(state) + 1).isInThePastOrNow(currentTime.get());
+    }
+
+    private static long getDelayInSeconds(ZonedDateTime now, ZonedDateTime nextStart) {
+        Duration between = Duration.between(now, nextStart);
+        if (between.isNegative()) {
+            return 0;
+        } else {
+            return between.getSeconds();
+        }
+    }
+
+    private void scheduleNextDay(ScheduledState state) {
+        reschedule(state, true);
     }
 
     private List<ScheduledState> getLightStatesForId(ScheduledState state) {

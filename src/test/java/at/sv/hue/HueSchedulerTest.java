@@ -73,7 +73,7 @@ class HueSchedulerTest {
             throw new IllegalArgumentException("New time is before now: " + newTime);
         }
         now = newTime;
-        LOG.info("New time: {}", now);
+        LOG.info("New time: {} ({})", now, DayOfWeek.from(now));
     }
 
     private void setCurrentAndInitialTimeTo(ZonedDateTime dateTime) {
@@ -1052,6 +1052,25 @@ class HueSchedulerTest {
     }
 
     @Test
+    void parse_weekdayScheduling_execution_todayIsMonday_multipleStates_nextStartIsCorrectlyCalculated() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        setupTimeWithDayOfWeek(DayOfWeek.MONDAY);
+        addStateNow(1, "ct:" + defaultCt, "days:Mo");
+        addState(1, "12:00", "ct:" + defaultCt, "days:Tu, We");
+        startScheduler();
+
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(2);
+        assertScheduleStart(scheduledRunnables.get(0), now, now.plusDays(1));
+        assertScheduleStart(scheduledRunnables.get(1), now.plusDays(1).plusHours(12), now.plusDays(2).plusHours(12));
+
+        setCurrentTimeTo(initialNow.plusDays(1).plusHours(11)); // Tuesday, AM
+
+        scheduledRunnables.get(0).run(); // already ended, state is not scheduled on Tuesday; schedule next week
+
+        ensureRunnable(initialNow.plusDays(7), initialNow.plusDays(8));
+    }
+
+    @Test
     void parse_weekdayScheduling_invalidDayParameter_exception() {
         addKnownLightIdsWithDefaultCapabilities(1);
         assertThrows(InvalidPropertyValue.class, () -> addStateNow(1, "ct:" + defaultCt, "days:INVALID"));
@@ -1377,9 +1396,9 @@ class HueSchedulerTest {
     @Test
     void parse_sunrise_callsStartTimeProvider_usesUpdatedSunriseTimeNextDay() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        ZonedDateTime sunrise = startTimeProvider.getStart("sunrise", now);
-        ZonedDateTime nextDaySunrise = startTimeProvider.getStart("sunrise", now.plusDays(1));
-        ZonedDateTime nextNextDaySunrise = startTimeProvider.getStart("sunrise", now.plusDays(2));
+        ZonedDateTime sunrise = startTimeProvider.getStart("sunrise", now); // 07:42:13
+        ZonedDateTime nextDaySunrise = startTimeProvider.getStart("sunrise", now.plusDays(1)); // 07:42:11
+        ZonedDateTime nextNextDaySunrise = startTimeProvider.getStart("sunrise", now.plusDays(2)); // 07:42:05
         setCurrentAndInitialTimeTo(sunrise);
         addState(1, "sunrise", "bri:" + defaultBrightness, "ct:" + defaultCt);
 
@@ -1408,7 +1427,7 @@ class HueSchedulerTest {
                 null, null, null, null, null, null, null, false);
         runAndAssertConfirmations();
 
-        ScheduledRunnable nextDayState = ensureRunnable(nextNextDaySunset, getSunset(initialNow.plusDays(3)));
+        ScheduledRunnable nextDayState = ensureRunnable(nextDaySunset, nextNextDaySunset);
 
         setCurrentTimeTo(nextNextDaySunset.minusMinutes(5));
 
@@ -1416,7 +1435,7 @@ class HueSchedulerTest {
                 null, null, null, null, null, null, false);
         runAndAssertConfirmations();
 
-        ensureRunnable(getSunset(initialNow.plusDays(3)), getSunset(initialNow.plusDays(4)));
+        ensureRunnable(nextNextDaySunset, getSunset(initialNow.plusDays(3)));
     }
 
     private ZonedDateTime getSunset(ZonedDateTime time) {
@@ -1426,9 +1445,9 @@ class HueSchedulerTest {
     @Test
     void parse_sunrise_updatesStartTimeCorrectlyIfEndingNextDay() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        ZonedDateTime sunrise = startTimeProvider.getStart("sunrise", now);
-        ZonedDateTime nextDaySunrise = startTimeProvider.getStart("sunrise", now.plusDays(1));
-        ZonedDateTime nextNextDaySunrise = startTimeProvider.getStart("sunrise", now.plusDays(2));
+        ZonedDateTime sunrise = startTimeProvider.getStart("sunrise", now); // 07:42:13
+        ZonedDateTime nextDaySunrise = startTimeProvider.getStart("sunrise", now.plusDays(1)); // 07:42:11
+        ZonedDateTime nextNextDaySunrise = startTimeProvider.getStart("sunrise", now.plusDays(2)); // 07:42:05
         setCurrentAndInitialTimeTo(sunrise);
         addState(1, "sunrise", "bri:" + defaultBrightness, "ct:" + defaultCt);
 
@@ -1440,7 +1459,27 @@ class HueSchedulerTest {
                 null, null, null, null, null, null, null, false);
         runAndAssertConfirmations();
 
-        ensureRunnable(nextNextDaySunrise, startTimeProvider.getStart("sunrise", initialNow.plusDays(3)));
+        ensureRunnable(nextDaySunrise, nextNextDaySunrise);
+    }
+
+    @Test
+    void parse_sunrise_updatesStartTimeCorrectlyIfEndingNextDay_timeIsAfterNextStart_rescheduledImmediately() {
+        disableConfirms();
+
+        addKnownLightIdsWithDefaultCapabilities(1);
+        ZonedDateTime sunrise = startTimeProvider.getStart("sunrise", now); // 07:42:13
+        ZonedDateTime nextDaySunrise = startTimeProvider.getStart("sunrise", now.plusDays(1)); // 07:42:11
+        ZonedDateTime nextNextDaySunrise = startTimeProvider.getStart("sunrise", now.plusDays(2)); // 07:42:05
+        setCurrentAndInitialTimeTo(sunrise);
+        addState(1, "sunrise", "bri:" + defaultBrightness, "ct:" + defaultCt);
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable(now, nextDaySunrise);
+
+        setCurrentTimeTo(sunrise.plusDays(1)); // this is after the next day sunrise, should schedule immediately again
+
+        scheduledRunnable.run();
+
+        ensureRunnable(now, nextNextDaySunrise);
     }
 
     @Test
@@ -1987,7 +2026,6 @@ class HueSchedulerTest {
         trackerUserModifications = true;
         disableConfirms();
 
-        addKnownLightIdsWithDefaultCapabilities(1);
         addState(1, now, defaultBrightness, defaultCt);
         addState(1, now.plusHours(1), defaultBrightness + 10, defaultCt);
 
@@ -2010,13 +2048,18 @@ class HueSchedulerTest {
                                                       .build();
         addLightStateResponse(1, userModifiedLightState);
         setCurrentTimeTo(secondState);
+
         secondState.run();
 
         ensureScheduledStates(0);
 
-        ScheduledRunnable powerOnEvent = simulateLightOnEventAndEnsureSingleScheduledState();
+        simulateLightOnEvent();
 
-        advanceTimeAndRunAndAssertApiCalls(powerOnEvent, true, true, defaultBrightness + 10, defaultCt, false);
+        List<ScheduledRunnable> powerOnEvents = ensureScheduledStates(2);
+
+        powerOnEvents.get(0).run(); // already ended
+
+        advanceTimeAndRunAndAssertApiCalls(powerOnEvents.get(1), true, true, defaultBrightness + 10, defaultCt, false);
 
         ensureRunnable(initialNow.plusHours(1).plusDays(1), initialNow.plusDays(2)); // for next day
     }
@@ -2040,7 +2083,118 @@ class HueSchedulerTest {
     }
 
     @Test
-    void run_execution_offState_manualOverride_isNotRescheduledWhenOnButSkippedAllTogether() {
+    void run_execution_manualOverride_stateIsDirectlyScheduledWhenOn_calculatesCorrectNextStart() {
+        trackerUserModifications = true;
+        disableConfirms();
+
+        addDefaultState();
+        manualOverrideTracker.onManuallyOverridden(id); // start directly with overridden state
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        setCurrentTimeTo(scheduledRunnable);
+        scheduledRunnable.run();
+
+        ensureScheduledStates(0);
+
+        simulateLightOnEventAndEnsureSingleScheduledState();
+    }
+
+    @Test
+    void run_execution_manualOverride_multipleStates_powerOnAfterNextDayStart_beforeNextState_reschedulesImmediately() {
+        trackerUserModifications = true;
+        disableConfirms();
+
+        addState(1, now, defaultBrightness, defaultCt);
+        addState(1, now.plusHours(1), defaultBrightness + 10, defaultCt);
+
+        manualOverrideTracker.onManuallyOverridden(1); // start with overridden state
+
+        startScheduler();
+
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(2);
+        ScheduledRunnable firstState = scheduledRunnables.get(0);
+
+        firstState.run(); // rescheduled when power on
+
+        ensureScheduledStates(0);
+
+        setCurrentTimeTo(initialNow.plusDays(1).plusMinutes(30)); // after next day start of state, but before next day start of second state
+
+        ScheduledRunnable powerOnEvent = simulateLightOnEventAndEnsureSingleScheduledState();
+
+        powerOnEvent.run();
+
+        ensureRunnable(now, now.plusMinutes(30)); // state should be scheduled immediately to fill in the remaining gap until the second state
+    }
+
+    @Test
+    void run_execution_manualOverride_multipleStates_powerOnAfterNextDayStart_afterNextState_rescheduledNextDay() {
+        trackerUserModifications = true;
+        disableConfirms();
+
+        addState(1, now, defaultBrightness, defaultCt);
+        addState(1, now.plusHours(1), defaultBrightness + 10, defaultCt);
+        addState(1, now.plusHours(2), defaultBrightness + 20, defaultCt);
+
+        manualOverrideTracker.onManuallyOverridden(1); // start with overridden state
+
+        startScheduler();
+
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(3);
+        ScheduledRunnable firstState = scheduledRunnables.get(0);
+
+        firstState.run(); // rescheduled when power on
+
+        ensureScheduledStates(0);
+
+        setCurrentTimeTo(initialNow.plusDays(1).plusHours(1).plusMinutes(30)); // after start of next day for first state, but after start of next state
+
+        ScheduledRunnable powerOnEvent = simulateLightOnEventAndEnsureSingleScheduledState();
+
+        powerOnEvent.run();
+
+        ensureRunnable(initialNow.plusDays(2), initialNow.plusDays(2).plusHours(1));
+    }
+
+    @Test
+    void run_execution_manualOverride_forDynamicSunTimes_turnedOnEventOnlyNextDay_correctlyReschedulesStateOnSameDay() {
+        trackerUserModifications = true;
+        disableConfirms();
+        ZonedDateTime sunrise = startTimeProvider.getStart("sunrise", now);
+        ZonedDateTime nextDaySunrise = startTimeProvider.getStart("sunrise", now.plusDays(1));
+        setCurrentAndInitialTimeTo(sunrise);
+
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, "sunrise", "bri:" + defaultBrightness);
+        addState(1, "sunrise+60", "bri:" + (defaultBrightness + 10));
+        manualOverrideTracker.onManuallyOverridden(1); // start directly with overridden state
+
+        startScheduler();
+
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(2);
+        ScheduledRunnable firstState = scheduledRunnables.get(0);
+        ScheduledRunnable secondState = scheduledRunnables.get(1);
+
+        setCurrentTimeTo(firstState);
+        firstState.run();
+        setCurrentTimeTo(secondState);
+        secondState.run();
+
+        ensureScheduledStates(0); // nothing scheduled, as both wait for power on
+
+        setCurrentTimeTo(initialNow.plusDays(1).minusHours(1)); // next day, one hour before next schedule
+        simulateLightOnEvent();
+
+        List<ScheduledRunnable> powerOnRunnables = ensureScheduledStates(2);
+
+        powerOnRunnables.get(0).run(); // already ended, but schedules the same state again for the same day sunrise
+
+        ensureRunnable(nextDaySunrise, nextDaySunrise.plusHours(1));
+    }
+
+    @Test
+    void run_execution_offState_manualOverride_offStateIsNotRescheduledWhenOn_skippedAllTogether() {
         trackerUserModifications = true;
         disableConfirms();
 
