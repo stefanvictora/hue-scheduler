@@ -210,17 +210,13 @@ Hue Scheduler offers two different transition time properties, which can be comb
 
 To summarize: `tr-before` allows you to define longer and smoother transitions when the lights are already on, without having to wait the same time if you would turn on your lights at a later time.
 
-#### Advanced Properties
-
-- `confirm`: defines whether Hue Scheduler should **send the request multiple times** to make sure the light is actually reachable: [`true`|`false`]. This is only relevant in combination with dumb wall switches that physically turn your lights off. For more details see "Why Does Hue Scheduler Confirm Requests?" Default: `true`.
-
 ## Advanced Command Line Options
+     
+### `--track-user-changes`
+                 
+TODO
 
-#### `--retry-delay`
-
-The maximum number of seconds to wait before trying again to control a light that was unreachable. To distribute the retries for multiple unreachable lights, Hue Scheduler chooses a random value between ``1`` and the given seconds on each retry attempt.
-
-**Default**: `5` seconds
+**Default**: true
 
 #### `--max-requests-per-second`
 
@@ -246,24 +242,6 @@ Note: At the moment, Hue Scheduler does not validate in such cases if all the li
 
 **Default**: false
 
-#### `--confirm-all`
-
-If Hue Scheduler should confirm all state changes, by globally setting the default value for the `confirm` state property. If you don't use dumb wall switches, you should set this to `false`. See "Why Does Hue Scheduler Confirm Requests?" for more details.
-
-**Default**: `true`
-
-#### `--confirm-count`
-
-The number of confirmations to send.
-
-**Default**: `20` confirmations
-
-#### `--confirm-delay`
-
-The delay in seconds between each confirmation.
-
-**Default**: `6` seconds
-
 #### `--multi-color-adjustment-delay`
 
 The adjustment delay in seconds for each light in a group when using the multi_color effect. Adjust this parameter to change the hue values of 'neighboring' lights.
@@ -276,6 +254,12 @@ The delay in seconds for retrying an API call, if the bridge could not be reache
 
 **Default**: `10` seconds
 
+### `--power-on-reschedule-delay`
+
+TODO
+
+**Default**: `150` ms
+
 #### `-Dlog.level`
 
 A JVM argument to configure the log level of Hue Scheduler. The following values are available:
@@ -283,7 +267,7 @@ A JVM argument to configure the log level of Hue Scheduler. The following values
 - `ERROR`: Only logs if the API returned with an error code. This should most likely never occur.
 - `WARN`: Additionally logs if the bridge is not reachable, and Hue Scheduler retries
 - `INFO`: Logs when a light state has been set, as well as the current sun times for each day.
-- `DEBUG` (default): Logs every scheduled state; if a state has already ended; or if it has been successfully confirmed.
+- `DEBUG` (default): Logs every scheduled state; if a state has already ended.
 - `TRACE`: Maximum logs, including all performed API requests and enforced wait times due to rate limiting.
 
 Note: The JVM argument needs to be defined before the jar file. For example:
@@ -429,12 +413,6 @@ Yes, but you need to use a third-party app like iConnectHue to configure your mo
 
 If you don't want to use light or group names in your configuration file, you can lookup their respective IDs by sending a GET request to either the `/api/<username>/lights` or `/api/<username>/groups` endpoint of your Philips Hue Bridge.
 
-### Why Does Hue Scheduler Confirm Requests?
-
-In short, to fully support dumb wall switches that physically turn off your lights. In such cases the bridge might take up to two minutes to update a lights reachable status. If you would now turn off a light around the time a state change is scheduled, the update will be missed by the light because the bridge will report the light as still reachable, and therefore Hue Scheduler will not retry to set the state.
-
-If you don't use dumb wall switches, or would like to set the confirmation behavior manually for each affected lights, you can configure the default behavior via the `--confirm-*` command line arguments and the `confirm` state property.
-
 ### How Does Hue Scheduler Check If a Group Is Reachable?
 
 Since the Hue API does not return the reachability state for a group, Hue Scheduler simply checks the first light of a group for its reachability state and uses that result for the whole group. This might result in false results and is a current limitation of Hue Scheduler.
@@ -448,7 +426,7 @@ Since the Hue API does not return the reachability state for a group, Hue Schedu
 
 ## Roadmap
 
-- [ ] **Conditional states** -- set light state only if it has not been manually changed since its previously scheduled state
+- [x] **Conditional states** -- set light state only if it has not been manually changed since its previously scheduled state
 - [ ] **Enforce states** -- ensure that a state is always set; allow no manual override
 - [ ] **Min/Max for sunrise/sunset** -- ensure that a dynamic start time is not active before or past a certain time
 - [ ] **GUI for configuring and updating light schedules** -- via a web interface

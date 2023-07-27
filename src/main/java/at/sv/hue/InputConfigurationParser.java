@@ -129,16 +129,13 @@ public final class InputConfigurationParser {
                     case "days":
                         DayOfWeeksParser.parseDayOfWeeks(value, dayOfWeeks);
                         break;
-                    case "confirm":
-                        confirm = parseBoolean(value, parameter);
-                        break;
                     default:
                         throw new UnknownStateProperty("Unknown state property '" + parameter + "' with value '" + value + "'");
                 }
             }
             String start = parts[1];
             states.add(createState(name, id, start, bri, ct, x, y, hue, sat, effect, on, transitionTimeBefore,
-                    transitionTime, dayOfWeeks, confirm, capabilities, groupState));
+                    transitionTime, dayOfWeeks, capabilities, groupState));
         }
         return states;
     }
@@ -182,7 +179,7 @@ public final class InputConfigurationParser {
 
     private ScheduledState createState(String name, int id, String start, Integer brightness, Integer ct, Double x, Double y,
                                        Integer hue, Integer sat, String effect, Boolean on, Integer transitionTimeBefore, Integer transitionTime,
-                                       EnumSet<DayOfWeek> dayOfWeeks, Boolean confirm, LightCapabilities capabilities, boolean groupState) {
+                                       EnumSet<DayOfWeek> dayOfWeeks, LightCapabilities capabilities, boolean groupState) {
         List<Integer> groupLights;
         if (groupState) {
             groupLights = getGroupLights(id);
@@ -190,7 +187,7 @@ public final class InputConfigurationParser {
             groupLights = null;
         }
         return new ScheduledState(name, id, start, brightness, ct, x, y, hue, sat, effect, on, transitionTimeBefore,
-                transitionTime, dayOfWeeks, confirm, startTimeProvider, groupState, groupLights, capabilities);
+                transitionTime, dayOfWeeks, startTimeProvider, groupState, groupLights, capabilities);
     }
 
     private List<Integer> getGroupLights(int groupId) {

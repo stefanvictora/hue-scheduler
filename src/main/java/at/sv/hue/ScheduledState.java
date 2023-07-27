@@ -27,7 +27,6 @@ final class ScheduledState {
     private final String name;
     private final int updateId;
     private final String start;
-    private final Boolean confirm;
     private final Integer brightness;
     private final Integer ct;
     private final Double x;
@@ -43,7 +42,6 @@ final class ScheduledState {
     private final boolean groupState;
     private final List<Integer> groupLights;
     private final LightCapabilities capabilities;
-    private int confirmCounter;
     private ZonedDateTime end;
     private ZonedDateTime lastStart;
     private boolean temporary;
@@ -52,12 +50,11 @@ final class ScheduledState {
     @Builder
     public ScheduledState(String name, int updateId, String start, Integer brightness, Integer ct, Double x, Double y,
                           Integer hue, Integer sat, String effect, Boolean on, Integer transitionTimeBefore, Integer transitionTime,
-                          EnumSet<DayOfWeek> daysOfWeek, Boolean confirm, StartTimeProvider startTimeProvider, boolean groupState,
+                          EnumSet<DayOfWeek> daysOfWeek, StartTimeProvider startTimeProvider, boolean groupState,
                           List<Integer> groupLights, LightCapabilities capabilities) {
         this.name = name;
         this.updateId = updateId;
         this.start = start;
-        this.confirm = confirm;
         if (daysOfWeek == null || daysOfWeek.isEmpty()) {
             this.daysOfWeek = EnumSet.allOf(DayOfWeek.class);
         } else {
@@ -77,7 +74,6 @@ final class ScheduledState {
         this.transitionTime = assertValidTransitionTime(transitionTime);
         this.transitionTimeBefore = assertValidTransitionTime(transitionTimeBefore);
         this.startTimeProvider = startTimeProvider;
-        confirmCounter = 0;
         temporary = false;
         assertColorCapabilities();
     }
@@ -85,7 +81,7 @@ final class ScheduledState {
     public static ScheduledState createTemporaryCopy(ScheduledState state, ZonedDateTime start, ZonedDateTime end) {
         ScheduledState copy = new ScheduledState(state.name, state.updateId, start.toLocalTime().toString(),
                 state.brightness, state.ct, state.x, state.y, state.hue, state.sat, state.effect, state.on, state.transitionTimeBefore,
-                state.transitionTime, state.daysOfWeek, state.confirm, state.startTimeProvider, state.groupState, state.groupLights, state.capabilities);
+                state.transitionTime, state.daysOfWeek, state.startTimeProvider, state.groupState, state.groupLights, state.capabilities);
         copy.end = end;
         copy.temporary = true;
         copy.lastStart = start;
@@ -251,18 +247,6 @@ final class ScheduledState {
         return (int) between.toMillis() / 100;
     }
 
-    public boolean isFullyConfirmed(int confirmCount) {
-        return confirmCounter >= confirmCount;
-    }
-
-    public void addConfirmation() {
-        confirmCounter++;
-    }
-
-    public void resetConfirmations() {
-        confirmCounter = 0;
-    }
-
     public boolean endsAfter(ZonedDateTime now) {
         return now.isAfter(end);
     }
@@ -279,17 +263,8 @@ final class ScheduledState {
         return on == Boolean.FALSE;
     }
 
-    public String getConfirmDebugString(int confirmCount) {
-        return confirmCounter + "/" + confirmCount;
-    }
-
     public void updateLastStart(ZonedDateTime now) {
         this.lastStart = getStart(now);
-    }
-
-    public boolean shouldConfirm(boolean confirmAll) {
-        if (confirm == null) return confirmAll;
-        return confirm;
     }
 
     public boolean lightStateDiffers(LightState lightState) {

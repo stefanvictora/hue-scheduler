@@ -27,7 +27,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
-@Command(name = "HueScheduler", version = "0.7.1.1", mixinStandardHelpOptions = true, sortOptions = false)
+@Command(name = "HueScheduler", version = "0.8.0", mixinStandardHelpOptions = true, sortOptions = false)
 public final class HueScheduler implements Runnable {
 
     private static final Logger LOG = LoggerFactory.getLogger(HueScheduler.class);
@@ -59,15 +59,6 @@ public final class HueScheduler implements Runnable {
             description = "Experimental: TODO." +
                     ". Default: ${DEFAULT-VALUE}")
     boolean trackUserModifications;
-    @Option(names = "--confirm-all", defaultValue = "true",
-            description = "If all states should be confirmed by default. Default: ${DEFAULT-VALUE}.")
-    boolean confirmAll;
-    @Option(names = "--confirm-count", paramLabel = "<count>", defaultValue = "20",
-            description = "The number of confirmations to send. Default: ${DEFAULT-VALUE} confirmations.")
-    int confirmationCount;
-    @Option(names = "--confirm-delay", paramLabel = "<delay>", defaultValue = "6",
-            description = "The delay in seconds between each confirmation. Default: ${DEFAULT-VALUE} seconds.")
-    int confirmDelayInSeconds;
     @Option(names = "--power-on-reschedule-delay", paramLabel = "<delay>", defaultValue = "150",
             description = "The delay in ms after the light on-event was received between each confirmation. Default: ${DEFAULT-VALUE} ms.")
     int powerOnRescheduleDelayInMs;
@@ -96,9 +87,8 @@ public final class HueScheduler implements Runnable {
     public HueScheduler(HueApi hueApi, StateScheduler stateScheduler,
                         StartTimeProvider startTimeProvider, Supplier<ZonedDateTime> currentTime,
                         double requestsPerSecond, boolean controlGroupLightsIndividually,
-                        boolean trackUserModifications, boolean confirmAll,
-                        int confirmationCount, int confirmDelayInSeconds,
-                        int powerOnRescheduleDelayInMs, int bridgeFailureRetryDelayInSeconds, int multiColorAdjustmentDelay) {
+                        boolean trackUserModifications, int powerOnRescheduleDelayInMs,
+                        int bridgeFailureRetryDelayInSeconds, int multiColorAdjustmentDelay) {
         this();
         this.hueApi = hueApi;
         this.stateScheduler = stateScheduler;
@@ -107,9 +97,6 @@ public final class HueScheduler implements Runnable {
         this.requestsPerSecond = requestsPerSecond;
         this.controlGroupLightsIndividually = controlGroupLightsIndividually;
         this.trackUserModifications = trackUserModifications;
-        this.confirmAll = confirmAll;
-        this.confirmationCount = confirmationCount;
-        this.confirmDelayInSeconds = confirmDelayInSeconds;
         this.powerOnRescheduleDelayInMs = powerOnRescheduleDelayInMs;
         this.bridgeFailureRetryDelayInSeconds = bridgeFailureRetryDelayInSeconds;
         this.multiColorAdjustmentDelay = multiColorAdjustmentDelay;
@@ -308,7 +295,6 @@ public final class HueScheduler implements Runnable {
             }
             if (success && state.isOff() && lightState.isUnreachableOrOff()) {
                 LOG.info("Turned off {}, or was already off", state.getFormattedName());
-                // todo: should we track the last seen here as well
                 reschedule(state, true);
                 return;
             }
@@ -317,30 +303,15 @@ public final class HueScheduler implements Runnable {
                 retryWhenBackOn(state);
                 return;
             }
-            if (state.getConfirmCounter() == 0) {
-                LOG.info("Set {}", state);
-                if (shouldAdjustMultiColorLoopOffset(state)) {
-                    scheduleMultiColorLoopOffsetAdjustments(state.getGroupLights(), 1);
-                }
+            LOG.info("Set {}", state);
+            if (shouldAdjustMultiColorLoopOffset(state)) {
+                scheduleMultiColorLoopOffsetAdjustments(state.getGroupLights(), 1);
             }
-            if (shouldAndIsNotFullyConfirmed(state)) {
-                state.addConfirmation();
-                state.setLastSeen(currentTime.get());
-                manualOverrideTracker.onAutomaticallyAssigned(state.getStatusId());
-                if (state.getConfirmCounter() % 5 == 0) {
-                    LOG.debug("Confirmed {} ({})", state.getFormattedName(), state.getConfirmDebugString(confirmationCount));
-                }
-                schedule(state, getMs(confirmDelayInSeconds));
-            } else {
-                if (isFullyConfirmed(state)) {
-                    LOG.debug("Fully confirmed {}", state.getFormattedName());
-                }
-                state.setLastSeen(currentTime.get());
-                manualOverrideTracker.onAutomaticallyAssigned(state.getStatusId());
-                retryWhenBackOn(ScheduledState.createTemporaryCopy(state, currentTime.get(), state.getEnd()));
-                boolean forceNextDay = currentTime.get().toLocalTime().isAfter(state.getLastStart().toLocalTime()) || currentTime.get().toLocalTime().equals(state.getLastStart().toLocalTime());
-                reschedule(state, forceNextDay);
-            }
+            state.setLastSeen(currentTime.get());
+            manualOverrideTracker.onAutomaticallyAssigned(state.getStatusId());
+            retryWhenBackOn(ScheduledState.createTemporaryCopy(state, currentTime.get(), state.getEnd()));
+            boolean forceNextDay = currentTime.get().toLocalTime().isAfter(state.getLastStart().toLocalTime()) || currentTime.get().toLocalTime().equals(state.getLastStart().toLocalTime());
+            reschedule(state, forceNextDay);
         }, currentTime.get().plus(delayInMs, ChronoUnit.MILLIS), state.getEnd());
     }
 
@@ -370,7 +341,7 @@ public final class HueScheduler implements Runnable {
     }
 
     private boolean shouldLogScheduleDebugMessage(long delayInMs) {
-        return delayInMs == 0 || delayInMs > Math.max(5000, getMs(confirmDelayInSeconds)) && delayInMs != getMs(bridgeFailureRetryDelayInSeconds);
+        return delayInMs == 0 || delayInMs > 5000 && delayInMs != getMs(bridgeFailureRetryDelayInSeconds);
     }
 
     private void reschedule(ScheduledState state) {
@@ -380,7 +351,6 @@ public final class HueScheduler implements Runnable {
     private void reschedule(ScheduledState state, boolean forceNextDay) {
         if (state.isTemporary()) return;
         ZonedDateTime now = currentTime.get();
-        state.resetConfirmations();
         ZonedDateTime nextStart = getNextStart(state, now, forceNextDay);
         state.updateLastStart(nextStart); // todo: we should write a test, that his value is now set to the next start instead of now
         calculateAndSetEndTime(state, getLightStatesForId(state), nextStart);
@@ -444,14 +414,6 @@ public final class HueScheduler implements Runnable {
         }
     }
 
-    private boolean shouldAndIsNotFullyConfirmed(ScheduledState state) {
-        return state.shouldConfirm(confirmAll) && !isFullyConfirmed(state);
-    }
-
-    private boolean isFullyConfirmed(ScheduledState state) {
-        return state.isFullyConfirmed(confirmationCount);
-    }
-
     private long getMs(long seconds) {
         return seconds * 1000L;
     }
@@ -480,12 +442,10 @@ public final class HueScheduler implements Runnable {
     }
 
     private void retry(ScheduledState state, long delayInMs) {
-        state.resetConfirmations();
         schedule(state, delayInMs);
     }
 
     private void retryWhenBackOn(ScheduledState state) {
-        state.resetConfirmations();
         onStateWaitingList.computeIfAbsent(state.getStatusId(), id -> new ArrayList<>()).add(() -> schedule(state, powerOnRescheduleDelayInMs));
     }
 
