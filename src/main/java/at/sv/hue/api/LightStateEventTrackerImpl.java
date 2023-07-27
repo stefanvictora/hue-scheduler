@@ -8,6 +8,7 @@ import okhttp3.OkHttpClient;
 
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.time.Duration;
 
 public class LightStateEventTrackerImpl {
 
@@ -18,7 +19,10 @@ public class LightStateEventTrackerImpl {
 
     public LightStateEventTrackerImpl(String ip, String apiKey, OkHttpClient httpsClient, HueRawEventHandler eventHandler) {
         this.apiKey = apiKey;
-        this.httpsClient = httpsClient;
+        this.httpsClient = httpsClient.newBuilder()
+                                      .connectTimeout(Duration.ofMinutes(1))
+                                      .readTimeout(Duration.ofMillis(Integer.MAX_VALUE))
+                                      .build();
         this.hueRawEventHandler = eventHandler;
         eventUrl = createUrl("https://" + ip + "/eventstream/clip/v2");
     }

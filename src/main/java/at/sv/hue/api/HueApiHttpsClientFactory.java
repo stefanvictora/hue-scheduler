@@ -10,7 +10,6 @@ import java.io.InputStream;
 import java.security.KeyStore;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
-import java.time.Duration;
 
 public class HueApiHttpsClientFactory {
 
@@ -21,8 +20,6 @@ public class HueApiHttpsClientFactory {
         SSLContext sslContext = createSSLContext(trustManager);
         return new OkHttpClient.Builder()
                 .sslSocketFactory(sslContext.getSocketFactory(), trustManager)
-                .connectTimeout(Duration.ofMinutes(1))
-                .readTimeout(Duration.ofMillis(Integer.MAX_VALUE))
                 .hostnameVerifier((hostname, session) -> hostname.equals(bridgeIp))
                 .build();
     }
