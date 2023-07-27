@@ -4,6 +4,7 @@ import at.sv.hue.api.*;
 import at.sv.hue.time.StartTimeProvider;
 import at.sv.hue.time.StartTimeProviderImpl;
 import at.sv.hue.time.SunTimesProviderImpl;
+import okhttp3.OkHttpClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -111,13 +112,24 @@ public final class HueScheduler implements Runnable {
 
     @Override
     public void run() {
-        hueApi = new HueApiImpl(new HttpResourceProviderImpl(), ip, username, RateLimiter.create(requestsPerSecond));
+        OkHttpClient httpsClient = createHttpsClient();
+        hueApi = new HueApiImpl(new HttpsResourceProviderImpl(httpsClient), ip, username, RateLimiter.create(requestsPerSecond));
         startTimeProvider = createStartTimeProvider(latitude, longitude, elevation);
         stateScheduler = createStateScheduler();
         currentTime = ZonedDateTime::now;
-        new LightStateEventTrackerImpl(ip, username, new HueRawEventHandler(hueEventListener)).start();
+        new LightStateEventTrackerImpl(ip, username, httpsClient, new HueRawEventHandler(hueEventListener)).start();
         assertInputIsReadable();
         assertConnectionAndStart();
+    }
+
+    private OkHttpClient createHttpsClient() {
+        try {
+            return HueApiHttpsClientFactory.createHttpsClient(ip);
+        } catch (Exception e) {
+            System.err.println("Failed to create https client: " + e.getLocalizedMessage());
+            System.exit(1);
+        }
+        return null;
     }
 
     private StartTimeProviderImpl createStartTimeProvider(double latitude, double longitude, double elevation) {

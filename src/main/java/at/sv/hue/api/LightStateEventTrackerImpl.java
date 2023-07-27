@@ -4,20 +4,21 @@ import com.launchdarkly.eventsource.ConnectStrategy;
 import com.launchdarkly.eventsource.ErrorStrategy;
 import com.launchdarkly.eventsource.EventSource;
 import com.launchdarkly.eventsource.background.BackgroundEventSource;
+import okhttp3.OkHttpClient;
 
 import java.net.MalformedURLException;
 import java.net.URL;
 
 public class LightStateEventTrackerImpl {
 
-    private final String ip;
     private final String apiKey;
     private final URL eventUrl;
     private final HueRawEventHandler hueRawEventHandler;
+    private final OkHttpClient httpsClient;
 
-    public LightStateEventTrackerImpl(String ip, String apiKey, HueRawEventHandler eventHandler) {
-        this.ip = ip;
+    public LightStateEventTrackerImpl(String ip, String apiKey, OkHttpClient httpsClient, HueRawEventHandler eventHandler) {
         this.apiKey = apiKey;
+        this.httpsClient = httpsClient;
         this.hueRawEventHandler = eventHandler;
         eventUrl = createUrl("https://" + ip + "/eventstream/clip/v2");
     }
@@ -33,15 +34,15 @@ public class LightStateEventTrackerImpl {
     public void start() {
         try {
             createBackgroundEventSource(hueRawEventHandler).start();
-        } catch (final Exception e) {
+        } catch (Exception e) {
             throw new IllegalStateException(e);
         }
     }
 
-    private BackgroundEventSource createBackgroundEventSource(HueRawEventHandler hueRawEventHandler) throws Exception {
+    private BackgroundEventSource createBackgroundEventSource(HueRawEventHandler hueRawEventHandler) {
         return new BackgroundEventSource.Builder(hueRawEventHandler,
                 new EventSource.Builder(ConnectStrategy.http(eventUrl)
-                                                       .httpClient(HueApiHttpsClientFactory.createHttpsClient(ip))
+                                                       .httpClient(httpsClient)
                                                        .header("hue-application-key", apiKey))
                         .errorStrategy(ErrorStrategy.alwaysContinue())
         ).build();

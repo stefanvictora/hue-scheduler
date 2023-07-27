@@ -30,7 +30,7 @@ public final class HueApiImpl implements HueApi {
         mapper = new ObjectMapper();
         mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
-        baseApi = "http://" + ip + "/api/" + username;
+        baseApi = "https://" + ip + "/api/" + username;
         this.rateLimiter = rateLimiter;
     }
 
