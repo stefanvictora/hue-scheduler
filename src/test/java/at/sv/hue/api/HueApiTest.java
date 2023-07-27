@@ -121,7 +121,7 @@ class HueApiTest {
             }
         };
         api = new HueApiImpl(resourceProvider, ip, username, permits -> {});
-        baseUrl = "http://" + ip + "/api/" + username;
+        baseUrl = "https://" + ip + "/api/" + username;
     }
 
     @Test
