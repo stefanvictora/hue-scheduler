@@ -16,6 +16,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
 import java.util.*;
+import java.util.function.Consumer;
 
 @Getter
 @Setter
@@ -46,6 +47,7 @@ final class ScheduledState {
     private ZonedDateTime lastStart;
     private boolean temporary;
     private ZonedDateTime lastSeen;
+    private Consumer<ZonedDateTime> lastSeenSync;
 
     @Builder
     public ScheduledState(String name, int updateId, String start, Integer brightness, Integer ct, Double x, Double y,
@@ -85,6 +87,8 @@ final class ScheduledState {
         copy.end = end;
         copy.temporary = true;
         copy.lastStart = start;
+        copy.lastSeen = state.lastSeen;
+        copy.lastSeenSync = state::setLastSeen;
         return copy;
     }
 
@@ -331,6 +335,13 @@ final class ScheduledState {
 
     private static BigDecimal getBigDecimal(Double value) {
         return new BigDecimal(value.toString()).setScale(3, RoundingMode.HALF_UP);
+    }
+
+    public void setLastSeen(ZonedDateTime lastSeen) {
+        this.lastSeen = lastSeen;
+        if (lastSeenSync != null) {
+            lastSeenSync.accept(lastSeen);
+        }
     }
 
     @Override

@@ -1908,6 +1908,42 @@ class HueSchedulerTest {
     }
 
     @Test
+    void run_execution_manualOverride_multipleStates_detectsChangesIfMadeDuringTemporaryCopy() {
+        trackerUserModifications = true;
+        create();
+
+        addState(1, now.plusHours(1), DEFAULT_BRIGHTNESS, DEFAULT_CT);
+        addState(1, now.plusHours(2), DEFAULT_BRIGHTNESS + 20, DEFAULT_CT);
+
+        startScheduler();
+
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(3);
+        ScheduledRunnable temporaryCopy = scheduledRunnables.get(0);
+        ScheduledRunnable firstState = scheduledRunnables.get(1);
+        ScheduledRunnable secondState = scheduledRunnables.get(2);
+
+        advanceTimeAndRunAndAssertReachablePutCall(temporaryCopy,
+                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 20).ct(DEFAULT_CT).build()); // runs through normally
+
+        // user modified light state before first state -> update skipped and retry scheduled
+        LightState userModifiedLightState = LightState.builder()
+                                                      .brightness(DEFAULT_BRIGHTNESS + 5)
+                                                      .colorTemperature(DEFAULT_CT)
+                                                      .reachable(true)
+                                                      .on(true)
+                                                      .build();
+        addLightStateResponse(1, userModifiedLightState);
+
+        setCurrentTimeToAndRun(firstState); // no update, as modification was detected
+
+        ensureScheduledStates(0);
+
+        setCurrentTimeToAndRun(secondState);  // no update, as modification was detected
+
+        ensureScheduledStates(0); // still overridden
+    }
+
+    @Test
     void run_execution_offState_manualOverride_offStateIsNotRescheduledWhenOn_skippedAllTogether() {
         trackerUserModifications = true;
         create();
