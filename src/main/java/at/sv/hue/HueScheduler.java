@@ -322,12 +322,14 @@ public final class HueScheduler implements Runnable {
             state.setLastSeen(currentTime.get());
             manualOverrideTracker.onAutomaticallyAssigned(state.getStatusId());
             retryWhenBackOn(ScheduledState.createTemporaryCopy(state, currentTime.get(), state.getEnd()));
-            reschedule(state, stateWasNotStartedToday(state));
+            reschedule(state, shouldEnforceNextDay(state));
         }, currentTime.get().plus(delayInMs, ChronoUnit.MILLIS), state.getEnd());
     }
 
-    private boolean stateWasNotStartedToday(ScheduledState state) {
-        return currentTime.get().toLocalTime().isAfter(state.getLastStart().toLocalTime()) || currentTime.get().toLocalTime().equals(state.getLastStart().toLocalTime());
+    private boolean shouldEnforceNextDay(ScheduledState state) {
+        LocalTime currentTime = this.currentTime.get().toLocalTime().truncatedTo(ChronoUnit.SECONDS).plusSeconds(1);
+        LocalTime stateStartTime = state.getLastStart().toLocalTime().truncatedTo(ChronoUnit.SECONDS);
+        return currentTime.isAfter(stateStartTime) || currentTime.equals(stateStartTime);
     }
 
     private boolean lightHasBeenManuallyOverriddenBefore(ScheduledState state) {
