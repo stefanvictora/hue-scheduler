@@ -69,7 +69,6 @@ public final class InputConfigurationParser {
             Integer transitionTime = null;
             String effect = null;
             EnumSet<DayOfWeek> dayOfWeeks = EnumSet.noneOf(DayOfWeek.class);
-            Boolean confirm = null;
             for (int i = 2; i < parts.length; i++) {
                 String part = parts[i];
                 String[] typeAndValue = part.split(":");
