@@ -50,7 +50,7 @@ class HueSchedulerTest {
     private int multiColorAdjustmentDelay;
     private StartTimeProviderImpl startTimeProvider;
     private boolean controlGroupLightsIndividually;
-    private boolean trackerUserModifications;
+    private boolean disableUserModificationTracking;
     private HueApi mockedHueApi;
     private InOrder orderVerifier;
 
@@ -92,7 +92,7 @@ class HueSchedulerTest {
 
     private void create() {
         scheduler = new HueScheduler(mockedHueApi, stateScheduler, startTimeProvider,
-                () -> now, 10.0, controlGroupLightsIndividually, trackerUserModifications,
+                () -> now, 10.0, controlGroupLightsIndividually, disableUserModificationTracking,
                 0, connectionFailureRetryDelay, multiColorAdjustmentDelay);
         manualOverrideTracker = scheduler.getManualOverrideTracker();
     }
@@ -313,6 +313,10 @@ class HueSchedulerTest {
         return when(mockedHueApi.putState(anyInt(), any(), any(), any(), any(), any(), any(), any(), any(), any(), anyBoolean()));
     }
 
+    private void enableUserModificationTracking() {
+        disableUserModificationTracking = false;
+    }
+
     @BeforeEach
     void setUp() {
         mockedHueApi = mock(HueApi.class);
@@ -328,7 +332,7 @@ class HueSchedulerTest {
         defaultCapabilities = new LightCapabilities(gamut, 153, 500);
         multiColorAdjustmentDelay = 4;
         controlGroupLightsIndividually = false;
-        trackerUserModifications = false;
+        disableUserModificationTracking = true;
         create();
     }
 
@@ -1736,7 +1740,7 @@ class HueSchedulerTest {
 
     @Test
     void run_execution_multipleStates_userChangedStateManuallyBetweenStates_secondStateIsNotApplied_untilPowerCycle() {
-        trackerUserModifications = true;
+        enableUserModificationTracking();
         create();
 
         addState(1, now, DEFAULT_BRIGHTNESS, DEFAULT_CT);
@@ -1780,7 +1784,7 @@ class HueSchedulerTest {
 
     @Test
     void run_execution_manualOverride_stateIsDirectlyScheduledWhenOn() {
-        trackerUserModifications = true;
+        enableUserModificationTracking();
         create();
 
         addDefaultState();
@@ -1798,7 +1802,7 @@ class HueSchedulerTest {
 
     @Test
     void run_execution_manualOverride_stateIsDirectlyScheduledWhenOn_calculatesCorrectNextStart() {
-        trackerUserModifications = true;
+        enableUserModificationTracking();
         create();
 
         addDefaultState();
@@ -1816,7 +1820,7 @@ class HueSchedulerTest {
 
     @Test
     void run_execution_manualOverride_multipleStates_powerOnAfterNextDayStart_beforeNextState_reschedulesImmediately() {
-        trackerUserModifications = true;
+        enableUserModificationTracking();
         create();
 
         addState(1, now, DEFAULT_BRIGHTNESS, DEFAULT_CT);
@@ -1844,7 +1848,7 @@ class HueSchedulerTest {
 
     @Test
     void run_execution_manualOverride_multipleStates_powerOnAfterNextDayStart_afterNextState_rescheduledNextDay() {
-        trackerUserModifications = true;
+        enableUserModificationTracking();
         create();
 
         addState(1, now, DEFAULT_BRIGHTNESS, DEFAULT_CT);
@@ -1873,7 +1877,7 @@ class HueSchedulerTest {
 
     @Test
     void run_execution_manualOverride_forDynamicSunTimes_turnedOnEventOnlyNextDay_correctlyReschedulesStateOnSameDay() {
-        trackerUserModifications = true;
+        enableUserModificationTracking();
         create();
         ZonedDateTime sunrise = startTimeProvider.getStart("sunrise", now);
         ZonedDateTime nextDaySunrise = startTimeProvider.getStart("sunrise", now.plusDays(1));
@@ -1909,7 +1913,7 @@ class HueSchedulerTest {
 
     @Test
     void run_execution_manualOverride_multipleStates_detectsChangesIfMadeDuringTemporaryCopy() {
-        trackerUserModifications = true;
+        enableUserModificationTracking();
         create();
 
         addState(1, now.plusHours(1), DEFAULT_BRIGHTNESS, DEFAULT_CT);
@@ -1945,7 +1949,7 @@ class HueSchedulerTest {
 
     @Test
     void run_execution_manualOverride_forceProperty_ignored() {
-        trackerUserModifications = true;
+        enableUserModificationTracking();
         create();
 
         addState(1, now, DEFAULT_BRIGHTNESS, DEFAULT_CT);
@@ -1977,7 +1981,7 @@ class HueSchedulerTest {
 
     @Test
     void run_execution_offState_manualOverride_offStateIsNotRescheduledWhenOn_skippedAllTogether() {
-        trackerUserModifications = true;
+        enableUserModificationTracking();
         create();
 
         addOffState();

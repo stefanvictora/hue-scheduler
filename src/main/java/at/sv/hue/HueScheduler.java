@@ -56,10 +56,10 @@ public final class HueScheduler implements Runnable {
             description = "Experimental: If the lights in a group should be controlled individually instead of using broadcast messages." +
                     " This might improve performance. Default: ${DEFAULT-VALUE}")
     boolean controlGroupLightsIndividually;
-    @Option(names = "--track-user-changes", defaultValue = "true",
-            description = "Experimental: TODO." +
-                    ". Default: ${DEFAULT-VALUE}")
-    boolean trackUserModifications;
+    @Option(names = "--disable-user-modification-tracking", defaultValue = "false",
+            description = "Globally disable tracking of user modifications which would pause their schedules until they are turned off and on again." +
+                    " Default: ${DEFAULT-VALUE}")
+    boolean disableUserModificationTracking;
     @Option(names = "--power-on-reschedule-delay", paramLabel = "<delay>", defaultValue = "150",
             description = "The delay in ms after the light on-event was received and the current state should be rescheduled again. Default: ${DEFAULT-VALUE} ms.")
     int powerOnRescheduleDelayInMs;
@@ -71,6 +71,10 @@ public final class HueScheduler implements Runnable {
             description = "The adjustment delay in seconds for each light in a group when using the multi_color effect." +
                     " Adjust to change the hue values of 'neighboring' lights. Default: ${DEFAULT-VALUE} seconds.")
     int multiColorAdjustmentDelay;
+    @Option(names = "--event-stream-read-timeout", paramLabel = "<timout>", defaultValue = "120",
+            description = "The read timeout of the API v2 SSE event stream in minutes. " +
+                    "The connection is automatically restored after a timeout. Default: ${DEFAULT-VALUE} minutes.")
+    int eventStreamReadTimeoutInMinutes;
     private HueApi hueApi;
     private StateScheduler stateScheduler;
     private final ManualOverrideTracker manualOverrideTracker;
@@ -88,7 +92,7 @@ public final class HueScheduler implements Runnable {
     public HueScheduler(HueApi hueApi, StateScheduler stateScheduler,
                         StartTimeProvider startTimeProvider, Supplier<ZonedDateTime> currentTime,
                         double requestsPerSecond, boolean controlGroupLightsIndividually,
-                        boolean trackUserModifications, int powerOnRescheduleDelayInMs,
+                        boolean disableUserModificationTracking, int powerOnRescheduleDelayInMs,
                         int bridgeFailureRetryDelayInSeconds, int multiColorAdjustmentDelay) {
         this();
         this.hueApi = hueApi;
@@ -97,7 +101,7 @@ public final class HueScheduler implements Runnable {
         this.currentTime = currentTime;
         this.requestsPerSecond = requestsPerSecond;
         this.controlGroupLightsIndividually = controlGroupLightsIndividually;
-        this.trackUserModifications = trackUserModifications;
+        this.disableUserModificationTracking = disableUserModificationTracking;
         this.powerOnRescheduleDelayInMs = powerOnRescheduleDelayInMs;
         this.bridgeFailureRetryDelayInSeconds = bridgeFailureRetryDelayInSeconds;
         this.multiColorAdjustmentDelay = multiColorAdjustmentDelay;
@@ -117,7 +121,7 @@ public final class HueScheduler implements Runnable {
         startTimeProvider = createStartTimeProvider(latitude, longitude, elevation);
         stateScheduler = createStateScheduler();
         currentTime = ZonedDateTime::now;
-        new LightStateEventTrackerImpl(ip, username, httpsClient, new HueRawEventHandler(hueEventListener)).start();
+        new LightStateEventTrackerImpl(ip, username, httpsClient, new HueRawEventHandler(hueEventListener), eventStreamReadTimeoutInMinutes).start();
         assertInputIsReadable();
         assertConnectionAndStart();
     }
@@ -333,11 +337,11 @@ public final class HueScheduler implements Runnable {
     }
 
     private boolean lightHasBeenManuallyOverriddenBefore(ScheduledState state) {
-        return trackUserModifications && manualOverrideTracker.isManuallyOverridden(state.getStatusId());
+        return !disableUserModificationTracking && manualOverrideTracker.isManuallyOverridden(state.getStatusId());
     }
 
     private boolean stateIsNotEnforced(ScheduledState state) {
-        return trackUserModifications && !state.isForced() && !manualOverrideTracker.shouldEnforceSchedule(state.getStatusId());
+        return !disableUserModificationTracking && !state.isForced() && !manualOverrideTracker.shouldEnforceSchedule(state.getStatusId());
     }
 
     private boolean stateHasBeenManuallyOverriddenSinceLastSeen(ScheduledState currentState) {

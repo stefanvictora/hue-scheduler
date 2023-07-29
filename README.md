@@ -274,11 +274,11 @@ To summarize: `tr-before` allows you to define longer and smoother transitions w
 
 ## Advanced Command Line Options
      
-### `--track-user-changes`
+### `--disable-user-modification-tracking`
                  
-Flag to globally disable tracking user modifications of lights. Per default Hue Scheduler compares the previously seen state with the current state of the light and only sets the expected scheduled state if no manual modifications have been made in between. If this 
+Flag to globally disable tracking of user modifications of lights. Per default Hue Scheduler compares the previously seen state with the current state of the light and only sets the expected scheduled state if no manual modifications have been made in between. To enforce just a single state, you can use the state-based configuration property of `force:true`. 
 
-**Default**: true
+**Default**: false
 
 ### `--max-requests-per-second`
 
@@ -321,6 +321,12 @@ The delay in seconds for retrying an API call, if the bridge could not be reache
 The delay in ms after the light on-event was received and the current state should be rescheduled.
 
 **Default**: `150` ms
+
+### `--event-stream-read-timeout`
+
+Configures the read timeout of the API v2 SSE event stream in minutes. The connection is automatically restored after a timeout. The default of 2 hours may change in the future after more empirical results of the new event stream.
+
+**Default**: `120` minutes
 
 ### `-Dlog.level`
 

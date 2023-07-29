@@ -17,11 +17,12 @@ public class LightStateEventTrackerImpl {
     private final HueRawEventHandler hueRawEventHandler;
     private final OkHttpClient httpsClient;
 
-    public LightStateEventTrackerImpl(String ip, String apiKey, OkHttpClient httpsClient, HueRawEventHandler eventHandler) {
+    public LightStateEventTrackerImpl(String ip, String apiKey, OkHttpClient httpsClient, HueRawEventHandler eventHandler,
+                                      int eventStreamReadTimeoutInMinutes) {
         this.apiKey = apiKey;
         this.httpsClient = httpsClient.newBuilder()
                                       .connectTimeout(Duration.ofSeconds(15))
-                                      .readTimeout(Duration.ofHours(2))
+                                      .readTimeout(Duration.ofMinutes(eventStreamReadTimeoutInMinutes))
                                       .build();
         this.hueRawEventHandler = eventHandler;
         eventUrl = createUrl("https://" + ip + "/eventstream/clip/v2");
