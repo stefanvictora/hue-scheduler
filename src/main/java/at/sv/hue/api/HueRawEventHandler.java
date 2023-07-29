@@ -27,12 +27,12 @@ public final class HueRawEventHandler implements BackgroundEventHandler {
 
     @Override
     public void onOpen() {
-        log.trace("Hue event stream handler opened");
+        log.info("Hue event stream handler opened");
     }
 
     @Override
     public void onClosed() {
-        log.trace("Hue event stream handler closed");
+        log.debug("Hue event stream handler closed");
     }
 
     @Override
@@ -55,7 +55,7 @@ public final class HueRawEventHandler implements BackgroundEventHandler {
 
     @Override
     public void onError(Throwable t) {
-        log.error("An error occurred during event stream processing", t);
+        log.error("An error occurred during event stream processing: {}", t.getLocalizedMessage());
     }
 
     @Data
