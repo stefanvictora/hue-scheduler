@@ -41,6 +41,7 @@ final class ScheduledState {
     private final String effect;
     private final EnumSet<DayOfWeek> daysOfWeek;
     private final boolean groupState;
+    private final Boolean force;
     private final List<Integer> groupLights;
     private final LightCapabilities capabilities;
     private ZonedDateTime end;
@@ -53,7 +54,7 @@ final class ScheduledState {
     public ScheduledState(String name, int updateId, String start, Integer brightness, Integer ct, Double x, Double y,
                           Integer hue, Integer sat, String effect, Boolean on, Integer transitionTimeBefore, Integer transitionTime,
                           EnumSet<DayOfWeek> daysOfWeek, StartTimeProvider startTimeProvider, boolean groupState,
-                          List<Integer> groupLights, LightCapabilities capabilities) {
+                          List<Integer> groupLights, LightCapabilities capabilities, Boolean force) {
         this.name = name;
         this.updateId = updateId;
         this.start = start;
@@ -76,6 +77,7 @@ final class ScheduledState {
         this.transitionTime = assertValidTransitionTime(transitionTime);
         this.transitionTimeBefore = assertValidTransitionTime(transitionTimeBefore);
         this.startTimeProvider = startTimeProvider;
+        this.force = force;
         temporary = false;
         assertColorCapabilities();
     }
@@ -83,7 +85,8 @@ final class ScheduledState {
     public static ScheduledState createTemporaryCopy(ScheduledState state, ZonedDateTime start, ZonedDateTime end) {
         ScheduledState copy = new ScheduledState(state.name, state.updateId, start.toLocalTime().toString(),
                 state.brightness, state.ct, state.x, state.y, state.hue, state.sat, state.effect, state.on, state.transitionTimeBefore,
-                state.transitionTime, state.daysOfWeek, state.startTimeProvider, state.groupState, state.groupLights, state.capabilities);
+                state.transitionTime, state.daysOfWeek, state.startTimeProvider, state.groupState, state.groupLights,
+                state.capabilities, state.force);
         copy.end = end;
         copy.temporary = true;
         copy.lastStart = start;
@@ -344,6 +347,10 @@ final class ScheduledState {
         }
     }
 
+    public boolean isForced() {
+        return force == Boolean.TRUE;
+    }
+
     @Override
     public String toString() {
         return getFormattedName() + " {" +
@@ -363,6 +370,7 @@ final class ScheduledState {
                 getFormattedTransitionTimeIfSet("transitionTimeBefore", transitionTimeBefore) +
                 getFormattedTransitionTimeIfSet("transitionTime", transitionTime) +
                 getFormattedPropertyIfSet("lastSeen", getFormattedTime(lastSeen)) +
+                getFormattedPropertyIfSet("force", force) +
                 '}';
     }
 

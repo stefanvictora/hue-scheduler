@@ -337,7 +337,7 @@ public final class HueScheduler implements Runnable {
     }
 
     private boolean stateIsNotEnforced(ScheduledState state) {
-        return trackUserModifications && !manualOverrideTracker.shouldEnforceSchedule(state.getStatusId()); // TODO: I think it would make sense to have a logic that also ENFORCES states regardless of user changes
+        return trackUserModifications && !state.isForced() && !manualOverrideTracker.shouldEnforceSchedule(state.getStatusId());
     }
 
     private boolean stateHasBeenManuallyOverriddenSinceLastSeen(ScheduledState currentState) {

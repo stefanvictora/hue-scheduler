@@ -1944,6 +1944,38 @@ class HueSchedulerTest {
     }
 
     @Test
+    void run_execution_manualOverride_forceProperty_ignored() {
+        trackerUserModifications = true;
+        create();
+
+        addState(1, now, DEFAULT_BRIGHTNESS, DEFAULT_CT);
+        addState(1, now.plusHours(1),"bri:" + (DEFAULT_BRIGHTNESS + 10), "force:true");
+
+        startScheduler();
+
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(2);
+        ScheduledRunnable firstState = scheduledRunnables.get(0);
+        ScheduledRunnable secondState = scheduledRunnables.get(1);
+
+        advanceTimeAndRunAndAssertReachablePutCall(firstState, DEFAULT_PUT_CALL);
+        ensureRunnable(initialNow.plusDays(1)); // for next day
+
+        // user modified light state between first and second state -> update skipped and retry scheduled
+        LightState userModifiedLightState = LightState.builder()
+                                                      .brightness(DEFAULT_BRIGHTNESS + 5)
+                                                      .colorTemperature(DEFAULT_CT)
+                                                      .reachable(true)
+                                                      .on(true)
+                                                      .build();
+        addLightStateResponse(1, userModifiedLightState);
+        
+        advanceTimeAndRunAndAssertReachablePutCall(secondState,
+                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 10).build()); // enforced despite user changes
+
+        ensureRunnable(initialNow.plusHours(1).plusDays(1), initialNow.plusDays(2)); // for next day
+    }
+
+    @Test
     void run_execution_offState_manualOverride_offStateIsNotRescheduledWhenOn_skippedAllTogether() {
         trackerUserModifications = true;
         create();
