@@ -7,10 +7,10 @@
 ### Added
 - Added support for the new Hue API v2 event stream
 - Switched to HTTPS for communicating with the Hue bridge (requires an up-to-date Hue bridge firmware)
-- New user modification tracking for lights. Such changes automatically disable any schedules for the light, until it has been turned off and on again.
+- New **user modification tracking for lights**. If such changes are detected, any schedules for the affected light are automatically disabled until the light has been turned off and on again.
 - New `--disable-user-modification-tracking` global configuration flag (default: `false`) to disable the new user modification tracking feature
 - New `force:true` state configuration property to always enforce light states despite possible user modifications (default: `false`)
-- Added advanced and internal `--event-stream-read-timeout` configuration flag, for fine-grained event stream controls. 
+- Added advanced and internal `--event-stream-read-timeout` configuration flag, for fine-grained event stream controls.
 
 ### Changed
 - Retry logic for unreachable lights has been replaced with light-on event tracking
