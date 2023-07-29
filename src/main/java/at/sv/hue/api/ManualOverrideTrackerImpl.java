@@ -39,7 +39,7 @@ public class ManualOverrideTrackerImpl implements ManualOverrideTracker {
     @Override
     public void onAutomaticallyAssigned(long lightId) {
         TrackedState trackedState = getOrCreateTrackedState(lightId);
-        trackedState.setManuallyOverridden(false);
+        trackedState.setManuallyOverridden(false);  // maybe not needed, as this flag is overridden also on light-on events
         trackedState.setEnforceSchedule(false);
     }
 

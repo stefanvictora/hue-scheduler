@@ -61,7 +61,7 @@ public final class HueScheduler implements Runnable {
                     ". Default: ${DEFAULT-VALUE}")
     boolean trackUserModifications;
     @Option(names = "--power-on-reschedule-delay", paramLabel = "<delay>", defaultValue = "150",
-            description = "The delay in ms after the light on-event was received between each confirmation. Default: ${DEFAULT-VALUE} ms.")
+            description = "The delay in ms after the light on-event was received and the current state should be rescheduled again. Default: ${DEFAULT-VALUE} ms.")
     int powerOnRescheduleDelayInMs;
     @Option(names = "--bridge-failure-retry-delay", paramLabel = "<delay>", defaultValue = "10",
             description = "The delay in seconds for retrying an API call, if the bridge could not be reached due to " +

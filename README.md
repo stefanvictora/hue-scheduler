@@ -6,26 +6,30 @@
 
 > With Hue Scheduler, you can improve your alertness during the day and relax in the evening by automatically adjusting your Philips Hue lights according to the time of day, the position of the sun and the day of the week.
 
-Compared to other approaches, such as Apple's Adaptive Lighting, Hue Scheduler lets you additionally control the brightness, color, and even the on-state of your lights. Furthermore, Hue Scheduler was designed to work well with dumb wall switches that physically turn off your lights, as it will keep trying to set their preferred state until they are reachable again.
+Compared to other approaches, such as Apple's Adaptive Lighting, Hue Scheduler lets you additionally control the brightness, color, and even the on-state of your lights. Furthermore, it was designed to work well with dumb wall switches that physically turn off your lights, as it reschedules each state until they become reachable again. Since version 0.8.0 Hue Scheduler uses the Hue API v2 event stream for detecting when lights have been turned on, further increasing its response time.
 
 ## Demo
 
 ~~~yacas
-# Energize ⚡
+# Energize
 Office        sunrise     bri:254  ct:6500  tr:10s  days:Mo-Fr
-# Concentrate 💪
+# Concentrate
 Office	      sunrise+90  ct:5000  tr-before:20min  days:Mo-Fr
-# Wind down 💤
+# Wind down
 Office        sunset      bri:200  ct:3000  tr-before:20min  days:Mo-Fr
-# Garden lights 🌆
+
+# Garden lights
 Garden        civil_dusk  on:true  bri:254  tr:1min
 Garden        01:00       on:false tr:5min
-# Party 🎉
+
+# Party
 Living room   22:00       bri:100  sat:150  effect:multi_colorloop  days:Fr,Sa
 Kitchen       22:00       color:#00835C     days:Fr,Sa
 ~~~
 
-In this example, the lights in your (home) office are set to a bright and blue white at sunrise for an energetic start to your day. Ninety minutes after sunrise, the color temperature is set to a more neutral white for prolonged concentrated work. Finally, the light is dimmed slightly to a warmer temperature as the sun sets. Each time with a smooth 20 minute transition.
+In this example, the lights in your (home) office are set to a bright and blue white at sunrise for an energetic start to your day. Ninety minutes after sunrise, the color temperature is set to a more neutral white for prolonged concentrated work. Finally, the light is dimmed slightly to a warmer temperature as the sun sets. Each time with a smooth 20-minute transition. With this simple configuration you can create fine-grained schedules that are enforced by Hue Scheduler.
+
+Since version 0.8.0 Hue Scheduler also **keeps track of any manual adjustments** to your lights and automatically disables the schedule for the affected lights, until they have been turned off and on again. This gives you the convenience of automatic schedules while still retaining manual control of certain lights when needed. After the manually adjusted lights have been turned off and on, Hue Scheduler automatically reschedules the expected state again. 
 
 *Note: Hue Scheduler does not automatically turn on your lights (unless explicitly told with ``on:true``), so you retain control over the state of your lights, while Hue Scheduler does all the heavy lifting of adjusting them to your defined schedule.*
 
@@ -34,7 +38,7 @@ In this example, the lights in your (home) office are set to a bright and blue w
 You need at least:
 
 - Java 8
-- A Philips Hue Bridge
+- An up-to-date Philips Hue Bridge
 - A computer or device (e.g. a Raspberry Pi) running continuously on your network
 
 ## Setup
@@ -82,11 +86,11 @@ java -jar hue-scheduler.jar <ip> <username> --lat=<latitude> --long=<longitude> 
 
 - **FILE**: The file path to your configured light schedules. The format is described in detail below.
 
-## Configuration File
+## Configuration
 
-To configure your light schedules, Hue Scheduler uses a simple text based file format, where each line corresponds to one light configuration. Comment lines can start with either `#` or `//`. Empty lines are ignored.
+To configure your light schedules, Hue Scheduler uses a simple **text based file format**, where each line corresponds to one light configuration. Comment lines can start with either `#` or `//`. Empty lines are ignored.
 
-Each line contains the following parts, separated either by a tab character or at least two spaces:
+Each line contains the following parts, separated either by a tab character or at least two spaces (recommended):
 
 ~~~yacas
 <Light/Group Name or ID>    <Start Time Expression>    [<Property>:<Value>]*
@@ -108,9 +112,11 @@ Note: If you have a group and light with the same name, Hue Scheduler prefers th
 
 To **improve your Hue system performance**, it might be beneficial to control your lights individually instead of using groups, as groups require broadcast messages that can impact overall Hue performance. You can tell Hue Scheduler to automatically control groups as individual lights by enabling the experimental *--control-group-lights-individually* command line option.
 
+**If you don't want to use light or group names** in your configuration file, you can ****lookup their respective IDs**** by sending a GET request to either the `/api/<username>/lights` or `/api/<username>/groups` endpoint of your Philips Hue Bridge. The response will contain a list of all your lights and groups in your system.
+
 ### `<Start Time Expression>`
 
-Either a fixed start time in the 24 hour format ``HH:mm:ss``, or a dynamic sun time expression. The following dynamic **sun time constants** are available, sorted in their chronological order:
+For each configured state, either a fixed start time in the 24-hour format ``HH:mm:ss``, or a dynamic sun time expression has to be provided. The following dynamic **sun time constants** are available, sorted in their chronological order:
 
 - ``astronomical_dawn``: e.g. `03:26`
 - ``nautical_dawn``: e.g. `04:17`
@@ -136,9 +142,34 @@ For example: ``sunset-30`` adjusts the start time to 30 minutes before sunset, a
 
 Further details about the different sun times can be found at [Twilight - Wikipedia](https://en.wikipedia.org/wiki/Twilight) and [Twilight - commons-suncalc](https://shredzone.org/maven/commons-suncalc/usage.html#twilight).
 
+**FAQ: How Does Hue Scheduler Determine the End of States?**
+
+To simplify the configuration and prevent gaps in your schedule, Hue Scheduler automatically sets the end time based on the start time of the following state for the same light.
+
+For example, the definition:
+
+  ~~~yacas
+Hallway  07:00       bri:254
+Hallway  civil_dusk  bri:150
+  ~~~
+
+results in the following **dynamic intervals**, which are adjusted each day based on the sun times:
+
+- **07:00–civil_dusk**: bri:254
+- **civil_dusk–07:00**: bri:150
+
+In order to **create gaps in your schedule**, you can set the end time of a state manually by simply defining a state with no properties. For example:
+
+  ~~~yacas
+Hallway  07:00  bri:254
+Hallway  10:00
+  ~~~
+
+In this case only the interval **07:00–10:00** is created. If you turn your lights on after `10:00` or before `7:00`, Hue Scheduler would not enforce any sate for the light.
+
 ### `[<Property>:<Value>]*`
 
-An arbitrary number of properties to control the lights state at the given time.
+To control the state of your lights in the given interval, an arbitrary number of properties can be provided for each configuration line.
 
 #### Basic Properties
 
@@ -162,6 +193,14 @@ An arbitrary number of properties to control the lights state at the given time.
 
 - `days`: defines the **days of week** on which the defined state should be active. Supported values: [`Mo|Mon` | `Tu|Tue|Di` | `We|Wen|Mi` | `Th|Thu|Do` | `Fr|Fri` | `Sa|Sat` | `Su|Sun|So`]. You can either separate the desired days by `,` or use `-` to define a range. Or use a combination of both. For example: `days:Mo-We,Fr-Su`. Hue Scheduler also supports ranges crossing over the end of the week, for example: `Sa-Tu`, which is a shorthand for `Mo,Tu,Sa,Su`.
 
+    ~~~yacas
+    Office        sunrise     bri:254  ct:6500  tr:10s  days:Mo-Fr
+    Office        sunset      bri:200  ct:3000  tr-before:20min  days:Mo-Fr
+
+    Living room   22:00       bri:100  sat:150  effect:multi_colorloop  days:Fr,Sa
+    Living room   23:59       days:Fr,Sa
+    ~~~
+
 #### Color-Related Properties
 
 Hue Scheduler offers several ways to define the color of support lights.
@@ -177,6 +216,16 @@ Hue Scheduler offers several ways to define the color of support lights.
   The `multi_colorloop` is only applicable to groups, as Hue Scheduler adjusts each light in the group to have a different starting hue value during the loop. This is achieved by turning each light in the group on and off, while waiting a set number of seconds in between. The exact wait time can be adjusted through the optional `--multi-color-adjustment-delay` command line argument, which results in different hue offsets between the lights.
 
 - ``x`` and ``y``: (advanced) modifies the **color** directly based on the x and y coordinates of a color in the [CIE color space](https://en.wikipedia.org/wiki/CIE_1931_color_space): [``0.0``-``1.0``]. This is useful if you want to set the color to the exact value you got from the Hue API after setting the color manually via an app. For example: `x:0.1652  y=0.3103` Cannot be combined with other color properties.
+        
+**Examples**:
+~~~yacas
+Desk  10:00  color:#3CD0E2
+Desk  11:00  color:60, 208, 226
+Desk  12:00  hue:2000  sat:100
+Desk  13:00  effect:colorloop
+Desk  14:00  effect:none
+Desk  15:00  x:0.1652  y=0.3103
+~~~
 
 #### Transition Time-Related Properties
 
@@ -210,15 +259,28 @@ Hue Scheduler offers two different transition time properties, which can be comb
 
 To summarize: `tr-before` allows you to define longer and smoother transitions when the lights are already on, without having to wait the same time if you would turn on your lights at a later time.
 
+#### Advanced Properties
+
+- `force`: defines whether Hue Scheduler should **enforce the state despite user modifications**: [`true`|`false`]. This is only relevant if user modification tracking is not disabled (see `--track-user-changes`). Default: `false`.
+
+  ~~~yacas
+  Office  09:00  bri:254  ct:6500
+  Office  sunset bri:200  ct:3000  force:true
+  ~~~
+  
+  In this example the sunset state would always be set, even if the light has been manually been adjusted since the morning.
+    
+  **Note**: Lights that are turned off and on again are always enforced, regardless of the `force` property. The `force` property is only relevant if you want to reset manual adjustments while the lights are continuously on.
+
 ## Advanced Command Line Options
      
 ### `--track-user-changes`
                  
-TODO
+Flag to globally disable tracking user modifications of lights. Per default Hue Scheduler compares the previously seen state with the current state of the light and only sets the expected scheduled state if no manual modifications have been made in between. If this 
 
 **Default**: true
 
-#### `--max-requests-per-second`
+### `--max-requests-per-second`
 
 The maximum number of PUT API requests Hue Scheduler is allowed to perform per second. The official Hue API Documentation recommends keeping this at 10 requests per second, or else the bridge might drop some requests.
 
@@ -232,7 +294,7 @@ To still benefit from the ease of use of groups, while improving overall system 
 
 **Default and recommended**: `10` requests per second
 
-#### `--control-group-lights-individually`
+### `--control-group-lights-individually`
 
 *Experimental*
 
@@ -242,13 +304,13 @@ Note: At the moment, Hue Scheduler does not validate in such cases if all the li
 
 **Default**: false
 
-#### `--multi-color-adjustment-delay`
+### `--multi-color-adjustment-delay`
 
 The adjustment delay in seconds for each light in a group when using the multi_color effect. Adjust this parameter to change the hue values of 'neighboring' lights.
 
 **Default**: `4` seconds
 
-#### `--bridge-failure-retry-delay`
+### `--bridge-failure-retry-delay`
 
 The delay in seconds for retrying an API call, if the bridge could not be reached due to network failure, or if it returned an API error code.
 
@@ -256,18 +318,18 @@ The delay in seconds for retrying an API call, if the bridge could not be reache
 
 ### `--power-on-reschedule-delay`
 
-TODO
+The delay in ms after the light on-event was received and the current state should be rescheduled.
 
 **Default**: `150` ms
 
-#### `-Dlog.level`
+### `-Dlog.level`
 
 A JVM argument to configure the log level of Hue Scheduler. The following values are available:
 
 - `ERROR`: Only logs if the API returned with an error code. This should most likely never occur.
 - `WARN`: Additionally logs if the bridge is not reachable, and Hue Scheduler retries
 - `INFO`: Logs when a light state has been set, as well as the current sun times for each day.
-- `DEBUG` (default): Logs every scheduled state; if a state has already ended.
+- `DEBUG` (default): Logs every scheduled state; if a state has already ended; or a manual override has been detected.
 - `TRACE`: Maximum logs, including all performed API requests and enforced wait times due to rate limiting.
 
 Note: The JVM argument needs to be defined before the jar file. For example:
@@ -370,34 +432,13 @@ This creates the runnable jar `target\hue-scheduler.jar` containing all dependen
 
 ## FAQ
 
-### How Does Hue Scheduler Determine the End of States?
+### Why is There a Short Delay When Physically Turning Lights on?
 
-To simplify the configuration and prevent gaps in your schedule, Hue Scheduler automatically sets the end time based on the start time of the following state for the same light. 
-
-For example, the definition:
-
-  ~~~yacas
-Hallway  07:00       bri:254
-Hallway  civil_dusk  bri:150
-  ~~~
-
-results in the following dynamic **intervals**, which are adjusted each day based on the sun times:
-
-  - **07:00–civil_dusk**: bri:254
-  - **civil_dusk–07:00**: bri:150
-
-In order to create gaps in your schedule, you can set the end time of a state manually by simply defining a state with no properties. For example:
-
-  ~~~yacas
-Hallway  07:00  bri:254
-Hallway  10:00
-  ~~~
-
-In this case only the interval **07:00–10:00** is created. If you turn your lights on after `10:00` or before `7:00`, Hue Scheduler would not enforce any sate for the light.
+This is a known limitation of the Hue Bridge. Currently, there is delay of around 3-4 seconds until physically turned on lights are detected as available again. In contrast, lights turned on via smart switches or an app are detected as available almost instantly.
 
 ### How Does Hue Scheduler Compare to Adaptive Lighting?
 
-Both approaches try to automate your lights state according to the time of day. However, Adaptive Lighting only updates the color temperature of your lights throughout the day, while Hue Scheduler additionally gives you control over your lights brightness, color, and even on-state. Furthermore, while Adaptive Lighting continuously updates your lights state with no manual control, Hue Scheduler gives you more freedom to configure your own schedule, and even allows you to temporarily take over control until the next state starts.
+Both approaches try to automate your lights state according to the time of day. However, Adaptive Lighting only updates the color temperature of your lights throughout the day, while Hue Scheduler additionally gives you control over your lights brightness, color, and even on-state. Furthermore, while Adaptive Lighting continuously updates your lights state with no manual control, Hue Scheduler gives you more freedom to configure your own schedule, and even allows you to take over and keep control of lights until you turn them on and off again.
 
 ### Does Hue Scheduler Access The Internet?
 
@@ -407,11 +448,7 @@ The dynamic sun times are also calculated locally using the [shred/commons-sunca
 
 ### Does Hue Scheduler Work With Motion Sensors?
 
-Yes, but you need to use a third-party app like iConnectHue to configure your motion sensor to only adjust the brightness of your lights, not the color or color temperature. Otherwise, it would override these properties every time the sensor is activated.
-
-### How Can I Lookup the IDs of My Lights?
-
-If you don't want to use light or group names in your configuration file, you can lookup their respective IDs by sending a GET request to either the `/api/<username>/lights` or `/api/<username>/groups` endpoint of your Philips Hue Bridge.
+Yes, but you should probably use a third-party app like iConnectHue to configure your motion sensor to only adjust the brightness of your lights, not the color or color temperature. Otherwise, the color or color temperature of your lights would switch between the sensor set values and the ones scheduled by Hue Scheduler, causing some flicker every time the sensor is activated.
 
 ### How Does Hue Scheduler Check If a Group Is Reachable?
 
