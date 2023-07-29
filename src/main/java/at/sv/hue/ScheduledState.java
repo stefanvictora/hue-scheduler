@@ -1,19 +1,25 @@
 package at.sv.hue;
 
 import at.sv.hue.api.LightCapabilities;
+import at.sv.hue.api.LightState;
 import at.sv.hue.time.StartTimeProvider;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.Setter;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.EnumSet;
-import java.util.List;
+import java.util.*;
+import java.util.function.Consumer;
 
+@Getter
+@Setter
 final class ScheduledState {
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
     private static final String MULTI_COLOR_LOOP = "multi_colorloop";
@@ -22,7 +28,6 @@ final class ScheduledState {
     private final String name;
     private final int updateId;
     private final String start;
-    private final Boolean confirm;
     private final Integer brightness;
     private final Integer ct;
     private final Double x;
@@ -36,22 +41,24 @@ final class ScheduledState {
     private final String effect;
     private final EnumSet<DayOfWeek> daysOfWeek;
     private final boolean groupState;
+    private final Boolean force;
     private final List<Integer> groupLights;
     private final LightCapabilities capabilities;
-    private int confirmCounter;
     private ZonedDateTime end;
     private ZonedDateTime lastStart;
     private boolean temporary;
+    private ZonedDateTime lastSeen;
+    private Consumer<ZonedDateTime> lastSeenSync;
 
+    @Builder
     public ScheduledState(String name, int updateId, String start, Integer brightness, Integer ct, Double x, Double y,
                           Integer hue, Integer sat, String effect, Boolean on, Integer transitionTimeBefore, Integer transitionTime,
-                          EnumSet<DayOfWeek> daysOfWeek, Boolean confirm, StartTimeProvider startTimeProvider, boolean groupState,
-                          List<Integer> groupLights, LightCapabilities capabilities) {
+                          EnumSet<DayOfWeek> daysOfWeek, StartTimeProvider startTimeProvider, boolean groupState,
+                          List<Integer> groupLights, LightCapabilities capabilities, Boolean force) {
         this.name = name;
         this.updateId = updateId;
         this.start = start;
-        this.confirm = confirm;
-        if (daysOfWeek.isEmpty()) {
+        if (daysOfWeek == null || daysOfWeek.isEmpty()) {
             this.daysOfWeek = EnumSet.allOf(DayOfWeek.class);
         } else {
             this.daysOfWeek = EnumSet.copyOf(daysOfWeek);
@@ -70,7 +77,7 @@ final class ScheduledState {
         this.transitionTime = assertValidTransitionTime(transitionTime);
         this.transitionTimeBefore = assertValidTransitionTime(transitionTimeBefore);
         this.startTimeProvider = startTimeProvider;
-        confirmCounter = 0;
+        this.force = force;
         temporary = false;
         assertColorCapabilities();
     }
@@ -78,10 +85,13 @@ final class ScheduledState {
     public static ScheduledState createTemporaryCopy(ScheduledState state, ZonedDateTime start, ZonedDateTime end) {
         ScheduledState copy = new ScheduledState(state.name, state.updateId, start.toLocalTime().toString(),
                 state.brightness, state.ct, state.x, state.y, state.hue, state.sat, state.effect, state.on, state.transitionTimeBefore,
-                state.transitionTime, state.daysOfWeek, state.confirm, state.startTimeProvider, state.groupState, state.groupLights, state.capabilities);
+                state.transitionTime, state.daysOfWeek, state.startTimeProvider, state.groupState, state.groupLights,
+                state.capabilities, state.force);
         copy.end = end;
         copy.temporary = true;
         copy.lastStart = start;
+        copy.lastSeen = state.lastSeen;
+        copy.lastSeenSync = state::setLastSeen;
         return copy;
     }
 
@@ -166,28 +176,7 @@ final class ScheduledState {
         }
     }
 
-    public long secondsUntilNextDayFromStart(ZonedDateTime now) {
-        return Duration.between(now, getNextStart(now)).getSeconds();
-    }
-
-    public ZonedDateTime getNextStart(ZonedDateTime now) {
-        if (shouldConsiderNextDayForStart(now)) {
-            return getStart(now.plusDays(1));
-        } else {
-            return getStart(now);
-        }
-    }
-
-    private boolean shouldConsiderNextDayForStart(ZonedDateTime now) {
-        ZonedDateTime start = getStart(now);
-        return !now.toLocalTime().isBefore(start.toLocalTime()) || startTimeHasChangedSinceLastTime(start);
-    }
-
-    private boolean startTimeHasChangedSinceLastTime(ZonedDateTime zonedStart) {
-        return lastStart != null && !zonedStart.toLocalTime().equals(lastStart.toLocalTime());
-    }
-
-    public boolean isInThePast(ZonedDateTime now) {
+    public boolean isInThePastOrNow(ZonedDateTime now) {
         return getDelayInSeconds(now) == 0;
     }
 
@@ -239,43 +228,11 @@ final class ScheduledState {
         return getDaysOfWeek().containsAll(Arrays.asList(day));
     }
 
-    public String getName() {
-        return name;
-    }
-
-    public int getUpdateId() {
-        return updateId;
-    }
-
     public int getStatusId() {
         if (groupState) {
             return groupLights.get(0);
         }
         return updateId;
-    }
-
-    public Integer getBrightness() {
-        return brightness;
-    }
-
-    public Integer getCt() {
-        return ct;
-    }
-
-    public Double getX() {
-        return x;
-    }
-
-    public Double getY() {
-        return y;
-    }
-
-    public Integer getHue() {
-        return hue;
-    }
-
-    public Integer getSat() {
-        return sat;
     }
 
     public String getEffect() {
@@ -289,10 +246,6 @@ final class ScheduledState {
         return MULTI_COLOR_LOOP.equals(effect);
     }
 
-    public Boolean getOn() {
-        return on;
-    }
-
     public Integer getTransitionTime(ZonedDateTime now) {
         if (transitionTimeBefore == null) return transitionTime;
         ZonedDateTime definedStart = getStartWithoutTransitionTime(lastStart).with(lastStart.toLocalDate());
@@ -301,36 +254,8 @@ final class ScheduledState {
         return (int) between.toMillis() / 100;
     }
 
-    public boolean isFullyConfirmed(int confirmCount) {
-        return confirmCounter >= confirmCount;
-    }
-
-    public void addConfirmation() {
-        confirmCounter++;
-    }
-
-    public int getConfirmCounter() {
-        return confirmCounter;
-    }
-
-    public void resetConfirmations() {
-        confirmCounter = 0;
-    }
-
     public boolean endsAfter(ZonedDateTime now) {
         return now.isAfter(end);
-    }
-
-    public ZonedDateTime getEnd() {
-        return end;
-    }
-
-    public void setEnd(ZonedDateTime end) {
-        this.end = end;
-    }
-
-    public boolean isGroupState() {
-        return groupState;
     }
 
     public List<Integer> getGroupLights() {
@@ -345,26 +270,90 @@ final class ScheduledState {
         return on == Boolean.FALSE;
     }
 
-    public String getConfirmDebugString(int confirmCount) {
-        return confirmCounter + "/" + confirmCount;
-    }
-
     public void updateLastStart(ZonedDateTime now) {
         this.lastStart = getStart(now);
     }
 
-    public boolean isTemporary() {
-        return temporary;
+    public boolean lightStateDiffers(LightState lightState) {
+        return brightnessDiffers(lightState) ||
+                colorModeDiffers(lightState) ||
+                effectDiffers(lightState);
     }
 
-    public boolean shouldConfirm(boolean confirmAll) {
-        if (confirm == null) return confirmAll;
-        return confirm;
+    private boolean brightnessDiffers(LightState lightState) {
+        return brightness != null && !brightness.equals(lightState.getBrightness());
+    }
+
+    private boolean colorModeDiffers(LightState lightState) {
+        String colorMode = getColorMode();
+        if (colorMode == null && lightState.getColormode() == null) {
+            return false;
+        }
+        if (!Objects.equals(colorMode, lightState.getColormode())) {
+            return true;
+        }
+        switch (colorMode) {
+            case "ct":
+                return ct != null && !ct.equals(lightState.getColorTemperature());
+            case "hs":
+                return hue != null && !hue.equals(lightState.getHue()) ||
+                        sat != null && !sat.equals(lightState.getSat());
+            case "xy":
+                return doubleValueDiffers(x, lightState.getX()) ||
+                        doubleValueDiffers(y, lightState.getY());
+        }
+        return false; // should not happen, but as a fallback we just ignore unknown color modes
+    }
+
+    private String getColorMode() {
+        if (ct != null) {
+            return "ct";
+        } else if (x != null) {
+            return "xy";
+        } else if (hue != null || sat != null) {
+            return "hs";
+        }
+        return null;
+    }
+
+    private boolean effectDiffers(LightState lightState) {
+        if (getEffect() == null) {
+            return false; // if no effect scheduled, always treat as equal
+        } else if (lightState.getEffect() == null) {
+            return !"none".equals(getEffect()); // if effect scheduled, but none set, only consider "none" to be equal
+        } else {
+            return !getEffect().equals(lightState.getEffect()); // otherwise, effects have to be exactly the same
+        }
+    }
+
+    private boolean doubleValueDiffers(Double scheduled, Double current) {
+        if (scheduled == null && current == null) {
+            return false;
+        }
+        if (scheduled == null || current == null) {
+            return true;
+        }
+        return getBigDecimal(scheduled).compareTo(getBigDecimal(current)) != 0;
+    }
+
+    private static BigDecimal getBigDecimal(Double value) {
+        return new BigDecimal(value.toString()).setScale(3, RoundingMode.HALF_UP);
+    }
+
+    public void setLastSeen(ZonedDateTime lastSeen) {
+        this.lastSeen = lastSeen;
+        if (lastSeenSync != null) {
+            lastSeenSync.accept(lastSeen);
+        }
+    }
+
+    public boolean isForced() {
+        return force == Boolean.TRUE;
     }
 
     @Override
     public String toString() {
-        return  getFormattedName() + " {" +
+        return getFormattedName() + " {" +
                 "id=" + getUpdateId() +
                 (temporary ? ", temporary" : "") +
                 ", start=" + getFormattedStart() +
@@ -380,6 +369,8 @@ final class ScheduledState {
                 getFormattedDaysOfWeek() +
                 getFormattedTransitionTimeIfSet("transitionTimeBefore", transitionTimeBefore) +
                 getFormattedTransitionTimeIfSet("transitionTime", transitionTime) +
+                getFormattedPropertyIfSet("lastSeen", getFormattedTime(lastSeen)) +
+                getFormattedPropertyIfSet("force", force) +
                 '}';
     }
 
@@ -398,6 +389,9 @@ final class ScheduledState {
     }
 
     private String getFormattedTime(ZonedDateTime zonedDateTime) {
+        if (zonedDateTime == null) {
+            return null;
+        }
         return TIME_FORMATTER.format(zonedDateTime);
     }
 

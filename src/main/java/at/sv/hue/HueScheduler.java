@@ -4,6 +4,7 @@ import at.sv.hue.api.*;
 import at.sv.hue.time.StartTimeProvider;
 import at.sv.hue.time.StartTimeProviderImpl;
 import at.sv.hue.time.SunTimesProviderImpl;
+import okhttp3.OkHttpClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -21,18 +22,19 @@ import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
-@Command(name = "HueScheduler", version = "0.7.1.1", mixinStandardHelpOptions = true, sortOptions = false)
+@Command(name = "HueScheduler", version = "0.8.0", mixinStandardHelpOptions = true, sortOptions = false)
 public final class HueScheduler implements Runnable {
 
     private static final Logger LOG = LoggerFactory.getLogger(HueScheduler.class);
 
     private final Map<Integer, List<ScheduledState>> lightStates;
+    private final ConcurrentHashMap<Integer, List<Runnable>> onStateWaitingList;
     @Parameters(description = "The IP address of your Philips Hue Bridge.")
     String ip;
     @Parameters(description = "The Philips Hue Bridge username created for Hue Scheduler during setup.")
@@ -46,10 +48,6 @@ public final class HueScheduler implements Runnable {
     @Option(names = "--elevation", defaultValue = "0.0", description = "The optional elevation (in meters) of your location, " +
             "used to provide more accurate sunrise and sunset times.")
     double elevation;
-    @Option(names = "--retry-delay", paramLabel = "<delay>", defaultValue = "5",
-            description = "The maximum number of seconds to wait before trying again to control a light that was unreachable." +
-                    " Default: ${DEFAULT-VALUE} seconds.")
-    int maxRetryDelayInSeconds;
     @Option(names = "--max-requests-per-second", paramLabel = "<requests>", defaultValue = "10.0",
             description = "The maximum number of PUT API requests to perform per second. Default and recommended: " +
                     "${DEFAULT-VALUE} requests per second.")
@@ -58,15 +56,13 @@ public final class HueScheduler implements Runnable {
             description = "Experimental: If the lights in a group should be controlled individually instead of using broadcast messages." +
                     " This might improve performance. Default: ${DEFAULT-VALUE}")
     boolean controlGroupLightsIndividually;
-    @Option(names = "--confirm-all", defaultValue = "true",
-            description = "If all states should be confirmed by default. Default: ${DEFAULT-VALUE}.")
-    boolean confirmAll;
-    @Option(names = "--confirm-count", paramLabel = "<count>", defaultValue = "20",
-            description = "The number of confirmations to send. Default: ${DEFAULT-VALUE} confirmations.")
-    int confirmationCount;
-    @Option(names = "--confirm-delay", paramLabel = "<delay>", defaultValue = "6",
-            description = "The delay in seconds between each confirmation. Default: ${DEFAULT-VALUE} seconds.")
-    int confirmDelayInSeconds;
+    @Option(names = "--disable-user-modification-tracking", defaultValue = "false",
+            description = "Globally disable tracking of user modifications which would pause their schedules until they are turned off and on again." +
+                    " Default: ${DEFAULT-VALUE}")
+    boolean disableUserModificationTracking;
+    @Option(names = "--power-on-reschedule-delay", paramLabel = "<delay>", defaultValue = "150",
+            description = "The delay in ms after the light on-event was received and the current state should be rescheduled again. Default: ${DEFAULT-VALUE} ms.")
+    int powerOnRescheduleDelayInMs;
     @Option(names = "--bridge-failure-retry-delay", paramLabel = "<delay>", defaultValue = "10",
             description = "The delay in seconds for retrying an API call, if the bridge could not be reached due to " +
                     "network failure, or if it returned an API error code. Default: ${DEFAULT-VALUE} seconds.")
@@ -75,19 +71,28 @@ public final class HueScheduler implements Runnable {
             description = "The adjustment delay in seconds for each light in a group when using the multi_color effect." +
                     " Adjust to change the hue values of 'neighboring' lights. Default: ${DEFAULT-VALUE} seconds.")
     int multiColorAdjustmentDelay;
+    @Option(names = "--event-stream-read-timeout", paramLabel = "<timout>", defaultValue = "120",
+            description = "The read timeout of the API v2 SSE event stream in minutes. " +
+                    "The connection is automatically restored after a timeout. Default: ${DEFAULT-VALUE} minutes.")
+    int eventStreamReadTimeoutInMinutes;
     private HueApi hueApi;
     private StateScheduler stateScheduler;
+    private final ManualOverrideTracker manualOverrideTracker;
+    private final HueEventListener hueEventListener;
     private StartTimeProvider startTimeProvider;
     private Supplier<ZonedDateTime> currentTime;
-    private Supplier<Integer> retryDelay;
 
     public HueScheduler() {
         lightStates = new HashMap<>();
+        onStateWaitingList = new ConcurrentHashMap<>();
+        manualOverrideTracker = new ManualOverrideTrackerImpl();
+        hueEventListener = new HueEventListenerImpl(manualOverrideTracker, onStateWaitingList::remove);
     }
 
-    public HueScheduler(HueApi hueApi, StateScheduler stateScheduler, StartTimeProvider startTimeProvider,
-                        Supplier<ZonedDateTime> currentTime, double requestsPerSecond, boolean controlGroupLightsIndividually,
-                        Supplier<Integer> retryDelayInMs, boolean confirmAll, int confirmationCount, int confirmDelayInSeconds,
+    public HueScheduler(HueApi hueApi, StateScheduler stateScheduler,
+                        StartTimeProvider startTimeProvider, Supplier<ZonedDateTime> currentTime,
+                        double requestsPerSecond, boolean controlGroupLightsIndividually,
+                        boolean disableUserModificationTracking, int powerOnRescheduleDelayInMs,
                         int bridgeFailureRetryDelayInSeconds, int multiColorAdjustmentDelay) {
         this();
         this.hueApi = hueApi;
@@ -96,10 +101,8 @@ public final class HueScheduler implements Runnable {
         this.currentTime = currentTime;
         this.requestsPerSecond = requestsPerSecond;
         this.controlGroupLightsIndividually = controlGroupLightsIndividually;
-        this.retryDelay = retryDelayInMs;
-        this.confirmAll = confirmAll;
-        this.confirmationCount = confirmationCount;
-        this.confirmDelayInSeconds = confirmDelayInSeconds;
+        this.disableUserModificationTracking = disableUserModificationTracking;
+        this.powerOnRescheduleDelayInMs = powerOnRescheduleDelayInMs;
         this.bridgeFailureRetryDelayInSeconds = bridgeFailureRetryDelayInSeconds;
         this.multiColorAdjustmentDelay = multiColorAdjustmentDelay;
     }
@@ -113,13 +116,24 @@ public final class HueScheduler implements Runnable {
 
     @Override
     public void run() {
-        hueApi = new HueApiImpl(new HttpResourceProviderImpl(), ip, username, RateLimiter.create(requestsPerSecond));
+        OkHttpClient httpsClient = createHttpsClient();
+        hueApi = new HueApiImpl(new HttpsResourceProviderImpl(httpsClient), ip, username, RateLimiter.create(requestsPerSecond));
         startTimeProvider = createStartTimeProvider(latitude, longitude, elevation);
         stateScheduler = createStateScheduler();
         currentTime = ZonedDateTime::now;
-        retryDelay = this::getRandomRetryDelayMs;
+        new LightStateEventTrackerImpl(ip, username, httpsClient, new HueRawEventHandler(hueEventListener), eventStreamReadTimeoutInMinutes).start();
         assertInputIsReadable();
         assertConnectionAndStart();
+    }
+
+    private OkHttpClient createHttpsClient() {
+        try {
+            return HueApiHttpsClientFactory.createHttpsClient(ip);
+        } catch (Exception e) {
+            System.err.println("Failed to create https client: " + e.getLocalizedMessage());
+            System.exit(1);
+        }
+        return null;
     }
 
     private StartTimeProviderImpl createStartTimeProvider(double latitude, double longitude, double elevation) {
@@ -128,10 +142,6 @@ public final class HueScheduler implements Runnable {
 
     private StateSchedulerImpl createStateScheduler() {
         return new StateSchedulerImpl(Executors.newScheduledThreadPool(Runtime.getRuntime().availableProcessors()), ZonedDateTime::now);
-    }
-
-    private int getRandomRetryDelayMs() {
-        return ThreadLocalRandom.current().nextInt(1000, maxRetryDelayInSeconds * 1000 + 1);
     }
 
     private void assertInputIsReadable() {
@@ -264,12 +274,28 @@ public final class HueScheduler implements Runnable {
         stateScheduler.schedule(() -> {
             if (state.endsAfter(currentTime.get())) {
                 LOG.debug("{} already ended", state);
-                scheduleNextDay(state);
+                reschedule(state);
+                return;
+            }
+            if (lightHasBeenManuallyOverriddenBefore(state)) {
+                if (state.isOff()) {
+                    LOG.debug("{} state has been manually overridden before, skip off-state for this day: {}", state.getFormattedName(), state);
+                    reschedule(state, true);
+                } else {
+                    LOG.debug("{} state has been manually overridden before, skip update and retry when back online", state.getFormattedName());
+                    retryWhenBackOn(state);
+                }
                 return;
             }
             boolean success;
             LightState lightState = null;
             try {
+                if (stateIsNotEnforced(state) && stateHasBeenManuallyOverriddenSinceLastSeen(state)) {
+                    LOG.debug("{} state has been manually overridden, pause update until light is turned off and on again", state.getFormattedName());
+                    manualOverrideTracker.onManuallyOverridden(state.getStatusId());
+                    retryWhenBackOn(state);
+                    return;
+                }
                 success = putState(state);
                 if (success) {
                     lightState = hueApi.getLightState(state.getStatusId());
@@ -285,55 +311,116 @@ public final class HueScheduler implements Runnable {
             }
             if (success && state.isOff() && lightState.isUnreachableOrOff()) {
                 LOG.info("Turned off {}, or was already off", state.getFormattedName());
-                scheduleNextDay(state);
+                reschedule(state, true);
                 return;
             }
             if (!success || lightState.isUnreachableOrOff()) {
-                Integer delay = retryDelay.get();
-                LOG.trace("{} not reachable or off, retrying in {}", state.getFormattedName(), Duration.ofMillis(delay));
-                retry(state, delay);
+                LOG.trace("{} not reachable or off, retry when light turns back on", state.getFormattedName());
+                retryWhenBackOn(state);
                 return;
             }
-            if (state.getConfirmCounter() == 0) {
-                LOG.info("Set {}", state);
-                if (shouldAdjustMultiColorLoopOffset(state)) {
-                    scheduleMultiColorLoopOffsetAdjustments(state.getGroupLights(), 1);
-                }
+            LOG.info("Set {}", state);
+            if (shouldAdjustMultiColorLoopOffset(state)) {
+                scheduleMultiColorLoopOffsetAdjustments(state.getGroupLights(), 1);
             }
-            if (shouldAndIsNotFullyConfirmed(state)) {
-                state.addConfirmation();
-                if (state.getConfirmCounter() % 5 == 0) {
-                    LOG.debug("Confirmed {} ({})", state.getFormattedName(), state.getConfirmDebugString(confirmationCount));
-                }
-                schedule(state, getMs(confirmDelayInSeconds));
-            } else {
-                if (isFullyConfirmed(state)) {
-                    LOG.debug("Fully confirmed {}", state.getFormattedName());
-                }
-                scheduleNextDay(state);
-            }
+            state.setLastSeen(currentTime.get());
+            manualOverrideTracker.onAutomaticallyAssigned(state.getStatusId());
+            retryWhenBackOn(ScheduledState.createTemporaryCopy(state, currentTime.get(), state.getEnd()));
+            reschedule(state, shouldEnforceNextDay(state));
         }, currentTime.get().plus(delayInMs, ChronoUnit.MILLIS), state.getEnd());
     }
 
+    private boolean shouldEnforceNextDay(ScheduledState state) {
+        LocalTime currentTime = this.currentTime.get().toLocalTime().truncatedTo(ChronoUnit.SECONDS).plusSeconds(1);
+        LocalTime stateStartTime = state.getLastStart().toLocalTime().truncatedTo(ChronoUnit.SECONDS);
+        return currentTime.isAfter(stateStartTime) || currentTime.equals(stateStartTime);
+    }
+
+    private boolean lightHasBeenManuallyOverriddenBefore(ScheduledState state) {
+        return !disableUserModificationTracking && manualOverrideTracker.isManuallyOverridden(state.getStatusId());
+    }
+
+    private boolean stateIsNotEnforced(ScheduledState state) {
+        return !disableUserModificationTracking && !state.isForced() && !manualOverrideTracker.shouldEnforceSchedule(state.getStatusId());
+    }
+
+    private boolean stateHasBeenManuallyOverriddenSinceLastSeen(ScheduledState currentState) {
+        ScheduledState lastSeenState = getLastSeenState(currentState);
+        if (lastSeenState == null) {
+            return false;
+        }
+        // todo: this does not really work reliably for groups, as it could be that just this light is not reachable because it was manually turned off
+        return lastSeenState.lightStateDiffers(hueApi.getLightState(currentState.getStatusId()));
+    }
+
+    private ScheduledState getLastSeenState(ScheduledState currentState) {
+        return getLightStatesForId(currentState).stream()
+                                                .sorted(Comparator.comparing(ScheduledState::getLastSeen, Comparator.nullsFirst(ZonedDateTime::compareTo).reversed()))
+                                                .filter(state -> state.getLastSeen() != null)
+                                                .findFirst()
+                                                .orElse(null);
+    }
+
     private boolean shouldLogScheduleDebugMessage(long delayInMs) {
-        return delayInMs == 0 || delayInMs > Math.max(5000, getMs(confirmDelayInSeconds)) && delayInMs != getMs(bridgeFailureRetryDelayInSeconds);
+        return delayInMs == 0 || delayInMs > 5000 && delayInMs != getMs(bridgeFailureRetryDelayInSeconds);
+    }
+
+    private void reschedule(ScheduledState state) {
+        reschedule(state, false);
+    }
+
+    private void reschedule(ScheduledState state, boolean forceNextDay) {
+        if (state.isTemporary()) return;
+        ZonedDateTime now = currentTime.get();
+        ZonedDateTime nextStart = getNextStart(state, now, forceNextDay);
+        state.updateLastStart(nextStart); // todo: we should write a test, that his value is now set to the next start instead of now
+        calculateAndSetEndTime(state, getLightStatesForId(state), nextStart);
+        schedule(state, getMs(getDelayInSeconds(now, nextStart)));
+    }
+
+    private ZonedDateTime getNextStart(ScheduledState state, ZonedDateTime now, boolean forceNextDay) {
+        if (forceNextDay || shouldScheduleNextDay(state)) {
+            return state.getStart(now.plusDays(1));
+        } else {
+            return state.getStart(now);
+        }
+    }
+
+    private boolean shouldScheduleNextDay(ScheduledState state) {
+        List<ScheduledState> todaysStates = getStatesStartingToday(state);
+        if (isLastState(state, todaysStates)) {
+            return false;
+        }
+        return nextStateAlreadyStarted(state, todaysStates);
+    }
+
+    private List<ScheduledState> getStatesStartingToday(ScheduledState state) {
+        ZonedDateTime now = currentTime.get();
+        return getStatesStartingOnDay(getLightStatesForId(state), now, DayOfWeek.from(now))
+                .stream()
+                .sorted(Comparator.comparing(scheduledState -> scheduledState.getStart(now)))
+                .collect(Collectors.toList());
+    }
+
+    private boolean isLastState(ScheduledState state, List<ScheduledState> todaysStates) {
+        return todaysStates.indexOf(state) == todaysStates.size() - 1;
+    }
+
+    private boolean nextStateAlreadyStarted(ScheduledState state, List<ScheduledState> todaysStates) {
+        return todaysStates.get(todaysStates.indexOf(state) + 1).isInThePastOrNow(currentTime.get());
+    }
+
+    private static long getDelayInSeconds(ZonedDateTime now, ZonedDateTime nextStart) {
+        Duration between = Duration.between(now, nextStart);
+        if (between.isNegative()) {
+            return 0;
+        } else {
+            return between.getSeconds();
+        }
     }
 
     private void scheduleNextDay(ScheduledState state) {
-        scheduleNextDay(state, currentTime.get());
-    }
-
-    private void scheduleNextDay(ScheduledState state, ZonedDateTime now) {
-        if (state.isTemporary()) return;
-        state.resetConfirmations();
-        recalculateNextEnd(state, now);
-        long delay = state.secondsUntilNextDayFromStart(now);
-        state.updateLastStart(now);
-        schedule(state, getMs(delay));
-    }
-
-    private void recalculateNextEnd(ScheduledState state, ZonedDateTime now) {
-        calculateAndSetEndTime(state, getLightStatesForId(state), state.getNextStart(now));
+        reschedule(state, true);
     }
 
     private List<ScheduledState> getLightStatesForId(ScheduledState state) {
@@ -346,14 +433,6 @@ public final class HueScheduler implements Runnable {
         } else {
             return state.getUpdateId();
         }
-    }
-
-    private boolean shouldAndIsNotFullyConfirmed(ScheduledState state) {
-        return state.shouldConfirm(confirmAll) && !isFullyConfirmed(state);
-    }
-
-    private boolean isFullyConfirmed(ScheduledState state) {
-        return state.isFullyConfirmed(confirmationCount);
     }
 
     private long getMs(long seconds) {
@@ -384,8 +463,11 @@ public final class HueScheduler implements Runnable {
     }
 
     private void retry(ScheduledState state, long delayInMs) {
-        state.resetConfirmations();
         schedule(state, delayInMs);
+    }
+
+    private void retryWhenBackOn(ScheduledState state) {
+        onStateWaitingList.computeIfAbsent(state.getStatusId(), id -> new ArrayList<>()).add(() -> schedule(state, powerOnRescheduleDelayInMs));
     }
 
     private boolean shouldAdjustMultiColorLoopOffset(ScheduledState state) {
@@ -435,5 +517,13 @@ public final class HueScheduler implements Runnable {
 
     private void logSunDataInfo() {
         LOG.info("Current sun times:\n{}", startTimeProvider.toDebugString(currentTime.get()));
+    }
+
+    HueEventListener getHueEventListener() {
+        return hueEventListener;
+    }
+
+    ManualOverrideTracker getManualOverrideTracker() {
+        return manualOverrideTracker;
     }
 }
