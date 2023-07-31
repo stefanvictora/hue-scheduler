@@ -14,6 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class StartTimeProviderTest {
 
     private ZonedDateTime sunrise;
+    private ZonedDateTime noon;
     private ZonedDateTime sunset;
     private StartTimeProvider provider;
     private ZonedDateTime nauticalStart;
@@ -45,6 +46,7 @@ class StartTimeProviderTest {
         nauticalStart = now.with(LocalTime.of(6, 13));
         civilStart = now.with(LocalTime.of(6, 50));
         sunrise = now.with(LocalTime.of(7, 0));
+        noon = now.with(LocalTime.of(12, 58));
         nextDaySunrise = now.with(LocalTime.of(7, 10));
         goldenHour = now.with(LocalTime.of(15, 0));
         sunset = now.with(LocalTime.of(16, 0));
@@ -61,6 +63,11 @@ class StartTimeProviderTest {
                 } else {
                     return sunrise;
                 }
+            }
+
+            @Override
+            public ZonedDateTime getNoon(ZonedDateTime dateTime) {
+                return noon;
             }
 
             @Override
@@ -124,6 +131,7 @@ class StartTimeProviderTest {
     @Test
     void parse_simpleKeyWord_returnsSunData() {
         assertStart("sunrise", sunrise);
+        assertStart("noon", noon);
         assertStart("sunset", sunset);
         assertStart("nautical_start", nauticalStart);
         assertStart("nautical_dawn", nauticalStart);

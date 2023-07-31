@@ -63,6 +63,8 @@ public final class StartTimeProviderImpl implements StartTimeProvider {
                 return sunTimesProvider.getCivilStart(dateTime);
             case "sunrise":
                 return sunTimesProvider.getSunrise(dateTime);
+            case "noon":
+                return sunTimesProvider.getNoon(dateTime);
             case "golden_hour":
                 return sunTimesProvider.getGoldenHour(dateTime);
             case "sunset":

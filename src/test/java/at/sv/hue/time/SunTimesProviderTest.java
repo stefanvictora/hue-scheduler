@@ -33,6 +33,7 @@ class SunTimesProviderTest {
         assertTime(provider.getNauticalStart(dateTime), 6, 29, 17);
         assertTime(provider.getCivilStart(dateTime), 7, 8, 51);
         assertTime(provider.getSunrise(dateTime), 7, 42, 13);
+        assertTime(provider.getNoon(dateTime), 11, 58, 13);
         assertTime(provider.getGoldenHour(dateTime), 15, 18, 3);
         assertTime(provider.getSunset(dateTime), 16, 14, 29);
         assertTime(provider.getBlueHour(dateTime), 16, 34, 3);
@@ -45,6 +46,7 @@ class SunTimesProviderTest {
         assertTime(provider.getNauticalStart(dateTime), 6, 12, 59);
         assertTime(provider.getCivilStart(dateTime), 6, 50, 27);
         assertTime(provider.getSunrise(dateTime), 7, 21, 13);
+        assertTime(provider.getNoon(dateTime), 12, 8, 11);
         assertTime(provider.getGoldenHour(dateTime), 16, 5, 15);
         assertTime(provider.getSunset(dateTime), 16, 55, 24);
         assertTime(provider.getBlueHour(dateTime), 17, 13, 21);

@@ -6,6 +6,8 @@ public interface SunTimesProvider {
 
     ZonedDateTime getSunrise(ZonedDateTime dateTime);
 
+    ZonedDateTime getNoon(ZonedDateTime dateTime);
+
     ZonedDateTime getSunset(ZonedDateTime dateTime);
 
     ZonedDateTime getNauticalStart(ZonedDateTime dateTime);

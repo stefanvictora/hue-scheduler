@@ -26,6 +26,11 @@ public final class SunTimesProviderImpl implements SunTimesProvider {
     }
 
     @Override
+    public ZonedDateTime getNoon(ZonedDateTime dateTime) {
+        return sunTimesFor(dateTime).getNoon();
+    }
+
+    @Override
     public ZonedDateTime getSunset(ZonedDateTime dateTime) {
         return sunTimesFor(dateTime).getSet();
     }
@@ -93,6 +98,7 @@ public final class SunTimesProviderImpl implements SunTimesProvider {
                 "\nnautical_dawn: " + format(getNauticalStart(dateTime)) +
                 "\ncivil_dawn: " + format(getCivilStart(dateTime)) +
                 "\nsunrise: " + format(getSunrise(dateTime)) +
+                "\nnoon: " + format(getNoon(dateTime)) +
                 "\ngolden_hour: " + format(getGoldenHour(dateTime)) +
                 "\nsunset: " + format(getSunset(dateTime)) +
                 "\nblue_hour: " + format(getBlueHour(dateTime)) +
