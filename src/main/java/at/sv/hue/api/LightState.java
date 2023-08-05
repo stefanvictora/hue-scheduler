@@ -1,5 +1,6 @@
 package at.sv.hue.api;
 
+import at.sv.hue.ColorMode;
 import lombok.Builder;
 import lombok.Data;
 
@@ -24,5 +25,9 @@ public final class LightState {
 
     public boolean isColorLoopEffect() {
         return "colorloop".equals(effect);
+    }
+
+    public ColorMode getColormode() {
+        return ColorMode.parse(colormode);
     }
 }

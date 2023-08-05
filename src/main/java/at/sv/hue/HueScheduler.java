@@ -296,6 +296,18 @@ public final class HueScheduler implements Runnable {
                     retryWhenBackOn(state);
                     return;
                 }
+
+                // TODO: WIP
+                if (state.getTransitionTimeBefore() != null) {
+                    ScheduledState previousState = getPreviousState(state);
+                    if (previousState != null) {
+                        PutCall interpolatedPutCall = state.getInterpolatedPutCall(currentTime.get(), previousState);
+                        if (interpolatedPutCall != null) {
+                            putState(previousState, interpolatedPutCall); // TODO: maybe use some transition time and wait until next put call
+                        }
+                    }
+                }
+
                 success = putState(state);
                 if (success) {
                     lightState = hueApi.getLightState(state.getStatusId());
@@ -357,6 +369,15 @@ public final class HueScheduler implements Runnable {
         return getLightStatesForId(currentState).stream()
                                                 .sorted(Comparator.comparing(ScheduledState::getLastSeen, Comparator.nullsFirst(ZonedDateTime::compareTo).reversed()))
                                                 .filter(state -> state.getLastSeen() != null)
+                                                .findFirst()
+                                                .orElse(null);
+    }
+
+    private ScheduledState getPreviousState(ScheduledState currentState) {
+        // TODO: We should also consider day cross overs, i.e. if the current state is the first of today, we should take the last state from yesterday as the previous state
+        return getLightStatesForId(currentState).stream()
+                                                .filter(state -> state != currentState)
+                                                .sorted(Comparator.comparing(state -> state.getStart(currentTime.get()), Comparator.reverseOrder()))
                                                 .findFirst()
                                                 .orElse(null);
     }
@@ -440,10 +461,17 @@ public final class HueScheduler implements Runnable {
     }
 
     private boolean putState(ScheduledState state) {
+        return putState(state, state.getPutCall(currentTime.get()));
+    }
+
+    private boolean putState(ScheduledState state, PutCall putCall) {
         if (state.isGroupState() && controlGroupLightsIndividually) {
             for (Integer id : state.getGroupLights()) {
                 try {
-                    if (!putState(id, state, false)) {
+                    if (!putState(putCall.toBuilder()
+                                         .id(id)
+                                         .groupState(false)
+                                         .build())) {
                         LOG.trace("Group light with id {} is off, could not update state", id);
                     }
                 } catch (HueApiFailure e) {
@@ -452,14 +480,12 @@ public final class HueScheduler implements Runnable {
             }
             return true;
         } else {
-            return putState(state.getUpdateId(), state, state.isGroupState());
+            return putState(putCall);
         }
     }
 
-    private boolean putState(int updateId, ScheduledState state, boolean groupState) {
-        return hueApi.putState(updateId, state.getBrightness(), state.getCt(), state.getX(), state.getY(),
-                state.getHue(), state.getSat(), state.getEffect(), state.getOn(), state.getTransitionTime(currentTime.get()),
-                groupState);
+    private boolean putState(PutCall putCall) {
+        return hueApi.putState(putCall);
     }
 
     private void retry(ScheduledState state, long delayInMs) {
@@ -504,7 +530,7 @@ public final class HueScheduler implements Runnable {
     }
 
     private void putOnState(int light, boolean on, String effect) {
-        hueApi.putState(light, null, null, null, null, null, null, effect, on, null, false);
+        hueApi.putState(PutCall.builder().id(light).on(on).effect(effect).build());
     }
 
     private void scheduleSunDataInfoLog() {

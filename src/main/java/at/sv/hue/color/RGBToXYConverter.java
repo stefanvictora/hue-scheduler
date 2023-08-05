@@ -1,9 +1,13 @@
 package at.sv.hue.color;
 
+import lombok.Data;
+
 import java.awt.*;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 
 /**
- * See: https://developers.meethue.com/develop/application-design-guidance/color-conversion-formulas-rgb-to-xy-and-back/
+ * See: <a href="https://developers.meethue.com/develop/application-design-guidance/color-conversion-formulas-rgb-to-xy-and-back/">developers.meethue.com</a>
  */
 public final class RGBToXYConverter {
 
@@ -45,34 +49,65 @@ public final class RGBToXYConverter {
             x = point.x;
             y = point.y;
         }
-        return new XYColor(x, y, (int) (Y * 255f));
+        return new XYColor(getDoubleValueWithFixedPrecision(x), getDoubleValueWithFixedPrecision(y), (int) (Y * 255f));
     }
 
     private static double gammaCorrect(float color) {
         return (color > 0.04045f) ? Math.pow((color + 0.055f) / (1.0f + 0.055f), 2.4000000953674316f) : (color / 12.92f);
     }
 
+    /**
+     * Adapted from <a href="https://github.com/home-assistant/core">Home Assistant Core</a>
+     * Apache License
+     * Version 2.0, January 2004
+     * http://www.apache.org/licenses/
+     */
+    public static int[] convert(double x, double y, int brightness, Double[][] gamut) {
+        if (gamut != null) {
+            Point point = new XYColorGamutCorrection(x, y, gamut).adjustIfNeeded();
+            x = point.x;
+            y = point.y;
+        }
+        double Y = brightness / 255.0;
+        if (Y == 0.0) {
+            return new int[]{0, 0, 0};
+        }
+        if (y == 0.0) {
+            y += 0.00000000001;
+        }
+        double z = 1 - x - y;
+        double X = (Y / y) * x;
+        double Z = (Y / y) * z;
+        double red = X * 1.656492 - Y * 0.354851 - Z * 0.255038;
+        double green = -X * 0.707196 + Y * 1.655397 + Z * 0.036152;
+        double blue = X * 0.051713 - Y * 0.121364 + Z * 1.011530;
+        red = inverseGammaCorrect(red);
+        green = inverseGammaCorrect(green);
+        blue = inverseGammaCorrect(blue);
+        red = Math.max(0, red);
+        green = Math.max(0, green);
+        blue = Math.max(0, blue);
+        double maxComponent = Math.max(red, Math.max(green, blue));
+        if (maxComponent > 1) {
+            red /= maxComponent;
+            green /= maxComponent;
+            blue /= maxComponent;
+        }
+        return new int[]{(int) (red * 255), (int) (green * 255), (int) (blue * 255)};
+    }
+
+    private static double inverseGammaCorrect(double color) {
+        return (color <= 0.0031308) ? 12.92 * color : (1.0 + 0.055) * Math.pow(color, 1.0 / 2.4) - 0.055;
+    }
+
+    private static double getDoubleValueWithFixedPrecision(double value) {
+        return BigDecimal.valueOf(value).setScale(4, RoundingMode.HALF_UP).doubleValue();
+    }
+
+    @Data
     public static final class XYColor {
         private final double x;
         private final double y;
         private final int brightness;
-
-        public XYColor(double x, double y, int brightness) {
-            this.x = x;
-            this.y = y;
-            this.brightness = brightness;
-        }
-
-        public double getX() {
-            return x;
-        }
-
-        public double getY() {
-            return y;
-        }
-
-        public int getBrightness() {
-            return brightness;
-        }
     }
 }

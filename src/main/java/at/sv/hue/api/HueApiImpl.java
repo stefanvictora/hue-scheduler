@@ -113,15 +113,15 @@ public final class HueApiImpl implements HueApi {
     }
 
     @Override
-    public boolean putState(int id, Integer bri, Integer ct, Double x, Double y, Integer hue, Integer sat, String effect,
-                            Boolean on, Integer transitionTime, boolean groupState) {
-        if (groupState) {
+    public boolean putState(PutCall putCall) {
+        if (putCall.isGroupState()) {
             rateLimiter.acquire(10);
         } else {
             rateLimiter.acquire(1);
         }
-        return assertNoPutErrors(resourceProvider.putResource(getUpdateUrl(id, groupState),
-                getBody(new State(bri, ct, x, y, hue, sat, effect, on, transitionTime))));
+        return assertNoPutErrors(resourceProvider.putResource(getUpdateUrl(putCall.id, putCall.groupState),
+                getBody(new State(putCall.bri, putCall.ct, putCall.x, putCall.y, putCall.hue, putCall.sat, putCall.effect,
+                        putCall.on, putCall.transitionTime))));
     }
 
     private boolean assertNoPutErrors(String putResource) {

@@ -68,12 +68,8 @@ class HueApiTest {
         assertThat("Effect differs", lightState.getEffect(), is(effect));
     }
 
-    private boolean putState(int id, int bri) {
-        return putState(id, bri, false);
-    }
-
-    private boolean putState(int id, int bri, boolean groupState) {
-        return api.putState(id, bri, null, null, null, null, null, null, null, null, groupState);
+    private boolean performPutCall(PutCall putCall) {
+        return api.putState(putCall);
     }
 
     private List<Integer> getGroupLights(int groupId) {
@@ -120,7 +116,8 @@ class HueApiTest {
                 throw new BridgeConnectionFailure("PUT failure for '" + url + "' with '" + body + "'.");
             }
         };
-        api = new HueApiImpl(resourceProvider, ip, username, permits -> {});
+        api = new HueApiImpl(resourceProvider, ip, username, permits -> {
+        });
         baseUrl = "https://" + ip + "/api/" + username;
     }
 
@@ -508,7 +505,7 @@ class HueApiTest {
                         "}\n" +
                         "]");
 
-        boolean success = putState(15, 200);
+        boolean success = performPutCall(PutCall.builder().id(15).bri(200).build());
 
         assertTrue(success, "Put not successful");
     }
@@ -524,7 +521,7 @@ class HueApiTest {
                         "}\n" +
                         "]");
 
-        boolean success = putState(9, 200, true);
+        boolean success = performPutCall(PutCall.builder().id(9).bri(200).groupState(true).build());
 
         assertTrue(success, "Put not successful");
     }
@@ -533,7 +530,7 @@ class HueApiTest {
     void putState_ct_correctBody() {
         setPutResponse("/lights/" + 16 + "/state", "{\"ct\":100}", "[success]");
 
-        boolean success = api.putState(16, null, 100, null, null, null, null, null, null, null, false);
+        boolean success = performPutCall(PutCall.builder().id(16).ct(100).build());
 
         assertTrue(success, "Put not successful");
     }
@@ -544,7 +541,7 @@ class HueApiTest {
         double y = 0.3525;
         setPutResponse("/lights/" + 16 + "/state", "{\"xy\":[" + x + "," + y + "]}", "[success]");
 
-        boolean success = api.putState(16, null, null, x, y, null, null, null, null, null, false);
+        boolean success = performPutCall(PutCall.builder().id(16).x(x).y(y).build());
 
         assertTrue(success, "Put not successful");
     }
@@ -555,7 +552,7 @@ class HueApiTest {
         int sat = 254;
         setPutResponse("/lights/" + 16 + "/state", "{\"hue\":" + hue + ",\"sat\":" + sat + "}", "[success]");
 
-        boolean success = api.putState(16, null, null, null, null, hue, sat, null, null, null, false);
+        boolean success = performPutCall(PutCall.builder().id(16).hue(hue).sat(sat).build());
 
         assertTrue(success, "Put not successful");
     }
@@ -564,7 +561,7 @@ class HueApiTest {
     void putState_on_setsFlagCorrectly() {
         setPutResponse("/lights/" + 16 + "/state", "{\"on\":true}", "[success]");
 
-        boolean success = api.putState(16, null, null, null, null, null, null, null, true, null, false);
+        boolean success = performPutCall(PutCall.builder().id(16).on(true).build());
 
         assertTrue(success, "Put not successful");
     }
@@ -573,7 +570,7 @@ class HueApiTest {
     void putState_transitionTime_setsTimeCorrectly() {
         setPutResponse("/lights/" + 16 + "/state", "{\"transitiontime\":2}", "[success]");
 
-        boolean success = api.putState(16, null, null, null, null, null, null, null, null, 2, false);
+        boolean success = performPutCall(PutCall.builder().id(16).transitionTime(2).build());
 
         assertTrue(success, "Put not successful");
     }
@@ -582,7 +579,7 @@ class HueApiTest {
     void putState_transitionTime_defaultValueOfFour_isIgnored() {
         setPutResponse("/lights/" + 16 + "/state", "{}", "[success]");
 
-        boolean success = api.putState(16, null, null, null, null, null, null, null, null, 4, false);
+        boolean success = performPutCall(PutCall.builder().id(16).transitionTime(4).build());
 
         assertTrue(success, "Put not successful");
     }
@@ -591,7 +588,7 @@ class HueApiTest {
     void putState_effect_correctlySet() {
         setPutResponse("/lights/" + 1 + "/state", "{\"effect\":\"colorloop\"}", "[success]");
 
-        boolean success = api.putState(1, null, null, null, null, null, null, "colorloop", null, null, false);
+        boolean success = performPutCall(PutCall.builder().id(1).effect("colorloop").build());
 
         assertTrue(success, "Put not successful");
     }
@@ -608,7 +605,7 @@ class HueApiTest {
                 "}\n" +
                 "]");
 
-        assertThrows(BridgeAuthenticationFailure.class, () -> putState(10, 100));
+        assertThrows(BridgeAuthenticationFailure.class, () -> performPutCall(PutCall.builder().id(10).bri(100).build()));
     }
 
     @Test
@@ -623,7 +620,7 @@ class HueApiTest {
                 "}\n" +
                 "]");
 
-        HueApiFailure hueApiFailure = assertThrows(HueApiFailure.class, () -> putState(1, 100));
+        HueApiFailure hueApiFailure = assertThrows(HueApiFailure.class, () -> performPutCall(PutCall.builder().id(1).bri(100).build()));
         assertThat(hueApiFailure.getMessage(), is("resource, /lights/1/state, not available"));
     }
 
@@ -639,7 +636,7 @@ class HueApiTest {
                 "}\n" +
                 "]");
 
-        HueApiFailure hueApiFailure = assertThrows(HueApiFailure.class, () -> putState(1, 100, true));
+        HueApiFailure hueApiFailure = assertThrows(HueApiFailure.class, () -> performPutCall(PutCall.builder().id(1).bri(100).groupState(true).build()));
         assertThat(hueApiFailure.getMessage(), is("resource, /groups/11/action, not available"));
     }
 
@@ -647,7 +644,7 @@ class HueApiTest {
     void putState_connectionFailure_exception() {
         assertResponseMatch = false;
 
-        assertThrows(BridgeConnectionFailure.class, () -> putState(123, 100));
+        assertThrows(BridgeConnectionFailure.class, () -> performPutCall(PutCall.builder().id(123).bri(100).build()));
     }
 
     @Test
@@ -656,7 +653,7 @@ class HueApiTest {
                 "[\n" +
                         "]");
 
-        boolean success = putState(123, 100);
+        boolean success = performPutCall(PutCall.builder().id(123).bri(100).build());
 
         assertTrue(success, "Put did fail");
     }
@@ -675,7 +672,7 @@ class HueApiTest {
                         "}\n" +
                         "]");
 
-        HueApiFailure hueApiFailure = assertThrows(HueApiFailure.class, () -> putState(777, 300));
+        HueApiFailure hueApiFailure = assertThrows(HueApiFailure.class, () -> performPutCall(PutCall.builder().id(777).bri(300).build()));
         assertThat(hueApiFailure.getMessage(), is("invalid value, 300}, for parameter, bri"));
     }
 
@@ -691,7 +688,7 @@ class HueApiTest {
                 "}\n" +
                 "]");
 
-        boolean reachable = putState(777, 200);
+        boolean reachable = performPutCall(PutCall.builder().id(777).bri(200).build());
 
         assertFalse(reachable, "Light is reachable");
     }
