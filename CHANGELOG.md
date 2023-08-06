@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [0.8.0.1] - 2023-08-06
+
+### Added
+- Added new `noon` dynamic sun time constant
+
+### Fixed
+- Fixed incorrect manual change detection for brightness only states
+
 ## [0.8.0] - 2023-07-29
 
 ### Added
@@ -11,6 +19,7 @@
 - New `--disable-user-modification-tracking` global configuration flag (default: `false`) to disable the new user modification tracking feature
 - New `force:true` state configuration property to always enforce light states despite possible user modifications (default: `false`)
 - Added advanced and internal `--event-stream-read-timeout` configuration flag, for fine-grained event stream controls.
+- Added --power-on-reschedule-delay global configuration flag, to fine tune the rescheduling after a power-on event was detected
 
 ### Changed
 - Retry logic for unreachable lights has been replaced with light-on event tracking
