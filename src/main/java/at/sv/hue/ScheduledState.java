@@ -437,6 +437,7 @@ final class ScheduledState {
         BigDecimal diff = BigDecimal.valueOf(target - previous);
         return BigDecimal.valueOf(previous)
                          .add(interpolatedTime.multiply(diff))
+                         .setScale(0, RoundingMode.CEILING)
                          .intValue();
     }
 
@@ -468,6 +469,7 @@ final class ScheduledState {
         int diff = ((target - previous + MIDDLE_HUE_VALUE) % (MAX_HUE_VALUE + 1)) - MIDDLE_HUE_VALUE;
         return BigDecimal.valueOf(previous)
                          .add(interpolatedTime.multiply(BigDecimal.valueOf(diff)))
+                         .setScale(0, RoundingMode.CEILING)
                          .intValue();
     }
 

@@ -1,9 +1,11 @@
 package at.sv.hue.api;
 
 import lombok.Builder;
-import lombok.Getter;
+import lombok.Data;
+import lombok.RequiredArgsConstructor;
 
-@Getter
+@Data
+@RequiredArgsConstructor
 @Builder
 public final class LightCapabilities {
 
@@ -12,12 +14,6 @@ public final class LightCapabilities {
     private final Double[][] colorGamut;
     private final Integer ctMin;
     private final Integer ctMax;
-
-    public LightCapabilities(Double[][] colorGamut, Integer ctMin, Integer ctMax) {
-        this.colorGamut = colorGamut;
-        this.ctMin = ctMin;
-        this.ctMax = ctMax;
-    }
 
     public boolean isColorSupported() {
         return colorGamut != null;

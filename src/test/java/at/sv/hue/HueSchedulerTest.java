@@ -652,7 +652,7 @@ class HueSchedulerTest {
     }
 
     @Test
-    void parse_transitionTimeBefore_multipleStates_ct_lightTurnedOnAfterStart_performsInterpolation_setsInterpolatedPreviousStateAgain() {
+    void parse_transitionTimeBefore_multipleStates_ct_lightTurnedOnAfterStart_performsInterpolation_andMakesAdditionalPut() {
         addKnownLightIdsWithDefaultCapabilities(1);
         addStateNow(1, "bri:" + DEFAULT_BRIGHTNESS, "ct:" + DEFAULT_CT);
         addState(1, now.plusMinutes(40), "bri:" + (DEFAULT_BRIGHTNESS + 20), "ct:" + (DEFAULT_CT  + 20), "tr-before:20min");
@@ -669,6 +669,28 @@ class HueSchedulerTest {
 
         assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 10).ct(DEFAULT_CT + 10).build());
         assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 20).ct(DEFAULT_CT + 20).transitionTime(6000).build());
+
+        ensureRunnable(initialNow.plusDays(1).plusMinutes(20), initialNow.plusDays(2));
+    }
+
+    @Test
+    void parse_transitionTimeBefore_multipleStates_ct_lightTurnedOnAfterStart_roundsUp() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addStateNow(1, "bri:" + DEFAULT_BRIGHTNESS, "ct:" + DEFAULT_CT);
+        addState(1, now.plusMinutes(40), "bri:" + (DEFAULT_BRIGHTNESS + 20), "ct:" + (DEFAULT_CT  + 20), "tr-before:20min");
+
+        startScheduler();
+
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(2);
+        ScheduledRunnable trBeforeRunnable = scheduledRunnables.get(1);
+
+        setCurrentTimeTo(now.plusMinutes(32).plusSeconds(18));
+        addLightStateResponse(1, REACHABLE);
+
+        trBeforeRunnable.run();
+
+        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 13).ct(DEFAULT_CT + 13).build());
+        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 20).ct(DEFAULT_CT + 20).transitionTime(4620).build());
 
         ensureRunnable(initialNow.plusDays(1).plusMinutes(20), initialNow.plusDays(2));
     }
@@ -755,7 +777,7 @@ class HueSchedulerTest {
 
         trBeforeRunnable.run();
 
-        assertPutCall(expectedPutCall(1).hue(49151).sat(127).build());
+        assertPutCall(expectedPutCall(1).hue(49152).sat(127).build());
         assertPutCall(expectedPutCall(1).hue(65535).sat(254).transitionTime(6000).build());
 
         ensureRunnable(initialNow.plusDays(1).plusMinutes(20), initialNow.plusDays(2));
@@ -777,7 +799,7 @@ class HueSchedulerTest {
 
         trBeforeRunnable.run();
 
-        assertPutCall(expectedPutCall(1).hue(8191).sat(127).build());
+        assertPutCall(expectedPutCall(1).hue(8192).sat(127).build());
         assertPutCall(expectedPutCall(1).hue(65535).sat(254).transitionTime(6000).build());
 
         ensureRunnable(initialNow.plusDays(1).plusMinutes(20), initialNow.plusDays(2));

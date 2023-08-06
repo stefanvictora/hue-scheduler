@@ -28,7 +28,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
-@Command(name = "HueScheduler", version = "0.8.0", mixinStandardHelpOptions = true, sortOptions = false)
+@Command(name = "HueScheduler", version = "0.8.1", mixinStandardHelpOptions = true, sortOptions = false)
 public final class HueScheduler implements Runnable {
 
     private static final Logger LOG = LoggerFactory.getLogger(HueScheduler.class);
@@ -367,9 +367,8 @@ public final class HueScheduler implements Runnable {
 
     private ScheduledState getLastSeenState(ScheduledState currentState) {
         return getLightStatesForId(currentState).stream()
-                                                .sorted(Comparator.comparing(ScheduledState::getLastSeen, Comparator.nullsFirst(ZonedDateTime::compareTo).reversed()))
                                                 .filter(state -> state.getLastSeen() != null)
-                                                .findFirst()
+                                                .max(Comparator.comparing(ScheduledState::getLastSeen))
                                                 .orElse(null);
     }
 
@@ -377,8 +376,7 @@ public final class HueScheduler implements Runnable {
         // TODO: We should also consider day cross overs, i.e. if the current state is the first of today, we should take the last state from yesterday as the previous state
         return getLightStatesForId(currentState).stream()
                                                 .filter(state -> state != currentState)
-                                                .sorted(Comparator.comparing(state -> state.getStart(currentTime.get()), Comparator.reverseOrder()))
-                                                .findFirst()
+                                                .max(Comparator.comparing(state -> state.getStart(currentTime.get())))
                                                 .orElse(null);
     }
 

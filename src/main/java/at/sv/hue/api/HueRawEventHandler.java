@@ -75,7 +75,7 @@ public final class HueRawEventHandler implements BackgroundEventHandler {
         private String type;
 
         private String getStatus() {
-            if (status.isTextual()) {
+            if (status != null && status.isTextual()) {
                 return status.asText();
             }
             return null;

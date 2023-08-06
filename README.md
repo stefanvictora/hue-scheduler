@@ -448,7 +448,7 @@ This means that if you want to rest manual overrides with dumb wall switches, yo
 
 ### How Does Hue Scheduler Compare to Adaptive Lighting?
 
-Both approaches try to automate your lights' state according to the time of day. However, Adaptive Lighting only updates the color temperature of your lights throughout the day, while Hue Scheduler additionally gives you control over your lights brightness, color, and even on-state. Furthermore, while Adaptive Lighting continuously updates your lights state with no manual control, Hue Scheduler gives you more freedom to configure your own schedule, and even allows you to take over and keep control of lights until you turn them on and off again.
+Both approaches try to automate your lights' state according to the time of day. However, Adaptive Lighting only updates the color temperature of your lights throughout the day, while Hue Scheduler additionally gives you control over your lights brightness, color, and even on-state. Furthermore, while Adaptive Lighting continuously updates your lights state with no manual control, Hue Scheduler gives you more freedom to configure your own schedule, and even allows you to take over and keep control of lights until you turn them off and on again.
 
 ### Does Hue Scheduler Access The Internet?
 
