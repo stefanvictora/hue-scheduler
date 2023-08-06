@@ -424,7 +424,7 @@ final class ScheduledState {
         ZonedDateTime endTime = getStartWithoutTransitionTimeBefore(lastStart).with(lastStart.toLocalDate());
         Duration totalDuration = Duration.between(startTime, endTime);
         return BigDecimal.valueOf(durationAfterStart.toMillis())
-                         .divide(BigDecimal.valueOf(totalDuration.toMillis()), 5, RoundingMode.HALF_UP);
+                         .divide(BigDecimal.valueOf(totalDuration.toMillis()), 7, RoundingMode.HALF_UP);
     }
 
     private static Integer interpolateInteger(BigDecimal interpolatedTime, Integer target, Integer previous) {
@@ -437,7 +437,7 @@ final class ScheduledState {
         BigDecimal diff = BigDecimal.valueOf(target - previous);
         return BigDecimal.valueOf(previous)
                          .add(interpolatedTime.multiply(diff))
-                         .setScale(0, RoundingMode.CEILING)
+                         .setScale(0, RoundingMode.HALF_UP)
                          .intValue();
     }
 
@@ -466,10 +466,13 @@ final class ScheduledState {
         if (previous == null) {
             return null;
         }
+        if (previous == 0 && target == MAX_HUE_VALUE || previous == MAX_HUE_VALUE && target == 0) {
+            return 0;
+        }
         int diff = ((target - previous + MIDDLE_HUE_VALUE) % (MAX_HUE_VALUE + 1)) - MIDDLE_HUE_VALUE;
         return BigDecimal.valueOf(previous)
                          .add(interpolatedTime.multiply(BigDecimal.valueOf(diff)))
-                         .setScale(0, RoundingMode.CEILING)
+                         .setScale(0, RoundingMode.HALF_UP)
                          .intValue();
     }
 

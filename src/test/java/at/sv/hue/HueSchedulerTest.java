@@ -674,7 +674,7 @@ class HueSchedulerTest {
     }
 
     @Test
-    void parse_transitionTimeBefore_multipleStates_ct_lightTurnedOnAfterStart_roundsUp() {
+    void parse_transitionTimeBefore_multipleStates_ct_lightTurnedOnAfterStart_correctRounding() {
         addKnownLightIdsWithDefaultCapabilities(1);
         addStateNow(1, "bri:" + DEFAULT_BRIGHTNESS, "ct:" + DEFAULT_CT);
         addState(1, now.plusMinutes(40), "bri:" + (DEFAULT_BRIGHTNESS + 20), "ct:" + (DEFAULT_CT  + 20), "tr-before:20min");
@@ -689,7 +689,7 @@ class HueSchedulerTest {
 
         trBeforeRunnable.run();
 
-        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 13).ct(DEFAULT_CT + 13).build());
+        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 12).ct(DEFAULT_CT + 12).build());
         assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 20).ct(DEFAULT_CT + 20).transitionTime(4620).build());
 
         ensureRunnable(initialNow.plusDays(1).plusMinutes(20), initialNow.plusDays(2));

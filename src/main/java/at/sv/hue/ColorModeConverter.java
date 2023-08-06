@@ -1,7 +1,7 @@
 package at.sv.hue;
 
 import at.sv.hue.api.PutCall;
-import at.sv.hue.color.ColorTemperatureToRGBConverter;
+import at.sv.hue.color.CTToRGBConverter;
 import at.sv.hue.color.RGBToHSVConverter;
 import at.sv.hue.color.RGBToXYConverter;
 
@@ -32,7 +32,7 @@ public class ColorModeConverter {
     }
 
     private static int[] convertCtToRgb(PutCall putCall) {
-        int[] rgb = ColorTemperatureToRGBConverter.approximateRGBFromMired(putCall.getCt());
+        int[] rgb = CTToRGBConverter.approximateRGBFromMired(putCall.getCt());
         putCall.setCt(null);
         return rgb;
     }
@@ -64,7 +64,7 @@ public class ColorModeConverter {
     }
 
     private static void setCtFromRgb(PutCall putCall, int[] rgb) {
-        int mired = ColorTemperatureToRGBConverter.approximateMiredFromRGB(rgb[0], rgb[1], rgb[2]);
+        int mired = CTToRGBConverter.approximateMiredFromRGB(rgb[0], rgb[1], rgb[2]);
         putCall.setCt(mired);
     }
 }

@@ -4,7 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class ColorTemperatureToRGBConverterTest {
+class CTToRGBConverterTest {
 
     @Test
     void testApproximationFromAndToKelvin() {
@@ -20,7 +20,7 @@ class ColorTemperatureToRGBConverterTest {
 
     private static void assertRGBFromAndToKelvin(int kelvin, int red, int green, int blue) {
         int mired = 1_000_000 / kelvin;
-        assertThat(ColorTemperatureToRGBConverter.approximateRGBFromMired(mired)).containsExactly(red, green, blue);
-        assertThat(ColorTemperatureToRGBConverter.approximateMiredFromRGB(red, green, blue)).isEqualTo(mired);
+        assertThat(CTToRGBConverter.approximateRGBFromMired(mired)).containsExactly(red, green, blue);
+        assertThat(CTToRGBConverter.approximateMiredFromRGB(red, green, blue)).isEqualTo(mired);
     }
 }

@@ -4,7 +4,7 @@ package at.sv.hue.color;
  * The approximation from RGB to Kelvin was ported from <a href="https://tannerhelland.com/2012/09/18/convert-temperature-rgb-algorithm-code.html">
  * How to Convert Temperature (K) to RGB: Algorithm and Sample Code</a> from Tanner Helland (c) 2012
  */
-public final class ColorTemperatureToRGBConverter {
+public final class CTToRGBConverter {
 
     private static final int MIN_KELVIN = 1000;
     private static final int MAX_KELVIN = 6700;
