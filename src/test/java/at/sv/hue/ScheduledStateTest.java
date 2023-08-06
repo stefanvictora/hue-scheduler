@@ -475,7 +475,7 @@ class ScheduledStateTest {
     }
 
     @Test
-    void lightStateDiffers_noCapabilities_sameBrightness_differentColorMode_true() {
+    void lightStateDiffers_noCapabilities_sameBrightness_differentColorMode_doesNotMatter_false() {
         ScheduledState scheduledState = ScheduledState.builder()
                                                       .brightness(10)
                                                       .capabilities(LightCapabilities.NO_CAPABILITIES)
@@ -487,7 +487,21 @@ class ScheduledStateTest {
                                           .colormode("xy")
                                           .build();
 
-        assertLightStateDiffers(scheduledState, lightState, true);
+        assertLightStateDiffers(scheduledState, lightState, false);
+    }
+
+    @Test
+    void lightStateDiffers_defaultCapabilities_sameBrightness_differentColorMode_doesNotMatter_false() {
+        ScheduledState scheduledState = ScheduledState.builder()
+                                                      .brightness(10)
+                                                      .capabilities(defaultCapabilities)
+                                                      .build();
+        LightState lightState = LightState.builder()
+                                          .brightness(10)
+                                          .colormode("ct")
+                                          .build();
+
+        assertLightStateDiffers(scheduledState, lightState, false);
     }
 
     @Test

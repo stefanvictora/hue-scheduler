@@ -286,8 +286,8 @@ final class ScheduledState {
 
     private boolean colorModeDiffers(LightState lightState) {
         String colorMode = getColorMode();
-        if (colorMode == null && lightState.getColormode() == null) {
-            return false;
+        if (colorMode == null) {
+            return false; // if no color mode scheduled, always treat as equal
         }
         if (!Objects.equals(colorMode, lightState.getColormode())) {
             return true;
