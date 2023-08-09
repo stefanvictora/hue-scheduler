@@ -87,7 +87,7 @@ final class ScheduledState {
 
     public static ScheduledState createTemporaryCopy(ScheduledState state, ZonedDateTime start, ZonedDateTime end) {
         ScheduledState copy = new ScheduledState(state.name, state.updateId, start.toLocalTime().toString(),
-                state.brightness, state.ct, state.x, state.y, state.hue, state.sat, state.effect, state.on, state.transitionTimeBefore,
+                state.brightness, state.ct, state.x, state.y, state.hue, state.sat, state.effect, state.on, null, // todo: is this change really needed
                 state.transitionTime, state.daysOfWeek, state.startTimeProvider, state.groupState, state.groupLights,
                 state.capabilities, state.force);
         copy.end = end;
@@ -191,7 +191,7 @@ final class ScheduledState {
         return start;
     }
 
-    private ZonedDateTime getStartWithoutTransitionTimeBefore(ZonedDateTime now) {
+    public ZonedDateTime getStartWithoutTransitionTimeBefore(ZonedDateTime now) {
         DayOfWeek day;
         DayOfWeek today = DayOfWeek.from(now);
         if (daysOfWeek.contains(today)) {
@@ -381,7 +381,7 @@ final class ScheduledState {
         if (transitionTimeBefore == null) {
             return null; // no interpolation needed
         }
-        int timeUntilThisState = getAdjustedTransitionTimeBefore(now);
+        int timeUntilThisState = getAdjustedTransitionTimeBefore(now); // todo: there seems to be an issue
         if (timeUntilThisState == 0) {
             return null; // the state is already reached
         }

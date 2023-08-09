@@ -556,6 +556,38 @@ class HueSchedulerTest {
         ensureNextDayRunnable(actualStart);
     }
 
+    @Disabled
+    @Test // TODO: WIP
+    void parse_transitionTimeBefore_crossesDayLine_correctlyScheduledRightNow() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now, "ct:" + DEFAULT_CT, "tr-before:20min");
+
+        ScheduledRunnable trRunnable = startAndGetSingleRunnable(now, now.plusDays(1).minusMinutes(20));
+
+        addLightStateResponse(1, REACHABLE);
+
+        runAndAssertReachablePutCall(trRunnable, expectedPutCall(1).ct(DEFAULT_CT).build());
+
+        ensureRunnable(now.plusDays(1).minusMinutes(20), now.plusDays(2).minusMinutes(20));
+//        assertScheduleStart(scheduledRunnables.get(0), now, now.plusDays(1).minusMinutes(20));
+//        assertScheduleStart(scheduledRunnables.get(1), now.plusDays(1).minusMinutes(20), now.plusDays(2).minusMinutes(20));
+    }
+
+    @Disabled
+    @Test // TODO: WIP
+    void parse_dayCrossOver_correctlyScheduled() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now.minusMinutes(20), "ct:" + DEFAULT_CT);
+
+        ScheduledRunnable trRunnable = startAndGetSingleRunnable(now, now.plusDays(1).minusMinutes(20));
+
+        addLightStateResponse(1, REACHABLE);
+
+        runAndAssertReachablePutCall(trRunnable, expectedPutCall(1).ct(DEFAULT_CT).build());
+
+        ensureRunnable(now.plusDays(1).minusMinutes(20), now.plusDays(2).minusMinutes(20));
+    }
+
     @Test
     void parse_transitionTimeBefore_overNight_doesNotOverAdjustTransitionTime_returnsNullInstead() {
         addKnownLightIdsWithDefaultCapabilities(1);

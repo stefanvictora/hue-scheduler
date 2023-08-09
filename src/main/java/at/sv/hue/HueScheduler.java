@@ -229,6 +229,7 @@ public final class HueScheduler implements Runnable {
             statesStartingOnDay.stream()
                                .filter(state -> !alreadyProcessedStates.contains(state))
                                .forEach(state -> calculateAndSetEndTime(state, states, state.getStart(now)));
+//                               .forEach(state -> calculateAndSetEndTime(state, states, state.getStartWithoutTransitionTimeBefore(now))); // todo: does this change really work?
             alreadyProcessedStates.addAll(statesStartingOnDay);
         }
     }
@@ -301,9 +302,14 @@ public final class HueScheduler implements Runnable {
                 if (state.getTransitionTimeBefore() != null) {
                     ScheduledState previousState = getPreviousState(state);
                     if (previousState != null) {
+                        LOG.trace("Got previous state: {}", previousState);
                         PutCall interpolatedPutCall = state.getInterpolatedPutCall(currentTime.get(), previousState);
                         if (interpolatedPutCall != null) {
+                            LOG.trace("Interpolated call: {}", interpolatedPutCall);
                             putState(previousState, interpolatedPutCall); // TODO: maybe use some transition time and wait until next put call
+//                            Thread.sleep(400);
+                        } else {
+                            LOG.trace("No interpolated call necessary");
                         }
                     }
                 }
@@ -345,6 +351,7 @@ public final class HueScheduler implements Runnable {
     private boolean shouldEnforceNextDay(ScheduledState state) {
         LocalTime currentTime = this.currentTime.get().toLocalTime().truncatedTo(ChronoUnit.SECONDS).plusSeconds(1);
         LocalTime stateStartTime = state.getLastStart().toLocalTime().truncatedTo(ChronoUnit.SECONDS);
+//        LocalTime stateStartTime = state.getStart(this.currentTime.get()).toLocalTime().truncatedTo(ChronoUnit.SECONDS); // todo: need to write more tests and find a better approach
         return currentTime.isAfter(stateStartTime) || currentTime.equals(stateStartTime);
     }
 
