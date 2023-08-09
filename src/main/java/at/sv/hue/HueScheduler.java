@@ -257,7 +257,7 @@ public final class HueScheduler implements Runnable {
     }
 
     private boolean doesNotStartToday(ScheduledState state, ZonedDateTime now) {
-        return !DayOfWeek.from(state.getStart(now)).equals(DayOfWeek.from(now));
+        return !state.isScheduledOn(DayOfWeek.from(now));
     }
 
     private void schedule(ScheduledState state) {
@@ -373,11 +373,18 @@ public final class HueScheduler implements Runnable {
     }
 
     private ScheduledState getPreviousState(ScheduledState currentState) {
-        // TODO: We should also consider day cross overs, i.e. if the current state is the first of today, we should take the last state from yesterday as the previous state
-        return getLightStatesForId(currentState).stream()
-                                                .filter(state -> state != currentState)
-                                                .max(Comparator.comparing(state -> state.getStart(currentTime.get())))
-                                                .orElse(null);
+        List<ScheduledState> lightStatesForId = getLightStatesForId(currentState);
+        List<ScheduledState> statesToday = lightStatesForId.stream()
+                                                           .sorted(Comparator.comparing(state -> state.getStart(currentTime.get())))
+                                                           .collect(Collectors.toList());
+        int position = statesToday.indexOf(currentState);
+        if (position > 0) {
+            return statesToday.get(position - 1);
+        }
+        return lightStatesForId.stream()
+                               .filter(state -> state != currentState)
+                               .max(Comparator.comparing(state -> state.getStart(currentTime.get().minusDays(1))))
+                               .orElse(null);
     }
 
     private boolean shouldLogScheduleDebugMessage(long delayInMs) {

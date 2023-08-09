@@ -508,7 +508,7 @@ final class ScheduledState {
 
     private String getFormattedStart() {
         if (lastStart != null) {
-            return start + " (" + getFormattedTime(getStart(lastStart)) + ")";
+            return start + " (" + getFormattedTime(lastStart) + ")";
         }
         return start;
     }
