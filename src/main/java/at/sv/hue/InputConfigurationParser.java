@@ -81,7 +81,7 @@ public final class InputConfigurationParser {
                         break;
                     case "ct":
                         ct = parseInteger(value, parameter);
-                        if (ct >= 1_000) {
+                        if (ct >= 2_000) {
                             ct = convertToMiredCt(ct);
                         }
                         break;

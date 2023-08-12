@@ -184,14 +184,14 @@ final class ScheduledState {
     }
 
     public ZonedDateTime getStart(ZonedDateTime dateTime) {
-        ZonedDateTime start = getStartWithoutTransitionTimeBefore(dateTime);
+        ZonedDateTime definedStart = getStartWithoutTransitionTimeBefore(dateTime);
         if (transitionTimeBefore != null) {
-            start = start.minus(transitionTimeBefore * 100, ChronoUnit.MILLIS);
+            return definedStart.with(definedStart.toLocalTime().minus(transitionTimeBefore * 100L, ChronoUnit.MILLIS));
         }
-        return start;
+        return definedStart;
     }
 
-    public ZonedDateTime getStartWithoutTransitionTimeBefore(ZonedDateTime now) {
+    private ZonedDateTime getStartWithoutTransitionTimeBefore(ZonedDateTime now) {
         DayOfWeek day;
         DayOfWeek today = DayOfWeek.from(now);
         if (daysOfWeek.contains(today)) {
@@ -219,7 +219,7 @@ final class ScheduledState {
         return daysOfWeek.stream().findFirst().get();
     }
 
-    public EnumSet<DayOfWeek> getDaysOfWeek() {
+    public Set<DayOfWeek> getDaysOfWeek() {
         return EnumSet.copyOf(daysOfWeek);
     }
 
@@ -259,12 +259,20 @@ final class ScheduledState {
 
     private int getAdjustedTransitionTimeBefore(ZonedDateTime now) {
         if (transitionTimeBefore == null) return 0;
-        ZonedDateTime definedStart = getStartWithoutTransitionTimeBefore(lastStart).with(lastStart.toLocalDate());
+        ZonedDateTime definedStart = getDefinedStartInTheFuture(lastStart);
         Duration between = Duration.between(now, definedStart);
         if (between.isZero() || between.isNegative()) return 0;
         return (int) between.toMillis() / 100;
     }
-
+    
+    private ZonedDateTime getDefinedStartInTheFuture(ZonedDateTime dateTime) { // todo: write more tests to verify this behavior
+        ZonedDateTime definedStart = getStartWithoutTransitionTimeBefore(dateTime); // .with(lastStart.toLocalDate())
+        if (definedStart.isBefore(dateTime)) {
+            return getStartWithoutTransitionTimeBefore(dateTime.plusDays(1)); // with(lastStart.plusDays(1).toLocalDate())
+        }
+        return definedStart;
+    }
+    
     public boolean endsAfter(ZonedDateTime now) {
         return now.isAfter(end);
     }
@@ -312,8 +320,9 @@ final class ScheduledState {
             case XY:
                 return doubleValueDiffers(x, lightState.getX()) ||
                         doubleValueDiffers(y, lightState.getY());
+            default:
+                return false; // should not happen, but as a fallback we just ignore unknown color modes
         }
-        return false; // should not happen, but as a fallback we just ignore unknown color modes
     }
 
     private ColorMode getColorMode() {
@@ -381,7 +390,7 @@ final class ScheduledState {
         if (transitionTimeBefore == null) {
             return null; // no interpolation needed
         }
-        int timeUntilThisState = getAdjustedTransitionTimeBefore(now); // todo: there seems to be an issue
+        int timeUntilThisState = getAdjustedTransitionTimeBefore(now);
         if (timeUntilThisState == 0) {
             return null; // the state is already reached
         }
@@ -421,7 +430,7 @@ final class ScheduledState {
     private BigDecimal getInterpolatedTime(ZonedDateTime now) {
         ZonedDateTime startTime = getStart(now).with(now.toLocalDate());
         Duration durationAfterStart = Duration.between(startTime, now);
-        ZonedDateTime endTime = getStartWithoutTransitionTimeBefore(lastStart).with(lastStart.toLocalDate());
+        ZonedDateTime endTime = getDefinedStartInTheFuture(lastStart);
         Duration totalDuration = Duration.between(startTime, endTime);
         return BigDecimal.valueOf(durationAfterStart.toMillis())
                          .divide(BigDecimal.valueOf(totalDuration.toMillis()), 7, RoundingMode.HALF_UP);

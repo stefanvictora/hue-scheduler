@@ -165,7 +165,7 @@ public final class HueScheduler implements Runnable {
             hueApi.assertConnection();
             LOG.info("Connected to bridge at {}.", ip);
         } catch (BridgeConnectionFailure e) {
-            LOG.warn("Bridge not reachable: '" + e.getCause().getLocalizedMessage() + "'. Retrying in 5s.");
+            LOG.warn("Bridge not reachable: '{}'. Retrying in 5s.", e.getCause().getLocalizedMessage());
             return false;
         } catch (BridgeAuthenticationFailure e) {
             System.err.println("Bridge connection rejected: 'Unauthorized user'. Please make sure you use the correct username from the setup process," +
@@ -201,7 +201,7 @@ public final class HueScheduler implements Runnable {
             } else {
                 updateId = state.getUpdateId();
             }
-            lightStates.computeIfAbsent(updateId, ArrayList::new).add(state);
+            lightStates.computeIfAbsent(updateId, key -> new ArrayList<>()).add(state);
         });
     }
 
@@ -229,7 +229,6 @@ public final class HueScheduler implements Runnable {
             statesStartingOnDay.stream()
                                .filter(state -> !alreadyProcessedStates.contains(state))
                                .forEach(state -> calculateAndSetEndTime(state, states, state.getStart(now)));
-//                               .forEach(state -> calculateAndSetEndTime(state, states, state.getStartWithoutTransitionTimeBefore(now))); // todo: does this change really work?
             alreadyProcessedStates.addAll(statesStartingOnDay);
         }
     }
@@ -349,10 +348,9 @@ public final class HueScheduler implements Runnable {
     }
 
     private boolean shouldEnforceNextDay(ScheduledState state) {
-        LocalTime currentTime = this.currentTime.get().toLocalTime().truncatedTo(ChronoUnit.SECONDS).plusSeconds(1);
-        LocalTime stateStartTime = state.getLastStart().toLocalTime().truncatedTo(ChronoUnit.SECONDS);
-//        LocalTime stateStartTime = state.getStart(this.currentTime.get()).toLocalTime().truncatedTo(ChronoUnit.SECONDS); // todo: need to write more tests and find a better approach
-        return currentTime.isAfter(stateStartTime) || currentTime.equals(stateStartTime);
+        LocalTime currentLocalTime = this.currentTime.get().toLocalTime().truncatedTo(ChronoUnit.SECONDS).plusSeconds(1);
+        LocalTime stateStartLocalTime = state.getLastStart().toLocalTime().truncatedTo(ChronoUnit.SECONDS);
+        return currentLocalTime.isAfter(stateStartLocalTime) || currentLocalTime.equals(stateStartLocalTime);
     }
 
     private boolean lightHasBeenManuallyOverriddenBefore(ScheduledState state) {
@@ -381,12 +379,12 @@ public final class HueScheduler implements Runnable {
 
     private ScheduledState getPreviousState(ScheduledState currentState) {
         List<ScheduledState> lightStatesForId = getLightStatesForId(currentState);
-        List<ScheduledState> statesToday = lightStatesForId.stream()
+        List<ScheduledState> calculatedStateOrderAscending = lightStatesForId.stream()
                                                            .sorted(Comparator.comparing(state -> state.getStart(currentTime.get())))
                                                            .collect(Collectors.toList());
-        int position = statesToday.indexOf(currentState);
+        int position = calculatedStateOrderAscending.indexOf(currentState);
         if (position > 0) {
-            return statesToday.get(position - 1);
+            return calculatedStateOrderAscending.get(position - 1);
         }
         return lightStatesForId.stream()
                                .filter(state -> state != currentState)
@@ -495,7 +493,7 @@ public final class HueScheduler implements Runnable {
             return putState(putCall);
         }
     }
-
+    
     private boolean putState(PutCall putCall) {
         return hueApi.putState(putCall);
     }
@@ -550,7 +548,7 @@ public final class HueScheduler implements Runnable {
         ZonedDateTime now = currentTime.get();
         ZonedDateTime midnight = ZonedDateTime.of(now.toLocalDate().plusDays(1), LocalTime.MIDNIGHT, now.getZone());
         long delay = Duration.between(now, midnight).toMinutes();
-        stateScheduler.scheduleAtFixedRate(this::logSunDataInfo, delay + 1, 60 * 24, TimeUnit.MINUTES);
+        stateScheduler.scheduleAtFixedRate(this::logSunDataInfo, delay + 1, 60 * 24L, TimeUnit.MINUTES);
     }
 
     private void logSunDataInfo() {
