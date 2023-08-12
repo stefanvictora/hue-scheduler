@@ -1,14 +1,15 @@
-package at.sv.hue;
+package at.sv.hue.color;
 
+import at.sv.hue.ColorMode;
 import at.sv.hue.api.PutCall;
-import at.sv.hue.color.CTToRGBConverter;
-import at.sv.hue.color.RGBToHSVConverter;
-import at.sv.hue.color.RGBToXYConverter;
 
 import static at.sv.hue.ColorMode.*;
 
-public class ColorModeConverter {
-
+public final class ColorModeConverter {
+    
+    private ColorModeConverter() {
+    }
+    
     public static void convertIfNeeded(PutCall putCall, Double[][] colorGamut, ColorMode source, ColorMode target) {
         if (source == CT && target == HS) {
             int[] rgb = convertCtToRgb(putCall);

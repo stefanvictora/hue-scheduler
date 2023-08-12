@@ -25,8 +25,8 @@ final class ScheduledState {
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
     private static final String MULTI_COLOR_LOOP = "multi_colorloop";
     private static final String COLOR_LOOP = "colorloop";
-    private static final int MAX_HUE_VALUE = 65535;
-    private static final int MIDDLE_HUE_VALUE = 32768;
+    public static final int MAX_HUE_VALUE = 65535;
+    public static final int MIDDLE_HUE_VALUE = 32768;
 
     private final String name;
     private final int updateId;
@@ -257,7 +257,7 @@ final class ScheduledState {
         return adjustedTrBefore;
     }
 
-    private int getAdjustedTransitionTimeBefore(ZonedDateTime now) {
+    public int getAdjustedTransitionTimeBefore(ZonedDateTime now) {
         if (transitionTimeBefore == null) return 0;
         ZonedDateTime definedStart = getDefinedStartInTheFuture(lastStart);
         Duration between = Duration.between(now, definedStart);
@@ -271,6 +271,18 @@ final class ScheduledState {
             return getStartWithoutTransitionTimeBefore(dateTime.plusDays(1)); // with(lastStart.plusDays(1).toLocalDate())
         }
         return definedStart;
+    }
+    
+    /**
+     * t = (current_time - start_time) / (end_time - start_time)
+     */
+    public BigDecimal getInterpolatedTime(ZonedDateTime now) {
+        ZonedDateTime startTime = getStart(now).with(now.toLocalDate());
+        Duration durationAfterStart = Duration.between(startTime, now);
+        ZonedDateTime endTime = getDefinedStartInTheFuture(lastStart);
+        Duration totalDuration = Duration.between(startTime, endTime);
+        return BigDecimal.valueOf(durationAfterStart.toMillis())
+                .divide(BigDecimal.valueOf(totalDuration.toMillis()), 7, RoundingMode.HALF_UP);
     }
     
     public boolean endsAfter(ZonedDateTime now) {
@@ -325,7 +337,7 @@ final class ScheduledState {
         }
     }
 
-    private ColorMode getColorMode() {
+    public ColorMode getColorMode() {
         if (ct != null) {
             return ColorMode.CT;
         } else if (x != null) {
@@ -385,104 +397,9 @@ final class ScheduledState {
                       .groupState(groupState)
                       .build();
     }
-
+    
     public PutCall getInterpolatedPutCall(ZonedDateTime now, ScheduledState previousState) {
-        if (transitionTimeBefore == null) {
-            return null; // no interpolation needed
-        }
-        int timeUntilThisState = getAdjustedTransitionTimeBefore(now);
-        if (timeUntilThisState == 0) {
-            return null; // the state is already reached
-        }
-        if (timeUntilThisState == transitionTimeBefore) {
-            return previousState.getPutCall(now); // directly at start, just return previous put call
-        }
-        return interpolate(previousState, now);
-    }
-
-    /**
-     * P = P0 + t(P1 - P0)
-     */
-    private PutCall interpolate(ScheduledState previousState, ZonedDateTime now) {
-        BigDecimal interpolatedTime = getInterpolatedTime(now);
-        PutCall previous = previousState.getPutCall(now);
-        PutCall target = getPutCall(now);
-
-        convertColorModeIfNeeded(previous, previousState);
-
-        previous.setBri(interpolateInteger(interpolatedTime, target.getBri(), previous.getBri()));
-        previous.setCt(interpolateInteger(interpolatedTime, target.getCt(), previous.getCt()));
-        previous.setHue(interpolateHue(interpolatedTime, target.getHue(), previous.getHue()));
-        previous.setSat(interpolateInteger(interpolatedTime, target.getSat(), previous.getSat()));
-        previous.setX(interpolateDouble(interpolatedTime, target.getX(), previous.getX()));
-        previous.setY(interpolateDouble(interpolatedTime, target.getY(), previous.getY()));
-        return previous;
-    }
-
-    private void convertColorModeIfNeeded(PutCall previousPutCall, ScheduledState previousState) {
-        Double[][] colorGamut = previousState.getCapabilities().getColorGamut();
-        ColorModeConverter.convertIfNeeded(previousPutCall, colorGamut, previousState.getColorMode(), getColorMode());
-    }
-
-    /**
-     * t = (current_time - start_time) / (end_time - start_time)
-     */
-    private BigDecimal getInterpolatedTime(ZonedDateTime now) {
-        ZonedDateTime startTime = getStart(now).with(now.toLocalDate());
-        Duration durationAfterStart = Duration.between(startTime, now);
-        ZonedDateTime endTime = getDefinedStartInTheFuture(lastStart);
-        Duration totalDuration = Duration.between(startTime, endTime);
-        return BigDecimal.valueOf(durationAfterStart.toMillis())
-                         .divide(BigDecimal.valueOf(totalDuration.toMillis()), 7, RoundingMode.HALF_UP);
-    }
-
-    private static Integer interpolateInteger(BigDecimal interpolatedTime, Integer target, Integer previous) {
-        if (target == null) {
-            return previous;
-        }
-        if (previous == null) {
-            return null;
-        }
-        BigDecimal diff = BigDecimal.valueOf(target - previous);
-        return BigDecimal.valueOf(previous)
-                         .add(interpolatedTime.multiply(diff))
-                         .setScale(0, RoundingMode.HALF_UP)
-                         .intValue();
-    }
-
-    private static Double interpolateDouble(BigDecimal interpolatedTime, Double target, Double previous) {
-        if (target == null) {
-            return previous;
-        }
-        if (previous == null) {
-            return null;
-        }
-        BigDecimal diff = BigDecimal.valueOf(target - previous);
-        return BigDecimal.valueOf(previous)
-                         .add(interpolatedTime.multiply(diff))
-                         .setScale(5, RoundingMode.HALF_UP)
-                         .doubleValue();
-    }
-
-    /**
-     * Perform special interpolation for hue values, as they wrap around i.e. 0 and 65535 are both considered red.
-     * This means that we need to decide in which direction we want to interpolate, to get the smoothest transition.
-     */
-    private static Integer interpolateHue(BigDecimal interpolatedTime, Integer target, Integer previous) {
-        if (target == null) {
-            return previous;
-        }
-        if (previous == null) {
-            return null;
-        }
-        if (previous == 0 && target == MAX_HUE_VALUE || previous == MAX_HUE_VALUE && target == 0) {
-            return 0;
-        }
-        int diff = ((target - previous + MIDDLE_HUE_VALUE) % (MAX_HUE_VALUE + 1)) - MIDDLE_HUE_VALUE;
-        return BigDecimal.valueOf(previous)
-                         .add(interpolatedTime.multiply(BigDecimal.valueOf(diff)))
-                         .setScale(0, RoundingMode.HALF_UP)
-                         .intValue();
+        return new StateInterpolator(this, previousState, now).getInterpolatedPutCall();
     }
 
     @Override
@@ -550,6 +467,6 @@ final class ScheduledState {
 
     private String getFormattedTransitionTimeIfSet(String name, Integer transitionTime) {
         if (transitionTime == null) return "";
-        return formatPropertyName(name) + Duration.ofMillis(transitionTime * 100).toString();
+        return formatPropertyName(name) + Duration.ofMillis(transitionTime * 100L).toString();
     }
 }

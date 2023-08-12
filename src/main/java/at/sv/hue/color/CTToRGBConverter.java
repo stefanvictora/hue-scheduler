@@ -4,8 +4,11 @@ package at.sv.hue.color;
  * The approximation from RGB to Kelvin was ported from <a href="https://tannerhelland.com/2012/09/18/convert-temperature-rgb-algorithm-code.html">
  * How to Convert Temperature (K) to RGB: Algorithm and Sample Code</a> from Tanner Helland (c) 2012
  */
-public final class CTToRGBConverter {
-
+final class CTToRGBConverter {
+    
+    private CTToRGBConverter() {
+    }
+    
     private static final int MIN_KELVIN = 1000;
     private static final int MAX_KELVIN = 6700;
     private static final int STEP = 50;
@@ -82,7 +85,7 @@ public final class CTToRGBConverter {
         if (kelvin <= 66) {
             return 255;
         } else {
-            return 329.698727446 * Math.pow(kelvin - 60, -0.1332047592);
+            return 329.698727446 * Math.pow(kelvin - 60.0, -0.1332047592);
         }
     }
 
@@ -90,7 +93,7 @@ public final class CTToRGBConverter {
         if (kelvin <= 66) {
             return 99.4708025861 * Math.log(kelvin) - 161.1195681661;
         } else {
-            return 288.1221695283 * Math.pow(kelvin - 60, -0.0755148492);
+            return 288.1221695283 * Math.pow(kelvin - 60.0, -0.0755148492);
         }
     }
 
@@ -100,7 +103,7 @@ public final class CTToRGBConverter {
         } else if (kelvin <= 19) {
             return 0;
         } else {
-            return 138.5177312231 * Math.log(kelvin - 10) - 305.0447927307;
+            return 138.5177312231 * Math.log(kelvin - 10.0) - 305.0447927307;
         }
     }
 

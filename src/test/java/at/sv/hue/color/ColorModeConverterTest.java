@@ -1,5 +1,6 @@
-package at.sv.hue;
+package at.sv.hue.color;
 
+import at.sv.hue.ColorMode;
 import at.sv.hue.api.PutCall;
 import org.junit.jupiter.api.Test;
 
