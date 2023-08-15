@@ -2,13 +2,13 @@ package at.sv.hue.api;
 
 public interface ManualOverrideTracker {
 
-    void onManuallyOverridden(long lightId);
+    void onManuallyOverridden(String id);
 
-    boolean isManuallyOverridden(long lightId);
+    boolean isManuallyOverridden(String id);
 
-    void onLightTurnedOn(long lightId);
+    void onLightTurnedOn(String id);
 
-    boolean shouldEnforceSchedule(long lightId);
+    boolean shouldEnforceSchedule(String id);
 
-    void onAutomaticallyAssigned(long lightId);
+    void onAutomaticallyAssigned(String id);
 }

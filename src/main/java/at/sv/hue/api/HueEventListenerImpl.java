@@ -11,19 +11,19 @@ import java.util.function.Function;
 public class HueEventListenerImpl implements HueEventListener {
 
     private final ManualOverrideTracker manualOverrideTracker;
-    private final Function<Integer, List<Runnable>> waitingListProvider;
+    private final Function<String, List<Runnable>> waitingListProvider;
 
     @Override
-    public void onLightOff(int lightId, String uuid) {
+    public void onLightOff(String idv1, String uuid) {
         // currently not needed
     }
 
     @Override
-    public void onLightOn(int lightId, String uuid) {
-        manualOverrideTracker.onLightTurnedOn(lightId);
-        List<Runnable> waitingList = waitingListProvider.apply(lightId);
+    public void onLightOn(String idv1, String uuid) {
+        manualOverrideTracker.onLightTurnedOn(idv1);
+        List<Runnable> waitingList = waitingListProvider.apply(idv1);
         if (waitingList != null) {
-            log.debug("Received on-event for light {}. Reschedule {} waiting states.", lightId, waitingList.size());
+            log.debug("Received on-event for {}. Reschedule {} waiting states.", idv1, waitingList.size());
             waitingList.forEach(Runnable::run);
         }
     }

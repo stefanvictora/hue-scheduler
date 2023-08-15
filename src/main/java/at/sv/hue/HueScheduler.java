@@ -53,8 +53,8 @@ public final class HueScheduler implements Runnable {
 
     private static final Logger LOG = LoggerFactory.getLogger(HueScheduler.class);
 
-    private final Map<Integer, List<ScheduledState>> lightStates;
-    private final ConcurrentHashMap<Integer, List<Runnable>> onStateWaitingList;
+    private final Map<String, List<ScheduledState>> lightStates;
+    private final ConcurrentHashMap<String, List<Runnable>> onStateWaitingList;
     @Parameters(description = "The IP address of your Philips Hue Bridge.")
     String ip;
     @Parameters(description = "The Philips Hue Bridge username created for Hue Scheduler during setup.")
@@ -214,19 +214,8 @@ public final class HueScheduler implements Runnable {
     }
 
     public void addState(String input) {
-        new InputConfigurationParser(startTimeProvider, hueApi).parse(input).forEach(state -> {
-            int updateId;
-            if (state.isGroupState()) {
-                updateId = getGroupId(state.getUpdateId());
-            } else {
-                updateId = state.getUpdateId();
-            }
-            lightStates.computeIfAbsent(updateId, key -> new ArrayList<>()).add(state);
-        });
-    }
-
-    private int getGroupId(int id) {
-        return id + 1000;
+        new InputConfigurationParser(startTimeProvider, hueApi).parse(input).forEach(state ->
+                lightStates.computeIfAbsent(state.getIdV1(), key -> new ArrayList<>()).add(state));
     }
 
     public void start() {
@@ -310,27 +299,11 @@ public final class HueScheduler implements Runnable {
             try {
                 if (stateIsNotEnforced(state) && stateHasBeenManuallyOverriddenSinceLastSeen(state)) {
                     LOG.debug("{} state has been manually overridden, pause update until light is turned off and on again", state.getFormattedName());
-                    manualOverrideTracker.onManuallyOverridden(state.getStatusId());
+                    manualOverrideTracker.onManuallyOverridden(state.getIdV1());
                     retryWhenBackOn(state);
                     return;
                 }
-
-                // TODO: WIP
-                if (state.getTransitionTimeBefore() != null) {
-                    ScheduledState previousState = getPreviousState(state);
-                    if (previousState != null) {
-                        LOG.trace("Got previous state: {}", previousState);
-                        PutCall interpolatedPutCall = state.getInterpolatedPutCall(currentTime.get(), previousState);
-                        if (interpolatedPutCall != null) {
-                            LOG.trace("Interpolated call: {}", interpolatedPutCall);
-                            putState(previousState, interpolatedPutCall); // TODO: maybe use some transition time and wait until next put call
-//                            Thread.sleep(400);
-                        } else {
-                            LOG.trace("No interpolated call necessary");
-                        }
-                    }
-                }
-                
+                putAdditionalInterpolatedStateIfNeeded(state);
                 putState(state);
             } catch (BridgeConnectionFailure e) {
                 LOG.warn("Bridge not reachable, retrying in {}s.", bridgeFailureRetryDelayInSeconds);
@@ -351,11 +324,11 @@ public final class HueScheduler implements Runnable {
                 scheduleMultiColorLoopOffsetAdjustments(state.getGroupLights(), 1);
             }
             state.setLastSeen(currentTime.get());
-            manualOverrideTracker.onAutomaticallyAssigned(state.getStatusId());
+            manualOverrideTracker.onAutomaticallyAssigned(state.getIdV1());
             reschedule(state, shouldEnforceNextDay(state));
         }, currentTime.get().plus(delayInMs, ChronoUnit.MILLIS), state.getEnd());
     }
-
+    
     private boolean shouldEnforceNextDay(ScheduledState state) {
         LocalTime currentLocalTime = this.currentTime.get().toLocalTime().truncatedTo(ChronoUnit.SECONDS).plusSeconds(1);
         LocalTime stateStartLocalTime = state.getLastStart().toLocalTime().truncatedTo(ChronoUnit.SECONDS);
@@ -363,11 +336,11 @@ public final class HueScheduler implements Runnable {
     }
 
     private boolean lightHasBeenManuallyOverriddenBefore(ScheduledState state) {
-        return !disableUserModificationTracking && manualOverrideTracker.isManuallyOverridden(state.getStatusId());
+        return !disableUserModificationTracking && manualOverrideTracker.isManuallyOverridden(state.getIdV1());
     }
 
     private boolean stateIsNotEnforced(ScheduledState state) {
-        return !disableUserModificationTracking && !state.isForced() && !manualOverrideTracker.shouldEnforceSchedule(state.getStatusId());
+        return !disableUserModificationTracking && !state.isForced() && !manualOverrideTracker.shouldEnforceSchedule(state.getIdV1());
     }
 
     private boolean stateHasBeenManuallyOverriddenSinceLastSeen(ScheduledState currentState) {
@@ -375,7 +348,7 @@ public final class HueScheduler implements Runnable {
         if (lastSeenState == null) {
             return false;
         }
-        // todo: this does not really work reliably for groups, as it could be that just this light is not reachable because it was manually turned off
+        // todo: implement light state comparison for groups
         return lastSeenState.lightStateDiffers(hueApi.getLightState(currentState.getStatusId()));
     }
 
@@ -385,7 +358,25 @@ public final class HueScheduler implements Runnable {
                                                 .max(Comparator.comparing(ScheduledState::getLastSeen))
                                                 .orElse(null);
     }
-
+    
+    private void putAdditionalInterpolatedStateIfNeeded(ScheduledState state) {
+        if (state.getTransitionTimeBefore() == null) {
+            return;
+        }
+        ScheduledState previousState = getPreviousState(state);
+        if (previousState == null) {
+            return;
+        }
+        LOG.trace("Got previous state: {}", previousState);
+        PutCall interpolatedPutCall = state.getInterpolatedPutCall(currentTime.get(), previousState);
+        if (interpolatedPutCall == null) {
+            return;
+        }
+        LOG.trace("Interpolated call: {}", interpolatedPutCall);
+        putState(previousState, interpolatedPutCall); // TODO: maybe use some transition time and wait until next put call
+        //                            Thread.sleep(400);
+    }
+    
     private ScheduledState getPreviousState(ScheduledState currentState) {
         List<ScheduledState> lightStatesForId = getLightStatesForId(currentState);
         List<ScheduledState> calculatedStateOrderAscending = lightStatesForId.stream()
@@ -464,15 +455,7 @@ public final class HueScheduler implements Runnable {
     }
 
     private List<ScheduledState> getLightStatesForId(ScheduledState state) {
-        return lightStates.get(getLightId(state));
-    }
-
-    private int getLightId(ScheduledState state) {
-        if (state.isGroupState()) {
-            return getGroupId(state.getUpdateId());
-        } else {
-            return state.getUpdateId();
-        }
+        return lightStates.get(state.getIdV1());
     }
 
     private long getMs(long seconds) {
@@ -512,7 +495,7 @@ public final class HueScheduler implements Runnable {
     }
 
     private void retryWhenBackOn(ScheduledState state) {
-        onStateWaitingList.computeIfAbsent(state.getStatusId(), id -> new ArrayList<>()).add(() -> schedule(state, powerOnRescheduleDelayInMs));
+        onStateWaitingList.computeIfAbsent(state.getIdV1(), id -> new ArrayList<>()).add(() -> schedule(state, powerOnRescheduleDelayInMs));
     }
 
     private boolean shouldAdjustMultiColorLoopOffset(ScheduledState state) {

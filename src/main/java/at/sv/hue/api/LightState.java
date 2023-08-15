@@ -19,10 +19,6 @@ public final class LightState {
     private final boolean reachable;
     private final boolean on;
 
-    public boolean isUnreachableOrOff() {
-        return !reachable || !on;
-    }
-
     public boolean isColorLoopEffect() {
         return "colorloop".equals(effect);
     }

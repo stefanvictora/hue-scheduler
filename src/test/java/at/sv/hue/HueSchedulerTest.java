@@ -297,9 +297,13 @@ class HueSchedulerTest {
 
         return ensureScheduledStates(1).get(0);
     }
-
+    
     private void simulateLightOnEvent() {
-        scheduler.getHueEventListener().onLightOn(ID, null);
+        simulateLightOnEvent("/lights/" + ID);
+    }
+    
+    private void simulateLightOnEvent(String idv1) {
+        scheduler.getHueEventListener().onLightOn(idv1, null);
     }
 
     private ScheduledRunnable simulateLightOnEventAndEnsureSingleScheduledState() {
@@ -369,7 +373,7 @@ class HueSchedulerTest {
         assertScheduleStart(scheduledRunnables.get(1), now, now.plusDays(1));
 
         // group state still calls api as the groups and lamps have different end states
-        advanceTimeAndRunAndAssertPutCall(scheduledRunnables.get(1), DEFAULT_PUT_CALL.toBuilder().groupState(true).build());
+        advanceTimeAndRunAndAssertPutCall(scheduledRunnables.get(0), DEFAULT_PUT_CALL.toBuilder().groupState(true).build());
 
         ensureNextDayRunnable();
     }
@@ -2192,7 +2196,7 @@ class HueSchedulerTest {
         create();
 
         addDefaultState();
-        manualOverrideTracker.onManuallyOverridden(ID); // start directly with overridden state
+        manualOverrideTracker.onManuallyOverridden("/lights/" + ID); // start with overridden state
 
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
@@ -2210,7 +2214,7 @@ class HueSchedulerTest {
         create();
 
         addDefaultState();
-        manualOverrideTracker.onManuallyOverridden(ID); // start directly with overridden state
+        manualOverrideTracker.onManuallyOverridden("/lights/" + ID); // start directly with overridden state
 
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
@@ -2221,6 +2225,25 @@ class HueSchedulerTest {
 
         simulateLightOnEventAndEnsureSingleScheduledState();
     }
+    
+    @Test
+    void run_execution_manualOverride_forGroup_stateIsDirectlyScheduledWhenOn_calculatesCorrectNextStart() {
+        enableUserModificationTracking();
+        create();
+        
+        addGroupState(2, now, 1);
+        manualOverrideTracker.onManuallyOverridden("/groups/2"); // start directly with overridden state
+        
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+        
+        setCurrentTimeTo(scheduledRunnable);
+        scheduledRunnable.run();
+        
+        ensureScheduledStates(0);
+        
+        simulateLightOnEvent("/groups/2");
+        ensureScheduledStates(1);
+    }
 
     @Test
     void run_execution_manualOverride_multipleStates_powerOnAfterNextDayStart_beforeNextState_reschedulesImmediately() {
@@ -2230,7 +2253,7 @@ class HueSchedulerTest {
         addState(1, now, DEFAULT_BRIGHTNESS, DEFAULT_CT);
         addState(1, now.plusHours(1), DEFAULT_BRIGHTNESS + 10, DEFAULT_CT);
 
-        manualOverrideTracker.onManuallyOverridden(1); // start with overridden state
+        manualOverrideTracker.onManuallyOverridden("/lights/" + 1); // start with overridden state
 
         startScheduler();
 
@@ -2258,9 +2281,9 @@ class HueSchedulerTest {
         addState(1, now, DEFAULT_BRIGHTNESS, DEFAULT_CT);
         addState(1, now.plusHours(1), DEFAULT_BRIGHTNESS + 10, DEFAULT_CT);
         addState(1, now.plusHours(2), DEFAULT_BRIGHTNESS + 20, DEFAULT_CT);
-
-        manualOverrideTracker.onManuallyOverridden(1); // start with overridden state
-
+        
+        manualOverrideTracker.onManuallyOverridden("/lights/" + 1); // start with overridden state
+        
         startScheduler();
 
         List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(3);
@@ -2290,8 +2313,8 @@ class HueSchedulerTest {
         addKnownLightIdsWithDefaultCapabilities(1);
         addState(1, "sunrise", "bri:" + DEFAULT_BRIGHTNESS);
         addState(1, "sunrise+60", "bri:" + (DEFAULT_BRIGHTNESS + 10));
-        manualOverrideTracker.onManuallyOverridden(1); // start directly with overridden state
-
+        manualOverrideTracker.onManuallyOverridden("/lights/" + 1); // start with overridden state
+        
         startScheduler();
 
         List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(2);
@@ -2389,7 +2412,7 @@ class HueSchedulerTest {
         create();
 
         addOffState();
-        manualOverrideTracker.onManuallyOverridden(1); // start directly with overridden state
+        manualOverrideTracker.onManuallyOverridden("/lights/1"); // start directly with overridden state
 
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 

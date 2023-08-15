@@ -230,10 +230,17 @@ final class ScheduledState {
     public boolean isScheduledOn(DayOfWeek... day) {
         return getDaysOfWeek().containsAll(Arrays.asList(day));
     }
-
+    
+    public String getIdV1() {
+        if (groupState) {
+            return "/groups/" + updateId;
+        }
+        return "/lights/" + updateId;
+    }
+    
     public int getStatusId() {
         if (groupState) {
-            return groupLights.get(0);
+            return groupLights.get(0); // todo: remove this after group state comparison
         }
         return updateId;
     }

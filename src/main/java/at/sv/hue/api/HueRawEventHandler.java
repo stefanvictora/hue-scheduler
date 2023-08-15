@@ -37,14 +37,15 @@ public final class HueRawEventHandler implements BackgroundEventHandler {
 
     @Override
     public void onMessage(String event, MessageEvent messageEvent) throws Exception {
+        log.trace("{}", messageEvent.getData());
         List<HueEventContainer> hueEventContainers = objectMapper.readValue(messageEvent.getData(), typeRef);
         hueEventContainers.stream()
                           .flatMap(container -> container.getData().stream())
                           .forEach(hueEvent -> {
-                              if (hueEvent.isLight() && hueEvent.isOffEvent()) {
-                                  hueEventListener.onLightOff(hueEvent.getLightId(), hueEvent.getId());
-                              } else if (hueEvent.isLight() && hueEvent.isOnEvent()) {
-                                  hueEventListener.onLightOn(hueEvent.getLightId(), hueEvent.getId());
+                              if (hueEvent.isLightOrGroup() && hueEvent.isOffEvent()) {
+                                  hueEventListener.onLightOff(hueEvent.getId_v1(), hueEvent.getId());
+                              } else if (hueEvent.isLightOrGroup() && hueEvent.isOnEvent()) {
+                                  hueEventListener.onLightOn(hueEvent.getId_v1(), hueEvent.getId());
                               }
                           });
     }
@@ -89,19 +90,19 @@ public final class HueRawEventHandler implements BackgroundEventHandler {
         public boolean isOnEvent() {
             return on != null && on.isOn() || "zigbee_connectivity".equals(type) && "connected".equals(getStatus());
         }
-
+        
+        public boolean isLightOrGroup() {
+            return isLight() || isGroup();
+        }
+        
         public boolean isLight() {
             return "light".equals(type) || id_v1 != null && id_v1.startsWith("/lights/");
-        }
-
-        public int getLightId() {
-            return Integer.parseInt(id_v1.substring("/lights/".length()));
         }
 
         public boolean isGroup() {
             return "grouped_light".equals(type) || id_v1 != null && id_v1.startsWith("/groups/");
         }
-
+        
         @Data
         private static final class On {
             private boolean on;
