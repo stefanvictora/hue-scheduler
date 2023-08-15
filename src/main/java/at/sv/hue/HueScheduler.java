@@ -1,6 +1,21 @@
 package at.sv.hue;
 
-import at.sv.hue.api.*;
+import at.sv.hue.api.BridgeAuthenticationFailure;
+import at.sv.hue.api.BridgeConnectionFailure;
+import at.sv.hue.api.HttpsResourceProviderImpl;
+import at.sv.hue.api.HueApi;
+import at.sv.hue.api.HueApiFailure;
+import at.sv.hue.api.HueApiHttpsClientFactory;
+import at.sv.hue.api.HueApiImpl;
+import at.sv.hue.api.HueEventListener;
+import at.sv.hue.api.HueEventListenerImpl;
+import at.sv.hue.api.HueRawEventHandler;
+import at.sv.hue.api.LightState;
+import at.sv.hue.api.LightStateEventTrackerImpl;
+import at.sv.hue.api.ManualOverrideTracker;
+import at.sv.hue.api.ManualOverrideTrackerImpl;
+import at.sv.hue.api.PutCall;
+import at.sv.hue.api.RateLimiter;
 import at.sv.hue.time.StartTimeProvider;
 import at.sv.hue.time.StartTimeProviderImpl;
 import at.sv.hue.time.SunTimesProviderImpl;
@@ -21,7 +36,12 @@ import java.time.Duration;
 import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -287,8 +307,6 @@ public final class HueScheduler implements Runnable {
                 }
                 return;
             }
-            boolean success;
-            LightState lightState = null;
             try {
                 if (stateIsNotEnforced(state) && stateHasBeenManuallyOverriddenSinceLastSeen(state)) {
                     LOG.debug("{} state has been manually overridden, pause update until light is turned off and on again", state.getFormattedName());
@@ -312,11 +330,8 @@ public final class HueScheduler implements Runnable {
                         }
                     }
                 }
-
-                success = putState(state);
-                if (success) {
-                    lightState = hueApi.getLightState(state.getStatusId());
-                }
+                
+                putState(state);
             } catch (BridgeConnectionFailure e) {
                 LOG.warn("Bridge not reachable, retrying in {}s.", bridgeFailureRetryDelayInSeconds);
                 retry(state, getMs(bridgeFailureRetryDelayInSeconds));
@@ -326,23 +341,17 @@ public final class HueScheduler implements Runnable {
                 retry(state, getMs(bridgeFailureRetryDelayInSeconds));
                 return;
             }
-            if (success && state.isOff() && lightState.isUnreachableOrOff()) {
+            if (state.isOff()) {
                 LOG.info("Turned off {}, or was already off", state.getFormattedName());
-                reschedule(state, true);
-                return;
+            } else {
+                LOG.info("Set {}", state);
+                retryWhenBackOn(ScheduledState.createTemporaryCopy(state, currentTime.get(), state.getEnd()));
             }
-            if (!success || lightState.isUnreachableOrOff()) {
-                LOG.trace("{} not reachable or off, retry when light turns back on", state.getFormattedName());
-                retryWhenBackOn(state);
-                return;
-            }
-            LOG.info("Set {}", state);
             if (shouldAdjustMultiColorLoopOffset(state)) {
                 scheduleMultiColorLoopOffsetAdjustments(state.getGroupLights(), 1);
             }
             state.setLastSeen(currentTime.get());
             manualOverrideTracker.onAutomaticallyAssigned(state.getStatusId());
-            retryWhenBackOn(ScheduledState.createTemporaryCopy(state, currentTime.get(), state.getEnd()));
             reschedule(state, shouldEnforceNextDay(state));
         }, currentTime.get().plus(delayInMs, ChronoUnit.MILLIS), state.getEnd());
     }
