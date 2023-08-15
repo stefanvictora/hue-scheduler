@@ -20,9 +20,6 @@ public final class StateInterpolator {
 	}
 	
 	public PutCall getInterpolatedPutCall() {
-		if (state.getTransitionTimeBefore() == null) {
-			return null; // no interpolation needed
-		}
 		int timeUntilThisState = state.getAdjustedTransitionTimeBefore(now);
 		if (timeUntilThisState == 0) {
 			return null; // the state is already reached

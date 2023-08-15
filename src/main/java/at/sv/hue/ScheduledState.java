@@ -87,7 +87,7 @@ final class ScheduledState {
 
     public static ScheduledState createTemporaryCopy(ScheduledState state, ZonedDateTime start, ZonedDateTime end) {
         ScheduledState copy = new ScheduledState(state.name, state.updateId, start.toLocalTime().toString(),
-                state.brightness, state.ct, state.x, state.y, state.hue, state.sat, state.effect, state.on, null, // todo: is this change really needed
+                state.brightness, state.ct, state.x, state.y, state.hue, state.sat, state.effect, state.on, null,
                 state.transitionTime, state.daysOfWeek, state.startTimeProvider, state.groupState, state.groupLights,
                 state.capabilities, state.force);
         copy.end = end;
@@ -259,16 +259,16 @@ final class ScheduledState {
 
     public int getAdjustedTransitionTimeBefore(ZonedDateTime now) {
         if (transitionTimeBefore == null) return 0;
-        ZonedDateTime definedStart = getDefinedStartInTheFuture(lastStart);
+        ZonedDateTime definedStart = getDefinedStartInTheFuture();
         Duration between = Duration.between(now, definedStart);
         if (between.isZero() || between.isNegative()) return 0;
         return (int) between.toMillis() / 100;
     }
     
-    private ZonedDateTime getDefinedStartInTheFuture(ZonedDateTime dateTime) { // todo: write more tests to verify this behavior
-        ZonedDateTime definedStart = getStartWithoutTransitionTimeBefore(dateTime); // .with(lastStart.toLocalDate())
-        if (definedStart.isBefore(dateTime)) {
-            return getStartWithoutTransitionTimeBefore(dateTime.plusDays(1)); // with(lastStart.plusDays(1).toLocalDate())
+    private ZonedDateTime getDefinedStartInTheFuture() { // todo: write more tests to verify this behavior
+        ZonedDateTime definedStart = getStartWithoutTransitionTimeBefore(lastStart); // .with(lastStart.toLocalDate())
+        if (definedStart.isBefore(lastStart)) {
+            return getStartWithoutTransitionTimeBefore(lastStart.plusDays(1)); // with(lastStart.plusDays(1).toLocalDate())
         }
         return definedStart;
     }
@@ -279,7 +279,7 @@ final class ScheduledState {
     public BigDecimal getInterpolatedTime(ZonedDateTime now) {
         ZonedDateTime startTime = getStart(now).with(now.toLocalDate());
         Duration durationAfterStart = Duration.between(startTime, now);
-        ZonedDateTime endTime = getDefinedStartInTheFuture(lastStart);
+        ZonedDateTime endTime = getDefinedStartInTheFuture();
         Duration totalDuration = Duration.between(startTime, endTime);
         return BigDecimal.valueOf(durationAfterStart.toMillis())
                 .divide(BigDecimal.valueOf(totalDuration.toMillis()), 7, RoundingMode.HALF_UP);
