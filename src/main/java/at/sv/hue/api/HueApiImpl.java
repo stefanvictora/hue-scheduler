@@ -40,12 +40,37 @@ public final class HueApiImpl implements HueApi {
         try {
             Light light = mapper.readValue(response, Light.class);
             State state = light.state;
-            return new LightState(state.bri, state.ct, getX(state), getY(state), state.hue, state.sat, state.effect, state.colormode, state.reachable, state.on);
+            return new LightState(state.bri, state.ct, getX(state.xy), getY(state.xy), state.hue, state.sat, state.effect, state.colormode, state.reachable, state.on);
         } catch (JsonProcessingException | NullPointerException e) {
             throw new HueApiFailure("Failed to parse light state response '" + response + "' for id " + id + ": " + e.getLocalizedMessage());
         }
     }
-
+    
+    @Override
+    public GroupState getGroupState(int id) {
+        String response = getResourceAndAssertNoErrors(getGroupStateUrl(id));
+        try {
+            Group group = mapper.readValue(response, Group.class);
+            StateOfGroup state = group.state;
+            Action action = group.action;
+            return GroupState.builder()
+                    .bri(action.bri)
+                    .ct(action.ct)
+                    .x(getX(action.xy))
+                    .y(getY(action.xy))
+                    .hue(action.hue)
+                    .sat(action.sat)
+                    .effect(action.effect)
+                    .colormode(action.colormode)
+                    .on(action.on)
+                    .allOn(state.all_on)
+                    .anyOn(state.any_on)
+                    .build();
+        } catch (JsonProcessingException | NullPointerException e) {
+            throw new HueApiFailure("Failed to parse group state response '" + response + "' for id " + id + ": " + e.getLocalizedMessage());
+        }
+    }
+    
     private String getResourceAndAssertNoErrors(URL url) {
         return assertNoErrors(resourceProvider.getResource(url));
     }
@@ -85,23 +110,27 @@ public final class HueApiImpl implements HueApi {
         }
     }
 
-    private Double getX(State state) {
-        return getXY(state, 0);
+    private Double getX(Double[] xy) {
+        return getXY(xy, 0);
     }
 
-    private Double getY(State state) {
-        return getXY(state, 1);
+    private Double getY(Double[] xy) {
+        return getXY(xy, 1);
     }
 
-    private Double getXY(State state, int i) {
-        if (state.xy != null) {
-            return state.xy[i];
+    private Double getXY(Double[] xy, int i) {
+        if (xy != null) {
+            return xy[i];
         }
         return null;
     }
 
     private URL getLightStateUrl(int id) {
         return createUrl("/lights/" + id);
+    }
+    
+    private URL getGroupStateUrl(int id) {
+        return createUrl("/groups/" + id);
     }
 
     private URL createUrl(String url) {
@@ -357,6 +386,26 @@ public final class HueApiImpl implements HueApi {
     private static final class Group {
         String name;
         Integer[] lights = new Integer[0];
+        StateOfGroup state;
+        Action action;
+    }
+    
+    @Data
+    private static final class Action {
+        Integer bri;
+        Integer ct;
+        Double[] xy;
+        Integer hue;
+        Integer sat;
+        String effect;
+        String colormode;
+        Boolean on;
+    }
+    
+    @Data
+    private static final class StateOfGroup {
+        Boolean all_on;
+        Boolean any_on;
     }
 
     @Data

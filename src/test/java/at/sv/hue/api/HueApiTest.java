@@ -2,121 +2,28 @@ package at.sv.hue.api;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.List;
 
-import static org.hamcrest.CoreMatchers.notNullValue;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.core.Is.is;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 
 class HueApiTest {
     private HueApi api;
     private String baseUrl;
-    private String expectedUrl;
-    private String expectedBody;
-    private String response;
-    private boolean assertResponseMatch;
-
-    private void setGetResponse(String expectedUrl, String response) {
-        this.expectedUrl = baseUrl + expectedUrl;
-        this.response = response;
-    }
-
-    private void setPutResponse(String expectedUrl, String expectedBody, String response) {
-        this.expectedUrl = baseUrl + expectedUrl;
-        this.expectedBody = expectedBody;
-        this.response = response;
-    }
-
-    private void clearResponse() {
-        expectedUrl = null;
-        expectedBody = null;
-        response = null;
-    }
-
-    private String createApiStateResponse(double x, double y, int ct, int bri, boolean reachable, boolean on, String effect) {
-        return "{\n" +
-                "\"state\": {\n" +
-                "\"on\": " + on + ",\n" +
-                "\"bri\": " + bri + ",\n" +
-                "\"hue\": 979,\n" +
-                "\"sat\": 254,\n" +
-                "\"effect\": \"" + effect + "\",\n" +
-                "\"xy\": [\n" +
-                "" + x + ",\n" +
-                "" + y + "\n" +
-                "],\n" +
-                "\"ct\": " + ct + ",\n" +
-                "\"reachable\": " + reachable + "\n" +
-                "}, \"name\": \"Name 2\"}";
-    }
-
-    private LightState getLightState(int lightId) {
-        return api.getLightState(lightId);
-    }
-
-    private void assertLightState(LightState lightState, boolean reachable, boolean on, Double x, Double y, Integer ct, int brightness, String effect) {
-        assertNotNull(lightState, "Light state is null");
-        assertThat("Reachable differs", lightState.isReachable(), is(reachable));
-        assertThat("On differs", lightState.isOn(), is(on));
-        assertThat("X differs", lightState.getX(), is(x));
-        assertThat("Y differs", lightState.getY(), is(y));
-        assertThat("Brightness differs", lightState.getBrightness(), is(brightness));
-        assertThat("Color temperature differs", lightState.getColorTemperature(), is(ct));
-        assertThat("Effect differs", lightState.getEffect(), is(effect));
-    }
-
-    private boolean performPutCall(PutCall putCall) {
-        return api.putState(putCall);
-    }
-
-    private List<Integer> getGroupLights(int groupId) {
-        return api.getGroupLights(groupId);
-    }
-
-    private void assertCapabilities(LightCapabilities capabilities, boolean colorSupported, Double[][] colorGamut, boolean ctSupported) {
-        assertThat("No capabilities returned", capabilities, notNullValue());
-        assertThat("Color support differs", capabilities.isColorSupported(), is(colorSupported));
-        assertThat("Color gamut differs", capabilities.getColorGamut(), is(colorGamut));
-        assertThat("CT support differs", capabilities.isCtSupported(), is(ctSupported));
-    }
-
+    private HttpResourceProvider resourceProviderMock;
+    
     @BeforeEach
     void setUp() {
         String ip = "localhost";
         String username = "username";
-        assertResponseMatch = true;
-        HttpResourceProvider resourceProvider = new HttpResourceProvider() {
-            @Override
-            public String getResource(URL url) {
-                if (assertResponseMatch) {
-                    assertEquals(expectedUrl, url.toString(), "Url differs");
-                }
-                if (url.toString().equals(expectedUrl)) {
-                    String result = response;
-                    clearResponse();
-                    return result;
-                }
-                throw new BridgeConnectionFailure("GET failure for '" + url + "'.");
-            }
-
-            @Override
-            public String putResource(URL url, String body) {
-                if (assertResponseMatch) {
-                    assertEquals(expectedUrl, url.toString(), "Url differs");
-                    assertEquals(expectedBody, body, "Body differs");
-                }
-                if (url.toString().equals(expectedUrl) && body.equals(expectedBody)) {
-                    String result = response;
-                    clearResponse();
-                    return result;
-                }
-                throw new BridgeConnectionFailure("PUT failure for '" + url + "' with '" + body + "'.");
-            }
-        };
-        api = new HueApiImpl(resourceProvider, ip, username, permits -> {
+        resourceProviderMock = Mockito.mock(HttpResourceProvider.class);
+        api = new HueApiImpl(resourceProviderMock, ip, username, permits -> {
         });
         baseUrl = "https://" + ip + "/api/" + username;
     }
@@ -135,10 +42,11 @@ class HueApiTest {
 
         assertThrows(BridgeAuthenticationFailure.class, () -> api.assertConnection());
     }
-
+    
     @Test
     void getState_networkFailure_exception() {
-        assertResponseMatch = false;
+        when(resourceProviderMock.getResource(any())).thenThrow(new BridgeConnectionFailure("Failed"));
+        
         assertThrows(BridgeConnectionFailure.class, () -> getLightState(1));
     }
 
@@ -193,11 +101,25 @@ class HueApiTest {
         double y = 0.3233;
         int ct = 153;
         int bri = 100;
-        setGetResponse("/lights/" + lightId, createApiStateResponse(x, y, ct, bri, true, true, "colorloop"));
+        int hue = 979;
+        int sat = 254;
+        setGetResponse("/lights/" + lightId, createApiStateResponse(x, y, ct, bri, hue, sat, true, true, "colorloop"));
 
         LightState lightState = getLightState(lightId);
-
-        assertLightState(lightState, true, true, x, y, ct, bri, "colorloop");
+        
+        assertLightState(
+                lightState, LightState.builder()
+                        .on(true)
+                        .reachable(true)
+                        .x(x)
+                        .y(y)
+                        .colorTemperature(ct)
+                        .brightness(bri)
+                        .hue(hue)
+                        .sat(sat)
+                        .effect("colorloop")
+                        .build()
+        );
     }
 
     @Test
@@ -207,11 +129,25 @@ class HueApiTest {
         double y = 0.1132;
         int ct = 100;
         int bri = 41;
-        setGetResponse("/lights/" + lightId, createApiStateResponse(x, y, ct, bri, false, false, "none"));
+        int hue = 6000;
+        int sat = 157;
+        setGetResponse("/lights/" + lightId, createApiStateResponse(x, y, ct, bri, hue, sat, false, false, "none"));
 
         LightState lightState = getLightState(lightId);
-
-        assertLightState(lightState, false, false, x, y, ct, bri, "none");
+        
+        assertLightState(
+                lightState, LightState.builder()
+                        .on(false)
+                        .reachable(false)
+                        .x(x)
+                        .y(y)
+                        .colorTemperature(ct)
+                        .brightness(bri)
+                        .hue(hue)
+                        .sat(sat)
+                        .effect("none")
+                        .build()
+        );
     }
 
     @Test
@@ -222,15 +158,82 @@ class HueApiTest {
                 "\"state\": {\n" +
                 "\"on\": true,\n" +
                 "\"bri\": " + bri + ",\n" +
-                "\"sat\": 254,\n" +
                 "\"reachable\": " + true + "\n" +
                 "}, \"name\": \"Name 2\"}");
 
         LightState lightState = getLightState(lightId);
-
-        assertLightState(lightState, true, true, null, null, null, bri, null);
+        
+        assertLightState(lightState, LightState.builder().on(true).reachable(true).brightness(bri).build());
     }
-
+    
+    @Test
+    void getState_onOffBulbOnly_noNullPointerException() {
+        int lightId = 11;
+        int bri = 41;
+        setGetResponse("/lights/" + lightId, "{\n" +
+                "\"state\": {\n" +
+                "\"on\": true,\n" +
+                "\"reachable\": " + true + "\n" +
+                "}, \"name\": \"Name 2\"}");
+        
+        LightState lightState = getLightState(lightId);
+        
+        assertLightState(lightState, LightState.builder().on(true).reachable(true).build());
+    }
+    
+    @Test
+    void getGroupState_returnsActionObjectAsState() {
+        int groupId = 17;
+        double x = 0.6715;
+        double y = 0.3233;
+        int ct = 153;
+        int bri = 100;
+        setGetResponse("/groups/" + groupId, "{\n"
+                + "\t\"name\": \"Hue to Go\",\n"
+                + "\t\"lights\": [\n"
+                + "\t\t\"28\"\n"
+                + "\t],\n"
+                + "\t\"sensors\": [],\n"
+                + "\t\"type\": \"Zone\",\n"
+                + "\t\"state\": {\n"
+                + "\t\t\"all_on\": true,\n"
+                + "\t\t\"any_on\": true\n"
+                + "\t},\n"
+                + "\t\"recycle\": false,\n"
+                + "\t\"class\": \"Living room\",\n"
+                + "\t\"action\": {\n"
+                + "\t\t\"on\": true,\n"
+                + "\t\t\"bri\": 79,\n"
+                + "\t\t\"hue\": 1319,\n"
+                + "\t\t\"sat\": 225,\n"
+                + "\t\t\"effect\": \"none\",\n"
+                + "\t\t\"xy\": [\n"
+                + "\t\t\t0.6326,\n"
+                + "\t\t\t0.3339\n"
+                + "\t\t],\n"
+                + "\t\t\"ct\": 500,\n"
+                + "\t\t\"alert\": \"select\",\n"
+                + "\t\t\"colormode\": \"xy\"\n"
+                + "\t}\n"
+                + "}");
+        
+        GroupState groupState = api.getGroupState(groupId);
+        
+        assertThat(groupState).isEqualTo(GroupState.builder()
+                .bri(79)
+                .ct(500)
+                .x(0.6326)
+                .y(0.3339)
+                .hue(1319)
+                .sat(225)
+                .effect("none")
+                .colormode("xy")
+                .on(true)
+                .allOn(true)
+                .anyOn(true)
+                .build());
+    }
+    
     @Test
     void getGroupLights_returnsLightIdsForGroup_reusesSameForName() {
         setGetResponse("/groups", "{\n" +
@@ -252,10 +255,9 @@ class HueApiTest {
 
         List<Integer> groupLights = getGroupLights(2);
         String groupName = api.getGroupName(2);
-
-        assertNotNull(groupLights, "GroupLights are null");
-        assertArrayEquals(new Integer[]{4, 5}, groupLights.toArray(), "GroupLights differ");
-        assertThat("Group name differs", groupName, is("Group 2"));
+        
+        assertThat(groupLights).containsExactly(4, 5);
+        assertThat(groupName).isEqualTo("Group 2");
     }
 
     @Test
@@ -306,9 +308,9 @@ class HueApiTest {
 
         String name1 = api.getGroupName(1);
         String name2 = api.getGroupName(2);
-
-        assertThat("Group name differs", name1, is("Group 1"));
-        assertThat("Group name differs", name2, is("Group 2"));
+        
+        assertThat(name1).isEqualTo("Group 1");
+        assertThat(name2).isEqualTo("Group 2");
     }
 
     @Test
@@ -338,9 +340,9 @@ class HueApiTest {
 
         int lightId1 = api.getLightId("Lamp 1");
         int lightId2 = api.getLightId("Lamp 2");
-
-        assertThat("Lamp id differs", lightId1, is(7));
-        assertThat("Lamp id differs", lightId2, is(1234));
+        
+        assertThat(lightId1).isEqualTo(7);
+        assertThat(lightId2).isEqualTo(1234);
     }
 
     @Test
@@ -378,9 +380,9 @@ class HueApiTest {
 
         int groupId1 = api.getGroupId("Group 1");
         int groupId2 = api.getGroupId("Group 2");
-
-        assertThat("Group id differs", groupId1, is(11));
-        assertThat("Group id differs", groupId2, is(789));
+        
+        assertThat(groupId1).isEqualTo(11);
+        assertThat(groupId2).isEqualTo(789);
     }
 
     @Test
@@ -410,9 +412,9 @@ class HueApiTest {
 
         String name1 = api.getLightName(7);
         String name2 = api.getLightName(1234);
-
-        assertThat(name1, is("Lamp 1"));
-        assertThat(name2, is("Lamp 2"));
+        
+        assertThat(name1).isEqualTo("Lamp 1");
+        assertThat(name2).isEqualTo("Lamp 2");
     }
 
     @Test
@@ -465,7 +467,7 @@ class HueApiTest {
         LightCapabilities capabilities = api.getLightCapabilities(22);
 
         Double[][] gamut = {{0.6915, 0.3083}, {0.17, 0.7}, {0.1532, 0.0475}};
-        assertCapabilities(capabilities, true, gamut, true);
+        assertCapabilities(capabilities, LightCapabilities.builder().colorGamut(gamut).ctMin(153).ctMax(500).build());
     }
 
     @Test
@@ -483,8 +485,8 @@ class HueApiTest {
                 "}");
 
         LightCapabilities capabilities = api.getLightCapabilities(7);
-
-        assertCapabilities(capabilities, false, null, false);
+        
+        assertCapabilities(capabilities, LightCapabilities.builder().build());
     }
 
     @Test
@@ -506,8 +508,8 @@ class HueApiTest {
                         "]");
 
         boolean success = performPutCall(PutCall.builder().id(15).bri(200).build());
-
-        assertTrue(success, "Put not successful");
+        
+        assertThat(success).isTrue();
     }
 
     @Test
@@ -522,8 +524,8 @@ class HueApiTest {
                         "]");
 
         boolean success = performPutCall(PutCall.builder().id(9).bri(200).groupState(true).build());
-
-        assertTrue(success, "Put not successful");
+        
+        assertThat(success).isTrue();
     }
 
     @Test
@@ -531,8 +533,8 @@ class HueApiTest {
         setPutResponse("/lights/" + 16 + "/state", "{\"ct\":100}", "[success]");
 
         boolean success = performPutCall(PutCall.builder().id(16).ct(100).build());
-
-        assertTrue(success, "Put not successful");
+        
+        assertThat(success).isTrue();
     }
 
     @Test
@@ -542,8 +544,8 @@ class HueApiTest {
         setPutResponse("/lights/" + 16 + "/state", "{\"xy\":[" + x + "," + y + "]}", "[success]");
 
         boolean success = performPutCall(PutCall.builder().id(16).x(x).y(y).build());
-
-        assertTrue(success, "Put not successful");
+        
+        assertThat(success).isTrue();
     }
 
     @Test
@@ -553,8 +555,8 @@ class HueApiTest {
         setPutResponse("/lights/" + 16 + "/state", "{\"hue\":" + hue + ",\"sat\":" + sat + "}", "[success]");
 
         boolean success = performPutCall(PutCall.builder().id(16).hue(hue).sat(sat).build());
-
-        assertTrue(success, "Put not successful");
+        
+        assertThat(success).isTrue();
     }
 
     @Test
@@ -562,8 +564,8 @@ class HueApiTest {
         setPutResponse("/lights/" + 16 + "/state", "{\"on\":true}", "[success]");
 
         boolean success = performPutCall(PutCall.builder().id(16).on(true).build());
-
-        assertTrue(success, "Put not successful");
+        
+        assertThat(success).isTrue();
     }
 
     @Test
@@ -571,8 +573,8 @@ class HueApiTest {
         setPutResponse("/lights/" + 16 + "/state", "{\"transitiontime\":2}", "[success]");
 
         boolean success = performPutCall(PutCall.builder().id(16).transitionTime(2).build());
-
-        assertTrue(success, "Put not successful");
+        
+        assertThat(success).isTrue();
     }
 
     @Test
@@ -580,8 +582,8 @@ class HueApiTest {
         setPutResponse("/lights/" + 16 + "/state", "{}", "[success]");
 
         boolean success = performPutCall(PutCall.builder().id(16).transitionTime(4).build());
-
-        assertTrue(success, "Put not successful");
+        
+        assertThat(success).isTrue();
     }
 
     @Test
@@ -589,8 +591,8 @@ class HueApiTest {
         setPutResponse("/lights/" + 1 + "/state", "{\"effect\":\"colorloop\"}", "[success]");
 
         boolean success = performPutCall(PutCall.builder().id(1).effect("colorloop").build());
-
-        assertTrue(success, "Put not successful");
+        
+        assertThat(success).isTrue();
     }
 
     @Test
@@ -621,7 +623,7 @@ class HueApiTest {
                 "]");
 
         HueApiFailure hueApiFailure = assertThrows(HueApiFailure.class, () -> performPutCall(PutCall.builder().id(1).bri(100).build()));
-        assertThat(hueApiFailure.getMessage(), is("resource, /lights/1/state, not available"));
+        assertThat(hueApiFailure.getMessage()).isEqualTo("resource, /lights/1/state, not available");
     }
 
     @Test
@@ -637,13 +639,13 @@ class HueApiTest {
                 "]");
 
         HueApiFailure hueApiFailure = assertThrows(HueApiFailure.class, () -> performPutCall(PutCall.builder().id(1).bri(100).groupState(true).build()));
-        assertThat(hueApiFailure.getMessage(), is("resource, /groups/11/action, not available"));
+        assertThat(hueApiFailure.getMessage()).isEqualTo("resource, /groups/11/action, not available");
     }
 
     @Test
     void putState_connectionFailure_exception() {
-        assertResponseMatch = false;
-
+        when(resourceProviderMock.putResource(any(), any())).thenThrow(new BridgeConnectionFailure("Failed"));
+        
         assertThrows(BridgeConnectionFailure.class, () -> performPutCall(PutCall.builder().id(123).bri(100).build()));
     }
 
@@ -654,8 +656,8 @@ class HueApiTest {
                         "]");
 
         boolean success = performPutCall(PutCall.builder().id(123).bri(100).build());
-
-        assertTrue(success, "Put did fail");
+        
+        assertThat(success).isTrue();
     }
 
     @Test
@@ -673,7 +675,7 @@ class HueApiTest {
                         "]");
 
         HueApiFailure hueApiFailure = assertThrows(HueApiFailure.class, () -> performPutCall(PutCall.builder().id(777).bri(300).build()));
-        assertThat(hueApiFailure.getMessage(), is("invalid value, 300}, for parameter, bri"));
+        assertThat(hueApiFailure.getMessage()).isEqualTo("invalid value, 300}, for parameter, bri");
     }
 
     @Test
@@ -689,7 +691,60 @@ class HueApiTest {
                 "]");
 
         boolean reachable = performPutCall(PutCall.builder().id(777).bri(200).build());
-
-        assertFalse(reachable, "Light is reachable");
+        
+        assertThat(reachable).isFalse();
+    }
+    
+    private void setGetResponse(String expectedUrl, String response) {
+        when(resourceProviderMock.getResource(getUrl(expectedUrl))).thenReturn(response);
+    }
+    
+    private URL getUrl(String expectedUrl) {
+        try {
+            return new URL(baseUrl + expectedUrl);
+        } catch (MalformedURLException e) {
+            throw new IllegalArgumentException("Could not create URL", e);
+        }
+    }
+    
+    private void setPutResponse(String expectedUrl, String expectedBody, String response) {
+        when(resourceProviderMock.putResource(getUrl(expectedUrl), expectedBody)).thenReturn(response);
+    }
+    
+    private String createApiStateResponse(double x, double y, int ct, int bri, int hue, int sat, boolean reachable, boolean on, String effect) {
+        return "{\n" +
+                "\"state\": {\n" +
+                "\"on\": " + on + ",\n" +
+                "\"bri\": " + bri + ",\n" +
+                "\"hue\": " + hue + ",\n" +
+                "\"sat\": " + sat + ",\n" +
+                "\"effect\": \"" + effect + "\",\n" +
+                "\"xy\": [\n" +
+                "" + x + ",\n" +
+                "" + y + "\n" +
+                "],\n" +
+                "\"ct\": " + ct + ",\n" +
+                "\"reachable\": " + reachable + "\n" +
+                "}, \"name\": \"Name 2\"}";
+    }
+    
+    private LightState getLightState(int lightId) {
+        return api.getLightState(lightId);
+    }
+    
+    private void assertLightState(LightState lightState, LightState expected) {
+        assertThat(lightState).isEqualTo(expected);
+    }
+    
+    private boolean performPutCall(PutCall putCall) {
+        return api.putState(putCall);
+    }
+    
+    private List<Integer> getGroupLights(int groupId) {
+        return api.getGroupLights(groupId);
+    }
+    
+    private void assertCapabilities(LightCapabilities capabilities, LightCapabilities expected) {
+        assertThat(capabilities).isEqualTo(expected);
     }
 }

@@ -8,7 +8,7 @@ import lombok.Data;
 @Builder
 public final class LightState {
 
-    private final int brightness;
+    private final Integer brightness;
     private final Integer colorTemperature;
     private final Double x;
     private final Double y;
