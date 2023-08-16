@@ -54,8 +54,8 @@ public final class HueApiImpl implements HueApi {
             StateOfGroup state = group.state;
             Action action = group.action;
             return GroupState.builder()
-                    .bri(action.bri)
-                    .ct(action.ct)
+                    .brightness(action.bri)
+                    .colorTemperature(action.ct)
                     .x(getX(action.xy))
                     .y(getY(action.xy))
                     .hue(action.hue)

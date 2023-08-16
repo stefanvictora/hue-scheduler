@@ -3,6 +3,7 @@ package at.sv.hue;
 import at.sv.hue.api.BridgeConnectionFailure;
 import at.sv.hue.api.EmptyGroupException;
 import at.sv.hue.api.GroupNotFoundException;
+import at.sv.hue.api.GroupState;
 import at.sv.hue.api.HueApi;
 import at.sv.hue.api.HueApiFailure;
 import at.sv.hue.api.LightCapabilities;
@@ -220,6 +221,10 @@ class HueSchedulerTest {
                                           .on(on)
                                           .build();
         addLightStateResponse(id, lightState);
+    }
+    
+    private void addGroupStateResponse(int id, GroupState groupState) {
+        when(mockedHueApi.getGroupState(id)).thenReturn(groupState);
     }
 
     private void ensureNextDayRunnable() {
@@ -602,7 +607,7 @@ class HueSchedulerTest {
         
         ensureRunnable(initialNow.plusDays(2).minusMinutes(20), initialNow.plusDays(3).minusMinutes(20));
     }
-
+    
     @Test
     void parse_transitionTimeBefore_overNight_doesNotOverAdjustTransitionTime_returnsNullInstead() {
         addKnownLightIdsWithDefaultCapabilities(1);
@@ -717,7 +722,29 @@ class HueSchedulerTest {
 
         ensureRunnable(initialNow.plusDays(1).plusMinutes(20), initialNow.plusDays(2));
     }
-
+    
+    @Test
+    void parse_transitionTimeBefore_groupStates_lightTurnedOnAfterStart_performsInterpolation() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addGroupLightsForId(5, 7, 8, 9);
+        addState("g5", now, "bri:" + DEFAULT_BRIGHTNESS, "ct:" + DEFAULT_CT);
+        addState("g5", now.plusMinutes(40), "bri:" + (DEFAULT_BRIGHTNESS + 20), "ct:" + (DEFAULT_CT + 20), "tr-before:20min");
+        
+        startScheduler();
+        
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(2);
+        ScheduledRunnable trBeforeRunnable = scheduledRunnables.get(1);
+        
+        setCurrentTimeTo(now.plusMinutes(30));
+        
+        trBeforeRunnable.run();
+        
+        assertPutCall(expectedPutCall(5).bri(DEFAULT_BRIGHTNESS + 10).ct(DEFAULT_CT + 10).groupState(true).build());
+        assertPutCall(expectedPutCall(5).bri(DEFAULT_BRIGHTNESS + 20).ct(DEFAULT_CT + 20).groupState(true).transitionTime(6000).build());
+        
+        ensureRunnable(initialNow.plusDays(1).plusMinutes(20), initialNow.plusDays(2));
+    }
+    
     @Test
     void parse_transitionTimeBefore_multipleStates_ct_lightTurnedOnAfterStart_correctRounding() {
         addKnownLightIdsWithDefaultCapabilities(1);
@@ -2189,7 +2216,94 @@ class HueSchedulerTest {
         
         verify(mockedHueApi, times(3)).getLightState(1);
     }
-
+    
+    @Test
+    void run_execution_manualOverride_groupState_correctlyComparesState() {
+        enableUserModificationTracking();
+        create();
+        
+        addGroupLightsForId(1, 9, 10);
+        addState("g1", now, "bri:" + DEFAULT_BRIGHTNESS);
+        addState("g1", now.plusHours(1), "bri:" + (DEFAULT_BRIGHTNESS + 10));
+        addState("g1", now.plusHours(2), "bri:" + (DEFAULT_BRIGHTNESS + 20));
+        addState("g1", now.plusHours(3), "bri:" + (DEFAULT_BRIGHTNESS + 30));
+        addState("g1", now.plusHours(4), "bri:" + (DEFAULT_BRIGHTNESS + 40));
+        
+        startScheduler();
+        
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(5);
+        ScheduledRunnable firstState = scheduledRunnables.get(0);
+        ScheduledRunnable secondState = scheduledRunnables.get(1);
+        ScheduledRunnable thirdState = scheduledRunnables.get(2);
+        ScheduledRunnable fourthState = scheduledRunnables.get(3);
+        ScheduledRunnable fifthState = scheduledRunnables.get(4);
+        
+        // first state is set normally
+        advanceTimeAndRunAndAssertPutCall(firstState, expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).groupState(true).build());
+        ensureRunnable(initialNow.plusDays(1)); // for next day
+        
+        // user modified group state between first and second state -> update skipped and retry scheduled
+        GroupState userModifiedGroupState = GroupState.builder()
+                .brightness(DEFAULT_BRIGHTNESS + 5)
+                .colormode("CT")
+                .on(true)
+                .build();
+        addGroupStateResponse(1, userModifiedGroupState);
+        setCurrentTimeTo(secondState);
+        
+        secondState.run(); // detects change, sets manually changed flag
+        
+        ensureScheduledStates(0);
+        
+        setCurrentTimeTo(thirdState);
+        
+        thirdState.run(); // directly skipped
+        
+        ensureScheduledStates(0);
+        
+        // simulate power on -> sets enforce flag, rerun third state
+        simulateLightOnEvent("/groups/1");
+        
+        List<ScheduledRunnable> powerOnEvents = ensureScheduledStates(3);
+        
+        powerOnEvents.get(0).run(); // temporary, already ended
+        powerOnEvents.get(1).run(); // already ended
+        ensureRunnable(initialNow.plusDays(1).plusHours(1), initialNow.plusDays(1).plusHours(2)); // second state, for next day
+        
+        // re-run third state after power on -> applies state as state is enforced
+        advanceTimeAndRunAndAssertPutCall(powerOnEvents.get(2),
+                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 20).groupState(true).build());
+        ensureRunnable(initialNow.plusDays(1).plusHours(2), initialNow.plusDays(1).plusHours(3)); // third state, for next day
+        
+        // no modification detected, fourth state set normally
+        GroupState sameStateAsThird = GroupState.builder()
+                .brightness(DEFAULT_BRIGHTNESS + 20)
+                .colormode("CT")
+                .on(true)
+                .build();
+        addGroupStateResponse(1, sameStateAsThird);
+        setCurrentTimeTo(fourthState);
+        
+        runAndAssertPutCall(fourthState, expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 30).groupState(true).build());
+        
+        ensureRunnable(initialNow.plusDays(1).plusHours(3), initialNow.plusDays(1).plusHours(4)); // fourth state, for next day
+        
+        // second modification detected, fifth state skipped again
+        GroupState secondUserModification = GroupState.builder()
+                .brightness(DEFAULT_BRIGHTNESS + 5)
+                .colormode("CT")
+                .on(true)
+                .build();
+        addGroupStateResponse(1, secondUserModification);
+        setCurrentTimeTo(fifthState);
+        
+        fifthState.run(); // detects manual modification again
+        
+        ensureScheduledStates(0);
+        
+        verify(mockedHueApi, times(3)).getGroupState(1);
+    }
+    
     @Test
     void run_execution_manualOverride_stateIsDirectlyScheduledWhenOn() {
         enableUserModificationTracking();
@@ -2422,7 +2536,7 @@ class HueSchedulerTest {
         ensureRunnable(initialNow.plusDays(1));
     }
 
-    private static PutCall.PutCallBuilder expectedPutCall(int lightId) {
-        return PutCall.builder().id(lightId);
+    private static PutCall.PutCallBuilder expectedPutCall(int id) {
+        return PutCall.builder().id(id);
     }
 }

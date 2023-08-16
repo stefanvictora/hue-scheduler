@@ -1,8 +1,8 @@
 package at.sv.hue;
 
 import at.sv.hue.api.LightCapabilities;
-import at.sv.hue.api.LightState;
 import at.sv.hue.api.PutCall;
+import at.sv.hue.api.State;
 import at.sv.hue.time.StartTimeProvider;
 import lombok.Builder;
 import lombok.Getter;
@@ -16,7 +16,12 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.function.Consumer;
 
 @Getter
@@ -56,7 +61,7 @@ final class ScheduledState {
     @Builder
     public ScheduledState(String name, int updateId, String start, Integer brightness, Integer ct, Double x, Double y,
                           Integer hue, Integer sat, String effect, Boolean on, Integer transitionTimeBefore, Integer transitionTime,
-                          EnumSet<DayOfWeek> daysOfWeek, StartTimeProvider startTimeProvider, boolean groupState,
+                          Set<DayOfWeek> daysOfWeek, StartTimeProvider startTimeProvider, boolean groupState,
                           List<Integer> groupLights, LightCapabilities capabilities, Boolean force) {
         this.name = name;
         this.updateId = updateId;
@@ -237,13 +242,6 @@ final class ScheduledState {
         }
         return "/lights/" + updateId;
     }
-    
-    public int getStatusId() {
-        if (groupState) {
-            return groupLights.get(0); // todo: remove this after group state comparison
-        }
-        return updateId;
-    }
 
     public String getEffect() {
         if (isMultiColorLoop()) {
@@ -311,34 +309,34 @@ final class ScheduledState {
     public void updateLastStart(ZonedDateTime now) {
         this.lastStart = getStart(now);
     }
-
-    public boolean lightStateDiffers(LightState lightState) {
-        return brightnessDiffers(lightState) ||
-                colorModeDiffers(lightState) ||
-                effectDiffers(lightState);
+    
+    public boolean lightStateDiffers(State currentState) {
+        return brightnessDiffers(currentState) ||
+                colorModeOrValuesDiffer(currentState) ||
+                effectDiffers(currentState);
     }
-
-    private boolean brightnessDiffers(LightState lightState) {
-        return brightness != null && !brightness.equals(lightState.getBrightness());
+    
+    private boolean brightnessDiffers(State currentState) {
+        return brightness != null && !brightness.equals(currentState.getBrightness());
     }
-
-    private boolean colorModeDiffers(LightState lightState) {
+    
+    private boolean colorModeOrValuesDiffer(State currentState) {
         ColorMode colorMode = getColorMode();
         if (colorMode == ColorMode.NONE) {
             return false; // if no color mode scheduled, always treat as equal
         }
-        if (!Objects.equals(colorMode, lightState.getColormode())) {
+        if (!Objects.equals(colorMode, currentState.getColormode())) {
             return true;
         }
         switch (colorMode) {
             case CT:
-                return ct != null && !ct.equals(lightState.getColorTemperature());
+                return ct != null && !ct.equals(currentState.getColorTemperature());
             case HS:
-                return hue != null && !hue.equals(lightState.getHue()) ||
-                        sat != null && !sat.equals(lightState.getSat());
+                return hue != null && !hue.equals(currentState.getHue()) ||
+                        sat != null && !sat.equals(currentState.getSat());
             case XY:
-                return doubleValueDiffers(x, lightState.getX()) ||
-                        doubleValueDiffers(y, lightState.getY());
+                return doubleValueDiffers(x, currentState.getX()) ||
+                        doubleValueDiffers(y, currentState.getY());
             default:
                 return false; // should not happen, but as a fallback we just ignore unknown color modes
         }
@@ -354,14 +352,14 @@ final class ScheduledState {
         }
         return ColorMode.NONE;
     }
-
-    private boolean effectDiffers(LightState lightState) {
+    
+    private boolean effectDiffers(State currentState) {
         if (getEffect() == null) {
             return false; // if no effect scheduled, always treat as equal
-        } else if (lightState.getEffect() == null) {
+        } else if (currentState.getEffect() == null) {
             return !"none".equals(getEffect()); // if effect scheduled, but none set, only consider "none" to be equal
         } else {
-            return !getEffect().equals(lightState.getEffect()); // otherwise, effects have to be exactly the same
+            return !getEffect().equals(currentState.getEffect()); // otherwise, effects have to be exactly the same
         }
     }
 

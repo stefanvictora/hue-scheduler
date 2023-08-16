@@ -6,8 +6,7 @@ import lombok.Data;
 
 @Data
 @Builder
-public final class LightState {
-
+public final class LightState implements State {
     private final Integer brightness;
     private final Integer colorTemperature;
     private final Double x;
@@ -19,10 +18,7 @@ public final class LightState {
     private final boolean reachable;
     private final boolean on;
 
-    public boolean isColorLoopEffect() {
-        return "colorloop".equals(effect);
-    }
-
+    @Override
     public ColorMode getColormode() {
         return ColorMode.parse(colormode);
     }

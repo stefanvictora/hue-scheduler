@@ -16,6 +16,7 @@ import at.sv.hue.api.ManualOverrideTracker;
 import at.sv.hue.api.ManualOverrideTrackerImpl;
 import at.sv.hue.api.PutCall;
 import at.sv.hue.api.RateLimiter;
+import at.sv.hue.api.State;
 import at.sv.hue.time.StartTimeProvider;
 import at.sv.hue.time.StartTimeProviderImpl;
 import at.sv.hue.time.SunTimesProviderImpl;
@@ -348,10 +349,17 @@ public final class HueScheduler implements Runnable {
         if (lastSeenState == null) {
             return false;
         }
-        // todo: implement light state comparison for groups
-        return lastSeenState.lightStateDiffers(hueApi.getLightState(currentState.getStatusId()));
+        return lastSeenState.lightStateDiffers(getCurrentState(currentState));
     }
-
+    
+    private State getCurrentState(ScheduledState scheduledState) {
+        if (scheduledState.isGroupState()) {
+            return hueApi.getGroupState(scheduledState.getUpdateId());
+        } else {
+            return hueApi.getLightState(scheduledState.getUpdateId());
+        }
+    }
+    
     private ScheduledState getLastSeenState(ScheduledState currentState) {
         return getLightStatesForId(currentState).stream()
                                                 .filter(state -> state.getLastSeen() != null)

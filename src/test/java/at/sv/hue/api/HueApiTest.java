@@ -220,8 +220,8 @@ class HueApiTest {
         GroupState groupState = api.getGroupState(groupId);
         
         assertThat(groupState).isEqualTo(GroupState.builder()
-                .bri(79)
-                .ct(500)
+                .brightness(79)
+                .colorTemperature(500)
                 .x(0.6326)
                 .y(0.3339)
                 .hue(1319)
