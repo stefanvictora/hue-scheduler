@@ -186,9 +186,18 @@ public final class HueApiImpl implements HueApi {
         }
         return Arrays.asList(lights);
     }
-
+    
+    @Override
+    public List<Integer> getAssignedGroups(int lightId) {
+        return getOrLookupGroups().entrySet()
+                .stream()
+                .filter(entry -> Arrays.asList(entry.getValue().getLights()).contains(lightId))
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toList());
+    }
+    
     private Map<Integer, Group> getOrLookupGroups() {
-        synchronized (groupMapLock) {
+        synchronized (groupMapLock) { // todo: add some refresh mechanism after some timeout
             if (availableGroups == null) {
                 availableGroups = lookupGroups();
             }

@@ -260,7 +260,32 @@ class HueApiTest {
         assertThat(groupLights).containsExactly(4, 5);
         assertThat(groupName).isEqualTo("Group 2");
     }
-
+    
+    @Test
+    void getAssignedGroups_givenLightId_returnsGroupIds() {
+        setGetResponse("/groups", "{\n" +
+                "\"1\": {\n" +
+                "\"name\": \"Group 1\",\n" +
+                "\"lights\": [\n" +
+                "\"1\",\n" +
+                "\"2\",\n" +
+                "\"3\"\n" +
+                "]\n" +
+                "},\n" +
+                "\"2\": {\n" +
+                "\"name\": \"Group 2\",\n" +
+                "\"lights\": [\n" +
+                "\"4\",\n" +
+                "\"5\",\n" +
+                "\"3\"\n" +
+                "]\n" +
+                "}}");
+        
+        assertThat(api.getAssignedGroups(2)).containsExactly(1);
+        assertThat(api.getAssignedGroups(3)).containsExactly(1, 2);
+        assertThat(api.getAssignedGroups(777)).isEmpty();
+    }
+    
     @Test
     void getGroupLights_emptyLights_exception() {
         setGetResponse("/groups", "{\n" +

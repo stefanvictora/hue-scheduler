@@ -12,14 +12,20 @@ public class HueEventListenerImpl implements HueEventListener {
 
     private final ManualOverrideTracker manualOverrideTracker;
     private final Function<String, List<Runnable>> waitingListProvider;
+    private final Function<String, List<String>> lightToGroupAssignmentLookup;
 
     @Override
     public void onLightOff(String idv1, String uuid) {
         // currently not needed
     }
-
+    
     @Override
-    public void onLightOn(String idv1, String uuid) {
+    public void onLightOn(String idv1, String uuid, boolean physical) {
+        if (physical) { // only lights can be turned on physically
+            // if light has been physically turned on, we additionally signal to each group the light is assigned
+            lightToGroupAssignmentLookup.apply(idv1)
+                    .forEach(groupId -> onLightOn(groupId, null, false));
+        }
         manualOverrideTracker.onLightTurnedOn(idv1);
         List<Runnable> waitingList = waitingListProvider.apply(idv1);
         if (waitingList != null) {

@@ -39,6 +39,11 @@ public interface HueApi {
     List<Integer> getGroupLights(int groupId);
     
     /**
+     * @return a list of group ids the light is assigned to, not null
+     */
+    List<Integer> getAssignedGroups(int lightId);
+    
+    /**
      * @throws GroupNotFoundException if no group with given name was found
      * @throws HueApiFailure          if the api call failed
      */

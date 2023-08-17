@@ -44,7 +44,7 @@ public final class HueRawEventHandler implements BackgroundEventHandler {
                               if (hueEvent.isLightOrGroup() && hueEvent.isOffEvent()) {
                                   hueEventListener.onLightOff(hueEvent.getId_v1(), hueEvent.getId());
                               } else if (hueEvent.isLightOrGroup() && hueEvent.isOnEvent()) {
-                                  hueEventListener.onLightOn(hueEvent.getId_v1(), hueEvent.getId());
+                                  hueEventListener.onLightOn(hueEvent.getId_v1(), hueEvent.getId(), hueEvent.isPhysical());
                               }
                           });
     }
@@ -88,6 +88,10 @@ public final class HueRawEventHandler implements BackgroundEventHandler {
 
         public boolean isOnEvent() {
             return on != null && on.isOn() || "zigbee_connectivity".equals(type) && "connected".equals(getStatus());
+        }
+        
+        public boolean isPhysical() {
+            return "zigbee_connectivity".equals(type);
         }
         
         public boolean isLightOrGroup() {

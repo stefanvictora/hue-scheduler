@@ -31,6 +31,7 @@ import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -41,6 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.calls;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -288,6 +290,10 @@ class HueSchedulerTest {
     private void mockGroupCapabilities(int id, LightCapabilities capabilities) {
         when(mockedHueApi.getGroupCapabilities(id)).thenReturn(capabilities);
     }
+    
+    private void mockAssignedGroups(int lightId, List<Integer> groups) {
+        lenient().when(mockedHueApi.getAssignedGroups(lightId)).thenReturn(groups);
+    }
 
     private ScheduledRunnable startWithDefaultState() {
         addDefaultState();
@@ -319,7 +325,7 @@ class HueSchedulerTest {
     }
     
     private void simulateLightOnEvent(String idv1) {
-        scheduler.getHueEventListener().onLightOn(idv1, null);
+        scheduler.getHueEventListener().onLightOn(idv1, null, false);
     }
 
     private ScheduledRunnable simulateLightOnEventAndEnsureSingleScheduledState() {
@@ -2386,7 +2392,73 @@ class HueSchedulerTest {
 
         simulateLightOnEventAndEnsureSingleScheduledState();
     }
-
+    
+    @Test
+    void run_execution_group_manualOverride_notScheduledWhenContainedLightIsTurnedOnViaSoftware() {
+        enableUserModificationTracking();
+        create();
+        int groupId = 4;
+        int lightId = 66;
+        mockGroupLightsForId(groupId, lightId);
+        mockDefaultGroupCapabilities(groupId);
+        mockDefaultLightCapabilities(lightId);
+        mockAssignedGroups(lightId, Collections.singletonList(groupId));
+        
+        addState("g" + groupId, now, "bri:" + DEFAULT_BRIGHTNESS);
+        addState(lightId, now, "ct:" + DEFAULT_CT);
+        manualOverrideTracker.onManuallyOverridden("/groups/" + groupId);
+        manualOverrideTracker.onManuallyOverridden("/lights/" + lightId);
+        
+        startScheduler();
+        
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(2);
+        
+        scheduledRunnables.get(0).run();
+        scheduledRunnables.get(1).run();
+        
+        ensureScheduledStates(0);
+        
+        simulateLightOnEvent("/lights/" + lightId); // non-physical light on event
+        
+        ensureScheduledStates(1); // only light is rescheduled, assigned group is ignored
+    }
+    
+    @Test
+    void run_execution_twoGroups_manualOverride_bothRescheduledWhenContainedLightIsTurnedOnPhysically() {
+        enableUserModificationTracking();
+        create();
+        int groupId1 = 5;
+        int groupId2 = 6;
+        int lightId = 77;
+        mockDefaultGroupCapabilities(groupId1);
+        mockDefaultGroupCapabilities(groupId2);
+        mockDefaultLightCapabilities(lightId);
+        mockGroupLightsForId(5, lightId);
+        mockGroupLightsForId(6, lightId);
+        mockAssignedGroups(lightId, Arrays.asList(groupId1, groupId2)); // light is part of two groups
+        
+        addState("g" + groupId1, now, "bri:" + DEFAULT_BRIGHTNESS);
+        addState("g" + groupId2, now, "bri:" + DEFAULT_BRIGHTNESS);
+        addState(lightId, now, "ct:" + DEFAULT_CT);
+        manualOverrideTracker.onManuallyOverridden("/groups/" + groupId1);
+        manualOverrideTracker.onManuallyOverridden("/groups/" + groupId2);
+        manualOverrideTracker.onManuallyOverridden("/lights/" + lightId);
+        
+        startScheduler();
+        
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(3);
+        
+        scheduledRunnables.get(0).run();
+        scheduledRunnables.get(1).run();
+        scheduledRunnables.get(2).run();
+        
+        ensureScheduledStates(0);
+        
+        scheduler.getHueEventListener().onLightOn("/lights/" + lightId, null, true);
+        
+        ensureScheduledStates(3); // individual light, as well as contained groups are rescheduled
+    }
+    
     @Test
     void run_execution_manualOverride_stateIsDirectlyScheduledWhenOn_calculatesCorrectNextStart() {
         enableUserModificationTracking();

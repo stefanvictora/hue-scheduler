@@ -87,7 +87,7 @@ class HueRawEventHandlerTest {
     }
 
     @Test
-    void onMessage_zigbeeConnectionEstablishedEvent_triggersLightOn() throws Exception {
+    void onMessage_zigbeeConnectionEstablishedEvent_triggersLightOn_setsPhysicalFlag() throws Exception {
         handler.onMessage("", new MessageEvent("[\n" +
                 "  {\n" +
                 "    \"creationtime\": \"2023-07-22T15:12:39Z\",\n" +
@@ -108,7 +108,7 @@ class HueRawEventHandlerTest {
                 "  }\n" +
                 "]"));
 
-        verify(hueEventListener).onLightOn("/lights/39", "60b2bafa-53f4-4062-9f58-253be813b349");
+        verify(hueEventListener).onLightOn("/lights/39", "60b2bafa-53f4-4062-9f58-253be813b349", true);
     }
 
     @Test
@@ -166,7 +166,7 @@ class HueRawEventHandlerTest {
                 "  }\n" +
                 "]"));
 
-        verify(hueEventListener).onLightOn("/lights/36", "d37eb9c4-d7eb-42ee-9a13-fa9148f8d403");
+        verify(hueEventListener).onLightOn("/lights/36", "d37eb9c4-d7eb-42ee-9a13-fa9148f8d403", false);
     }
 
     @Test
@@ -235,7 +235,7 @@ class HueRawEventHandlerTest {
                 + "  }\n"
                 + "]"));
         
-        verify(hueEventListener).onLightOn("/groups/13", "560cd8f7-c498-4358-8dba-19734b4173f7");
+        verify(hueEventListener).onLightOn("/groups/13", "560cd8f7-c498-4358-8dba-19734b4173f7", false);
     }
     
     @Test
@@ -349,7 +349,7 @@ class HueRawEventHandlerTest {
                 "]"));
 
         verify(hueEventListener).onLightOff("/lights/36", "d37eb9c4-d7eb-42ee-9a13-fa9148f8d403");
-        verify(hueEventListener).onLightOn("/lights/38", "db1d8ea4-d55d-47bd-b741-aa9d6ac0f0e7");
+        verify(hueEventListener).onLightOn("/lights/38", "db1d8ea4-d55d-47bd-b741-aa9d6ac0f0e7", false);
         verifyNoMoreInteractions(hueEventListener);
     }
 }

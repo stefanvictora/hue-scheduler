@@ -107,9 +107,9 @@ public final class HueScheduler implements Runnable {
         lightStates = new HashMap<>();
         onStateWaitingList = new ConcurrentHashMap<>();
         manualOverrideTracker = new ManualOverrideTrackerImpl();
-        hueEventListener = new HueEventListenerImpl(manualOverrideTracker, onStateWaitingList::remove);
+        hueEventListener = new HueEventListenerImpl(manualOverrideTracker, onStateWaitingList::remove, this::getAssignedGroups);
     }
-
+    
     public HueScheduler(HueApi hueApi, StateScheduler stateScheduler,
                         StartTimeProvider startTimeProvider, Supplier<ZonedDateTime> currentTime,
                         double requestsPerSecond, boolean controlGroupLightsIndividually,
@@ -553,6 +553,14 @@ public final class HueScheduler implements Runnable {
 
     private void logSunDataInfo() {
         LOG.info("Current sun times:\n{}", startTimeProvider.toDebugString(currentTime.get()));
+    }
+    
+    private List<String> getAssignedGroups(String idv1LightId) {
+        int lightId = Integer.parseInt(idv1LightId.substring("/lights/".length()));
+        return hueApi.getAssignedGroups(lightId)
+                .stream()
+                .map(id -> "/groups/" + id)
+                .collect(Collectors.toList());
     }
 
     HueEventListener getHueEventListener() {
