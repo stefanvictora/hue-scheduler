@@ -1743,8 +1743,16 @@ class HueSchedulerTest {
     }
 
     @Test
-    void parse_invalidCtValue_tooLow_exception() {
+    void parse_light_invalidCtValue_tooLow_exception() {
         assertThrows(InvalidColorTemperatureValue.class, () -> addState(1, now, null, 152));
+    }
+    
+    @Test
+    void parse_group_invalidCtValue_tooLow_exception() {
+        mockGroupCapabilities(1, LightCapabilities.builder().ctMin(100).ctMax(200).capabilities(EnumSet.of(Capability.COLOR_TEMPERATURE)).build());
+        mockGroupLightsForId(1, 2, 3);
+        
+        assertThrows(InvalidColorTemperatureValue.class, () -> addState("g1", now, "ct:50"));
     }
 
     @Test
@@ -1755,6 +1763,30 @@ class HueSchedulerTest {
 
         startScheduler();
 
+        ensureScheduledStates(1);
+    }
+    
+    @Test
+    void parse_ctValueValidationUsesCapabilities_alsoForGroups_lowerThanDefault_noException() {
+        mockGroupCapabilities(1, LightCapabilities.builder().ctMin(100).ctMax(200).capabilities(EnumSet.of(Capability.COLOR_TEMPERATURE)).build());
+        mockGroupLightsForId(1, 2, 3);
+        
+        addState("g1", now,"ct:100");
+        
+        startScheduler();
+        
+        ensureScheduledStates(1);
+    }
+    
+    @Test
+    void parse_ct_group_noMinAndMax_noValidationPerformed() {
+        mockGroupCapabilities(1, LightCapabilities.builder().capabilities(EnumSet.of(Capability.COLOR_TEMPERATURE)).build());
+        mockGroupLightsForId(1, 2, 3);
+        
+        addState("g1", now,"ct:10");
+        
+        startScheduler();
+        
         ensureScheduledStates(1);
     }
 

@@ -136,8 +136,11 @@ final class ScheduledState {
 			return null;
 		}
         assertCtSupported();
-        if (!isGroupState() && (ct > capabilities.getCtMax() || ct < capabilities.getCtMin())) {
-            throw new InvalidColorTemperatureValue("Invalid ct value '" + ct + "'. Support integer range for light model: "
+        if (capabilities.getCtMax() == null || capabilities.getCtMin() == null) {
+            return ct;
+        }
+        if (ct > capabilities.getCtMax() || ct < capabilities.getCtMin()) {
+            throw new InvalidColorTemperatureValue("Invalid ct value '" + ct + "'. Support integer range for " + getFormattedName() + ": "
                     + capabilities.getCtMin() + "-" + capabilities.getCtMax());
         }
         return ct;

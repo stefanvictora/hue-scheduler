@@ -677,7 +677,7 @@ class HueApiTest {
                 + "        \"mindimlevel\": 200,\n"
                 + "        \"maxlumen\": 800,\n"
                 + "        \"ct\": {\n"
-                + "          \"min\": 153,\n"
+                + "          \"min\": 100,\n"
                 + "          \"max\": 454\n"
                 + "        }\n"
                 + "      }\n"
@@ -755,6 +755,35 @@ class HueApiTest {
                 + "      }\n"
                 + "    }\n"
                 + "  },\n"
+                + "  \"25\": {\n"
+                + "    \"type\": \"Extended color light\",\n"
+                + "    \"capabilities\": {\n"
+                + "      \"certified\": true,\n"
+                + "      \"control\": {\n"
+                + "        \"mindimlevel\": 40,\n"
+                + "        \"maxlumen\": 1600,\n"
+                + "        \"colorgamuttype\": \"C\",\n"
+                + "        \"colorgamut\": [\n"
+                + "          [\n"
+                + "            0.6915,\n"
+                + "            0.3083\n"
+                + "          ],\n"
+                + "          [\n"
+                + "            0.17,\n"
+                + "            0.7\n"
+                + "          ],\n"
+                + "          [\n"
+                + "            0.1532,\n"
+                + "            0.0475\n"
+                + "          ]\n"
+                + "        ],\n"
+                + "        \"ct\": {\n"
+                + "          \"min\": 153,\n"
+                + "          \"max\": 500\n"
+                + "        }\n"
+                + "      }\n"
+                + "    }\n"
+                + "  },\n"
                 + "  \"30\": {\n"
                 + "    \"type\": \"On/Off plug-in unit\",\n"
                 + "    \"capabilities\": {\n"
@@ -769,7 +798,8 @@ class HueApiTest {
                 + "    \"lights\": [\n"
                 + "      \"42\",\n"
                 + "      \"22\",\n"
-                + "      \"30\"\n"
+                + "      \"30\",\n"
+                + "      \"25\"\n"
                 + "    ]\n"
                 + "  },\n"
                 + "  \"2\": {\n"
@@ -815,29 +845,49 @@ class HueApiTest {
         Double[][] gamutC = { { 0.6915, 0.3083 }, { 0.17, 0.7 }, { 0.1532, 0.0475 } };
         
         assertCapabilities(
-                api.getGroupCapabilities(1), LightCapabilities.builder().colorGamut(gamutC).capabilities(EnumSet.allOf(Capability.class)).build());
+                api.getGroupCapabilities(1),
+                LightCapabilities.builder()
+                        .colorGamut(gamutC)
+                        .ctMin(100)
+                        .ctMax(500)
+                        .capabilities(EnumSet.allOf(Capability.class))
+                        .build()
+        );
         assertCapabilities(
-                api.getGroupCapabilities(2), LightCapabilities.builder()
+                api.getGroupCapabilities(2),
+                LightCapabilities.builder()
                         .colorGamut(gamutC)
                         .capabilities(EnumSet.of(Capability.COLOR, Capability.BRIGHTNESS, Capability.ON_OFF))
                         .build());
         assertCapabilities(
                 api.getGroupCapabilities(3),
-                LightCapabilities.builder().capabilities(EnumSet.of(Capability.COLOR_TEMPERATURE, Capability.BRIGHTNESS, Capability.ON_OFF)).build()
+                LightCapabilities.builder()
+                        .ctMin(100)
+                        .ctMax(454)
+                        .capabilities(EnumSet.of(Capability.COLOR_TEMPERATURE, Capability.BRIGHTNESS, Capability.ON_OFF))
+                        .build()
         );
-        assertCapabilities(api.getGroupCapabilities(4), LightCapabilities.builder().capabilities(EnumSet.of(Capability.ON_OFF)).build());
         assertCapabilities(
-                api.getGroupCapabilities(5), LightCapabilities.builder()
+                api.getGroupCapabilities(4),
+                LightCapabilities.builder()
+                        .capabilities(EnumSet.of(Capability.ON_OFF))
+                        .build()
+        );
+        assertCapabilities(
+                api.getGroupCapabilities(5),
+                LightCapabilities.builder()
                         .colorGamut(gamutA)
                         .capabilities(EnumSet.of(Capability.COLOR, Capability.BRIGHTNESS, Capability.ON_OFF))
                         .build());
         assertCapabilities(
-                api.getGroupCapabilities(6), LightCapabilities.builder()
+                api.getGroupCapabilities(6),
+                LightCapabilities.builder()
                         .colorGamut(gamutC)
                         .capabilities(EnumSet.of(Capability.COLOR, Capability.BRIGHTNESS, Capability.ON_OFF))
                         .build());
         assertCapabilities(
-                api.getGroupCapabilities(7), LightCapabilities.builder()
+                api.getGroupCapabilities(7),
+                LightCapabilities.builder()
                         .colorGamut(gamutB)
                         .capabilities(EnumSet.of(Capability.COLOR, Capability.BRIGHTNESS, Capability.ON_OFF))
                         .build());

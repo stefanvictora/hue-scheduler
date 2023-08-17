@@ -17,6 +17,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 public final class HueApiImpl implements HueApi {
@@ -320,6 +321,8 @@ public final class HueApiImpl implements HueApi {
                 .map(this::getLightCapabilities)
                 .collect(Collectors.toList());
         return LightCapabilities.builder()
+                .ctMin(getMinCtMin(lightCapabilities))
+                .ctMax(getMaxCtMax(lightCapabilities))
                 .colorGamut(getMaxGamut(lightCapabilities))
                 .capabilities(getMaxCapabilities(lightCapabilities))
                 .build();
@@ -328,7 +331,8 @@ public final class HueApiImpl implements HueApi {
     private static Double[][] getMaxGamut(List<LightCapabilities> lightCapabilities) {
         Map<String, Double[][]> colorGamutMap = lightCapabilities.stream()
                 .filter(c -> c.getColorGamut() != null)
-                .collect(Collectors.toMap(LightCapabilities::getColorGamutType, LightCapabilities::getColorGamut));
+                .collect(Collectors.toMap(LightCapabilities::getColorGamutType, LightCapabilities::getColorGamut,
+                        (gamut1, gamut2) -> gamut1));
         return colorGamutMap.getOrDefault("C", colorGamutMap.getOrDefault("B", colorGamutMap.getOrDefault("A", null)));
     }
     
@@ -338,6 +342,22 @@ public final class HueApiImpl implements HueApi {
                 .map(LightCapabilities::getCapabilities)
                 .flatMap(Collection::stream)
                 .collect(Collectors.toSet()));
+    }
+    
+    private Integer getMinCtMin(List<LightCapabilities> lightCapabilities) {
+        return lightCapabilities.stream()
+                .map(LightCapabilities::getCtMin)
+                .filter(Objects::nonNull)
+                .min(Integer::compareTo)
+                .orElse(null);
+    }
+    
+    private Integer getMaxCtMax(List<LightCapabilities> lightCapabilities) {
+        return lightCapabilities.stream()
+                .map(LightCapabilities::getCtMax)
+                .filter(Objects::nonNull)
+                .max(Integer::compareTo)
+                .orElse(null);
     }
     
     private EnumSet<Capability> getCapabilities(String type) {
