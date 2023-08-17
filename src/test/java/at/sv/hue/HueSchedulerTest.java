@@ -1,6 +1,7 @@
 package at.sv.hue;
 
 import at.sv.hue.api.BridgeConnectionFailure;
+import at.sv.hue.api.Capability;
 import at.sv.hue.api.EmptyGroupException;
 import at.sv.hue.api.GroupNotFoundException;
 import at.sv.hue.api.GroupState;
@@ -30,6 +31,7 @@ import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -346,7 +348,7 @@ class HueSchedulerTest {
         nowTimeString = now.toLocalTime().toString();
         connectionFailureRetryDelay = 5;
         Double[][] gamut = {{0.6915, 0.3083}, {0.17, 0.7}, {0.1532, 0.0475}};
-        defaultCapabilities = new LightCapabilities(gamut, 153, 500);
+        defaultCapabilities = LightCapabilities.builder().ctMin(153).ctMax(500).colorGamut(gamut).capabilities(EnumSet.allOf(Capability.class)).build();
         multiColorAdjustmentDelay = 4;
         controlGroupLightsIndividually = false;
         disableUserModificationTracking = true;
@@ -1468,7 +1470,7 @@ class HueSchedulerTest {
 
     @Test
     void parse_colorInput_x_y_butLightDoesNotSupportColor_exception() {
-        mockCapabilities(1, LightCapabilities.NO_CAPABILITIES);
+        mockCapabilities(1, LightCapabilities.builder().capabilities(EnumSet.of(Capability.BRIGHTNESS)).build());
         assertThrows(ColorNotSupported.class, () -> addStateNow("1", "color:#ffbaff"));
     }
 
@@ -1697,7 +1699,7 @@ class HueSchedulerTest {
 
     @Test
     void parse_ctValueValidationUsesCapabilities_lowerThanDefault_noException() {
-        mockCapabilities(1, new LightCapabilities(null, 100, 200));
+        mockCapabilities(1, LightCapabilities.builder().ctMin(100).ctMax(200).capabilities(EnumSet.of(Capability.COLOR_TEMPERATURE)).build());
 
         addStateNow("1", "ct:100");
 
@@ -1708,7 +1710,7 @@ class HueSchedulerTest {
 
     @Test
     void parse_ctValueValidationUsesCapabilities_higherThanDefault_noException() {
-        mockCapabilities(1, new LightCapabilities(null, 100, 1000));
+        mockCapabilities(1, LightCapabilities.builder().ctMin(100).ctMax(1000).capabilities(EnumSet.of(Capability.COLOR_TEMPERATURE)).build());
 
         addStateNow("1", "ct:1000");
 
@@ -1716,7 +1718,25 @@ class HueSchedulerTest {
 
         ensureScheduledStates(1);
     }
-
+    
+    @Test
+    void parse_brightness_forOnOffLight_exception() {
+        mockCapabilities(1, LightCapabilities.builder().capabilities(EnumSet.of(Capability.ON_OFF)).build());
+        
+        assertThrows(BrightnessNotSupported.class, () -> addStateNow(1, "bri:250"));
+    }
+    
+    @Test
+    void parse_on_forOnOffLight() {
+        mockCapabilities(1, LightCapabilities.builder().capabilities(EnumSet.of(Capability.ON_OFF)).build());
+        
+        addStateNow(1, "on:true");
+        
+        startScheduler();
+        
+        ensureScheduledStates(1);
+    }
+    
     @Test
     void parse_invalidCtValue_tooHigh_exception() {
         assertThrows(InvalidColorTemperatureValue.class, () -> addState(1, now, null, 501));

@@ -9,7 +9,13 @@ import lombok.Data;
 
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 public final class HueApiImpl implements HueApi {
@@ -291,9 +297,27 @@ public final class HueApiImpl implements HueApi {
         Light light = getAndAssertLight(id);
         if (light.capabilities == null || light.capabilities.control == null) return LightCapabilities.NO_CAPABILITIES;
         Control control = light.capabilities.control;
-        return new LightCapabilities(control.colorgamut, getMinCtOrNull(control), getMaxCtOrNull(control));
+        return new LightCapabilities(
+                control.colorgamut, getMinCtOrNull(control), getMaxCtOrNull(control), getCapabilities(light.type));
     }
-
+    
+    private EnumSet<Capability> getCapabilities(String type) {
+        switch (type.toLowerCase(Locale.ENGLISH)) {
+            case "extended color light":
+                return EnumSet.allOf(Capability.class);
+            case "color light":
+                return EnumSet.of(Capability.COLOR, Capability.BRIGHTNESS, Capability.ON_OFF);
+            case "color temperature light":
+                return EnumSet.of(Capability.COLOR_TEMPERATURE, Capability.BRIGHTNESS, Capability.ON_OFF);
+            case "dimmable light":
+                return EnumSet.of(Capability.BRIGHTNESS, Capability.ON_OFF);
+            case "on/off plug-in unit":
+                return EnumSet.of(Capability.ON_OFF);
+            default:
+                return EnumSet.noneOf(Capability.class);
+        }
+    }
+    
     @Override
     public void assertConnection() {
         getOrLookupLights();
@@ -324,6 +348,7 @@ public final class HueApiImpl implements HueApi {
     @Data
     private static final class Light {
         State state;
+        String type;
         Capabilities capabilities;
         String name;
     }

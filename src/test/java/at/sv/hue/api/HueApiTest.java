@@ -6,6 +6,7 @@ import org.mockito.Mockito;
 
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.EnumSet;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -467,11 +468,59 @@ class HueApiTest {
         LightCapabilities capabilities = api.getLightCapabilities(22);
 
         Double[][] gamut = {{0.6915, 0.3083}, {0.17, 0.7}, {0.1532, 0.0475}};
-        assertCapabilities(capabilities, LightCapabilities.builder().colorGamut(gamut).ctMin(153).ctMax(500).build());
+        assertCapabilities(
+                capabilities,
+                LightCapabilities.builder().colorGamut(gamut).ctMin(153).ctMax(500).capabilities(EnumSet.allOf(Capability.class)).build()
+        );
+        assertThat(capabilities.isColorSupported()).isTrue();
+        assertThat(capabilities.isCtSupported()).isTrue();
+    }
+    
+    @Test
+    void getCapabilities_colorOnly() {
+        setGetResponse("/lights", "{\n" +
+                "\"22\": {\n" +
+                "\"type\": \"Color light\",\n" +
+                "\"capabilities\": {\n" +
+                "\"control\": {\n" +
+                "\"mindimlevel\": 200,\n" +
+                "\"maxlumen\": 800,\n" +
+                "\"colorgamuttype\": \"C\",\n" +
+                "\"colorgamut\": [\n" +
+                "[\n" +
+                "0.6915,\n" +
+                "0.3083\n" +
+                "],\n" +
+                "[\n" +
+                "0.17,\n" +
+                "0.7\n" +
+                "],\n" +
+                "[\n" +
+                "0.1532,\n" +
+                "0.0475\n" +
+                "]\n" +
+                "]\n" +
+                "}\n" +
+                "}\n" +
+                "}\n" +
+                "}");
+        
+        LightCapabilities capabilities = api.getLightCapabilities(22);
+        
+        Double[][] gamut = { { 0.6915, 0.3083 }, { 0.17, 0.7 }, { 0.1532, 0.0475 } };
+        assertCapabilities(
+                capabilities,
+                LightCapabilities.builder()
+                        .colorGamut(gamut)
+                        .capabilities(EnumSet.of(Capability.COLOR, Capability.BRIGHTNESS, Capability.ON_OFF))
+                        .build()
+        );
+        assertThat(capabilities.isColorSupported()).isTrue();
+        assertThat(capabilities.isCtSupported()).isFalse();
     }
 
     @Test
-    void getCapabilities_hasNoColorAndNoCTSupport() {
+    void getCapabilities_brightnessOnly() {
         setGetResponse("/lights", "{\n" +
                 "\"7\": {\n" +
                 "\"type\": \"Dimmable light\",\n" +
@@ -486,7 +535,91 @@ class HueApiTest {
 
         LightCapabilities capabilities = api.getLightCapabilities(7);
         
-        assertCapabilities(capabilities, LightCapabilities.builder().build());
+        assertCapabilities(capabilities, LightCapabilities.builder().capabilities(EnumSet.of(Capability.BRIGHTNESS, Capability.ON_OFF)).build());
+        assertThat(capabilities.isColorSupported()).isFalse();
+        assertThat(capabilities.isCtSupported()).isFalse();
+    }
+    
+    @Test
+    void getCapabilities_colorTemperatureOnly() {
+        setGetResponse("/lights", "{\n"
+                + "  \"42\": {\n"
+                + "    \"state\": {\n"
+                + "      \"on\": true,\n"
+                + "      \"bri\": 254,\n"
+                + "      \"ct\": 408,\n"
+                + "      \"alert\": \"select\",\n"
+                + "      \"colormode\": \"ct\",\n"
+                + "      \"mode\": \"homeautomation\",\n"
+                + "      \"reachable\": false\n"
+                + "    },\n"
+                + "    \"type\": \"Color temperature light\",\n"
+                + "    \"name\": \"Spot\",\n"
+                + "    \"modelid\": \"LTA001\",\n"
+                + "    \"manufacturername\": \"Signify Netherlands B.V.\",\n"
+                + "    \"productname\": \"Hue ambiance lamp\",\n"
+                + "    \"capabilities\": {\n"
+                + "      \"certified\": true,\n"
+                + "      \"control\": {\n"
+                + "        \"mindimlevel\": 200,\n"
+                + "        \"maxlumen\": 800,\n"
+                + "        \"ct\": {\n"
+                + "          \"min\": 153,\n"
+                + "          \"max\": 454\n"
+                + "        }\n"
+                + "      },\n"
+                + "      \"streaming\": {\n"
+                + "        \"renderer\": false,\n"
+                + "        \"proxy\": false\n"
+                + "      }\n"
+                + "    }\n"
+                + "  }\n"
+                + "}");
+        
+        LightCapabilities capabilities = api.getLightCapabilities(42);
+        
+        assertCapabilities(
+                capabilities,
+                LightCapabilities.builder()
+                        .ctMin(153)
+                        .ctMax(454)
+                        .capabilities(EnumSet.of(Capability.COLOR_TEMPERATURE, Capability.BRIGHTNESS, Capability.ON_OFF)).build()
+        );
+        assertThat(capabilities.isColorSupported()).isFalse();
+        assertThat(capabilities.isCtSupported()).isTrue();
+    }
+    
+    @Test
+    void getCapabilities_onOffOnly() {
+        setGetResponse("/lights", "{\n"
+                + "  \"24\": {\n"
+                + "    \"state\": {\n"
+                + "      \"on\": false,\n"
+                + "      \"alert\": \"select\",\n"
+                + "      \"mode\": \"homeautomation\",\n"
+                + "      \"reachable\": true\n"
+                + "    },\n"
+                + "    \"type\": \"On/Off plug-in unit\",\n"
+                + "    \"name\": \"Smart Plug\",\n"
+                + "    \"modelid\": \"LOM001\",\n"
+                + "    \"manufacturername\": \"Signify Netherlands B.V.\",\n"
+                + "    \"productname\": \"Hue Smart plug\",\n"
+                + "    \"capabilities\": {\n"
+                + "      \"certified\": true,\n"
+                + "      \"control\": {},\n"
+                + "      \"streaming\": {\n"
+                + "        \"renderer\": false,\n"
+                + "        \"proxy\": false\n"
+                + "      }\n"
+                + "    }\n"
+                + "  }\n"
+                + "}");
+        
+        LightCapabilities capabilities = api.getLightCapabilities(24);
+        
+        assertCapabilities(capabilities, LightCapabilities.builder().capabilities(EnumSet.of(Capability.ON_OFF)).build());
+        assertThat(capabilities.isColorSupported()).isFalse();
+        assertThat(capabilities.isCtSupported()).isFalse();
     }
 
     @Test

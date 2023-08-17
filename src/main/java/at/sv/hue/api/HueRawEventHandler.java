@@ -14,7 +14,7 @@ import java.util.List;
 
 @Slf4j
 public final class HueRawEventHandler implements BackgroundEventHandler {
-    private final static TypeReference<List<HueEventContainer>> typeRef = new TypeReference<List<HueEventContainer>>() {
+    private static final TypeReference<List<HueEventContainer>> typeRef = new TypeReference<List<HueEventContainer>>() {
     };
     private final HueEventListener hueEventListener;
     private final ObjectMapper objectMapper;
@@ -37,7 +37,6 @@ public final class HueRawEventHandler implements BackgroundEventHandler {
 
     @Override
     public void onMessage(String event, MessageEvent messageEvent) throws Exception {
-        log.trace("{}", messageEvent.getData());
         List<HueEventContainer> hueEventContainers = objectMapper.readValue(messageEvent.getData(), typeRef);
         hueEventContainers.stream()
                           .flatMap(container -> container.getData().stream())

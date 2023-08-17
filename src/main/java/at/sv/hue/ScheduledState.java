@@ -114,14 +114,24 @@ final class ScheduledState {
     }
 
     private Integer assertValidBrightnessValue(Integer brightness) {
-        if (brightness != null && (brightness > 254 || brightness < 1)) {
+		if (brightness == null || isGroupState()) { // todo: add group capability validation
+			return brightness; 
+		}
+        assertBrightnessSupported();
+        if (brightness > 254 || brightness < 1) {
             throw new InvalidBrightnessValue("Invalid brightness value '" + brightness + "'. Allowed integer range: 1-254");
         }
         return brightness;
     }
-
+    
+    private void assertBrightnessSupported() {
+        if (!capabilities.isBrightnessSupported()) {
+            throw new BrightnessNotSupported("Light '" + getName() + "' does not support setting brightness!");
+        }
+    }
+    
     private Integer assertCtSupportAndValue(Integer ct) {
-        if (ct == null || isGroupState()) return ct;
+        if (ct == null || isGroupState()) return ct; // todo: add group capability validations
         assertCtSupported();
         if (ct > capabilities.getCtMax() || ct < capabilities.getCtMin()) {
             throw new InvalidColorTemperatureValue("Invalid ct value '" + ct + "'. Support integer range for light model: "
@@ -165,7 +175,7 @@ final class ScheduledState {
     }
 
     private void assertColorCapabilities() {
-        if (isGroupState()) return;
+        if (isGroupState()) return; // todo: implement group validations. for this we need information about all contained lights.
         if (isColorState() && !capabilities.isColorSupported()) {
             throw new ColorNotSupported("Light '" + getName() + "' does not support setting color!");
         }
