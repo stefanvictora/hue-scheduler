@@ -10,6 +10,7 @@ import lombok.Data;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -178,10 +179,7 @@ public final class HueApiImpl implements HueApi {
 
     @Override
     public List<Integer> getGroupLights(int groupId) {
-        Group group = getOrLookupGroups().get(groupId);
-        if (group == null) {
-            throw new GroupNotFoundException("Group with id '" + groupId + "' not found!");
-        }
+        Group group = getAndAssertGroupExists(groupId);
         Integer[] lights = group.lights;
         if (lights.length == 0) {
             throw new EmptyGroupException("Group with id '" + groupId + "' has no lights to control!");
@@ -233,13 +231,17 @@ public final class HueApiImpl implements HueApi {
 
     @Override
     public String getGroupName(int groupId) {
+        return getAndAssertGroupExists(groupId).name;
+    }
+    
+    private Group getAndAssertGroupExists(int groupId) {
         Group group = getOrLookupGroups().get(groupId);
         if (group == null) {
             throw new GroupNotFoundException("Group with id '" + groupId + "' not found!");
         }
-        return group.name;
+        return group;
     }
-
+    
     @Override
     public int getLightId(String name) {
         Integer lightId = getOrLookupLightNameToIdMap().get(name);
@@ -280,11 +282,11 @@ public final class HueApiImpl implements HueApi {
 
     @Override
     public String getLightName(int id) {
-        Light light = getAndAssertLight(id);
+        Light light = getAndAssertLightExists(id);
         return light.name;
     }
-
-    private Light getAndAssertLight(int id) {
+    
+    private Light getAndAssertLightExists(int id) {
         Light light = getOrLookupLights().get(id);
         if (light == null) {
             throw new LightNotFoundException("Light with id '" + id + "' not found!");
@@ -294,11 +296,39 @@ public final class HueApiImpl implements HueApi {
 
     @Override
     public LightCapabilities getLightCapabilities(int id) {
-        Light light = getAndAssertLight(id);
+        Light light = getAndAssertLightExists(id);
         if (light.capabilities == null || light.capabilities.control == null) return LightCapabilities.NO_CAPABILITIES;
         Control control = light.capabilities.control;
         return new LightCapabilities(
+                control.colorgamuttype,
                 control.colorgamut, getMinCtOrNull(control), getMaxCtOrNull(control), getCapabilities(light.type));
+    }
+    
+    @Override
+    public LightCapabilities getGroupCapabilities(int id) {
+        List<LightCapabilities> lightCapabilities = getGroupLights(id)
+                .stream()
+                .map(this::getLightCapabilities)
+                .collect(Collectors.toList());
+        return LightCapabilities.builder()
+                .colorGamut(getMaxGamut(lightCapabilities))
+                .capabilities(getMaxCapabilities(lightCapabilities))
+                .build();
+    }
+    
+    private static Double[][] getMaxGamut(List<LightCapabilities> lightCapabilities) {
+        Map<String, Double[][]> colorGamutMap = lightCapabilities.stream()
+                .filter(c -> c.getColorGamut() != null)
+                .collect(Collectors.toMap(LightCapabilities::getColorGamutType, LightCapabilities::getColorGamut));
+        return colorGamutMap.getOrDefault("C", colorGamutMap.getOrDefault("B", colorGamutMap.getOrDefault("A", null)));
+    }
+    
+    private static EnumSet<Capability> getMaxCapabilities(List<LightCapabilities> lightCapabilities) {
+        return EnumSet.copyOf(lightCapabilities
+                .stream()
+                .map(LightCapabilities::getCapabilities)
+                .flatMap(Collection::stream)
+                .collect(Collectors.toSet()));
     }
     
     private EnumSet<Capability> getCapabilities(String type) {

@@ -1,9 +1,12 @@
 package at.sv.hue;
 
+import at.sv.hue.api.Capability;
 import at.sv.hue.api.LightCapabilities;
 import at.sv.hue.api.LightState;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
+import java.util.EnumSet;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -13,7 +16,12 @@ class ScheduledStateTest {
 
     @BeforeEach
     void setUp() {
-        defaultCapabilities = LightCapabilities.builder().ctMin(0).ctMax(100).colorGamut(new Double[0][0]).build();
+        defaultCapabilities = LightCapabilities.builder()
+                .ctMin(0)
+                .ctMax(100)
+                .colorGamut(new Double[0][0])
+                .capabilities(EnumSet.allOf(Capability.class))
+                .build();
     }
 
     @Test
@@ -456,10 +464,10 @@ class ScheduledStateTest {
     }
 
     @Test
-    void lightStateDiffers_noCapabilities_sameBrightness_sameColorMode_ignoresAnyEffectAndOtherProperties_false() {
+    void lightStateDiffers_sameBrightness_sameColorMode_ignoresAnyEffectAndOtherProperties_false() {
         ScheduledState scheduledState = ScheduledState.builder()
                                                       .brightness(10)
-                                                      .capabilities(LightCapabilities.NO_CAPABILITIES)
+                                                      .capabilities(defaultCapabilities)
                                                       .build();
         LightState lightState = LightState.builder()
                                           .brightness(10)
@@ -475,10 +483,10 @@ class ScheduledStateTest {
     }
 
     @Test
-    void lightStateDiffers_noCapabilities_sameBrightness_differentColorMode_doesNotMatter_false() {
+    void lightStateDiffers_sameBrightness_differentColorMode_doesNotMatter_false() {
         ScheduledState scheduledState = ScheduledState.builder()
                                                       .brightness(10)
-                                                      .capabilities(LightCapabilities.NO_CAPABILITIES)
+                                                      .capabilities(defaultCapabilities)
                                                       .build();
         LightState lightState = LightState.builder()
                                           .brightness(10)
@@ -505,10 +513,10 @@ class ScheduledStateTest {
     }
 
     @Test
-    void lightStateDiffers_noCapabilities_differentBrightness_true() {
+    void lightStateDiffers_differentBrightness_true() {
         ScheduledState scheduledState = ScheduledState.builder()
                                                       .brightness(10)
-                                                      .capabilities(LightCapabilities.NO_CAPABILITIES)
+                                                      .capabilities(defaultCapabilities)
                                                       .build();
         LightState lightState = LightState.builder()
                                           .brightness(200)

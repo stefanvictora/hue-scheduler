@@ -129,7 +129,8 @@ class HueSchedulerTest {
     }
 
     private void addGroupState(int groupId, ZonedDateTime start, Integer... lights) {
-        addGroupLightsForId(groupId, lights);
+        mockGroupLightsForId(groupId, lights);
+        mockDefaultGroupCapabilities(groupId);
         addState("g" + groupId, start, "bri:" + DEFAULT_BRIGHTNESS, "ct:" + DEFAULT_CT);
     }
 
@@ -163,15 +164,15 @@ class HueSchedulerTest {
         return scheduledRunnables;
     }
 
-    private void addLightIdForName(String name, int id) {
-        when(mockedHueApi.getLightName(id)).thenReturn(name);
+    private void mockLightIdForName(String name, int id) {
+        when(mockedHueApi.getLightId(name)).thenReturn(id);
     }
 
-    private void addGroupLightsForId(int groupId, Integer... lights) {
+    private void mockGroupLightsForId(int groupId, Integer... lights) {
         when(mockedHueApi.getGroupLights(groupId)).thenReturn(Arrays.asList(lights));
     }
 
-    private void addGroupIdForName(String name, int id) {
+    private void mockGroupIdForName(String name, int id) {
         when(mockedHueApi.getGroupId(name)).thenReturn(id);
     }
 
@@ -269,15 +270,23 @@ class HueSchedulerTest {
     }
 
     private void addKnownLightIdsWithDefaultCapabilities(Integer... ids) {
-        Arrays.stream(ids).forEach(this::mockDefaultCapabilities);
+        Arrays.stream(ids).forEach(this::mockDefaultLightCapabilities);
     }
 
-    private void mockCapabilities(int id, LightCapabilities capabilities) {
+    private void mockLightCapabilities(int id, LightCapabilities capabilities) {
         when(mockedHueApi.getLightCapabilities(id)).thenReturn(capabilities);
     }
-
-    private void mockDefaultCapabilities(int id) {
-        mockCapabilities(id, defaultCapabilities);
+    
+    private void mockDefaultLightCapabilities(int id) {
+        mockLightCapabilities(id, defaultCapabilities);
+    }
+    
+    private void mockDefaultGroupCapabilities(int id) {
+        mockGroupCapabilities(id, defaultCapabilities);
+    }
+    
+    private void mockGroupCapabilities(int id, LightCapabilities capabilities) {
+        when(mockedHueApi.getGroupCapabilities(id)).thenReturn(capabilities);
     }
 
     private ScheduledRunnable startWithDefaultState() {
@@ -466,12 +475,37 @@ class HueSchedulerTest {
 
         assertThrows(EmptyGroupException.class, () -> addStateNow("g1"));
     }
-
+    
+    @Test
+    void parse_group_brightness_missingCapabilities_exception() {
+        mockGroupLightsForId(7, 2);
+        mockGroupCapabilities(7, LightCapabilities.NO_CAPABILITIES);
+        
+        assertThrows(BrightnessNotSupported.class, () -> addStateNow("g7", "bri:254"));
+    }
+    
+    @Test
+    void parse_group_colorTemperature_missingCapabilities_exception() {
+        mockGroupLightsForId(7, 2);
+        mockGroupCapabilities(7, LightCapabilities.NO_CAPABILITIES);
+        
+        assertThrows(ColorTemperatureNotSupported.class, () -> addStateNow("g7", "ct:500"));
+    }
+    
+    @Test
+    void parse_group_color_missingCapabilities_exception() {
+        mockGroupLightsForId(7, 2);
+        mockGroupCapabilities(7, LightCapabilities.NO_CAPABILITIES);
+        
+        assertThrows(ColorNotSupported.class, () -> addStateNow("g7", "x:1", "y:1"));
+    }
+    
     @Test
     void parse_parsesInputLine_createsMultipleStates_canHandleGroups() {
         int groupId = 9;
-        addGroupLightsForId(groupId, 77);
+        mockGroupLightsForId(groupId, 77);
         addKnownLightIdsWithDefaultCapabilities(1, 2);
+        mockDefaultGroupCapabilities(groupId);
         addStateNow("1, 2,g" + groupId, "bri:" + DEFAULT_BRIGHTNESS, "ct:" + DEFAULT_CT);
 
         startScheduler();
@@ -630,8 +664,9 @@ class HueSchedulerTest {
 
     @Test
     void parse_transitionTimeBefore_group_lightTurnedOnLater_stillBeforeStart_transitionTimeIsShortenedToRemainingTimeBefore() {
-        addGroupLightsForId(1, 1);
+        mockGroupLightsForId(1, 5);
         addKnownLightIdsWithDefaultCapabilities(1);
+        mockDefaultGroupCapabilities(1);
         ZonedDateTime actualStart = now;
         ZonedDateTime definedStart = actualStart.plusMinutes(10);
         addState("g1", definedStart, "bri:" + DEFAULT_BRIGHTNESS, "tr-before:10min");
@@ -728,7 +763,9 @@ class HueSchedulerTest {
     @Test
     void parse_transitionTimeBefore_groupStates_lightTurnedOnAfterStart_performsInterpolation() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        addGroupLightsForId(5, 7, 8, 9);
+        mockGroupLightsForId(5, 7, 8, 9);
+        mockGroupCapabilities(5,
+                LightCapabilities.builder().capabilities(EnumSet.of(Capability.BRIGHTNESS, Capability.COLOR_TEMPERATURE)).build());
         addState("g5", now, "bri:" + DEFAULT_BRIGHTNESS, "ct:" + DEFAULT_CT);
         addState("g5", now.plusMinutes(40), "bri:" + (DEFAULT_BRIGHTNESS + 20), "ct:" + (DEFAULT_CT + 20), "tr-before:20min");
         
@@ -1253,9 +1290,10 @@ class HueSchedulerTest {
 
     @Test
     void parse_canHandleColorInput_viaXAndY_forGroups() {
-        addGroupLightsForId(1, ID);
+        mockGroupLightsForId(1, ID);
         double x = 0.5043;
         double y = 0.6079;
+        mockDefaultGroupCapabilities(1);
         addStateNow("g1", "x:" + x, "y:" + y);
 
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
@@ -1353,7 +1391,8 @@ class HueSchedulerTest {
 
     @Test
     void parse_canHandleEffect_colorLoop_group() {
-        addGroupLightsForId(1, 1);
+        mockGroupLightsForId(1, 1);
+        mockDefaultGroupCapabilities(1);
         addStateNow("g1", "effect:colorloop");
 
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
@@ -1366,7 +1405,8 @@ class HueSchedulerTest {
 
     @Test
     void parse_multiColorLoopEffect_group_withMultipleLights() {
-        addGroupLightsForId(1, 1, 2, 3, 4, 5, 6);
+        mockGroupLightsForId(1, 1, 2, 3, 4, 5, 6);
+        mockDefaultGroupCapabilities(1);
         addStateNow("g1", "effect:multi_colorloop");
 
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
@@ -1411,7 +1451,8 @@ class HueSchedulerTest {
 
     @Test
     void parse_multiColorLoopEffect_group_withMultipleLights_secondExample() {
-        addGroupLightsForId(1, 1, 2);
+        mockGroupLightsForId(1, 1, 2);
+        mockDefaultGroupCapabilities(1);
         addStateNow("g1", "effect:multi_colorloop");
 
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
@@ -1438,7 +1479,8 @@ class HueSchedulerTest {
 
     @Test
     void parse_multiColorLoopEffect_justOneLightInGroup_skipsAdjustment() {
-        addGroupLightsForId(1, 1);
+        mockGroupLightsForId(1, 1);
+        mockDefaultGroupCapabilities(1);
         addStateNow("g1", "effect:multi_colorloop");
 
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
@@ -1470,25 +1512,25 @@ class HueSchedulerTest {
 
     @Test
     void parse_colorInput_x_y_butLightDoesNotSupportColor_exception() {
-        mockCapabilities(1, LightCapabilities.builder().capabilities(EnumSet.of(Capability.BRIGHTNESS)).build());
+        mockLightCapabilities(1, LightCapabilities.builder().capabilities(EnumSet.of(Capability.BRIGHTNESS)).build());
         assertThrows(ColorNotSupported.class, () -> addStateNow("1", "color:#ffbaff"));
     }
 
     @Test
     void parse_colorInput_hue_butLightDoesNotSupportColor_exception() {
-        mockCapabilities(1, LightCapabilities.NO_CAPABILITIES);
+        mockLightCapabilities(1, LightCapabilities.NO_CAPABILITIES);
         assertThrows(ColorNotSupported.class, () -> addStateNow("1", "hue:200"));
     }
 
     @Test
     void parse_colorInput_sat_butLightDoesNotSupportColor_exception() {
-        mockCapabilities(1, LightCapabilities.NO_CAPABILITIES);
+        mockLightCapabilities(1, LightCapabilities.NO_CAPABILITIES);
         assertThrows(ColorNotSupported.class, () -> addStateNow("1", "sat:200"));
     }
 
     @Test
     void parse_colorInput_effect_butLightDoesNotSupportColor_exception() {
-        mockCapabilities(1, LightCapabilities.NO_CAPABILITIES);
+        mockLightCapabilities(1, LightCapabilities.NO_CAPABILITIES);
         assertThrows(ColorNotSupported.class, () -> addStateNow("1", "effect:colorloop"));
     }
 
@@ -1522,7 +1564,7 @@ class HueSchedulerTest {
 
     @Test
     void parse_ct_butLightDoesNotSupportCt_exception() {
-        mockCapabilities(1, LightCapabilities.NO_CAPABILITIES);
+        mockLightCapabilities(1, LightCapabilities.NO_CAPABILITIES);
         assertThrows(ColorTemperatureNotSupported.class, () -> addStateNow("1", "ct:200"));
     }
 
@@ -1651,15 +1693,16 @@ class HueSchedulerTest {
     @Test
     void parse_useLampNameInsteadOfId_nameIsCorrectlyResolved() {
         String name = "gKitchen Lamp";
-        addLightIdForName(name, 2);
-        mockDefaultCapabilities(2);
+        mockLightIdForName(name, 2);
+        mockDefaultLightCapabilities(2);
+        when(mockedHueApi.getGroupId(name)).thenThrow(new GroupNotFoundException("Group not found"));
         addStateNow(name, "ct:" + DEFAULT_CT);
 
         startScheduler();
 
         ensureScheduledStates(1);
     }
-
+    
     @Test
     void parse_unknownLampName_exception() {
         String unknownLightName = "Unknown Light";
@@ -1673,8 +1716,9 @@ class HueSchedulerTest {
     void parse_useGroupNameInsteadOfId_nameIsCorrectlyResolved() {
         String name = "Kitchen";
         int id = 12345;
-        addGroupIdForName(name, id);
-        addGroupLightsForId(id, 1, 2);
+        mockGroupIdForName(name, id);
+        mockGroupLightsForId(id, 1, 2);
+        mockDefaultGroupCapabilities(id);
         addStateNow(name, "ct:" + DEFAULT_CT);
 
         startScheduler();
@@ -1699,7 +1743,7 @@ class HueSchedulerTest {
 
     @Test
     void parse_ctValueValidationUsesCapabilities_lowerThanDefault_noException() {
-        mockCapabilities(1, LightCapabilities.builder().ctMin(100).ctMax(200).capabilities(EnumSet.of(Capability.COLOR_TEMPERATURE)).build());
+        mockLightCapabilities(1, LightCapabilities.builder().ctMin(100).ctMax(200).capabilities(EnumSet.of(Capability.COLOR_TEMPERATURE)).build());
 
         addStateNow("1", "ct:100");
 
@@ -1710,7 +1754,7 @@ class HueSchedulerTest {
 
     @Test
     void parse_ctValueValidationUsesCapabilities_higherThanDefault_noException() {
-        mockCapabilities(1, LightCapabilities.builder().ctMin(100).ctMax(1000).capabilities(EnumSet.of(Capability.COLOR_TEMPERATURE)).build());
+        mockLightCapabilities(1, LightCapabilities.builder().ctMin(100).ctMax(1000).capabilities(EnumSet.of(Capability.COLOR_TEMPERATURE)).build());
 
         addStateNow("1", "ct:1000");
 
@@ -1721,14 +1765,14 @@ class HueSchedulerTest {
     
     @Test
     void parse_brightness_forOnOffLight_exception() {
-        mockCapabilities(1, LightCapabilities.builder().capabilities(EnumSet.of(Capability.ON_OFF)).build());
+        mockLightCapabilities(1, LightCapabilities.builder().capabilities(EnumSet.of(Capability.ON_OFF)).build());
         
         assertThrows(BrightnessNotSupported.class, () -> addStateNow(1, "bri:250"));
     }
     
     @Test
     void parse_on_forOnOffLight() {
-        mockCapabilities(1, LightCapabilities.builder().capabilities(EnumSet.of(Capability.ON_OFF)).build());
+        mockLightCapabilities(1, LightCapabilities.builder().capabilities(EnumSet.of(Capability.ON_OFF)).build());
         
         addStateNow(1, "on:true");
         
@@ -2242,7 +2286,8 @@ class HueSchedulerTest {
         enableUserModificationTracking();
         create();
         
-        addGroupLightsForId(1, 9, 10);
+        mockGroupLightsForId(1, 9, 10);
+        mockDefaultGroupCapabilities(1);
         addState("g1", now, "bri:" + DEFAULT_BRIGHTNESS);
         addState("g1", now.plusHours(1), "bri:" + (DEFAULT_BRIGHTNESS + 10));
         addState("g1", now.plusHours(2), "bri:" + (DEFAULT_BRIGHTNESS + 20));

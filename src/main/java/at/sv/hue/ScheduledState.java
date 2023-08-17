@@ -114,8 +114,8 @@ final class ScheduledState {
     }
 
     private Integer assertValidBrightnessValue(Integer brightness) {
-		if (brightness == null || isGroupState()) { // todo: add group capability validation
-			return brightness; 
+		if (brightness == null) {
+			return null;
 		}
         assertBrightnessSupported();
         if (brightness > 254 || brightness < 1) {
@@ -126,14 +126,17 @@ final class ScheduledState {
     
     private void assertBrightnessSupported() {
         if (!capabilities.isBrightnessSupported()) {
-            throw new BrightnessNotSupported("Light '" + getName() + "' does not support setting brightness!");
+            throw new BrightnessNotSupported(getFormattedName() + "' does not support setting brightness! "
+                    + "Capabilities: " + capabilities.getCapabilities());
         }
     }
     
     private Integer assertCtSupportAndValue(Integer ct) {
-        if (ct == null || isGroupState()) return ct; // todo: add group capability validations
+        if (ct == null) {
+			return null;
+		}
         assertCtSupported();
-        if (ct > capabilities.getCtMax() || ct < capabilities.getCtMin()) {
+        if (!isGroupState() && (ct > capabilities.getCtMax() || ct < capabilities.getCtMin())) {
             throw new InvalidColorTemperatureValue("Invalid ct value '" + ct + "'. Support integer range for light model: "
                     + capabilities.getCtMin() + "-" + capabilities.getCtMax());
         }
@@ -142,7 +145,8 @@ final class ScheduledState {
 
     private void assertCtSupported() {
         if (!capabilities.isCtSupported()) {
-            throw new ColorTemperatureNotSupported("Light '" + getName() + "' does not support setting color temperature!");
+            throw new ColorTemperatureNotSupported(getFormattedName() + "' does not support setting color temperature! "
+                    + "Capabilities: " + capabilities.getCapabilities());
         }
     }
 
@@ -175,9 +179,9 @@ final class ScheduledState {
     }
 
     private void assertColorCapabilities() {
-        if (isGroupState()) return; // todo: implement group validations. for this we need information about all contained lights.
         if (isColorState() && !capabilities.isColorSupported()) {
-            throw new ColorNotSupported("Light '" + getName() + "' does not support setting color!");
+            throw new ColorNotSupported(getFormattedName() + "' does not support setting color! "
+                    + "Capabilities: " + capabilities.getCapabilities());
         }
     }
 

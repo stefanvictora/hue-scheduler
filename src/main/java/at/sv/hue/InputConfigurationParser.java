@@ -53,12 +53,12 @@ public final class InputConfigurationParser {
                 }
             }
             LightCapabilities capabilities;
-            if (!groupState) {
-                capabilities = hueApi.getLightCapabilities(id);
-            } else {
-                capabilities = LightCapabilities.NO_CAPABILITIES; // TODO: fetch summed capabilities for groups
-            }
-            Integer bri = null;
+			if (groupState) {
+				capabilities = hueApi.getGroupCapabilities(id);
+			} else {
+				capabilities = hueApi.getLightCapabilities(id);
+			}
+			Integer bri = null;
             Integer ct = null;
             Boolean on = null;
             Boolean force = null;

@@ -470,10 +470,17 @@ class HueApiTest {
         Double[][] gamut = {{0.6915, 0.3083}, {0.17, 0.7}, {0.1532, 0.0475}};
         assertCapabilities(
                 capabilities,
-                LightCapabilities.builder().colorGamut(gamut).ctMin(153).ctMax(500).capabilities(EnumSet.allOf(Capability.class)).build()
+                LightCapabilities.builder()
+                        .colorGamutType("C")
+                        .colorGamut(gamut)
+                        .ctMin(153)
+                        .ctMax(500)
+                        .capabilities(EnumSet.allOf(Capability.class))
+                        .build()
         );
         assertThat(capabilities.isColorSupported()).isTrue();
         assertThat(capabilities.isCtSupported()).isTrue();
+        assertThat(capabilities.isBrightnessSupported()).isTrue();
     }
     
     @Test
@@ -511,12 +518,14 @@ class HueApiTest {
         assertCapabilities(
                 capabilities,
                 LightCapabilities.builder()
+                        .colorGamutType("C")
                         .colorGamut(gamut)
                         .capabilities(EnumSet.of(Capability.COLOR, Capability.BRIGHTNESS, Capability.ON_OFF))
                         .build()
         );
         assertThat(capabilities.isColorSupported()).isTrue();
         assertThat(capabilities.isCtSupported()).isFalse();
+        assertThat(capabilities.isBrightnessSupported()).isTrue();
     }
 
     @Test
@@ -538,6 +547,7 @@ class HueApiTest {
         assertCapabilities(capabilities, LightCapabilities.builder().capabilities(EnumSet.of(Capability.BRIGHTNESS, Capability.ON_OFF)).build());
         assertThat(capabilities.isColorSupported()).isFalse();
         assertThat(capabilities.isCtSupported()).isFalse();
+        assertThat(capabilities.isBrightnessSupported()).isTrue();
     }
     
     @Test
@@ -587,6 +597,7 @@ class HueApiTest {
         );
         assertThat(capabilities.isColorSupported()).isFalse();
         assertThat(capabilities.isCtSupported()).isTrue();
+        assertThat(capabilities.isBrightnessSupported()).isTrue();
     }
     
     @Test
@@ -620,6 +631,7 @@ class HueApiTest {
         assertCapabilities(capabilities, LightCapabilities.builder().capabilities(EnumSet.of(Capability.ON_OFF)).build());
         assertThat(capabilities.isColorSupported()).isFalse();
         assertThat(capabilities.isCtSupported()).isFalse();
+        assertThat(capabilities.isBrightnessSupported()).isFalse();
     }
 
     @Test
@@ -628,7 +640,184 @@ class HueApiTest {
 
         assertThrows(LightNotFoundException.class, () -> api.getLightCapabilities(1234));
     }
-
+    
+    @Test
+    void getGroupCapabilities_returnsMaxOfAllContainedLights() {
+        setGetResponse("/lights", "{\n"
+                + "  \"42\": {\n"
+                + "    \"type\": \"Color temperature light\",\n"
+                + "    \"capabilities\": {\n"
+                + "      \"certified\": true,\n"
+                + "      \"control\": {\n"
+                + "        \"mindimlevel\": 200,\n"
+                + "        \"maxlumen\": 800,\n"
+                + "        \"ct\": {\n"
+                + "          \"min\": 153,\n"
+                + "          \"max\": 454\n"
+                + "        }\n"
+                + "      }\n"
+                + "    }\n"
+                + "  },\n"
+                + "  \"22\": {\n"
+                + "    \"type\": \"Color light\",\n"
+                + "    \"capabilities\": {\n"
+                + "      \"control\": {\n"
+                + "        \"mindimlevel\": 200,\n"
+                + "        \"maxlumen\": 800,\n"
+                + "        \"colorgamuttype\": \"C\",\n"
+                + "        \"colorgamut\": [\n"
+                + "          [\n"
+                + "            0.6915,\n"
+                + "            0.3083\n"
+                + "          ],\n"
+                + "          [\n"
+                + "            0.17,\n"
+                + "            0.7\n"
+                + "          ],\n"
+                + "          [\n"
+                + "            0.1532,\n"
+                + "            0.0475\n"
+                + "          ]\n"
+                + "        ]\n"
+                + "      }\n"
+                + "    }\n"
+                + "  },\n"
+                + "  \"23\": {\n"
+                + "    \"type\": \"Color light\",\n"
+                + "    \"capabilities\": {\n"
+                + "      \"control\": {\n"
+                + "        \"mindimlevel\": 200,\n"
+                + "        \"maxlumen\": 800,\n"
+                + "        \"colorgamuttype\": \"A\",\n"
+                + "        \"colorgamut\": [\n"
+                + "          [\n"
+                + "            0.704,\n"
+                + "            0.296\n"
+                + "          ],\n"
+                + "          [\n"
+                + "            0.2151,\n"
+                + "            0.7106\n"
+                + "          ],\n"
+                + "          [\n"
+                + "            0.138,\n"
+                + "            0.08\n"
+                + "          ]\n"
+                + "        ]\n"
+                + "      }\n"
+                + "    }\n"
+                + "  },\n"
+                + "  \"24\": {\n"
+                + "    \"type\": \"Color light\",\n"
+                + "    \"capabilities\": {\n"
+                + "      \"control\": {\n"
+                + "        \"mindimlevel\": 200,\n"
+                + "        \"maxlumen\": 800,\n"
+                + "        \"colorgamuttype\": \"B\",\n"
+                + "        \"colorgamut\": [\n"
+                + "          [\n"
+                + "            0.675,\n"
+                + "            0.322\n"
+                + "          ],\n"
+                + "          [\n"
+                + "            0.409,\n"
+                + "            0.518\n"
+                + "          ],\n"
+                + "          [\n"
+                + "            0.167,\n"
+                + "            0.04\n"
+                + "          ]\n"
+                + "        ]\n"
+                + "      }\n"
+                + "    }\n"
+                + "  },\n"
+                + "  \"30\": {\n"
+                + "    \"type\": \"On/Off plug-in unit\",\n"
+                + "    \"capabilities\": {\n"
+                + "      \"certified\": true,\n"
+                + "      \"control\": {}\n"
+                + "    }\n"
+                + "  }\n"
+                + "}");
+        setGetResponse("/groups", "{\n"
+                + "  \"1\": {\n"
+                + "    \"name\": \"Group 1\",\n"
+                + "    \"lights\": [\n"
+                + "      \"42\",\n"
+                + "      \"22\",\n"
+                + "      \"30\"\n"
+                + "    ]\n"
+                + "  },\n"
+                + "  \"2\": {\n"
+                + "    \"name\": \"Group 2\",\n"
+                + "    \"lights\": [\n"
+                + "      \"22\"\n"
+                + "    ]\n"
+                + "  },\n"
+                + "  \"3\": {\n"
+                + "    \"name\": \"Group 3\",\n"
+                + "    \"lights\": [\n"
+                + "      \"42\"\n"
+                + "    ]\n"
+                + "  },\n"
+                + "  \"4\": {\n"
+                + "    \"name\": \"Group 4\",\n"
+                + "    \"lights\": [\n"
+                + "      \"30\"\n"
+                + "    ]\n"
+                + "  },\n"
+                + "  \"5\": {\n"
+                + "    \"name\": \"Group 5\",\n"
+                + "    \"lights\": [\n"
+                + "      \"23\"\n"
+                + "    ]\n"
+                + "  },\n"
+                + "  \"6\": {\n"
+                + "    \"name\": \"Group 6\",\n"
+                + "    \"lights\": [\n"
+                + "      \"22\",\n"
+                + "      \"23\"\n"
+                + "    ]\n"
+                + "  },\n"
+                + "  \"7\": {\n"
+                + "    \"name\": \"Group 7\",\n"
+                + "    \"lights\": [\n"
+                + "      \"24\"\n"
+                + "    ]\n"
+                + "  }\n"
+                + "}");
+        Double[][] gamutA = { { 0.704, 0.296 }, { 0.2151, 0.7106 }, { 0.138, 0.08 } };
+        Double[][] gamutB = { { 0.675, 0.322 }, { 0.409, 0.518 }, { 0.167, 0.04 } };
+        Double[][] gamutC = { { 0.6915, 0.3083 }, { 0.17, 0.7 }, { 0.1532, 0.0475 } };
+        
+        assertCapabilities(
+                api.getGroupCapabilities(1), LightCapabilities.builder().colorGamut(gamutC).capabilities(EnumSet.allOf(Capability.class)).build());
+        assertCapabilities(
+                api.getGroupCapabilities(2), LightCapabilities.builder()
+                        .colorGamut(gamutC)
+                        .capabilities(EnumSet.of(Capability.COLOR, Capability.BRIGHTNESS, Capability.ON_OFF))
+                        .build());
+        assertCapabilities(
+                api.getGroupCapabilities(3),
+                LightCapabilities.builder().capabilities(EnumSet.of(Capability.COLOR_TEMPERATURE, Capability.BRIGHTNESS, Capability.ON_OFF)).build()
+        );
+        assertCapabilities(api.getGroupCapabilities(4), LightCapabilities.builder().capabilities(EnumSet.of(Capability.ON_OFF)).build());
+        assertCapabilities(
+                api.getGroupCapabilities(5), LightCapabilities.builder()
+                        .colorGamut(gamutA)
+                        .capabilities(EnumSet.of(Capability.COLOR, Capability.BRIGHTNESS, Capability.ON_OFF))
+                        .build());
+        assertCapabilities(
+                api.getGroupCapabilities(6), LightCapabilities.builder()
+                        .colorGamut(gamutC)
+                        .capabilities(EnumSet.of(Capability.COLOR, Capability.BRIGHTNESS, Capability.ON_OFF))
+                        .build());
+        assertCapabilities(
+                api.getGroupCapabilities(7), LightCapabilities.builder()
+                        .colorGamut(gamutB)
+                        .capabilities(EnumSet.of(Capability.COLOR, Capability.BRIGHTNESS, Capability.ON_OFF))
+                        .build());
+    }
+    
     @Test
     void putState_brightness_success_callsCorrectUrl() {
         setPutResponse("/lights/" + 15 + "/state", "{\"bri\":200}",

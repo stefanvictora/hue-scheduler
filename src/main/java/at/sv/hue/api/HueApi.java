@@ -68,4 +68,18 @@ public interface HueApi {
      * @throws HueApiFailure          if the api call failed
      */
     LightCapabilities getLightCapabilities(int id);
+    
+    /**
+     * Derives the group capabilities from all the contained lights. We take the maximum of all summed capabilities. I.e. if a group contains a
+     * CT-only and a Brightness-only light, CT and Brightness are returned as group capabilities.
+     * <br>
+     * The color gamut is chosen in the order C > B > A > null
+     * <br>
+     * CT-min and max values are not calculated.
+     *
+     * @return the light capabilities derived from the given group
+     * @throws GroupNotFoundException if no group with given id was found
+     * @throws HueApiFailure if the api call failed
+     */
+    LightCapabilities getGroupCapabilities(int id);
 }
