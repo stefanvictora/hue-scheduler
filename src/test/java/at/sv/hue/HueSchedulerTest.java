@@ -595,21 +595,64 @@ class HueSchedulerTest {
     }
 
     @Test
-    void parse_transitionTimeBefore_shiftsGivenStartByThatTime() {
+    void parse_transitionTimeBefore_shiftsGivenStartByThatTime_afterPowerCycle_sameStateAgainWithTransitionTime() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        ZonedDateTime actualStart = now;
-        ZonedDateTime definedStart = actualStart.plusMinutes(10);
-        addState(1, definedStart, "bri:" + DEFAULT_BRIGHTNESS, "tr-before:10min");
+        addState(1, now.plusMinutes(10), "bri:" + DEFAULT_BRIGHTNESS, "tr-before:10min");
 
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
-        assertScheduleStart(scheduledRunnable, actualStart, actualStart.plusDays(1));
+        assertScheduleStart(scheduledRunnable, now, now.plusDays(1));
 
         advanceTimeAndRunAndAssertPutCall(scheduledRunnable,
                 expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).transitionTime(6000).build());
-
-        ensureNextDayRunnable(actualStart);
+        
+        ensureNextDayRunnable(initialNow);
+        
+        ScheduledRunnable powerOnRunnable = simulateLightOnEventAndEnsureSingleScheduledState();
+        
+        advanceTimeAndRunAndAssertPutCall(powerOnRunnable, expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).transitionTime(6000).build());
     }
-
+    
+    @Test
+    void parse_transitionTimeBefore_performsInterpolationAfterPowerCycle() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now, "bri:" + DEFAULT_BRIGHTNESS);
+        addState(1, now.plusMinutes(10), "bri:" + (DEFAULT_BRIGHTNESS + 10), "tr-before:9min");
+        
+        setCurrentTimeTo(now.plusMinutes(2)); // one minute after tr-before state
+        
+        startScheduler();
+        
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(2);
+        
+        assertScheduleStart(scheduledRunnables.get(0), now, initialNow.plusDays(1));
+        assertScheduleStart(scheduledRunnables.get(1), initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(1));
+        
+        scheduledRunnables.get(0).run();
+        
+        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 1).build());
+        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 10).transitionTime(4800).build());
+        
+        ensureRunnable(initialNow.plusDays(1).plusMinutes(1), initialNow.plusDays(2)); // next day
+        
+        ScheduledRunnable powerOnRunnable1 = simulateLightOnEventAndEnsureSingleScheduledState();
+        
+        powerOnRunnable1.run();
+        
+        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 1).build());
+        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 10).transitionTime(4800).build());
+        
+        ScheduledRunnable powerOnRunnable2 = simulateLightOnEventAndEnsureSingleScheduledState();
+        
+        powerOnRunnable2.run();
+        
+        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 1).build());
+        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 10).transitionTime(4800).build());
+    }
+    
+    // todo: test for multiple tr-before after each other. there was a case where an interpolated call had a big transition time
+    
+    // todo: add test for temporary state on initial startup in combination with tr-before: shouldn't there then happen a interpolation
+    
     @Test
     void parse_transitionTimeBefore_crossesDayLine_correctlyScheduled() {
         addKnownLightIdsWithDefaultCapabilities(1);

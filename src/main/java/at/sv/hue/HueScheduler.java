@@ -319,7 +319,7 @@ public final class HueScheduler implements Runnable {
                 LOG.info("Turned off {}, or was already off", state.getFormattedName());
             } else {
                 LOG.info("Set {}", state);
-                retryWhenBackOn(ScheduledState.createTemporaryCopy(state, currentTime.get(), state.getEnd()));
+                retryWhenBackOn(ScheduledState.createTemporaryCopy(state, state.getEnd()));
             }
             if (shouldAdjustMultiColorLoopOffset(state)) {
                 scheduleMultiColorLoopOffsetAdjustments(state.getGroupLights(), 1);
@@ -395,7 +395,7 @@ public final class HueScheduler implements Runnable {
             return calculatedStateOrderAscending.get(position - 1);
         }
         return lightStatesForId.stream()
-                               .filter(state -> state != currentState)
+                               .filter(state -> state != currentState && currentState.getOriginalState() != state)
                                .max(Comparator.comparing(state -> state.getStart(currentTime.get().minusDays(1))))
                                .orElse(null);
     }

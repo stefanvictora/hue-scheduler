@@ -62,7 +62,7 @@ public final class InitialTodayScheduler {
 
     private ScheduledState createTemporaryCopyOfLatestState(List<ScheduledState> statesScheduledBothTodayAndYesterday) {
         ScheduledState latestState = sortByLatestStartTimeFirst(statesScheduledBothTodayAndYesterday).get(0);
-        return ScheduledState.createTemporaryCopy(latestState, now, getRightBeforeStartOfEarliestStateToday());
+        return ScheduledState.createTemporaryCopyNow(latestState, now, getRightBeforeStartOfEarliestStateToday());
     }
 
     private ZonedDateTime getRightBeforeStartOfEarliestStateToday() {

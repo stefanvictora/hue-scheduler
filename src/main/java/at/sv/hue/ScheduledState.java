@@ -57,6 +57,7 @@ final class ScheduledState {
     private boolean temporary;
     private ZonedDateTime lastSeen;
     private Consumer<ZonedDateTime> lastSeenSync;
+    private ScheduledState originalState;
 
     @Builder
     public ScheduledState(String name, int updateId, String start, Integer brightness, Integer ct, Double x, Double y,
@@ -87,10 +88,11 @@ final class ScheduledState {
         this.startTimeProvider = startTimeProvider;
         this.force = force;
         temporary = false;
+        originalState = this;
         assertColorCapabilities();
     }
-
-    public static ScheduledState createTemporaryCopy(ScheduledState state, ZonedDateTime start, ZonedDateTime end) {
+    
+    public static ScheduledState createTemporaryCopyNow(ScheduledState state, ZonedDateTime start, ZonedDateTime end) {
         ScheduledState copy = new ScheduledState(state.name, state.updateId, start.toLocalTime().toString(),
                 state.brightness, state.ct, state.x, state.y, state.hue, state.sat, state.effect, state.on, null,
                 state.transitionTime, state.daysOfWeek, state.startTimeProvider, state.groupState, state.groupLights,
@@ -100,6 +102,21 @@ final class ScheduledState {
         copy.lastStart = start;
         copy.lastSeen = state.lastSeen;
         copy.lastSeenSync = state::setLastSeen;
+        copy.originalState = state.originalState;
+        return copy;
+    }
+    
+    public static ScheduledState createTemporaryCopy(ScheduledState state, ZonedDateTime end) {
+        ScheduledState copy = new ScheduledState(state.name, state.updateId, state.start,
+                state.brightness, state.ct, state.x, state.y, state.hue, state.sat, state.effect, state.on, state.getTransitionTimeBefore(),
+                state.transitionTime, state.daysOfWeek, state.startTimeProvider, state.groupState, state.groupLights,
+                state.capabilities, state.force);
+        copy.end = end;
+        copy.temporary = true;
+        copy.lastStart = state.lastStart;
+        copy.lastSeen = state.lastSeen;
+        copy.lastSeenSync = state::setLastSeen;
+        copy.originalState = state.originalState;
         return copy;
     }
 
@@ -312,7 +329,7 @@ final class ScheduledState {
     }
 
     public List<Integer> getGroupLights() {
-        return new ArrayList<>(groupLights);
+        return new ArrayList<>(groupLights); // todo: maybe fetch this dynamically
     }
 
     public boolean isNullState() {
