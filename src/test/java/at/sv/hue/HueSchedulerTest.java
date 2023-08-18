@@ -903,6 +903,28 @@ class HueSchedulerTest {
 
         ensureRunnable(initialNow.plusDays(1).plusMinutes(20), initialNow.plusDays(2));
     }
+    
+    @Test
+    void parse_transitionTimeBefore_multipleStates_ct_lightTurnedOnAfter_performsCorrectInterpolation() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addStateNow(1, "ct:400");
+        addState(1, now.plusHours(3), "ct:200", "tr-before:30min");
+        
+        setCurrentTimeTo(now.plusHours(2).plusMinutes(45));
+        
+        startScheduler();
+        
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(2);
+        
+        ScheduledRunnable trBeforeRunnable = scheduledRunnables.get(0);
+        
+        trBeforeRunnable.run();
+        
+        assertPutCall(expectedPutCall(1).ct(300).build()); // correct interpolated ct value
+        assertPutCall(expectedPutCall(1).ct(200).transitionTime(9000).build());
+        
+        ensureRunnable(initialNow.plusDays(1).plusHours(3).minusMinutes(30), initialNow.plusDays(2));
+    }
 
     @Test
     void parse_transitionTimeBefore_multipleStates_ct_lightTurnedOnExactlyAtStart_noAdditionalPutCall() {
@@ -923,7 +945,7 @@ class HueSchedulerTest {
 
         ensureRunnable(initialNow.plusDays(1).plusMinutes(20), initialNow.plusDays(2));
     }
-
+    
     @Test
     void parse_transitionTimeBefore_multipleStates_ct_lightTurnedOnAfterStart_performsInterpolation_andMakesAdditionalPut() {
         addKnownLightIdsWithDefaultCapabilities(1);

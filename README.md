@@ -1,4 +1,4 @@
-<img align="right" width="160" height="160" src="https://raw.githubusercontent.com/stefanvictora/hue-scheduler/main/logo.png">
+<img align="right" width="155" height="155" src="https://raw.githubusercontent.com/stefanvictora/hue-scheduler/main/logo.png">
 
 # Hue Scheduler
 
@@ -27,7 +27,7 @@ Living room   22:00       bri:100  sat:150  effect:multi_colorloop  days:Fr,Sa
 Kitchen       22:00       color:#00835C     days:Fr,Sa
 ~~~
 
-In this example, the lights in your (home) office are set to a bright and blue white at sunrise for an energetic start to your day. Ninety minutes after sunrise, the color temperature is set to a more neutral white for prolonged concentrated work. Finally, the light is dimmed slightly to a warmer temperature as the sun sets. Each time with a smooth 20-minute transition. With this simple configuration, you can create fine-grained schedules that are enforced by Hue Scheduler.
+In this example, the lights in your (home) office are set to a bright and blue white at sunrise for an energetic start to your day. Ninety minutes after sunrise, the color temperature is set to a more neutral white for prolonged concentrated work. Finally, the light is dimmed slightly to a warmer temperature as the sun sets. Each time with a smooth 20-minute transition. Should the lights be turned on in the middle of those transitions, Hue Scheduler automatically calculates the mid-transition state and continues the transition from this point on. With this simple configuration, you can create fine-grained schedules that are enforced by Hue Scheduler.
 
 Since version 0.8.0 Hue Scheduler also **keeps track of any manual adjustments** to your lights and automatically disables the schedule for the affected lights, until they have been turned off and on again. This gives you the convenience of automatic schedules while still retaining manual control of certain lights when needed. After the manually adjusted lights have been turned off and on, Hue Scheduler automatically reschedules the expected state again. 
 
@@ -182,7 +182,7 @@ To control the state of your lights in the given interval, an arbitrary number o
 
 - ``on``: modifies the **on state** of the light: [``true``|``false``].
 
-  As already mentioned: Hue Scheduler does not modify a lights on state, unless explicitly told. If a light is off or unreachable, Hue Scheduler retries to set the desired state until the light is turned on or reachable again.
+  As already mentioned: Hue Scheduler does not modify a lights on state, unless explicitly told. If a light is off or unreachable, Hue Scheduler waits until the light is turned on or reachable again.
 
   Note: If you would like to smoothly turn on a light using a transition, be sure to also specify another property like brightness or color temperature. For example:
 
@@ -246,19 +246,21 @@ Hue Scheduler offers two different transition time properties, which can be comb
 
   Here the transition starts 10 minutes before sunrise to smoothly turn on the light to full brightness until the sun has risen.
 
-  What makes `tr-before` especially useful is that Hue Scheduler automatically adjusts the transition to the remaining time if the light is turned on at a later point before the start. Consider, for example:
+  What makes `tr-before` especially useful is that Hue Scheduler automatically adjusts the transition time to the remaining duration if the light is turned on at later point. And most importantly, it also calculates the mid-transition state based on the elapsed time. Consider, for example:
 
   ~~~yacas
-  Office  09:00  ct:6500  tr-before:30min  tr:10s
+  Office  06:00  ct:400
+  Office  09:00  ct:200  tr-before:30min  tr:10s
   ~~~
 
-  1. If you turn on the lights at `08:30`, or if they are already on at that time, the lights will smoothly transition to the given color temperature over the course of 30 minutes.
+  1. If you turn on the lights at `08:30`, or if they are already on at that time, the lights will smoothly transition from the previous to the given color temperature over the course of 30 minutes.
 
-  2. If you turn on the lights at `08:45`, Hue Scheduler automatically shortens the transition time to the remaining 15 minutes till start. Making sure the desired color temperature is reached on time.
+  2. If you turn on the lights at `08:45`, Hue Scheduler **automatically shortens the transition time** to the remaining 15 minutes until its start and **interpolates the ``ct`` value** to `300`, making sure the lights always have the desired color temperature regardless when they are turned on during the transition.
 
-  3. If you turn on the lights at any time after `09:00`, Hue Scheduler ignores `tr-before` and instead uses the transition time defined via ``tr`` instead.
+  3. If you turn on the lights at any time after `09:00`, Hue Scheduler ignores `tr-before` and instead uses the transition time defined via ``tr`` instead. If no explicit ``tr`` is defined, Hue lights automatically use a transition time of 400ms.
 
-To summarize: `tr-before` allows you to define longer and smoother transitions when the lights are already on, without having to wait the same time if you turn on your lights at a later time.
+To summarize: `tr-before` allows you to define longer and smoother transitions that always match the desired state, regardless of when they are turned on during the transition. Those interpolations are available for all color modes (CT, XY/RGB, Hue/Sat).
+The starting point for those interpolations is always the previously defined state. If the color mode differs between the states, then Hue Scheduler automatically performs a conversion between them. This allows us to transition, e.g., from a color temperature to some color value.
 
 #### Advanced Properties
 
@@ -460,10 +462,6 @@ The dynamic sun times are also calculated locally using the [shred/commons-sunca
 
 Yes, but you should probably use a third-party app like iConnectHue to configure your motion sensor to only adjust the brightness of your lights, not the color or color temperature. Otherwise, the color or color temperature of your lights would switch between the sensor set values and the ones scheduled by Hue Scheduler, causing some flicker every time the sensor is activated.
 
-### How Does Hue Scheduler Check If a Group Is Reachable?
-
-Since the Hue API does not return the reachability state for a group, Hue Scheduler simply checks the first light of a group for its reachability state and uses that result for the whole group. This might result in false results and is a current limitation of Hue Scheduler.
-
 ##  Links
 
 **Similar projects**:
@@ -475,7 +473,11 @@ Since the Hue API does not return the reachability state for a group, Hue Schedu
 
 - [x] **Conditional states** -- set light state only if it has not been manually changed since its previously scheduled state
 - [x] **Enforce states** -- ensure that a state is always set; allow no manual override
-- [ ] **Interpolate between states** -- support more advanced interpolations between states when using `tr-before`
+- [x] **Interpolate between states** -- support more advanced interpolations between states when using `tr-before`
+- [ ] **Advanced state interpolations** -- easily create full day state interpolations without explicitly using `tr-before`
+- [ ] **Date-based scheduling** -- schedule state only during a specific date range
+- [ ] **Support for gradients** -- support setting gradients to supported lights
+- [ ] **Support for scenes** -- support scheduling scenes for groups
 - [ ] **Min/Max for sunrise/sunset** -- ensure that a dynamic start time is not active before or past a certain time
 - [ ] **GUI for configuring and updating light schedules** -- via a web interface
 

@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+## [0.9.0] - tbd
+
+### Added
+- Added **interpolations for tr-before** states (#4)
+  - For all states with tr-before, if the light is turned on in the middle of the transition, Hue Scheduler now calculates
+    the mid-transition state based on the previous state and elapsed time, and continues the transition from this point
+  - To transition between multiple color modes, Hue Scheduler can now convert values between all color modes (CT, XY, Hue/Sat) 
+- Added group capability validations
+  - During startup, group states are now validated for their capabilities based on their contained lights
+
+### Changed
+- Improved manual modification tracking for groups
+  - Instead of just comparing with the state of the first contained light, Hue Scheduler now compares against the group state provided by the API
+- Improved on-event tracking for groups
+  - Instead of listening only for the first contained light being turned on, group on-events are now correctly supported
+  - Additionally, every physically turned-on light inside a group also triggers a group-on event. This is necessary, as the API does not generate any group-specific events in such cases.
+
+### Removed
+- Removed obsolete reachable checks after each state update
+  - Those became obsolete after switching to the Hue API v2 event stream and some further optimizations implemented in v0.9.0
+
 ## [0.8.0.1] - 2023-08-06
 
 ### Added
