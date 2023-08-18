@@ -92,28 +92,23 @@ final class ScheduledState {
         assertColorCapabilities();
     }
     
-    public static ScheduledState createTemporaryCopyNow(ScheduledState state, ZonedDateTime start, ZonedDateTime end) {
-        ScheduledState copy = new ScheduledState(state.name, state.updateId, start.toLocalTime().toString(),
-                state.brightness, state.ct, state.x, state.y, state.hue, state.sat, state.effect, state.on, null,
-                state.transitionTime, state.daysOfWeek, state.startTimeProvider, state.groupState, state.groupLights,
-                state.capabilities, state.force);
-        copy.end = end;
-        copy.temporary = true;
-        copy.lastStart = start;
-        copy.lastSeen = state.lastSeen;
-        copy.lastSeenSync = state::setLastSeen;
-        copy.originalState = state.originalState;
-        return copy;
+    public static ScheduledState createTemporaryCopyNow(ScheduledState state, ZonedDateTime now, ZonedDateTime end) {
+        return createTemporaryCopy(state, now.toLocalTime().toString(), now, end, null);
     }
     
     public static ScheduledState createTemporaryCopy(ScheduledState state, ZonedDateTime end) {
-        ScheduledState copy = new ScheduledState(state.name, state.updateId, state.start,
-                state.brightness, state.ct, state.x, state.y, state.hue, state.sat, state.effect, state.on, state.getTransitionTimeBefore(),
+        return createTemporaryCopy(state, state.start, state.lastStart, end, state.transitionTimeBefore);
+    }
+    
+    private static ScheduledState createTemporaryCopy(ScheduledState state, String start, ZonedDateTime lastStart, ZonedDateTime end,
+            Integer transitionTimeBefore) {
+        ScheduledState copy = new ScheduledState(state.name, state.updateId, start,
+                state.brightness, state.ct, state.x, state.y, state.hue, state.sat, state.effect, state.on, transitionTimeBefore,
                 state.transitionTime, state.daysOfWeek, state.startTimeProvider, state.groupState, state.groupLights,
                 state.capabilities, state.force);
         copy.end = end;
         copy.temporary = true;
-        copy.lastStart = state.lastStart;
+        copy.lastStart = lastStart;
         copy.lastSeen = state.lastSeen;
         copy.lastSeenSync = state::setLastSeen;
         copy.originalState = state.originalState;

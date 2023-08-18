@@ -209,8 +209,8 @@ class HueSchedulerTest {
     }
 
     private void assertPutCall(PutCall putCall) {
-        orderVerifier.verify(mockedHueApi, calls(1)).putState(putCall);
         expectedPutCalls++;
+        orderVerifier.verify(mockedHueApi, calls(1)).putState(putCall);
     }
 
     private void addLightStateResponse(int id, LightState lightState) {
