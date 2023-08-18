@@ -20,6 +20,7 @@ import at.sv.hue.api.State;
 import at.sv.hue.time.StartTimeProvider;
 import at.sv.hue.time.StartTimeProviderImpl;
 import at.sv.hue.time.SunTimesProviderImpl;
+import lombok.SneakyThrows;
 import okhttp3.OkHttpClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,6 +82,14 @@ public final class HueScheduler implements Runnable {
             description = "Globally disable tracking of user modifications which would pause their schedules until they are turned off and on again." +
                     " Default: ${DEFAULT-VALUE}")
     boolean disableUserModificationTracking;
+    @Option(names = "--interpolation-transition-time", paramLabel = "<tr>", defaultValue = "4",
+            description = "The transition time in defined as a multiple of 100ms used for the interpolated call when turning a light on during a tr-before transition."
+                    + " Default: ${DEFAULT-VALUE} (=400 ms). You can also use, e.g., 2s for convenience.")
+    String interpolationTransitionTimeString;
+    /**
+     * The converted transition time as a multiple of 100ms.
+     */
+    Integer interpolationTransitionTime = 4;
     @Option(names = "--power-on-reschedule-delay", paramLabel = "<delay>", defaultValue = "150",
             description = "The delay in ms after the light on-event was received and the current state should be rescheduled again. Default: ${DEFAULT-VALUE} ms.")
     int powerOnRescheduleDelayInMs;
@@ -113,7 +122,7 @@ public final class HueScheduler implements Runnable {
     public HueScheduler(HueApi hueApi, StateScheduler stateScheduler,
                         StartTimeProvider startTimeProvider, Supplier<ZonedDateTime> currentTime,
                         double requestsPerSecond, boolean controlGroupLightsIndividually,
-                        boolean disableUserModificationTracking, int powerOnRescheduleDelayInMs,
+                        boolean disableUserModificationTracking, String interpolationTransitionTimeString, int powerOnRescheduleDelayInMs,
                         int bridgeFailureRetryDelayInSeconds, int multiColorAdjustmentDelay) {
         this();
         this.hueApi = hueApi;
@@ -123,11 +132,21 @@ public final class HueScheduler implements Runnable {
         this.requestsPerSecond = requestsPerSecond;
         this.controlGroupLightsIndividually = controlGroupLightsIndividually;
         this.disableUserModificationTracking = disableUserModificationTracking;
+        this.interpolationTransitionTimeString = interpolationTransitionTimeString;
         this.powerOnRescheduleDelayInMs = powerOnRescheduleDelayInMs;
         this.bridgeFailureRetryDelayInSeconds = bridgeFailureRetryDelayInSeconds;
         this.multiColorAdjustmentDelay = multiColorAdjustmentDelay;
+        interpolationTransitionTime = parseInterpolationTransitionTime(interpolationTransitionTimeString);
     }
-
+    
+    private Integer parseInterpolationTransitionTime(String interpolationTransitionTimeString) {
+		if (interpolationTransitionTimeString == null) {
+			return null;
+		}
+		return InputConfigurationParser.parseTransitionTime(
+				"interpolation-transition-time", interpolationTransitionTimeString);
+	}
+    
     public static void main(String[] args) {
         int execute = new CommandLine(new HueScheduler()).execute(args);
         if (execute != 0) {
@@ -142,6 +161,7 @@ public final class HueScheduler implements Runnable {
         startTimeProvider = createStartTimeProvider(latitude, longitude, elevation);
         stateScheduler = createStateScheduler();
         currentTime = ZonedDateTime::now;
+        interpolationTransitionTime = parseInterpolationTransitionTime(interpolationTransitionTimeString);
         new LightStateEventTrackerImpl(ip, username, httpsClient, new HueRawEventHandler(hueEventListener), eventStreamReadTimeoutInMinutes).start();
         assertInputIsReadable();
         assertConnectionAndStart();
@@ -380,10 +400,18 @@ public final class HueScheduler implements Runnable {
         if (interpolatedPutCall == null) {
             return;
         }
-        interpolatedPutCall.setTransitionTime(null);
+        interpolatedPutCall.setTransitionTime(interpolationTransitionTime);
         LOG.trace("Interpolated call: {}", interpolatedPutCall);
-        putState(previousState, interpolatedPutCall); // TODO: maybe use some transition time and wait until next put call
-        //                            Thread.sleep(400);
+        putState(previousState, interpolatedPutCall);
+        sleepIfNeeded();
+    }
+    
+    @SneakyThrows(InterruptedException.class)
+    private void sleepIfNeeded() {
+        if (interpolationTransitionTime == null) {
+            return;
+        }
+        Thread.sleep(interpolationTransitionTime * 100L);
     }
     
     private ScheduledState getPreviousState(ScheduledState currentState) {

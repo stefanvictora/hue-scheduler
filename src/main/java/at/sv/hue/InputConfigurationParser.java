@@ -143,7 +143,7 @@ public final class InputConfigurationParser {
         return states;
     }
 
-    private Integer parseInteger(String value, String parameter) {
+    private static Integer parseInteger(String value, String parameter) {
         return parseValueWithErrorHandling(value, parameter, "integer", Integer::valueOf);
     }
 
@@ -155,7 +155,7 @@ public final class InputConfigurationParser {
         return parseValueWithErrorHandling(value, parameter, "boolean", Boolean::parseBoolean);
     }
 
-    private <T> T parseValueWithErrorHandling(String value, String parameter, String type, Function<String, T> function) {
+    private static <T> T parseValueWithErrorHandling(String value, String parameter, String type, Function<String, T> function) {
         try {
             return function.apply(value);
         } catch (Exception e) {
@@ -163,7 +163,7 @@ public final class InputConfigurationParser {
         }
     }
 
-    private Integer parseTransitionTime(String parameter, String s) {
+    public static Integer parseTransitionTime(String parameter, String s) {
         String value = s;
         int modifier = 1;
         if (s.endsWith("s")) {

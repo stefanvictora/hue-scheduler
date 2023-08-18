@@ -206,7 +206,7 @@ To control the state of your lights in the given interval, an arbitrary number o
 
 Hue Scheduler offers several ways to define the color of support lights.
 
-- ``color``: modifies the color of the light either through **hex** (e.g. ``color:#3CD0E2``) or **rgb** (e.g. ``color:60, 208, 226``). Can't be combined with other color properties.
+- ``color``: modifies the color of the light either through **hex** (e.g. ``color:#3CD0E2``) or **rgb** (e.g. ``color:60, 208, 226``). Can't be combined with other color properties. If you don't specify an additional ``bri`` property, Hue Scheduler also calculates an appropriate brightness level for the given color.
 
 - ``hue``: modifies the **hue** color value of the light: [``0``-``65535``]. The value "wraps" around, i.e. both `0` and `65535` are red. Related to ``sat``.
 
@@ -282,6 +282,14 @@ The starting point for those interpolations is always the previously defined sta
 Flag to globally disable tracking of user modifications of lights. Per default Hue Scheduler compares the previously seen state with the current state of the light and only sets the expected scheduled state if no manual modifications have been made in between. To enforce just a single state, you can use the state-based configuration property of `force:true`. 
 
 **Default**: false
+
+### `--interpolation-transition-time`
+
+Flag to configure the transition time as a multiple of 100ms used for the interpolated call when turning a light on during a `tr-before` transition.
+This does not affect the actual longer transition used for the `tr-before` state, but just the interpolated call before.
+Note: This option behaves the same as the other `tr` related state properties, i.e., you can use, e.g., `5s` for convenience.
+
+**Default**: `4` (= 400 ms)
 
 ### `--max-requests-per-second`
 

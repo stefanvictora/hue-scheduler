@@ -73,7 +73,8 @@ class HueSchedulerTest {
     private HueApi mockedHueApi;
     private InOrder orderVerifier;
     private int expectedPutCalls;
-
+    private String interpolationTransitionTimeInMs;
+    
     private void setCurrentTimeToAndRun(ScheduledRunnable scheduledRunnable) {
         setCurrentTimeTo(scheduledRunnable);
         scheduledRunnable.run();
@@ -113,7 +114,7 @@ class HueSchedulerTest {
     private void create() {
         scheduler = new HueScheduler(mockedHueApi, stateScheduler, startTimeProvider,
                 () -> now, 10.0, controlGroupLightsIndividually, disableUserModificationTracking,
-                0, connectionFailureRetryDelay, multiColorAdjustmentDelay);
+                interpolationTransitionTimeInMs, 0, connectionFailureRetryDelay, multiColorAdjustmentDelay);
         manualOverrideTracker = scheduler.getManualOverrideTracker();
     }
 
@@ -367,6 +368,7 @@ class HueSchedulerTest {
         multiColorAdjustmentDelay = 4;
         controlGroupLightsIndividually = false;
         disableUserModificationTracking = true;
+        interpolationTransitionTimeInMs = null;
         create();
     }
 
@@ -613,7 +615,9 @@ class HueSchedulerTest {
     }
     
     @Test
-    void parse_transitionTimeBefore_performsInterpolationsAfterPowerCycles_ignoresTransitionFromPreviousState() {
+    void parse_transitionTimeBefore_performsInterpolationsAfterPowerCycles_ignoresManualTransitionFromPreviousState_usesPredefinedTransitionTime() {
+        interpolationTransitionTimeInMs = "2";
+        create();
         addKnownLightIdsWithDefaultCapabilities(1);
         addState(1, now, "bri:" + DEFAULT_BRIGHTNESS, "tr:1s"); // this transition is ignored in interpolated call
         addState(1, now.plusMinutes(10), "bri:" + (DEFAULT_BRIGHTNESS + 10), "tr-before:9min");
@@ -629,7 +633,7 @@ class HueSchedulerTest {
         
         scheduledRunnables.get(0).run();
         
-        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 1).build());
+        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 1).transitionTime(2).build());
         assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 10).transitionTime(4800).build());
         
         ensureRunnable(initialNow.plusDays(1).plusMinutes(1), initialNow.plusDays(2)); // next day
@@ -638,14 +642,14 @@ class HueSchedulerTest {
         
         powerOnRunnable1.run();
         
-        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 1).build());
+        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 1).transitionTime(2).build());
         assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 10).transitionTime(4800).build());
         
         ScheduledRunnable powerOnRunnable2 = simulateLightOnEventAndEnsureSingleScheduledState();
         
         powerOnRunnable2.run();
         
-        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 1).build());
+        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 1).transitionTime(2).build());
         assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 10).transitionTime(4800).build());
     }
     
@@ -753,7 +757,7 @@ class HueSchedulerTest {
         assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 10).build()); // now still have a previous state, so perform interpolation
         assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).transitionTime(3000).build());
         
-        ScheduledRunnable nextDay3 = ensureRunnable(now.plusDays(1), now.plusDays(2)); // next day (Thursday)
+        ensureRunnable(now.plusDays(1), now.plusDays(2)); // next day (Thursday)
     }
     
     @Test
