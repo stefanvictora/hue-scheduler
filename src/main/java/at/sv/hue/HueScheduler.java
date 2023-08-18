@@ -380,6 +380,7 @@ public final class HueScheduler implements Runnable {
         if (interpolatedPutCall == null) {
             return;
         }
+        interpolatedPutCall.setTransitionTime(null);
         LOG.trace("Interpolated call: {}", interpolatedPutCall);
         putState(previousState, interpolatedPutCall); // TODO: maybe use some transition time and wait until next put call
         //                            Thread.sleep(400);
@@ -394,10 +395,12 @@ public final class HueScheduler implements Runnable {
         if (position > 0) {
             return calculatedStateOrderAscending.get(position - 1);
         }
+        ZonedDateTime yesterday = currentTime.get().minusDays(1);
         return lightStatesForId.stream()
-                               .filter(state -> state != currentState && currentState.getOriginalState() != state)
-                               .max(Comparator.comparing(state -> state.getStart(currentTime.get().minusDays(1))))
-                               .orElse(null);
+                .filter(state -> state.isScheduledOn(yesterday))
+                .filter(state -> state != currentState && currentState.getOriginalState() != state)
+                .max(Comparator.comparing(state -> state.getStart(yesterday)))
+                .orElse(null);
     }
 
     private boolean shouldLogScheduleDebugMessage(long delayInMs) {
