@@ -29,9 +29,13 @@ public final class HueApiImpl implements HueApi {
     private final Object groupMapLock = new Object();
     private final RateLimiter rateLimiter;
     private Map<Integer, Light> availableLights;
+    private boolean availableLightsInvalidated;
     private Map<Integer, Group> availableGroups;
+    private boolean availableGroupsInvalidated;
     private Map<String, Integer> lightNameToIdMap;
+    private boolean lightNameToIdMapInvalidated;
     private Map<String, Integer> groupNameToIdMap;
+    private boolean groupNameToIdMapInvalidated;
 
     public HueApiImpl(HttpResourceProvider resourceProvider, String ip, String username, RateLimiter rateLimiter) {
         this.resourceProvider = resourceProvider;
@@ -198,9 +202,10 @@ public final class HueApiImpl implements HueApi {
     }
     
     private Map<Integer, Group> getOrLookupGroups() {
-        synchronized (groupMapLock) { // todo: add some refresh mechanism after some timeout
-            if (availableGroups == null) {
+        synchronized (groupMapLock) {
+            if (availableGroups == null || availableGroupsInvalidated) {
                 availableGroups = lookupGroups();
+                availableGroupsInvalidated = false;
             }
         }
         return availableGroups;
@@ -231,9 +236,10 @@ public final class HueApiImpl implements HueApi {
 
     private Map<String, Integer> getOrLookupGroupNameToIdMap() {
         synchronized (groupMapLock) {
-            if (groupNameToIdMap == null) {
+            if (groupNameToIdMap == null || groupNameToIdMapInvalidated) {
                 groupNameToIdMap = new HashMap<>();
                 getOrLookupGroups().forEach((id, group) -> groupNameToIdMap.put(group.name, id));
+                groupNameToIdMapInvalidated = false;
             }
         }
         return groupNameToIdMap;
@@ -263,9 +269,10 @@ public final class HueApiImpl implements HueApi {
 
     private Map<String, Integer> getOrLookupLightNameToIdMap() {
         synchronized (lightMapLock) {
-            if (lightNameToIdMap == null) {
+            if (lightNameToIdMap == null || lightNameToIdMapInvalidated) {
                 lightNameToIdMap = new HashMap<>();
                 getOrLookupLights().forEach((id, light) -> lightNameToIdMap.put(light.name, id));
+                lightNameToIdMapInvalidated = false;
             }
         }
         return lightNameToIdMap;
@@ -273,8 +280,9 @@ public final class HueApiImpl implements HueApi {
 
     private Map<Integer, Light> getOrLookupLights() {
         synchronized (lightMapLock) {
-            if (availableLights == null) {
+            if (availableLights == null || availableLightsInvalidated) {
                 availableLights = lookupLights();
+                availableLightsInvalidated = false;
             }
         }
         return availableLights;
@@ -326,6 +334,18 @@ public final class HueApiImpl implements HueApi {
                 .colorGamut(getMaxGamut(lightCapabilities))
                 .capabilities(getMaxCapabilities(lightCapabilities))
                 .build();
+    }
+    
+    @Override
+    public void clearCaches() {
+        synchronized (lightMapLock) {
+            availableLightsInvalidated = true;
+            lightNameToIdMapInvalidated = true;
+        }
+        synchronized (groupMapLock) {
+            availableGroupsInvalidated = true;
+            groupNameToIdMapInvalidated = true;
+        }
     }
     
     private static Double[][] getMaxGamut(List<LightCapabilities> lightCapabilities) {

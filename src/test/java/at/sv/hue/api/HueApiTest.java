@@ -12,6 +12,8 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class HueApiTest {
@@ -287,6 +289,35 @@ class HueApiTest {
     }
     
     @Test
+    void getAssignedGroups_givenLightId_returnsGroupIds_correctlyClearsCaches() {
+        setGetResponse("/groups", "{\n" +
+                "\"1\": {\n" +
+                "\"name\": \"Group 1\",\n" +
+                "\"lights\": [\n" +
+                "\"1\",\n" +
+                "\"2\",\n" +
+                "\"3\"\n" +
+                "]\n" +
+                "},\n" +
+                "\"2\": {\n" +
+                "\"name\": \"Group 2\",\n" +
+                "\"lights\": [\n" +
+                "\"4\",\n" +
+                "\"5\",\n" +
+                "\"3\"\n" +
+                "]\n" +
+                "}}");
+        
+        assertThat(api.getAssignedGroups(2)).containsExactly(1);
+        assertThat(api.getAssignedGroups(2)).containsExactly(1);
+        api.clearCaches();
+        assertThat(api.getAssignedGroups(3)).containsExactly(1, 2);
+        assertThat(api.getAssignedGroups(777)).isEmpty();
+        
+        verify(resourceProviderMock, times(2)).getResource(any());
+    }
+    
+    @Test
     void getGroupLights_emptyLights_exception() {
         setGetResponse("/groups", "{\n" +
                 "\"1\": {\n" +
@@ -369,8 +400,29 @@ class HueApiTest {
         
         assertThat(lightId1).isEqualTo(7);
         assertThat(lightId2).isEqualTo(1234);
+        verify(resourceProviderMock).getResource(any());
     }
-
+    
+    @Test
+    void getLightId_resetCache_causesMultipleRequests() {
+        setGetResponse("/lights", "{\n" +
+                "\"7\": {\n" +
+                "\"name\": \"Lamp 1\"\n" +
+                "},\n" +
+                "\"1234\": {\n" +
+                "\"name\": \"Lamp 2\"\n" +
+                "}\n" +
+                "}");
+        
+        assertThat(api.getLightId("Lamp 1")).isEqualTo(7);
+        assertThat(api.getLightId("Lamp 1")).isEqualTo(7);
+        api.clearCaches();
+        assertThat(api.getLightId("Lamp 2")).isEqualTo(1234);
+        assertThat(api.getLightId("Lamp 2")).isEqualTo(1234);
+        
+        verify(resourceProviderMock, times(2)).getResource(any());
+    }
+    
     @Test
     void getLightId_unknownName_exception() {
         setGetResponse("/lights", "{}");
@@ -409,6 +461,35 @@ class HueApiTest {
         
         assertThat(groupId1).isEqualTo(11);
         assertThat(groupId2).isEqualTo(789);
+        verify(resourceProviderMock).getResource(any());
+    }
+    
+    @Test
+    void getGroupId_clearCaches_performsTwoFetches() {
+        setGetResponse("/groups", "{\n" +
+                "\"11\": {\n" +
+                "\"name\": \"Group 1\",\n" +
+                "\"lights\": [\n" +
+                "\"1\",\n" +
+                "\"2\"\n" +
+                "]\n" +
+                "},\n" +
+                "\"789\": {\n" +
+                "\"name\": \"Group 2\",\n" +
+                "\"lights\": [\n" +
+                "\"3\",\n" +
+                "\"4\"\n" +
+                "]\n" +
+                "}\n" +
+                "}");
+        
+        assertThat(api.getGroupId("Group 1")).isEqualTo(11);
+        assertThat(api.getGroupId("Group 1")).isEqualTo(11);
+        api.clearCaches();
+        assertThat(api.getGroupId("Group 2")).isEqualTo(789);
+        assertThat(api.getGroupId("Group 2")).isEqualTo(789);
+        
+        verify(resourceProviderMock, times(2)).getResource(any());
     }
 
     @Test
@@ -441,6 +522,26 @@ class HueApiTest {
         
         assertThat(name1).isEqualTo("Lamp 1");
         assertThat(name2).isEqualTo("Lamp 2");
+    }
+    
+    @Test
+    void getLightName_returnsNameForLightId_correctlyResetsCache() {
+        setGetResponse("/lights", "{\n" +
+                "\"7\": {\n" +
+                "\"name\": \"Lamp 1\"\n" +
+                "},\n" +
+                "\"1234\": {\n" +
+                "\"name\": \"Lamp 2\"\n" +
+                "}\n" +
+                "}");
+        
+        assertThat(api.getLightName(7)).isEqualTo("Lamp 1");
+        assertThat(api.getLightName(7)).isEqualTo("Lamp 1");
+        api.clearCaches();
+        assertThat(api.getLightName(1234)).isEqualTo("Lamp 2");
+        assertThat(api.getLightName(1234)).isEqualTo("Lamp 2");
+        
+        verify(resourceProviderMock, times(2)).getResource(any());
     }
 
     @Test

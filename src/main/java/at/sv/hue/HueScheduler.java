@@ -105,6 +105,12 @@ public final class HueScheduler implements Runnable {
             description = "The read timeout of the API v2 SSE event stream in minutes. " +
                     "The connection is automatically restored after a timeout. Default: ${DEFAULT-VALUE} minutes.")
     int eventStreamReadTimeoutInMinutes;
+    @Option(
+            names = "--api-cache-invalidation-interval", paramLabel = "<interval>", defaultValue = "15",
+            description = "The interval in which the api cache for groups and lights should be invalidated. " +
+                    "Default: ${DEFAULT-VALUE} minutes."
+    )
+    int apiCacheInvalidationIntervalInMinutes;
     private HueApi hueApi;
     private StateScheduler stateScheduler;
     private final ManualOverrideTracker manualOverrideTracker;
@@ -137,6 +143,7 @@ public final class HueScheduler implements Runnable {
         this.bridgeFailureRetryDelayInSeconds = bridgeFailureRetryDelayInSeconds;
         this.multiColorAdjustmentDelay = multiColorAdjustmentDelay;
         interpolationTransitionTime = parseInterpolationTransitionTime(interpolationTransitionTimeString);
+        apiCacheInvalidationIntervalInMinutes = 15;
     }
     
     private Integer parseInterpolationTransitionTime(String interpolationTransitionTimeString) {
@@ -243,8 +250,9 @@ public final class HueScheduler implements Runnable {
         ZonedDateTime now = currentTime.get();
         lightStates.forEach((id, states) -> scheduleInitialStartup(states, now));
         scheduleSunDataInfoLog();
+        scheduleApiCacheClear();
     }
-
+    
     private void scheduleInitialStartup(List<ScheduledState> states, ZonedDateTime now) {
         calculateAndSetEndTimes(states, now);
         scheduleStatesStartingToday(states, now);
@@ -583,6 +591,11 @@ public final class HueScheduler implements Runnable {
 
     private void logSunDataInfo() {
         LOG.info("Current sun times:\n{}", startTimeProvider.toDebugString(currentTime.get()));
+    }
+    
+    private void scheduleApiCacheClear() {
+        stateScheduler.scheduleAtFixedRate(
+                hueApi::clearCaches, apiCacheInvalidationIntervalInMinutes, apiCacheInvalidationIntervalInMinutes, TimeUnit.MINUTES);
     }
     
     private List<String> getAssignedGroups(String idv1LightId) {

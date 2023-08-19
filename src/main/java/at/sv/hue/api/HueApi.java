@@ -85,4 +85,9 @@ public interface HueApi {
      * @throws HueApiFailure if the api call failed
      */
     LightCapabilities getGroupCapabilities(int id);
+    
+    /**
+     * Clears caches for both the /lights and /groups resources, so that up-to-date information is fetched next time
+     */
+	void clearCaches();
 }
