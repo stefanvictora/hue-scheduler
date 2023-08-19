@@ -77,7 +77,7 @@ public final class InputConfigurationParser {
                 String value = typeAndValue[1];
                 switch (parameter) {
                     case "bri":
-                        bri = parseInteger(value, parameter);
+                        bri = parseBrightness(value);
                         break;
                     case "ct":
                         ct = parseInteger(value, parameter);
@@ -104,7 +104,7 @@ public final class InputConfigurationParser {
                         hue = parseInteger(value, parameter);
                         break;
                     case "sat":
-                        sat = parseInteger(value, parameter);
+                        sat = parseSaturation(value);
                         break;
                     case "color":
                         RGBToXYConverter.XYColor xyColor;
@@ -142,7 +142,49 @@ public final class InputConfigurationParser {
         }
         return states;
     }
-
+    
+    private Integer parseBrightness(String value) {
+        if (value.endsWith("%")) {
+            return parseBrightnessPercentValue(value);
+        }
+        return parseInteger(value, "bri");
+    }
+    
+    private Integer parseSaturation(String value) {
+        if (value.endsWith("%")) {
+            return parseSaturationPercentValue(value);
+        }
+        return parseInteger(value, "sat");
+    }
+    
+    /**
+     * Calculates the brightness value [1-254]. This uses an adapted percentage range of [1%-100%]. Treating 1% as the min value. To make sure, we
+     * also handle the special case of 0% and treat is as 1%.
+     */
+    private int parseBrightnessPercentValue(String value) {
+        String percentString = value.replace("%", "").trim();
+        Double percent = parseDouble(percentString, "bri");
+        if (percent < 1) {
+            return 1;
+        }
+        if (percent > 100) {
+            return 254;
+        }
+        return (int) Math.round((254.0 - 1.0) * (percent - 1) / 99.0 + 1.0);
+    }
+    
+    private int parseSaturationPercentValue(String value) {
+        String percentString = value.replace("%", "").trim();
+        Double percent = parseDouble(percentString, "sat");
+        if (percent < 0) {
+            return 0;
+        }
+        if (percent > 100) {
+            return 254;
+        }
+        return (int) Math.round(254.0 * percent / 100.0);
+    }
+    
     private static Integer parseInteger(String value, String parameter) {
         return parseValueWithErrorHandling(value, parameter, "integer", Integer::valueOf);
     }

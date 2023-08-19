@@ -118,7 +118,7 @@ class HueSchedulerTest {
         manualOverrideTracker = scheduler.getManualOverrideTracker();
     }
 
-    private void addState(int id, ZonedDateTime startTime) {
+    private void addDefaultState(int id, ZonedDateTime startTime) {
         addState(id, startTime, DEFAULT_BRIGHTNESS, DEFAULT_CT);
     }
 
@@ -131,7 +131,7 @@ class HueSchedulerTest {
         addState(id, startTime, "bri:" + brightness, "ct:" + ct, "on:" + on);
     }
 
-    private void addGroupState(int groupId, ZonedDateTime start, Integer... lights) {
+    private void addDefaultGroupState(int groupId, ZonedDateTime start, Integer... lights) {
         mockGroupLightsForId(groupId, lights);
         mockDefaultGroupCapabilities(groupId);
         addState("g" + groupId, start, "bri:" + DEFAULT_BRIGHTNESS, "ct:" + DEFAULT_CT);
@@ -380,15 +380,15 @@ class HueSchedulerTest {
 
     @Test
     void run_groupState_looksUpContainingLights_addsState() {
-        addGroupState(9, now, 1, 2, 3);
+        addDefaultGroupState(9, now, 1, 2, 3);
 
         startAndGetSingleRunnable(now);
     }
 
     @Test
     void run_groupState_andLightState_sameId_treatedDifferently_endIsCalculatedIndependently() {
-        addGroupState(1, now, 1);
-        addState(1, now);
+        addDefaultGroupState(1, now, 1);
+        addDefaultState(1, now);
 
         startScheduler();
 
@@ -404,7 +404,7 @@ class HueSchedulerTest {
 
     @Test
     void run_singleState_inOneHour_scheduledImmediately_asAdditionalCopy_becauseOfDayWrapAround() {
-        addState(22, now.plusHours(1));
+        addDefaultState(22, now.plusHours(1));
 
         startScheduler();
 
@@ -415,8 +415,8 @@ class HueSchedulerTest {
 
     @Test
     void run_multipleStates_allInTheFuture_runsTheOneOfTheNextDayImmediately_asAdditionalCopy_theNextWithCorrectDelay() {
-        addState(1, now.plusHours(1));
-        addState(1, now.plusHours(2));
+        addDefaultState(1, now.plusHours(1));
+        addDefaultState(1, now.plusHours(2));
 
         startScheduler();
 
@@ -429,16 +429,16 @@ class HueSchedulerTest {
     @Test
     void run_singleState_inThePast_singleRunnableScheduled_immediately() {
         setCurrentTimeTo(now.plusHours(2));
-        addState(11, now.minusHours(1));
+        addDefaultState(11, now.minusHours(1));
 
         startAndGetSingleRunnable(now, initialNow.plusDays(1).plusHours(1));
     }
 
     @Test
     void run_multipleStates_sameId_differentTimes_correctlyScheduled() {
-        addState(22, now);
-        addState(22, now.plusHours(1));
-        addState(22, now.plusHours(2));
+        addDefaultState(22, now);
+        addDefaultState(22, now.plusHours(1));
+        addDefaultState(22, now.plusHours(2));
 
         startScheduler();
 
@@ -451,9 +451,9 @@ class HueSchedulerTest {
     @Test
     void run_multipleStates_sameId_oneInTheFuture_twoInThePast_onlyOnePastAddedImmediately_theOtherOneNextDay() {
         setCurrentTimeTo(now.plusHours(3)); // 03:00
-        addState(13, initialNow.plusHours(4));  // 04:00 -> scheduled in one hour
-        addState(13, initialNow.plusHours(2)); // 02:00 -> scheduled immediately
-        addState(13, initialNow.plusHours(1)); // 01:00 -> scheduled next day
+        addDefaultState(13, initialNow.plusHours(4));  // 04:00 -> scheduled in one hour
+        addDefaultState(13, initialNow.plusHours(2)); // 02:00 -> scheduled immediately
+        addDefaultState(13, initialNow.plusHours(1)); // 01:00 -> scheduled next day
 
         startScheduler();
 
@@ -886,7 +886,70 @@ class HueSchedulerTest {
 
         ensureNextDayRunnable(actualStart);
     }
-
+    
+    @Test
+    void parse_transitionTimeBefore_multipleStates_nullState_performsNoInterpolations() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addStateNow(1, "bri:" + (DEFAULT_BRIGHTNESS - 10));
+        addState(1, now.plusMinutes(2)); // null state, detected as previous state -> treated as no interpolation possible
+        addState(1, now.plusMinutes(40), "bri:" + DEFAULT_BRIGHTNESS, "tr-before:20min");
+        
+        startScheduler();
+        
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(2);
+        ScheduledRunnable trBeforeRunnable = scheduledRunnables.get(1);
+        
+        setCurrentTimeTo(now.plusMinutes(20));
+        
+        trBeforeRunnable.run();
+        
+        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).transitionTime(12000).build());
+        
+        ensureRunnable(initialNow.plusDays(1).plusMinutes(20), initialNow.plusDays(2));
+    }
+    
+    @Test
+    void parse_transitionTimeBefore_multipleStates_onState_withBrightness_notUsedDuringInterpolation() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addStateNow(1, "on:true", "bri:10");
+        addState(1, now.plusMinutes(40), "bri:" + DEFAULT_BRIGHTNESS, "tr-before:20min");
+        
+        startScheduler();
+        
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(2);
+        ScheduledRunnable trBeforeRunnable = scheduledRunnables.get(1);
+        
+        setCurrentTimeTo(now.plusMinutes(20));
+        
+        trBeforeRunnable.run();
+        
+        assertPutCall(expectedPutCall(1).bri(10).build()); // no "on" property
+        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).transitionTime(12000).build());
+        
+        ensureRunnable(initialNow.plusDays(1).plusMinutes(20), initialNow.plusDays(2));
+    }
+    
+    @Test
+    void parse_transitionTimeBefore_multipleStates_onStateOnly_notInterpolationAtAll() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addStateNow(1, "on:true"); // just a single "on"
+        addState(1, now.plusMinutes(40), "bri:" + DEFAULT_BRIGHTNESS, "tr-before:20min");
+        
+        startScheduler();
+        
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(2);
+        ScheduledRunnable trBeforeRunnable = scheduledRunnables.get(1);
+        
+        setCurrentTimeTo(now.plusMinutes(20));
+        
+        trBeforeRunnable.run();
+        
+        // no additional interpolation call
+        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).transitionTime(12000).build());
+        
+        ensureRunnable(initialNow.plusDays(1).plusMinutes(20), initialNow.plusDays(2));
+    }
+    
     @Test
     void parse_transitionTimeBefore_multipleStates_ct_lightTurnedOnExactlyAtTrBeforeStart_performsNoInterpolation_setsExactPreviousStateAgain() {
         addKnownLightIdsWithDefaultCapabilities(1);
@@ -1484,7 +1547,89 @@ class HueSchedulerTest {
         addKnownLightIdsWithDefaultCapabilities(1);
         addStateNow(1, "ct:" + DEFAULT_CT, "days:Mo,Di,Mi,Do,Fr,Sa,So");
     }
-
+    
+    @Test
+    void parse_canHandleSaturationInPercent_minvalue() {
+        assertAppliedSaturation("0%", 0);
+    }
+    
+    @Test
+    void parse_canHandleSaturationInPercent_halfPercent() {
+        assertAppliedSaturation("0.5%", 1);
+    }
+    
+    @Test
+    void parse_canHandleSaturationInPercent_tooLow_stillUsesMinvalue() {
+        assertAppliedSaturation("-0.5%", 0);
+    }
+    
+    @Test
+    void parse_canHandleSaturationInPercent_maxValue() {
+        assertAppliedSaturation("100%", 254);
+    }
+    
+    @Test
+    void parse_canHandleSaturationInPercent_tooHigh_stillUsesMaxValue() {
+        assertAppliedSaturation("100.5%", 254);
+    }
+    
+    private void assertAppliedSaturation(String input, int expected) {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addStateNow(1, "sat:" + input);
+        
+        ScheduledRunnable runnable = startAndGetSingleRunnable();
+        
+        advanceTimeAndRunAndAssertPutCall(runnable, expectedPutCall(1).sat(expected).build());
+        
+        ensureRunnable(initialNow.plusDays(1));
+    }
+    
+    @Test
+    void parse_canHandleBrightnessInPercent_minValue() {
+        assertAppliedBrightness("1%", 1);
+    }
+    
+    @Test
+    void parse_canHandleBrightnessInPercent_zeroPercentage_specialHandling_alsoReturnsMinValue() {
+        assertAppliedBrightness("0%", 1);
+    }
+    
+    @Test
+    void parse_canHandleBrightnessInPercent_halfPercentage_specialHandling_alsoReturnsMinValue() {
+        assertAppliedBrightness("0.5%", 1);
+    }
+    
+    @Test
+    void parse_canHandleBrightnessInPercent_negativePercentage_specialHandling_alsoReturnsMinValue() {
+        assertAppliedBrightness("-0.5%", 1);
+    }
+    
+    @Test
+    void parse_canHandleBrightnessInPercent_tooHigh_specialHandling_returnsMaxValue() {
+        assertAppliedBrightness("100.5%", 254);
+    }
+    
+    @Test
+    void parse_canHandleBrightnessInPercent_alsoDoubleValues() {
+        assertAppliedBrightness("1.5%", 2);
+    }
+    
+    @Test
+    void parse_canHandleBrightnessInPercent_maxValue() {
+        assertAppliedBrightness("100%", 254);
+    }
+    
+    private void assertAppliedBrightness(String input, int expected) {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addStateNow(1, "bri:" + input);
+        
+        ScheduledRunnable runnable = startAndGetSingleRunnable();
+        
+        advanceTimeAndRunAndAssertPutCall(runnable, expectedPutCall(1).bri(expected).build());
+        
+        ensureRunnable(initialNow.plusDays(1));
+    }
+    
     @Test
     void parse_canHandleColorInput_viaXAndY() {
         addKnownLightIdsWithDefaultCapabilities(1);
@@ -1797,7 +1942,7 @@ class HueSchedulerTest {
         ZonedDateTime nextDaySunset = getSunset(now.plusDays(1));
         addKnownLightIdsWithDefaultCapabilities(1);
         setCurrentAndInitialTimeTo(sunset.minusHours(1));
-        addState(1, now); // one hour before sunset
+        addDefaultState(1, now); // one hour before sunset
         addState(1, "sunset", "bri:" + DEFAULT_BRIGHTNESS, "ct:" + DEFAULT_CT);
 
         startScheduler();
@@ -2122,7 +2267,7 @@ class HueSchedulerTest {
 
     @Test
     void run_execution_groupState_correctPutCall() {
-        addGroupState(1, now, 1, 2, 3);
+        addDefaultGroupState(1, now, 1, 2, 3);
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
         advanceTimeAndRunAndAssertPutCall(scheduledRunnable, DEFAULT_PUT_CALL.toBuilder().groupState(true).build());
@@ -2134,7 +2279,7 @@ class HueSchedulerTest {
     void run_execution_groupState_controlIndividuallyFlagSet_multipleSinglePutCalls() {
         controlGroupLightsIndividually = true;
         create();
-        addGroupState(10, now, 1, 2, 3);
+        addDefaultGroupState(10, now, 1, 2, 3);
 
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
@@ -2174,8 +2319,8 @@ class HueSchedulerTest {
 
     @Test
     void run_execution_twoStates_oneAlreadyPassed_runTheOneAlreadyPassedTheNextDay_correctExecution_asEndWasAdjustedCorrectlyInitially() {
-        addState(1, now);
-        addState(1, now.minusHours(1));
+        addDefaultState(1, now);
+        addDefaultState(1, now.minusHours(1));
         startScheduler();
         List<ScheduledRunnable> initialStates = ensureScheduledStates(2);
         ScheduledRunnable nextDayState = initialStates.get(1);
@@ -2189,8 +2334,8 @@ class HueSchedulerTest {
 
     @Test
     void run_execution_twoStates_multipleRuns_updatesEndsCorrectly() {
-        addState(1, now);
-        addState(1, now.plusHours(1));
+        addDefaultState(1, now);
+        addDefaultState(1, now.plusHours(1));
         startScheduler();
         List<ScheduledRunnable> initialStates = ensureScheduledStates(2);
         assertScheduleStart(initialStates.get(0), now, now.plusHours(1));
@@ -2253,8 +2398,8 @@ class HueSchedulerTest {
     void run_execution_allStatesInTheFuture_schedulesLastStateImmediately_asCopy_butAbortsIfFirstStateOfDayStarts() {
         ZonedDateTime firstStart = now.plusMinutes(5);
         ZonedDateTime secondStart = now.plusMinutes(10);
-        addState(1, firstStart);
-        addState(1, secondStart);
+        addDefaultState(1, firstStart);
+        addDefaultState(1, secondStart);
         startScheduler();
 
         List<ScheduledRunnable> states = ensureScheduledStates(3);
@@ -2278,7 +2423,7 @@ class HueSchedulerTest {
     void run_execution_multipleStates_reachable_stopsRescheduleIfNextIntervallStarts() {
         addDefaultState();
         ZonedDateTime secondStateStart = now.plusMinutes(10);
-        addState(ID, secondStateStart);
+        addDefaultState(ID, secondStateStart);
         startScheduler();
         List<ScheduledRunnable> initialStates = ensureScheduledStates(2);
 
@@ -2390,7 +2535,7 @@ class HueSchedulerTest {
 
     @Test
     void run_execution_nullState_allInTheFuture_stillIgnored() {
-        addState(1, now.plusMinutes(5));
+        addDefaultState(1, now.plusMinutes(5));
         addNullState(now.plusMinutes(10));
         startScheduler();
 
@@ -2719,7 +2864,7 @@ class HueSchedulerTest {
         enableUserModificationTracking();
         create();
         
-        addGroupState(2, now, 1);
+        addDefaultGroupState(2, now, 1);
         manualOverrideTracker.onManuallyOverridden("/groups/2"); // start directly with overridden state
         
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();

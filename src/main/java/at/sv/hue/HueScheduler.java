@@ -392,12 +392,16 @@ public final class HueScheduler implements Runnable {
             return;
         }
         ScheduledState previousState = getPreviousState(state);
-        if (previousState == null) {
+        if (previousState == null || previousState.isNullState()) {
             return;
         }
         LOG.trace("Got previous state: {}", previousState);
         PutCall interpolatedPutCall = state.getInterpolatedPutCall(currentTime.get(), previousState);
         if (interpolatedPutCall == null) {
+            return;
+        }
+        interpolatedPutCall.setOn(null);
+        if (interpolatedPutCall.isNullCall()) {
             return;
         }
         interpolatedPutCall.setTransitionTime(interpolationTransitionTime);
@@ -443,7 +447,7 @@ public final class HueScheduler implements Runnable {
         if (state.isTemporary()) return;
         ZonedDateTime now = currentTime.get();
         ZonedDateTime nextStart = getNextStart(state, now, forceNextDay);
-        state.updateLastStart(nextStart); // todo: we should write a test, that his value is now set to the next start instead of now
+        state.updateLastStart(nextStart);
         calculateAndSetEndTime(state, getLightStatesForId(state), nextStart);
         schedule(state, getMs(getDelayInSeconds(now, nextStart)));
     }

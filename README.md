@@ -174,7 +174,7 @@ To control the state of your lights in the given interval, an arbitrary number o
 
 ### Basic Properties
 
-- ``bri``: modifies the **brightness** of the light: [``1``-``254``]. From dim to bright.
+- ``bri``: modifies the **brightness** of the light: [``1``-``254``] or [``1%``-``100%``]. From dim to bright.
 
 - ``ct``: modifies the **color temperature** of the light. Either in [Kelvin](https://en.wikipedia.org/wiki/Color_temperature) [``6500``-``2000``] or [Mired](https://en.wikipedia.org/wiki/Mired) [``153``-``500``]. Each from cool to warm white.
 
@@ -210,7 +210,7 @@ Hue Scheduler offers several ways to define the color of support lights.
 
 - ``hue``: modifies the **hue** color value of the light: [``0``-``65535``]. The value "wraps" around, i.e. both `0` and `65535` are red. Related to ``sat``.
 
-- ``sat``: modifies the **saturation** color value of the light: [``0``-``254``]. From white to fully colored. Related to ``hue``.
+- ``sat``: modifies the **saturation** color value of the light: [``0``-``254``] or [``0%``-``100%``]. From white to fully colored. Related to ``hue``.
 
 - ``effect``: makes the light **loop through all their hues** with their current ``sat`` and ``bri`` values. The lights loop until they are turned off, or they receive ``none`` as effect. This means you can adjust the saturation and brightness, while the lights keep looping. Supported values: [`colorloop`|`multi_colorloop`|`none`].
 
@@ -234,7 +234,7 @@ Desk  15:00  x:0.1652  y=0.3103
 > Ikea Tradfri light bulbs currently don't support setting multiple properties, e.g., `bri` and `ct`,
 > in combination with a transition time > 0. Since the Hue bridge applies a default transition time of 400ms (`tr:4`)
 > if not specified otherwise, you have to explicitly set `tr:0` if you want to set multiple properties for Ikea Tradfri light bulbs.
-> Another workaround is to only set one property per state and offset the state changes accordingly.
+> Another workaround is to only set one property per state and offset the state changes accordingly to the used transition time.
 
 The transition time between two light states, defined as a multiple of 100ms: [``0``-``65535``]. For example: `tr:1` equals a transition time of 100ms. The maximum support value ``65535`` equals roughly 1 hour and 48 min.
 
