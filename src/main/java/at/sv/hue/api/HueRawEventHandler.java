@@ -27,12 +27,12 @@ public final class HueRawEventHandler implements BackgroundEventHandler {
 
     @Override
     public void onOpen() {
-        log.info("Hue event stream handler opened");
+        log.trace("Hue event stream handler opened");
     }
 
     @Override
     public void onClosed() {
-        log.debug("Hue event stream handler closed");
+        log.trace("Hue event stream handler closed");
     }
 
     @Override

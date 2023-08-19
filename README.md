@@ -351,8 +351,8 @@ A JVM argument to configure the log level of Hue Scheduler. The following values
 
 - `ERROR`: Only logs if the API returned with an error code. This should most likely never occur.
 - `WARN`: Additionally logs if the bridge is not reachable, and Hue Scheduler retries
-- `INFO`: Logs when a light state has been set, as well as the current sun times for each day.
-- `DEBUG` (default): Logs every scheduled state; if a state has already ended; or a manual override has been detected.
+- `INFO`: Logs when a light state has been set, a manual override has been detected, as well as the current sun times for each day.
+- `DEBUG` (default): Logs every scheduled state; if a state has already ended, and if an on-event for a light has been received.
 - `TRACE`: Maximum logs, including all performed API requests and enforced wait times due to rate limiting.
 
 Note: The JVM argument needs to be defined before the jar file. For example:

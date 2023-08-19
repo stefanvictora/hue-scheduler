@@ -309,17 +309,18 @@ public final class HueScheduler implements Runnable {
             }
             if (lightHasBeenManuallyOverriddenBefore(state)) {
                 if (state.isOff()) {
-                    LOG.debug("{} state has been manually overridden before, skip off-state for this day: {}", state.getFormattedName(), state);
+                    LOG.info("{} state has been manually overridden before, skip off-state for this day: {}", state.getFormattedName(), state);
                     reschedule(state, true);
                 } else {
-                    LOG.debug("{} state has been manually overridden before, skip update and retry when back online", state.getFormattedName());
+                    LOG.info("{} state has been manually overridden before, skip update and retry when back online", state.getFormattedName());
                     retryWhenBackOn(state);
                 }
                 return;
             }
             try {
+                LOG.info("Set {}", state);
                 if (stateIsNotEnforced(state) && stateHasBeenManuallyOverriddenSinceLastSeen(state)) {
-                    LOG.debug("{} state has been manually overridden, pause update until light is turned off and on again", state.getFormattedName());
+                    LOG.info("{} state has been manually overridden, pause update until light is turned off and on again", state.getFormattedName());
                     manualOverrideTracker.onManuallyOverridden(state.getIdV1());
                     retryWhenBackOn(state);
                     return;
@@ -338,7 +339,6 @@ public final class HueScheduler implements Runnable {
             if (state.isOff()) {
                 LOG.info("Turned off {}, or was already off", state.getFormattedName());
             } else {
-                LOG.info("Set {}", state);
                 retryWhenBackOn(ScheduledState.createTemporaryCopy(state, state.getEnd()));
             }
             if (shouldAdjustMultiColorLoopOffset(state)) {
@@ -395,13 +395,12 @@ public final class HueScheduler implements Runnable {
         if (previousState == null || previousState.isNullState()) {
             return;
         }
-        LOG.trace("Got previous state: {}", previousState);
         PutCall interpolatedPutCall = state.getInterpolatedPutCall(currentTime.get(), previousState);
         if (interpolatedPutCall == null) {
             return;
         }
+        LOG.trace("Perform interpolation from previous state: {}", previousState);
         interpolatedPutCall.setTransitionTime(interpolationTransitionTime);
-        LOG.trace("Interpolated call: {}", interpolatedPutCall);
         putState(previousState, interpolatedPutCall);
         sleepIfNeeded();
     }
