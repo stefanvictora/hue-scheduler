@@ -400,10 +400,6 @@ public final class HueScheduler implements Runnable {
         if (interpolatedPutCall == null) {
             return;
         }
-        interpolatedPutCall.setOn(null);
-        if (interpolatedPutCall.isNullCall()) {
-            return;
-        }
         interpolatedPutCall.setTransitionTime(interpolationTransitionTime);
         LOG.trace("Interpolated call: {}", interpolatedPutCall);
         putState(previousState, interpolatedPutCall);

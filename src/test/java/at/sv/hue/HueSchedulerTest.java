@@ -909,7 +909,7 @@ class HueSchedulerTest {
     }
     
     @Test
-    void parse_transitionTimeBefore_multipleStates_onState_withBrightness_notUsedDuringInterpolation() {
+    void parse_transitionTimeBefore_multipleStates_previousIsOnState_withBrightness_removedForInterpolatedCall() {
         addKnownLightIdsWithDefaultCapabilities(1);
         addStateNow(1, "on:true", "bri:10");
         addState(1, now.plusMinutes(40), "bri:" + DEFAULT_BRIGHTNESS, "tr-before:20min");
@@ -930,7 +930,7 @@ class HueSchedulerTest {
     }
     
     @Test
-    void parse_transitionTimeBefore_multipleStates_onStateOnly_notInterpolationAtAll() {
+    void parse_transitionTimeBefore_multipleStates_previousIsOnStateOnly_notInterpolationAtAll() {
         addKnownLightIdsWithDefaultCapabilities(1);
         addStateNow(1, "on:true"); // just a single "on"
         addState(1, now.plusMinutes(40), "bri:" + DEFAULT_BRIGHTNESS, "tr-before:20min");
@@ -946,6 +946,48 @@ class HueSchedulerTest {
         
         // no additional interpolation call
         assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).transitionTime(12000).build());
+        
+        ensureRunnable(initialNow.plusDays(1).plusMinutes(20), initialNow.plusDays(2));
+    }
+    
+    @Test
+    void parse_transitionTimeBefore_multipleStates_currentIsOnState_alsoAddsOnPropertyToInterpolatedCall() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addStateNow(1, "bri:10"); // no explicit "on"
+        addState(1, now.plusMinutes(40), "on:true", "bri:" + DEFAULT_BRIGHTNESS, "tr-before:20min");
+        
+        startScheduler();
+        
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(2);
+        ScheduledRunnable trBeforeRunnable = scheduledRunnables.get(1);
+        
+        setCurrentTimeTo(now.plusMinutes(20));
+        
+        trBeforeRunnable.run();
+        
+        assertPutCall(expectedPutCall(1).bri(10).on(true).build()); // added "on" property
+        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).on(true).transitionTime(12000).build());
+        
+        ensureRunnable(initialNow.plusDays(1).plusMinutes(20), initialNow.plusDays(2));
+    }
+    
+    @Test
+    void parse_transitionTimeBefore_multipleStates_currentIsOffState_doesNotAddOffPropertyToInterpolatedCall() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addStateNow(1, "bri:10"); // no explicit "off"
+        addState(1, now.plusMinutes(40), "on:false", "bri:" + DEFAULT_BRIGHTNESS, "tr-before:20min");
+        
+        startScheduler();
+        
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(2);
+        ScheduledRunnable trBeforeRunnable = scheduledRunnables.get(1);
+        
+        setCurrentTimeTo(now.plusMinutes(20));
+        
+        trBeforeRunnable.run();
+        
+        assertPutCall(expectedPutCall(1).bri(10).build()); // no "off" added
+        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).on(false).transitionTime(12000).build());
         
         ensureRunnable(initialNow.plusDays(1).plusMinutes(20), initialNow.plusDays(2));
     }

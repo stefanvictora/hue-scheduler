@@ -334,6 +334,10 @@ final class ScheduledState {
     public boolean isOff() {
         return on == Boolean.FALSE;
     }
+    
+    public boolean isOn() {
+        return on == Boolean.TRUE;
+    }
 
     public void updateLastStart(ZonedDateTime now) {
         this.lastStart = getStart(now);

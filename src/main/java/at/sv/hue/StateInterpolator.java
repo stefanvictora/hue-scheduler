@@ -24,10 +24,24 @@ public final class StateInterpolator {
 		if (timeUntilThisState == 0) {
 			return null; // the state is already reached
 		}
+		PutCall interpolatedPutCall;
 		if (timeUntilThisState == state.getTransitionTimeBefore()) {
-			return previousState.getPutCall(now); // directly at start, just return previous put call
+			interpolatedPutCall = previousState.getPutCall(now); // directly at start, just use previous put call
+		} else {
+			interpolatedPutCall = interpolate();
 		}
-		return interpolate();
+		return modifyProperties(interpolatedPutCall);
+	}
+	
+	private PutCall modifyProperties(PutCall interpolatedPutCall) {
+		interpolatedPutCall.setOn(null); // do not reuse "on" property for interpolation
+		if (interpolatedPutCall.isNullCall()) {
+			return null; // no relevant properties set, don't perform interpolations
+		}
+		if (state.isOn()) {
+			interpolatedPutCall.setOn(true); // the current state is turning lights on, also set "on" property for interpolated state
+		}
+		return interpolatedPutCall;
 	}
 	
 	/**
