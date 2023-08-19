@@ -172,7 +172,7 @@ In this case, only the interval **07:00–10:00** is created. If you turn your l
 
 To control the state of your lights in the given interval, an arbitrary number of properties can be provided for each configuration line.
 
-#### Basic Properties
+### Basic Properties
 
 - ``bri``: modifies the **brightness** of the light: [``1``-``254``]. From dim to bright.
 
@@ -202,7 +202,7 @@ To control the state of your lights in the given interval, an arbitrary number o
     Living room   23:59       days:Fr,Sa
     ~~~
 
-#### Color-Related Properties
+### Color-Related Properties
 
 Hue Scheduler offers several ways to define the color of support lights.
 
@@ -228,7 +228,13 @@ Desk  14:00  effect:none
 Desk  15:00  x:0.1652  y=0.3103
 ~~~
 
-#### Transition Time-Related Properties
+### Transition Time-Related Properties
+
+> **Warning**: Due to a [firmware bug](https://www.reddit.com/r/tradfri/comments/au903n/firmware_bugs_in_ikea_bulbs/) (see https://github.com/stefanvictora/hue-scheduler/issues/5),
+> Ikea Tradfri light bulbs currently don't support setting multiple properties, e.g., `bri` and `ct`,
+> in combination with a transition time > 0. Since the Hue bridge applies a default transition time of 400ms (`tr:4`)
+> if not specified otherwise, you have to explicitly set `tr:0` if you want to set multiple properties for Ikea Tradfri light bulbs.
+> Another workaround is to only set one property per state and offset the state changes accordingly.
 
 The transition time between two light states, defined as a multiple of 100ms: [``0``-``65535``]. For example: `tr:1` equals a transition time of 100ms. The maximum support value ``65535`` equals roughly 1 hour and 48 min.
 
@@ -262,7 +268,7 @@ Hue Scheduler offers two different transition time properties, which can be comb
 To summarize: `tr-before` allows you to define longer and smoother transitions that always match the desired state, regardless of when they are turned on during the transition. Those interpolations are available for all color modes (CT, XY/RGB, Hue/Sat).
 The starting point for those interpolations is always the previously defined state. If the color mode differs between the states, then Hue Scheduler automatically performs a conversion between them. This allows us to transition, e.g., from a color temperature to some color value.
 
-#### Advanced Properties
+### Advanced Properties
 
 - `force`: defines whether Hue Scheduler should **enforce the state despite user modifications**: [`true`|`false`]. This is only relevant if user modification tracking is not disabled (see `--track-user-changes`). Default: `false`.
 
