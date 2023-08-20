@@ -2649,6 +2649,7 @@ class HueSchedulerTest {
                                                       .colormode("CT")
                                                       .reachable(true)
                                                       .on(true)
+                                                      .capabilities(EnumSet.of(Capability.COLOR_TEMPERATURE, Capability.BRIGHTNESS, Capability.ON_OFF))
                                                       .build();
         addLightStateResponse(1, userModifiedLightState);
         setCurrentTimeTo(secondState);
@@ -2684,6 +2685,7 @@ class HueSchedulerTest {
                 .colormode("CT")
                 .reachable(true)
                 .on(true)
+                .capabilities(EnumSet.of(Capability.COLOR_TEMPERATURE, Capability.BRIGHTNESS, Capability.ON_OFF))
                 .build();
         addLightStateResponse(1, sameStateAsThird);
         setCurrentTimeTo(fourthState);
@@ -2699,6 +2701,7 @@ class HueSchedulerTest {
                 .colormode("CT")
                 .reachable(true)
                 .on(true)
+                .capabilities(EnumSet.of(Capability.COLOR_TEMPERATURE, Capability.BRIGHTNESS, Capability.ON_OFF))
                 .build();
         addLightStateResponse(1, secondUserModification);
         setCurrentTimeTo(fifthState);
@@ -2741,11 +2744,13 @@ class HueSchedulerTest {
                 .brightness(DEFAULT_BRIGHTNESS + 5)
                 .colormode("CT")
                 .on(true)
+                .capabilities(EnumSet.allOf(Capability.class))
                 .build();
         LightState sameAsFirst = LightState.builder() // same as first
                 .brightness(DEFAULT_BRIGHTNESS)
                 .colormode("CT")
                 .on(true)
+                .capabilities(EnumSet.allOf(Capability.class))
                 .build();
         addGroupStateResponses(1, sameAsFirst, userModifiedLightState);
         setCurrentTimeTo(secondState);
@@ -2779,6 +2784,7 @@ class HueSchedulerTest {
                 .brightness(DEFAULT_BRIGHTNESS + 20)
                 .colormode("CT")
                 .on(true)
+                .capabilities(EnumSet.allOf(Capability.class))
                 .build();
         addGroupStateResponses(1, sameStateAsThird, sameStateAsThird);
         setCurrentTimeTo(fourthState);
@@ -2792,6 +2798,7 @@ class HueSchedulerTest {
                 .brightness(DEFAULT_BRIGHTNESS + 5)
                 .colormode("CT")
                 .on(true)
+                .capabilities(EnumSet.allOf(Capability.class))
                 .build();
         addGroupStateResponses(1, secondUserModification, secondUserModification);
         setCurrentTimeTo(fifthState);
@@ -3041,6 +3048,7 @@ class HueSchedulerTest {
                                                       .colorTemperature(DEFAULT_CT)
                                                       .reachable(true)
                                                       .on(true)
+                                                      .capabilities(EnumSet.allOf(Capability.class))
                                                       .build();
         addLightStateResponse(1, userModifiedLightState);
 
