@@ -51,36 +51,28 @@ public final class HueApiImpl implements HueApi {
         String response = getResourceAndAssertNoErrors(getLightStateUrl(id));
         try {
             Light light = mapper.readValue(response, Light.class);
-            State state = light.state;
-            return new LightState(state.bri, state.ct, getX(state.xy), getY(state.xy), state.hue, state.sat, state.effect, state.colormode, state.reachable, state.on);
+            return createLightState(light);
         } catch (JsonProcessingException | NullPointerException e) {
             throw new HueApiFailure("Failed to parse light state response '" + response + "' for id " + id + ": " + e.getLocalizedMessage());
         }
     }
     
+    private LightState createLightState(Light light) {
+        State state = light.state;
+        return new LightState(
+                state.bri, state.ct, getX(state.xy), getY(state.xy), state.hue, state.sat, state.effect, state.colormode, state.reachable, state.on,
+                getCapabilities(light.type));
+    }
+    
     @Override
-    public GroupState getGroupState(int id) {
-        String response = getResourceAndAssertNoErrors(getGroupStateUrl(id));
-        try {
-            Group group = mapper.readValue(response, Group.class);
-            StateOfGroup state = group.state;
-            Action action = group.action;
-            return GroupState.builder()
-                    .brightness(action.bri)
-                    .colorTemperature(action.ct)
-                    .x(getX(action.xy))
-                    .y(getY(action.xy))
-                    .hue(action.hue)
-                    .sat(action.sat)
-                    .effect(action.effect)
-                    .colormode(action.colormode)
-                    .on(action.on)
-                    .allOn(state.all_on)
-                    .anyOn(state.any_on)
-                    .build();
-        } catch (JsonProcessingException | NullPointerException e) {
-            throw new HueApiFailure("Failed to parse group state response '" + response + "' for id " + id + ": " + e.getLocalizedMessage());
-        }
+    public List<LightState> getGroupStates(int id) {
+        List<Integer> groupLights = getGroupLights(id);
+        Map<Integer, Light> currentLights = lookupLights();
+        return groupLights.stream()
+                .map(currentLights::get)
+                .filter(Objects::nonNull)
+                .map(this::createLightState)
+                .collect(Collectors.toList());
     }
     
     private String getResourceAndAssertNoErrors(URL url) {
@@ -139,10 +131,6 @@ public final class HueApiImpl implements HueApi {
 
     private URL getLightStateUrl(int id) {
         return createUrl("/lights/" + id);
-    }
-    
-    private URL getGroupStateUrl(int id) {
-        return createUrl("/groups/" + id);
     }
 
     private URL createUrl(String url) {
@@ -381,6 +369,9 @@ public final class HueApiImpl implements HueApi {
     }
     
     private EnumSet<Capability> getCapabilities(String type) {
+        if (type == null) {
+            return EnumSet.noneOf(Capability.class);
+        }
         switch (type.toLowerCase(Locale.ENGLISH)) {
             case "extended color light":
                 return EnumSet.allOf(Capability.class);

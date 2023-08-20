@@ -106,7 +106,24 @@ class HueApiTest {
         int bri = 100;
         int hue = 979;
         int sat = 254;
-        setGetResponse("/lights/" + lightId, createApiStateResponse(x, y, ct, bri, hue, sat, true, true, "colorloop"));
+        setGetResponse("/lights/" + lightId, "{\n"
+                + "  \"state\": {\n"
+                + "    \"on\": true,\n"
+                + "    \"bri\": " + bri + ",\n"
+                + "    \"hue\": " + hue + ",\n"
+                + "    \"sat\": " + sat + ",\n"
+                + "    \"effect\": \"colorloop\",\n"
+                + "    \"xy\": [\n"
+                + "      " + x + ",\n"
+                + "      " + y + "\n"
+                + "    ],\n"
+                + "    \"ct\": " + ct + ",\n"
+                + "    \"reachable\": true\n"
+                + "  },\n"
+                + "  \"name\": \"Name 2\",\n"
+                + "  \"type\": \"Extended color light\"\n"
+                + "}\n"
+                + "\n");
 
         LightState lightState = getLightState(lightId);
         
@@ -121,6 +138,7 @@ class HueApiTest {
                         .hue(hue)
                         .sat(sat)
                         .effect("colorloop")
+                        .capabilities(EnumSet.allOf(Capability.class))
                         .build()
         );
     }
@@ -134,7 +152,24 @@ class HueApiTest {
         int bri = 41;
         int hue = 6000;
         int sat = 157;
-        setGetResponse("/lights/" + lightId, createApiStateResponse(x, y, ct, bri, hue, sat, false, false, "none"));
+        setGetResponse("/lights/" + lightId, "{\n"
+                + "  \"state\": {\n"
+                + "    \"on\": false,\n"
+                + "    \"bri\": " + bri + ",\n"
+                + "    \"hue\": " + hue + ",\n"
+                + "    \"sat\": " + sat + ",\n"
+                + "    \"effect\": \"none\",\n"
+                + "    \"xy\": [\n"
+                + "      " + x + ",\n"
+                + "      " + y + "\n"
+                + "    ],\n"
+                + "    \"ct\": " + ct + ",\n"
+                + "    \"reachable\": false\n"
+                + "  },\n"
+                + "  \"name\": \"Name 2\",\n"
+                + "  \"type\": \"Extended color light\"\n"
+                + "}\n"
+                + "\n");
 
         LightState lightState = getLightState(lightId);
         
@@ -149,6 +184,7 @@ class HueApiTest {
                         .hue(hue)
                         .sat(sat)
                         .effect("none")
+                        .capabilities(EnumSet.allOf(Capability.class))
                         .build()
         );
     }
@@ -157,175 +193,263 @@ class HueApiTest {
     void getState_whiteBulbOnly_noNullPointerException() {
         int lightId = 11;
         int bri = 41;
-        setGetResponse("/lights/" + lightId, "{\n" +
-                "\"state\": {\n" +
-                "\"on\": true,\n" +
-                "\"bri\": " + bri + ",\n" +
-                "\"reachable\": " + true + "\n" +
-                "}, \"name\": \"Name 2\"}");
+        setGetResponse("/lights/" + lightId, "{\n"
+                + "  \"state\": {\n"
+                + "    \"on\": true,\n"
+                + "    \"bri\": " + bri + ",\n"
+                + "    \"reachable\": true\n"
+                + "  },\n"
+                + "  \"name\": \"Name 2\",\n"
+                + "  \"type\": \"Dimmable light\"\n"
+                + "}");
 
         LightState lightState = getLightState(lightId);
         
-        assertLightState(lightState, LightState.builder().on(true).reachable(true).brightness(bri).build());
+        assertLightState(lightState, LightState.builder()
+                .on(true)
+                .reachable(true)
+                .brightness(bri)
+                .capabilities(EnumSet.of(Capability.BRIGHTNESS, Capability.ON_OFF))
+                .build());
     }
     
     @Test
     void getState_onOffBulbOnly_noNullPointerException() {
         int lightId = 11;
-        int bri = 41;
-        setGetResponse("/lights/" + lightId, "{\n" +
-                "\"state\": {\n" +
-                "\"on\": true,\n" +
-                "\"reachable\": " + true + "\n" +
-                "}, \"name\": \"Name 2\"}");
+        setGetResponse("/lights/" + lightId, "{\n"
+                + "  \"state\": {\n"
+                + "    \"on\": true,\n"
+                + "    \"reachable\": true\n"
+                + "  },\n"
+                + "  \"name\": \"Name 2\",\n"
+                + "  \"type\": \"On/Off plug-in unit\"\n"
+                + "}");
         
         LightState lightState = getLightState(lightId);
         
-        assertLightState(lightState, LightState.builder().on(true).reachable(true).build());
+        assertLightState(lightState, LightState.builder().on(true).reachable(true).capabilities(EnumSet.of(Capability.ON_OFF)).build());
     }
     
     @Test
-    void getGroupState_returnsActionObjectAsState() {
-        int groupId = 17;
-        double x = 0.6715;
-        double y = 0.3233;
-        int ct = 153;
-        int bri = 100;
-        setGetResponse("/groups/" + groupId, "{\n"
-                + "\t\"name\": \"Hue to Go\",\n"
-                + "\t\"lights\": [\n"
-                + "\t\t\"28\"\n"
-                + "\t],\n"
-                + "\t\"sensors\": [],\n"
-                + "\t\"type\": \"Zone\",\n"
-                + "\t\"state\": {\n"
-                + "\t\t\"all_on\": true,\n"
-                + "\t\t\"any_on\": true\n"
-                + "\t},\n"
-                + "\t\"recycle\": false,\n"
-                + "\t\"class\": \"Living room\",\n"
-                + "\t\"action\": {\n"
-                + "\t\t\"on\": true,\n"
-                + "\t\t\"bri\": 79,\n"
-                + "\t\t\"hue\": 1319,\n"
-                + "\t\t\"sat\": 225,\n"
-                + "\t\t\"effect\": \"none\",\n"
-                + "\t\t\"xy\": [\n"
-                + "\t\t\t0.6326,\n"
-                + "\t\t\t0.3339\n"
-                + "\t\t],\n"
-                + "\t\t\"ct\": 500,\n"
-                + "\t\t\"alert\": \"select\",\n"
-                + "\t\t\"colormode\": \"xy\"\n"
-                + "\t}\n"
+    void getGroupState_returnsListOfLightStates_ignoresUnknownLights() {
+        setGetResponse("/groups", "{\n"
+                + "  \"17\": {\n"
+                + "    \"name\": \"Group 17\",\n"
+                + "    \"lights\": [\n"
+                + "      \"8\",\n"
+                + "      \"16\",\n"
+                + "      \"21\",\n"
+                + "      \"777\"\n"
+                + "    ]\n"
+                + "  },\n"
+                + "  \"18\": {\n"
+                + "    \"name\": \"Group 18\",\n"
+                + "    \"lights\": [\n"
+                + "      \"24\"\n"
+                + "    ]\n"
+                + "  }\n"
+                + "}");
+        setGetResponse("/lights", "{\n"
+                + "  \"8\": {\n"
+                + "    \"state\": {\n"
+                + "      \"on\": true,\n"
+                + "      \"bri\": 43,\n"
+                + "      \"hue\": 692,\n"
+                + "      \"sat\": 204,\n"
+                + "      \"effect\": \"none\",\n"
+                + "      \"xy\": [\n"
+                + "        0.6189,\n"
+                + "        0.3303\n"
+                + "      ],\n"
+                + "      \"ct\": 500,\n"
+                + "      \"alert\": \"select\",\n"
+                + "      \"colormode\": \"xy\",\n"
+                + "      \"mode\": \"homeautomation\",\n"
+                + "      \"reachable\": true\n"
+                + "    },\n"
+                + "    \"type\": \"Extended color light\",\n"
+                + "    \"capabilities\": {\n"
+                + "      \"certified\": true,\n"
+                + "      \"control\": {\n"
+                + "        \"mindimlevel\": 40,\n"
+                + "        \"maxlumen\": 1600,\n"
+                + "        \"colorgamuttype\": \"C\",\n"
+                + "        \"colorgamut\": [\n"
+                + "          [\n"
+                + "            0.6915,\n"
+                + "            0.3083\n"
+                + "          ],\n"
+                + "          [\n"
+                + "            0.17,\n"
+                + "            0.7\n"
+                + "          ],\n"
+                + "          [\n"
+                + "            0.1532,\n"
+                + "            0.0475\n"
+                + "          ]\n"
+                + "        ],\n"
+                + "        \"ct\": {\n"
+                + "          \"min\": 153,\n"
+                + "          \"max\": 500\n"
+                + "        }\n"
+                + "      }\n"
+                + "    }\n"
+                + "  },\n"
+                + "  \"16\": {\n"
+                + "    \"state\": {\n"
+                + "      \"on\": false,\n"
+                + "      \"bri\": 127,\n"
+                + "      \"alert\": \"select\",\n"
+                + "      \"mode\": \"homeautomation\",\n"
+                + "      \"reachable\": true\n"
+                + "    },\n"
+                + "    \"type\": \"Dimmable light\",\n"
+                + "    \"capabilities\": {\n"
+                + "      \"certified\": true,\n"
+                + "      \"control\": {\n"
+                + "        \"mindimlevel\": 5000,\n"
+                + "        \"maxlumen\": 800\n"
+                + "      }\n"
+                + "    }\n"
+                + "  },\n"
+                + "  \"21\": {\n"
+                + "    \"state\": {\n"
+                + "      \"on\": false,\n"
+                + "      \"bri\": 184,\n"
+                + "      \"ct\": 366,\n"
+                + "      \"alert\": \"select\",\n"
+                + "      \"colormode\": \"ct\",\n"
+                + "      \"mode\": \"homeautomation\",\n"
+                + "      \"reachable\": true\n"
+                + "    },\n"
+                + "    \"type\": \"Color temperature light\",\n"
+                + "    \"capabilities\": {\n"
+                + "      \"certified\": true,\n"
+                + "      \"control\": {\n"
+                + "        \"mindimlevel\": 200,\n"
+                + "        \"maxlumen\": 350,\n"
+                + "        \"ct\": {\n"
+                + "          \"min\": 153,\n"
+                + "          \"max\": 454\n"
+                + "        }\n"
+                + "      }\n"
+                + "    }\n"
+                + "  },\n"
+                + "  \"24\": {\n"
+                + "    \"state\": {\n"
+                + "      \"on\": false,\n"
+                + "      \"alert\": \"select\",\n"
+                + "      \"mode\": \"homeautomation\",\n"
+                + "      \"reachable\": true\n"
+                + "    },\n"
+                + "    \"type\": \"On/Off plug-in unit\",\n"
+                + "    \"capabilities\": {\n"
+                + "      \"certified\": true,\n"
+                + "      \"control\": {}\n"
+                + "    }\n"
+                + "  }\n"
                 + "}");
         
-        GroupState groupState = api.getGroupState(groupId);
+        assertThat(api.getGroupStates(17)).containsExactly(
+                LightState.builder()
+                        .on(true)
+                        .brightness(43)
+                        .hue(692)
+                        .sat(204)
+                        .effect("none")
+                        .x(0.6189)
+                        .y(0.3303)
+                        .colorTemperature(500)
+                        .colormode("xy")
+                        .reachable(true)
+                        .capabilities(EnumSet.allOf(Capability.class))
+                        .build(),
+                LightState.builder()
+                        .on(false)
+                        .brightness(127)
+                        .reachable(true)
+                        .capabilities(EnumSet.of(Capability.BRIGHTNESS, Capability.ON_OFF))
+                        .build(),
+                LightState.builder()
+                        .on(false)
+                        .brightness(184)
+                        .colorTemperature(366)
+                        .colormode("ct")
+                        .reachable(true)
+                        .capabilities(EnumSet.of(Capability.COLOR_TEMPERATURE, Capability.BRIGHTNESS, Capability.ON_OFF))
+                        .build()
+        );
         
-        assertThat(groupState).isEqualTo(GroupState.builder()
-                .brightness(79)
-                .colorTemperature(500)
-                .x(0.6326)
-                .y(0.3339)
-                .hue(1319)
-                .sat(225)
-                .effect("none")
-                .colormode("xy")
-                .on(true)
-                .allOn(true)
-                .anyOn(true)
-                .build());
+        assertThat(api.getGroupStates(18)).containsExactly(
+                LightState.builder()
+                        .on(false)
+                        .reachable(true)
+                        .capabilities(EnumSet.of(Capability.ON_OFF))
+                        .build()
+        );
     }
     
     @Test
     void getGroupLights_returnsLightIdsForGroup_reusesSameForName() {
-        setGetResponse("/groups", "{\n" +
-                "\"1\": {\n" +
-                "\"name\": \"Group 1\",\n" +
-                "\"lights\": [\n" +
-                "\"1\",\n" +
-                "\"2\",\n" +
-                "\"3\"\n" +
-                "]\n" +
-                "},\n" +
-                "\"2\": {\n" +
-                "\"name\": \"Group 2\",\n" +
-                "\"lights\": [\n" +
-                "\"4\",\n" +
-                "\"5\"\n" +
-                "]\n" +
-                "}}");
-
-        List<Integer> groupLights = getGroupLights(2);
-        String groupName = api.getGroupName(2);
+        setGetResponse("/groups", "{\n"
+                + "  \"1\": {\n"
+                + "    \"name\": \"Group 1\",\n"
+                + "    \"lights\": [\n"
+                + "      \"1\",\n"
+                + "      \"2\",\n"
+                + "      \"3\"\n"
+                + "    ]\n"
+                + "  },\n"
+                + "  \"2\": {\n"
+                + "    \"name\": \"Group 2\",\n"
+                + "    \"lights\": [\n"
+                + "      \"4\",\n"
+                + "      \"5\"\n"
+                + "    ]\n"
+                + "  }}");
         
-        assertThat(groupLights).containsExactly(4, 5);
-        assertThat(groupName).isEqualTo("Group 2");
+        assertThat(getGroupLights(2)).containsExactly(4, 5);
+        assertThat(api.getGroupName(2)).isEqualTo("Group 2");
     }
     
     @Test
     void getAssignedGroups_givenLightId_returnsGroupIds() {
-        setGetResponse("/groups", "{\n" +
-                "\"1\": {\n" +
-                "\"name\": \"Group 1\",\n" +
-                "\"lights\": [\n" +
-                "\"1\",\n" +
-                "\"2\",\n" +
-                "\"3\"\n" +
-                "]\n" +
-                "},\n" +
-                "\"2\": {\n" +
-                "\"name\": \"Group 2\",\n" +
-                "\"lights\": [\n" +
-                "\"4\",\n" +
-                "\"5\",\n" +
-                "\"3\"\n" +
-                "]\n" +
-                "}}");
+        setGetResponse("/groups", "{\n"
+                + "  \"1\": {\n"
+                + "    \"name\": \"Group 1\",\n"
+                + "    \"lights\": [\n"
+                + "      \"1\",\n"
+                + "      \"2\",\n"
+                + "      \"3\"\n"
+                + "    ]\n"
+                + "  },\n"
+                + "  \"2\": {\n"
+                + "    \"name\": \"Group 2\",\n"
+                + "    \"lights\": [\n"
+                + "      \"4\",\n"
+                + "      \"5\",\n"
+                + "      \"3\"\n"
+                + "    ]\n"
+                + "  }}");
         
         assertThat(api.getAssignedGroups(2)).containsExactly(1);
         assertThat(api.getAssignedGroups(3)).containsExactly(1, 2);
         assertThat(api.getAssignedGroups(777)).isEmpty();
-    }
-    
-    @Test
-    void getAssignedGroups_givenLightId_returnsGroupIds_correctlyClearsCaches() {
-        setGetResponse("/groups", "{\n" +
-                "\"1\": {\n" +
-                "\"name\": \"Group 1\",\n" +
-                "\"lights\": [\n" +
-                "\"1\",\n" +
-                "\"2\",\n" +
-                "\"3\"\n" +
-                "]\n" +
-                "},\n" +
-                "\"2\": {\n" +
-                "\"name\": \"Group 2\",\n" +
-                "\"lights\": [\n" +
-                "\"4\",\n" +
-                "\"5\",\n" +
-                "\"3\"\n" +
-                "]\n" +
-                "}}");
-        
-        assertThat(api.getAssignedGroups(2)).containsExactly(1);
-        assertThat(api.getAssignedGroups(2)).containsExactly(1);
         api.clearCaches();
-        assertThat(api.getAssignedGroups(3)).containsExactly(1, 2);
-        assertThat(api.getAssignedGroups(777)).isEmpty();
-        
+        assertThat(api.getAssignedGroups(2)).containsExactly(1);
+        assertThat(api.getAssignedGroups(2)).containsExactly(1);
         verify(resourceProviderMock, times(2)).getResource(any());
     }
     
     @Test
     void getGroupLights_emptyLights_exception() {
-        setGetResponse("/groups", "{\n" +
-                "\"1\": {\n" +
-                "\"name\": \"Group 1\",\n" +
-                "\"lights\": [\n" +
-                "]\n" +
-                "}\n" +
-                "}}");
+        setGetResponse("/groups", "{\n"
+                + "  \"1\": {\n"
+                + "    \"name\": \"Group 1\",\n"
+                + "    \"lights\": [\n"
+                + "    ]\n"
+                + "  }\n"
+                + "}}");
 
         assertThrows(EmptyGroupException.class, () -> getGroupLights(1));
     }
@@ -346,22 +470,22 @@ class HueApiTest {
 
     @Test
     void getGroupName_returnsNameForGroupId() {
-        setGetResponse("/groups", "{\n" +
-                "\"1\": {\n" +
-                "\"name\": \"Group 1\",\n" +
-                "\"lights\": [\n" +
-                "\"1\",\n" +
-                "\"2\",\n" +
-                "\"3\"\n" +
-                "]\n" +
-                "},\n" +
-                "\"2\": {\n" +
-                "\"name\": \"Group 2\",\n" +
-                "\"lights\": [\n" +
-                "\"4\",\n" +
-                "\"5\"\n" +
-                "]\n" +
-                "}}");
+        setGetResponse("/groups", "{\n"
+                + "  \"1\": {\n"
+                + "    \"name\": \"Group 1\",\n"
+                + "    \"lights\": [\n"
+                + "      \"1\",\n"
+                + "      \"2\",\n"
+                + "      \"3\"\n"
+                + "    ]\n"
+                + "  },\n"
+                + "  \"2\": {\n"
+                + "    \"name\": \"Group 2\",\n"
+                + "    \"lights\": [\n"
+                + "      \"4\",\n"
+                + "      \"5\"\n"
+                + "    ]\n"
+                + "  }}");
 
         String name1 = api.getGroupName(1);
         String name2 = api.getGroupName(2);
@@ -386,40 +510,21 @@ class HueApiTest {
 
     @Test
     void getLightId_returnsIdForLightName_reusesResponseForMultipleRequest() {
-        setGetResponse("/lights", "{\n" +
-                "\"7\": {\n" +
-                "\"name\": \"Lamp 1\"\n" +
-                "},\n" +
-                "\"1234\": {\n" +
-                "\"name\": \"Lamp 2\"\n" +
-                "}\n" +
-                "}");
-
-        int lightId1 = api.getLightId("Lamp 1");
-        int lightId2 = api.getLightId("Lamp 2");
+        setGetResponse("/lights", "{\n"
+                + "  \"7\": {\n"
+                + "    \"name\": \"Lamp 1\"\n"
+                + "  },\n"
+                + "  \"1234\": {\n"
+                + "    \"name\": \"Lamp 2\"\n"
+                + "  }\n"
+                + "}");
         
-        assertThat(lightId1).isEqualTo(7);
-        assertThat(lightId2).isEqualTo(1234);
+        assertThat(api.getLightId("Lamp 1")).isEqualTo(7);
+        assertThat(api.getLightId("Lamp 2")).isEqualTo(1234);
         verify(resourceProviderMock).getResource(any());
-    }
-    
-    @Test
-    void getLightId_resetCache_causesMultipleRequests() {
-        setGetResponse("/lights", "{\n" +
-                "\"7\": {\n" +
-                "\"name\": \"Lamp 1\"\n" +
-                "},\n" +
-                "\"1234\": {\n" +
-                "\"name\": \"Lamp 2\"\n" +
-                "}\n" +
-                "}");
-        
-        assertThat(api.getLightId("Lamp 1")).isEqualTo(7);
-        assertThat(api.getLightId("Lamp 1")).isEqualTo(7);
         api.clearCaches();
-        assertThat(api.getLightId("Lamp 2")).isEqualTo(1234);
-        assertThat(api.getLightId("Lamp 2")).isEqualTo(1234);
-        
+        assertThat(api.getLightId("Lamp 1")).isEqualTo(7);
+        assertThat(api.getLightId("Lamp 1")).isEqualTo(7);
         verify(resourceProviderMock, times(2)).getResource(any());
     }
     
@@ -439,59 +544,32 @@ class HueApiTest {
 
     @Test
     void getGroupId_returnsIdForGroupName_reusesResponse() {
-        setGetResponse("/groups", "{\n" +
-                "\"11\": {\n" +
-                "\"name\": \"Group 1\",\n" +
-                "\"lights\": [\n" +
-                "\"1\",\n" +
-                "\"2\"\n" +
-                "]\n" +
-                "},\n" +
-                "\"789\": {\n" +
-                "\"name\": \"Group 2\",\n" +
-                "\"lights\": [\n" +
-                "\"3\",\n" +
-                "\"4\"\n" +
-                "]\n" +
-                "}\n" +
-                "}");
-
-        int groupId1 = api.getGroupId("Group 1");
-        int groupId2 = api.getGroupId("Group 2");
+        setGetResponse("/groups", "{\n"
+                + "  \"11\": {\n"
+                + "    \"name\": \"Group 1\",\n"
+                + "    \"lights\": [\n"
+                + "      \"1\",\n"
+                + "      \"2\"\n"
+                + "    ]\n"
+                + "  },\n"
+                + "  \"789\": {\n"
+                + "    \"name\": \"Group 2\",\n"
+                + "    \"lights\": [\n"
+                + "      \"3\",\n"
+                + "      \"4\"\n"
+                + "    ]\n"
+                + "  }\n"
+                + "}");
         
-        assertThat(groupId1).isEqualTo(11);
-        assertThat(groupId2).isEqualTo(789);
+        assertThat(api.getGroupId("Group 1")).isEqualTo(11);
+        assertThat(api.getGroupId("Group 2")).isEqualTo(789);
         verify(resourceProviderMock).getResource(any());
-    }
-    
-    @Test
-    void getGroupId_clearCaches_performsTwoFetches() {
-        setGetResponse("/groups", "{\n" +
-                "\"11\": {\n" +
-                "\"name\": \"Group 1\",\n" +
-                "\"lights\": [\n" +
-                "\"1\",\n" +
-                "\"2\"\n" +
-                "]\n" +
-                "},\n" +
-                "\"789\": {\n" +
-                "\"name\": \"Group 2\",\n" +
-                "\"lights\": [\n" +
-                "\"3\",\n" +
-                "\"4\"\n" +
-                "]\n" +
-                "}\n" +
-                "}");
-        
-        assertThat(api.getGroupId("Group 1")).isEqualTo(11);
-        assertThat(api.getGroupId("Group 1")).isEqualTo(11);
         api.clearCaches();
-        assertThat(api.getGroupId("Group 2")).isEqualTo(789);
-        assertThat(api.getGroupId("Group 2")).isEqualTo(789);
-        
+        assertThat(api.getGroupId("Group 1")).isEqualTo(11);
+        assertThat(api.getGroupId("Group 1")).isEqualTo(11);
         verify(resourceProviderMock, times(2)).getResource(any());
     }
-
+    
     @Test
     void getGroupId_unknownName_exception() {
         setGetResponse("/groups", "{}");
@@ -508,39 +586,21 @@ class HueApiTest {
 
     @Test
     void getLightName_returnsNameForLightId() {
-        setGetResponse("/lights", "{\n" +
-                "\"7\": {\n" +
-                "\"name\": \"Lamp 1\"\n" +
-                "},\n" +
-                "\"1234\": {\n" +
-                "\"name\": \"Lamp 2\"\n" +
-                "}\n" +
-                "}");
-
-        String name1 = api.getLightName(7);
-        String name2 = api.getLightName(1234);
-        
-        assertThat(name1).isEqualTo("Lamp 1");
-        assertThat(name2).isEqualTo("Lamp 2");
-    }
-    
-    @Test
-    void getLightName_returnsNameForLightId_correctlyResetsCache() {
-        setGetResponse("/lights", "{\n" +
-                "\"7\": {\n" +
-                "\"name\": \"Lamp 1\"\n" +
-                "},\n" +
-                "\"1234\": {\n" +
-                "\"name\": \"Lamp 2\"\n" +
-                "}\n" +
-                "}");
+        setGetResponse("/lights", "{\n"
+                + "  \"7\": {\n"
+                + "    \"name\": \"Lamp 1\"\n"
+                + "  },\n"
+                + "  \"1234\": {\n"
+                + "    \"name\": \"Lamp 2\"\n"
+                + "  }\n"
+                + "}");
         
         assertThat(api.getLightName(7)).isEqualTo("Lamp 1");
-        assertThat(api.getLightName(7)).isEqualTo("Lamp 1");
+        assertThat(api.getLightName(1234)).isEqualTo("Lamp 2");
+        verify(resourceProviderMock).getResource(any());
         api.clearCaches();
-        assertThat(api.getLightName(1234)).isEqualTo("Lamp 2");
-        assertThat(api.getLightName(1234)).isEqualTo("Lamp 2");
-        
+        assertThat(api.getLightName(7)).isEqualTo("Lamp 1");
+        assertThat(api.getLightName(7)).isEqualTo("Lamp 1");
         verify(resourceProviderMock, times(2)).getResource(any());
     }
 
@@ -560,36 +620,36 @@ class HueApiTest {
 
     @Test
     void getCapabilities_hasColorAndCtSupport() {
-        setGetResponse("/lights", "{\n" +
-                "\"22\": {\n" +
-                "\"type\": \"Extended color light\",\n" +
-                "\"capabilities\": {\n" +
-                "\"control\": {\n" +
-                "\"mindimlevel\": 200,\n" +
-                "\"maxlumen\": 800,\n" +
-                "\"colorgamuttype\": \"C\",\n" +
-                "\"colorgamut\": [\n" +
-                "[\n" +
-                "0.6915,\n" +
-                "0.3083\n" +
-                "],\n" +
-                "[\n" +
-                "0.17,\n" +
-                "0.7\n" +
-                "],\n" +
-                "[\n" +
-                "0.1532,\n" +
-                "0.0475\n" +
-                "]\n" +
-                "],\n" +
-                "\"ct\": {\n" +
-                "\"min\": 153,\n" +
-                "\"max\": 500\n" +
-                "}\n" +
-                "}\n" +
-                "}\n" +
-                "}\n" +
-                "}");
+        setGetResponse("/lights", "{\n"
+                + "  \"22\": {\n"
+                + "    \"type\": \"Extended color light\",\n"
+                + "    \"capabilities\": {\n"
+                + "      \"control\": {\n"
+                + "        \"mindimlevel\": 200,\n"
+                + "        \"maxlumen\": 800,\n"
+                + "        \"colorgamuttype\": \"C\",\n"
+                + "        \"colorgamut\": [\n"
+                + "          [\n"
+                + "            0.6915,\n"
+                + "            0.3083\n"
+                + "          ],\n"
+                + "          [\n"
+                + "            0.17,\n"
+                + "            0.7\n"
+                + "          ],\n"
+                + "          [\n"
+                + "            0.1532,\n"
+                + "            0.0475\n"
+                + "          ]\n"
+                + "        ],\n"
+                + "        \"ct\": {\n"
+                + "          \"min\": 153,\n"
+                + "          \"max\": 500\n"
+                + "        }\n"
+                + "      }\n"
+                + "    }\n"
+                + "  }\n"
+                + "}");
 
         LightCapabilities capabilities = api.getLightCapabilities(22);
 
@@ -656,17 +716,17 @@ class HueApiTest {
 
     @Test
     void getCapabilities_brightnessOnly() {
-        setGetResponse("/lights", "{\n" +
-                "\"7\": {\n" +
-                "\"type\": \"Dimmable light\",\n" +
-                "\"capabilities\": {\n" +
-                "\"control\": {\n" +
-                "\"mindimlevel\": 5000,\n" +
-                "\"maxlumen\": 1600\n" +
-                "}\n" +
-                "}\n" +
-                "}\n" +
-                "}");
+        setGetResponse("/lights", "{\n"
+                + "  \"7\": {\n"
+                + "    \"type\": \"Dimmable light\",\n"
+                + "    \"capabilities\": {\n"
+                + "      \"control\": {\n"
+                + "        \"mindimlevel\": 5000,\n"
+                + "        \"maxlumen\": 1600\n"
+                + "      }\n"
+                + "    }\n"
+                + "  }\n"
+                + "}");
 
         LightCapabilities capabilities = api.getLightCapabilities(7);
         
@@ -1207,23 +1267,6 @@ class HueApiTest {
     
     private void setPutResponse(String expectedUrl, String expectedBody, String response) {
         when(resourceProviderMock.putResource(getUrl(expectedUrl), expectedBody)).thenReturn(response);
-    }
-    
-    private String createApiStateResponse(double x, double y, int ct, int bri, int hue, int sat, boolean reachable, boolean on, String effect) {
-        return "{\n" +
-                "\"state\": {\n" +
-                "\"on\": " + on + ",\n" +
-                "\"bri\": " + bri + ",\n" +
-                "\"hue\": " + hue + ",\n" +
-                "\"sat\": " + sat + ",\n" +
-                "\"effect\": \"" + effect + "\",\n" +
-                "\"xy\": [\n" +
-                "" + x + ",\n" +
-                "" + y + "\n" +
-                "],\n" +
-                "\"ct\": " + ct + ",\n" +
-                "\"reachable\": " + reachable + "\n" +
-                "}, \"name\": \"Name 2\"}";
     }
     
     private LightState getLightState(int lightId) {

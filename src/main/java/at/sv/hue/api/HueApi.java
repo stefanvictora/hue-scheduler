@@ -18,10 +18,10 @@ public interface HueApi {
     
     /**
      * @param id the id of the group
-     * @return the state of the group read from the "action" object returned
+     * @return a list of light states for all the contained lights of the group
      * @throws HueApiFailure if the api call failed
      */
-    GroupState getGroupState(int id);
+    List<LightState> getGroupStates(int id);
     
     /**
      * @return true if the put api call was successful, false if not because the light is off.

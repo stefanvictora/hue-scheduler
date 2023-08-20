@@ -1,8 +1,8 @@
 package at.sv.hue;
 
 import at.sv.hue.api.LightCapabilities;
+import at.sv.hue.api.LightState;
 import at.sv.hue.api.PutCall;
-import at.sv.hue.api.State;
 import at.sv.hue.time.StartTimeProvider;
 import lombok.Builder;
 import lombok.Getter;
@@ -300,9 +300,9 @@ final class ScheduledState {
     }
     
     private ZonedDateTime getDefinedStartInTheFuture() { // todo: write more tests to verify this behavior
-        ZonedDateTime definedStart = getStartWithoutTransitionTimeBefore(lastStart); // .with(lastStart.toLocalDate())
+        ZonedDateTime definedStart = getStartWithoutTransitionTimeBefore(lastStart);
         if (definedStart.isBefore(lastStart)) {
-            return getStartWithoutTransitionTimeBefore(lastStart.plusDays(1)); // with(lastStart.plusDays(1).toLocalDate())
+            return getStartWithoutTransitionTimeBefore(lastStart.plusDays(1));
         }
         return definedStart;
     }
@@ -343,22 +343,25 @@ final class ScheduledState {
         this.lastStart = getStart(now);
     }
     
-    public boolean lightStateDiffers(State currentState) {
+    public boolean lightStateDiffers(LightState currentState) {
         return brightnessDiffers(currentState) ||
                 colorModeOrValuesDiffer(currentState) ||
                 effectDiffers(currentState);
     }
     
-    private boolean brightnessDiffers(State currentState) {
-        return brightness != null && !brightness.equals(currentState.getBrightness());
+    private boolean brightnessDiffers(LightState currentState) {
+        return brightness != null && currentState.isBrightnessSupported() && !brightness.equals(currentState.getBrightness());
     }
     
-    private boolean colorModeOrValuesDiffer(State currentState) {
+    private boolean colorModeOrValuesDiffer(LightState currentState) {
         ColorMode colorMode = getColorMode();
         if (colorMode == ColorMode.NONE) {
             return false; // if no color mode scheduled, always treat as equal
         }
-        if (!Objects.equals(colorMode, currentState.getColormode())) {
+        if (colorModeNotSupportedByState(colorMode, currentState)) {
+			return false;
+		}
+        if (colorModeDiffers(colorMode, currentState)) {
             return true;
         }
         switch (colorMode) {
@@ -374,7 +377,7 @@ final class ScheduledState {
                 return false; // should not happen, but as a fallback we just ignore unknown color modes
         }
     }
-
+    
     public ColorMode getColorMode() {
         if (ct != null) {
             return ColorMode.CT;
@@ -386,7 +389,17 @@ final class ScheduledState {
         return ColorMode.NONE;
     }
     
-    private boolean effectDiffers(State currentState) {
+    private static boolean colorModeNotSupportedByState(ColorMode colorMode, LightState currentState) {
+        return colorMode == ColorMode.CT && !currentState.isCtSupported()
+                || colorMode == ColorMode.HS && !currentState.isColorSupported()
+                || colorMode == ColorMode.XY && !currentState.isColorSupported();
+    }
+    
+    private static boolean colorModeDiffers(ColorMode colorMode, LightState currentState) {
+        return !Objects.equals(colorMode, currentState.getColormode());
+    }
+    
+    private boolean effectDiffers(LightState currentState) {
         if (getEffect() == null) {
             return false; // if no effect scheduled, always treat as equal
         } else if (currentState.getEffect() == null) {

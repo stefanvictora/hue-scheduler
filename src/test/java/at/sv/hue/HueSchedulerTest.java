@@ -4,7 +4,6 @@ import at.sv.hue.api.BridgeConnectionFailure;
 import at.sv.hue.api.Capability;
 import at.sv.hue.api.EmptyGroupException;
 import at.sv.hue.api.GroupNotFoundException;
-import at.sv.hue.api.GroupState;
 import at.sv.hue.api.HueApi;
 import at.sv.hue.api.HueApiFailure;
 import at.sv.hue.api.LightCapabilities;
@@ -229,8 +228,8 @@ class HueSchedulerTest {
         addLightStateResponse(id, lightState);
     }
     
-    private void addGroupStateResponse(int id, GroupState groupState) {
-        when(mockedHueApi.getGroupState(id)).thenReturn(groupState);
+    private void addGroupStateResponses(int id, LightState... lightStates) {
+        when(mockedHueApi.getGroupStates(id)).thenReturn(Arrays.asList(lightStates));
     }
 
     private void ensureNextDayRunnable() {
@@ -2712,7 +2711,7 @@ class HueSchedulerTest {
     }
     
     @Test
-    void run_execution_manualOverride_groupState_correctlyComparesState() {
+    void run_execution_manualOverride_groupState_allLightsWithSameCapabilities_correctlyComparesState() {
         enableUserModificationTracking();
         create();
         
@@ -2738,12 +2737,17 @@ class HueSchedulerTest {
         ensureRunnable(initialNow.plusDays(1)); // for next day
         
         // user modified group state between first and second state -> update skipped and retry scheduled
-        GroupState userModifiedGroupState = GroupState.builder()
+        LightState userModifiedLightState = LightState.builder()
                 .brightness(DEFAULT_BRIGHTNESS + 5)
                 .colormode("CT")
                 .on(true)
                 .build();
-        addGroupStateResponse(1, userModifiedGroupState);
+        LightState sameAsFirst = LightState.builder() // same as first
+                .brightness(DEFAULT_BRIGHTNESS)
+                .colormode("CT")
+                .on(true)
+                .build();
+        addGroupStateResponses(1, sameAsFirst, userModifiedLightState);
         setCurrentTimeTo(secondState);
         
         secondState.run(); // detects change, sets manually changed flag
@@ -2771,12 +2775,12 @@ class HueSchedulerTest {
         ensureRunnable(initialNow.plusDays(1).plusHours(2), initialNow.plusDays(1).plusHours(3)); // third state, for next day
         
         // no modification detected, fourth state set normally
-        GroupState sameStateAsThird = GroupState.builder()
+        LightState sameStateAsThird = LightState.builder()
                 .brightness(DEFAULT_BRIGHTNESS + 20)
                 .colormode("CT")
                 .on(true)
                 .build();
-        addGroupStateResponse(1, sameStateAsThird);
+        addGroupStateResponses(1, sameStateAsThird, sameStateAsThird);
         setCurrentTimeTo(fourthState);
         
         runAndAssertPutCall(fourthState, expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 30).groupState(true).build());
@@ -2784,19 +2788,19 @@ class HueSchedulerTest {
         ensureRunnable(initialNow.plusDays(1).plusHours(3), initialNow.plusDays(1).plusHours(4)); // fourth state, for next day
         
         // second modification detected, fifth state skipped again
-        GroupState secondUserModification = GroupState.builder()
+        LightState secondUserModification = LightState.builder()
                 .brightness(DEFAULT_BRIGHTNESS + 5)
                 .colormode("CT")
                 .on(true)
                 .build();
-        addGroupStateResponse(1, secondUserModification);
+        addGroupStateResponses(1, secondUserModification, secondUserModification);
         setCurrentTimeTo(fifthState);
         
         fifthState.run(); // detects manual modification again
         
         ensureScheduledStates(0);
         
-        verify(mockedHueApi, times(3)).getGroupState(1);
+        verify(mockedHueApi, times(3)).getGroupStates(1);
     }
     
     @Test

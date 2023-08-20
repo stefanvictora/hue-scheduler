@@ -7,12 +7,16 @@
 ### Added
 - Added **interpolations for tr-before** states (#4): For any states using `tr-before`, if the light is turned on in the middle of the transition, Hue Scheduler now calculates the mid-transition state based on the previous state and elapsed time, and continues the transition from this point. To transition between multiple color modes, Hue Scheduler is now capable of converting values among all color modes, including CT, XY, and Hue/Sat.
 - Added new `--interpolation-transition-time` global configuration flag (default `4` = 400 ms) to configure the transition time as a multiple of 100ms. This is used for the interpolated calls mentioned above.
-- Added group capability validations: During startup, group states are now validated for their capabilities based on their contained lights
+- Added group capability validations: During startup, group states are now also validated based on the capabilities of the contained lights
 - Added ability to specify brightness (`bri`) [``1%``-``100%``] and saturation (`sat`) [``0%``-``100%``] as percentage 
 
 ### Changed
-- Improved **manual modification tracking for groups**: Rather than only comparing with the state of the first light in the group, Hue Scheduler now uses the group state provided by the API
-- Improved **turn-on tracking for groups**: Hue Scheduler now uses group-on events instead of listening for the first contained light being turned on. To detect groups being physically turned on, every physically turned-on light inside a group now also triggers a group-on event. This is necessary, as the API does not generate any group-specific events in such cases.
+- Improved **manual modification tracking for groups**: Rather than only comparing with the state of the first light in the group,
+  Hue Scheduler now compares the state of all contained lights. While handling special cases for contained lights with different
+  capabilities, as we can't expect, e.g., color temperature lights to display color.
+- Improved **turn-on tracking for groups**: Hue Scheduler now uses group-on events instead of listening for the first contained light being turned on. 
+  To still detect groups being physically turned on, now every physically turned-on light inside a group also triggers a group-on event.
+  This is necessary, as the Hue bridge currently does not generate any group-specific events in such cases.
 - Improved support for 'On/Off plug-in unit' type of lights
 
 ### Removed

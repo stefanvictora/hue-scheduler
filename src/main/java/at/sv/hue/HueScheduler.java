@@ -16,7 +16,6 @@ import at.sv.hue.api.ManualOverrideTracker;
 import at.sv.hue.api.ManualOverrideTrackerImpl;
 import at.sv.hue.api.PutCall;
 import at.sv.hue.api.RateLimiter;
-import at.sv.hue.api.State;
 import at.sv.hue.time.StartTimeProvider;
 import at.sv.hue.time.StartTimeProviderImpl;
 import at.sv.hue.time.SunTimesProviderImpl;
@@ -372,19 +371,15 @@ public final class HueScheduler implements Runnable {
         return !disableUserModificationTracking && !state.isForced() && !manualOverrideTracker.shouldEnforceSchedule(state.getIdV1());
     }
 
-    private boolean stateHasBeenManuallyOverriddenSinceLastSeen(ScheduledState currentState) {
-        ScheduledState lastSeenState = getLastSeenState(currentState);
+    private boolean stateHasBeenManuallyOverriddenSinceLastSeen(ScheduledState scheduledState) {
+        ScheduledState lastSeenState = getLastSeenState(scheduledState);
         if (lastSeenState == null) {
             return false;
         }
-        return lastSeenState.lightStateDiffers(getCurrentState(currentState));
-    }
-    
-    private State getCurrentState(ScheduledState scheduledState) {
         if (scheduledState.isGroupState()) {
-            return hueApi.getGroupState(scheduledState.getUpdateId());
+            return hueApi.getGroupStates(scheduledState.getUpdateId()).stream().anyMatch(lastSeenState::lightStateDiffers);
         } else {
-            return hueApi.getLightState(scheduledState.getUpdateId());
+            return lastSeenState.lightStateDiffers(hueApi.getLightState(scheduledState.getUpdateId()));
         }
     }
     
