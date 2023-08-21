@@ -18,7 +18,7 @@ public final class StartTimeProviderImpl implements StartTimeProvider {
         if (time != null) return dateTime.with(time);
         try {
             if (isOffsetExpression(input)) {
-                return parseOffsetExpresion(input, dateTime);
+                return parseOffsetExpression(input, dateTime);
             }
             return parseSunKeywords(input, dateTime);
         } catch (Exception e) {
@@ -39,7 +39,7 @@ public final class StartTimeProviderImpl implements StartTimeProvider {
         return input.contains("+") || input.contains("-");
     }
 
-    private ZonedDateTime parseOffsetExpresion(String input, ZonedDateTime dateTime) {
+    private ZonedDateTime parseOffsetExpression(String input, ZonedDateTime dateTime) {
         String[] parts = input.split("[+-]");
         ZonedDateTime startTime = parseSunKeywords(parts[0].trim(), dateTime);
         int offset = Integer.parseInt(parts[1].trim());

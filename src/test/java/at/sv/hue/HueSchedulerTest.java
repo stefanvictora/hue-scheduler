@@ -594,7 +594,51 @@ class HueSchedulerTest {
 
         ensureRunnable(initialNow.plusDays(1));
     }
-
+    
+    @Test
+    void parse_canParseTransitionTime_withSunTime() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState("1", "civil_dusk", "bri:" + DEFAULT_BRIGHTNESS, "tr-before:sunset+10");
+        ZonedDateTime sunset = startTimeProvider.getStart("sunset", now);
+        ZonedDateTime civilDusk = startTimeProvider.getStart("civil_dusk", now);
+        ZonedDateTime nextDaySunset = startTimeProvider.getStart("sunset", now.plusDays(1));
+        ZonedDateTime nextNextDaySunset = startTimeProvider.getStart("sunset", now.plusDays(2));
+        
+        startScheduler();
+        
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(2);
+        ScheduledRunnable trBeforeRunnable = scheduledRunnables.get(1);
+        
+        assertScheduleStart(trBeforeRunnable, sunset.plusMinutes(10), nextDaySunset.plusMinutes(10));
+        
+        int expectedTransitionTime = (int) (Duration.between(sunset.plusMinutes(10), civilDusk).toMillis() / 100L);
+        advanceTimeAndRunAndAssertPutCall(trBeforeRunnable, expectedPutCall(1)
+                .bri(DEFAULT_BRIGHTNESS)
+                .transitionTime(expectedTransitionTime).build());
+        
+        ensureRunnable(nextDaySunset.plusMinutes(10), nextNextDaySunset.plusMinutes(10));
+    }
+    
+    @Test
+    void parse_canParseTransitionTime_negativeDuration_ignored() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState("1", "golden_hour", "bri:" + DEFAULT_BRIGHTNESS, "tr-before:sunset"); // referenced time is AFTER start
+        ZonedDateTime goldenHour = startTimeProvider.getStart("golden_hour", now);
+        ZonedDateTime nextDayGoldenHour = startTimeProvider.getStart("golden_hour", now.plusDays(1));
+        ZonedDateTime nextNextDayGoldenHour = startTimeProvider.getStart("golden_hour", now.plusDays(2));
+        
+        startScheduler();
+        
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(2);
+        ScheduledRunnable trBeforeRunnable = scheduledRunnables.get(1);
+        
+        assertScheduleStart(trBeforeRunnable, goldenHour, nextDayGoldenHour);
+        
+        advanceTimeAndRunAndAssertPutCall(trBeforeRunnable, expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).build());
+        
+        ensureRunnable(nextDayGoldenHour, nextNextDayGoldenHour);
+    }
+    
     @Test
     void parse_transitionTimeBefore_shiftsGivenStartByThatTime_afterPowerCycle_sameStateAgainWithTransitionTime() {
         addKnownLightIdsWithDefaultCapabilities(1);

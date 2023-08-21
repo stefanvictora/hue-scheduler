@@ -35,7 +35,7 @@ final class ScheduledState {
 
     private final String name;
     private final int updateId;
-    private final String start;
+    private final String startString;
     private final Integer brightness;
     private final Integer ct;
     private final Double x;
@@ -44,7 +44,7 @@ final class ScheduledState {
     private final Integer sat;
     private final Boolean on;
     private final Integer transitionTime;
-    private final Integer transitionTimeBefore;
+    private final String transitionTimeBeforeString;
     private final StartTimeProvider startTimeProvider;
     private final String effect;
     private final EnumSet<DayOfWeek> daysOfWeek;
@@ -60,13 +60,13 @@ final class ScheduledState {
     private ScheduledState originalState;
 
     @Builder
-    public ScheduledState(String name, int updateId, String start, Integer brightness, Integer ct, Double x, Double y,
-                          Integer hue, Integer sat, String effect, Boolean on, Integer transitionTimeBefore, Integer transitionTime,
+    public ScheduledState(String name, int updateId, String startString, Integer brightness, Integer ct, Double x, Double y,
+            Integer hue, Integer sat, String effect, Boolean on, String transitionTimeBeforeString, Integer transitionTime,
                           Set<DayOfWeek> daysOfWeek, StartTimeProvider startTimeProvider, boolean groupState,
                           List<Integer> groupLights, LightCapabilities capabilities, Boolean force) {
         this.name = name;
         this.updateId = updateId;
-        this.start = start;
+        this.startString = startString;
         if (daysOfWeek == null || daysOfWeek.isEmpty()) {
             this.daysOfWeek = EnumSet.allOf(DayOfWeek.class);
         } else {
@@ -84,7 +84,7 @@ final class ScheduledState {
         this.sat = assertValidSaturationValue(sat);
         this.on = on;
         this.transitionTime = assertValidTransitionTime(transitionTime);
-        this.transitionTimeBefore = assertValidTransitionTime(transitionTimeBefore);
+        this.transitionTimeBeforeString = transitionTimeBeforeString;
         this.startTimeProvider = startTimeProvider;
         this.force = force;
         temporary = false;
@@ -97,11 +97,11 @@ final class ScheduledState {
     }
     
     public static ScheduledState createTemporaryCopy(ScheduledState state, ZonedDateTime end) {
-        return createTemporaryCopy(state, state.start, state.lastStart, end, state.transitionTimeBefore);
+        return createTemporaryCopy(state, state.startString, state.lastStart, end, state.transitionTimeBeforeString);
     }
     
     private static ScheduledState createTemporaryCopy(ScheduledState state, String start, ZonedDateTime lastStart, ZonedDateTime end,
-            Integer transitionTimeBefore) {
+            String transitionTimeBefore) {
         ScheduledState copy = new ScheduledState(state.name, state.updateId, start,
                 state.brightness, state.ct, state.x, state.y, state.hue, state.sat, state.effect, state.on, transitionTimeBefore,
                 state.transitionTime, state.daysOfWeek, state.startTimeProvider, state.groupState, state.groupLights,
@@ -219,12 +219,38 @@ final class ScheduledState {
 
     public ZonedDateTime getStart(ZonedDateTime dateTime) {
         ZonedDateTime definedStart = getStartWithoutTransitionTimeBefore(dateTime);
-        if (transitionTimeBefore != null) {
+        if (transitionTimeBeforeString != null) {
+            int transitionTimeBefore = getTransitionTimeBefore(dateTime);
             return definedStart.with(definedStart.toLocalTime().minus(transitionTimeBefore * 100L, ChronoUnit.MILLIS));
         }
         return definedStart;
     }
-
+    
+    /**
+     * Returns the calculated transition time before as multiple of 100ms, to be directly used by the Hue API.
+     * To get the actual ms, multiply the returned value by 100.
+     *
+     * @param dateTime the date time used as input for calculating sun-based transition before times.
+     * @return the calculated transition time before as multiple of 100ms
+     */
+    public Integer getTransitionTimeBefore(ZonedDateTime dateTime) {
+        try {
+            return InputConfigurationParser.parseTransitionTime("tr-before", transitionTimeBeforeString);
+        } catch (Exception e) {
+            return parseStartTimeBasedTransitionTime(dateTime);
+        }
+    }
+    
+    private int parseStartTimeBasedTransitionTime(ZonedDateTime dateTime) {
+        ZonedDateTime transitionTimeBeforeStart = startTimeProvider.getStart(transitionTimeBeforeString, dateTime);
+        ZonedDateTime definedStart = getStartWithoutTransitionTimeBefore(dateTime);
+        Duration duration = Duration.between(transitionTimeBeforeStart, definedStart);
+        if (duration.isNegative()) {
+            return 0;
+        }
+        return (int) (duration.toMillis() / 100L);
+    }
+    
     private ZonedDateTime getStartWithoutTransitionTimeBefore(ZonedDateTime now) {
         DayOfWeek day;
         DayOfWeek today = DayOfWeek.from(now);
@@ -234,7 +260,7 @@ final class ScheduledState {
             day = getNextDayAfterTodayOrFirstNextWeek(today);
         }
         now = now.with(TemporalAdjusters.nextOrSame(day));
-        return startTimeProvider.getStart(start, now);
+        return startTimeProvider.getStart(startString, now);
     }
 
     private DayOfWeek getNextDayAfterTodayOrFirstNextWeek(DayOfWeek today) {
@@ -288,11 +314,13 @@ final class ScheduledState {
         if (adjustedTrBefore == 0) {
             return transitionTime;
         }
-        return adjustedTrBefore;
+        return adjustedTrBefore; // todo: it could be now that this value is too big for the Hue API
     }
 
     public int getAdjustedTransitionTimeBefore(ZonedDateTime now) {
-        if (transitionTimeBefore == null) return 0;
+        if (transitionTimeBeforeString == null) {
+            return 0;
+        }
         ZonedDateTime definedStart = getDefinedStartInTheFuture();
         Duration between = Duration.between(now, definedStart);
         if (between.isZero() || between.isNegative()) return 0;
@@ -444,8 +472,8 @@ final class ScheduledState {
                       .sat(sat)
                       .on(on)
                       .effect(getEffect())
-                      .transitionTime(getTransitionTime(now))
-                      .groupState(groupState)
+                .transitionTime(getTransitionTime(now)) // todo: this transition time could be too big, think about some splitting logic maybe
+                .groupState(groupState)
                       .build();
     }
     
@@ -469,7 +497,7 @@ final class ScheduledState {
                 getFormattedPropertyIfSet("sat", sat) +
                 getFormattedPropertyIfSet("effect", effect) +
                 getFormattedDaysOfWeek() +
-                getFormattedTransitionTimeIfSet("transitionTimeBefore", transitionTimeBefore) +
+                getFormattedTransitionTimeBefore() +
                 getFormattedTransitionTimeIfSet("transitionTime", transitionTime) +
                 getFormattedPropertyIfSet("lastSeen", getFormattedTime(lastSeen)) +
                 getFormattedPropertyIfSet("force", force) +
@@ -485,9 +513,9 @@ final class ScheduledState {
 
     private String getFormattedStart() {
         if (lastStart != null) {
-            return start + " (" + getFormattedTime(lastStart) + ")";
+            return startString + " (" + getFormattedTime(lastStart) + ")";
         }
-        return start;
+        return startString;
     }
 
     private String getFormattedTime(ZonedDateTime zonedDateTime) {
@@ -501,7 +529,18 @@ final class ScheduledState {
         if (end == null) return "<ERROR: not set>";
         return end.toLocalDateTime().toString();
     }
-
+    
+    private String getFormattedTransitionTimeBefore() {
+        if (transitionTimeBeforeString == null) {
+            return "";
+        }
+        if (lastStart != null) {
+            return formatPropertyName("transitionTimeBefore") + transitionTimeBeforeString +
+                    " (" + formatTransitionTime(getTransitionTimeBefore(lastStart)) + ")";
+        }
+        return formatPropertyName("transitionTimeBefore") + transitionTimeBeforeString;
+    }
+    
     private String getFormattedPropertyIfSet(String name, Object property) {
         if (property == null) return "";
         return formatPropertyName(name) + property;
@@ -518,6 +557,10 @@ final class ScheduledState {
 
     private String getFormattedTransitionTimeIfSet(String name, Integer transitionTime) {
         if (transitionTime == null) return "";
-        return formatPropertyName(name) + Duration.ofMillis(transitionTime * 100L).toString();
+        return formatPropertyName(name) + formatTransitionTime(transitionTime);
+    }
+    
+    private static String formatTransitionTime(Integer transitionTime) {
+        return Duration.ofMillis(transitionTime * 100L).toString();
     }
 }

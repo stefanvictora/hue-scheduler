@@ -66,7 +66,7 @@ public final class InputConfigurationParser {
             Double y = null;
             Integer hue = null;
             Integer sat = null;
-            Integer transitionTimeBefore = null;
+            String transitionTimeBefore = null;
             Integer transitionTime = null;
             String effect = null;
             EnumSet<DayOfWeek> dayOfWeeks = EnumSet.noneOf(DayOfWeek.class);
@@ -92,7 +92,7 @@ public final class InputConfigurationParser {
                         transitionTime = parseTransitionTime(parameter, value);
                         break;
                     case "tr-before":
-                        transitionTimeBefore = parseTransitionTime(parameter, value);
+                        transitionTimeBefore = value;
                         break;
                     case "x":
                         x = parseDouble(value, parameter);
@@ -223,7 +223,7 @@ public final class InputConfigurationParser {
     }
 
     private ScheduledState createState(String name, int id, String start, Integer brightness, Integer ct, Double x, Double y,
-                                       Integer hue, Integer sat, String effect, Boolean on, Integer transitionTimeBefore, Integer transitionTime,
+                                       Integer hue, Integer sat, String effect, Boolean on, String transitionTimeBefore, Integer transitionTime,
                                        EnumSet<DayOfWeek> dayOfWeeks, LightCapabilities capabilities, boolean groupState, Boolean force) {
         List<Integer> groupLights;
         if (groupState) {

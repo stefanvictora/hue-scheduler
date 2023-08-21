@@ -16,10 +16,10 @@ Office        sunrise     bri:254  ct:6500  tr:10s  days:Mo-Fr
 # Concentrate
 Office	      sunrise+90  ct:5000  tr-before:20min  days:Mo-Fr
 # Wind down
-Office        sunset      bri:200  ct:3000  tr-before:20min  days:Mo-Fr
+Office        sunset      bri:80%  ct:3000  tr-before:golden_hour+10  days:Mo-Fr
 
 # Garden lights
-Garden        civil_dusk  on:true  bri:254  tr:1min
+Garden        civil_dusk  on:true  bri:100%  tr:1min
 Garden        01:00       on:false tr:5min
 
 # Party
@@ -236,7 +236,7 @@ Desk  15:00  x:0.1652  y=0.3103
 > if not specified otherwise, you have to explicitly set `tr:0` if you want to set multiple properties for Ikea Tradfri light bulbs.
 > Another workaround is to only set one property per state and offset the state changes accordingly to the used transition time.
 
-The transition time between two light states, defined as a multiple of 100ms: [``0``-``65535``]. For example: `tr:1` equals a transition time of 100ms. The maximum support value ``65535`` equals roughly 1 hour and 48 min.
+The transition time between two light states, defined as a multiple of 100ms: [``0``-``65535``]. For example: `tr:1` equals a transition time of 100ms. The maximally supported value ``65535`` equals roughly 1 hour and 48 min.
 
 To simplify the definition, you can use the ``s`` (seconds) and ``min`` (minutes) units. For example: ``tr:10s`` or ``tr:2min``.
 
@@ -244,13 +244,18 @@ Hue Scheduler offers two different transition time properties, which can be comb
 
 - ``tr``: defines the transition time used at or *after* the defined start time. The default transition used by the Hue System. Default: `4` (400ms).
 
-- ``tr-before``: defines the transition time used *before* the defined start time. The additional transition provided by Hue Scheduler. For example:
+- ``tr-before``: defines the transition time used *before* the defined start time. The additional transition provided by Hue Scheduler. In addition to the seconds and minute shorthand from above, ``tr-before`` also supports setting absolute times, including dynamic sun times (see _Start Time Expression_). For example:
 
   ~~~yacas
-  Office  sunrise  on:true  bri:254  tr-before:10min
+  Office  sunrise  on:true  bri:254  tr-before:30min
+  Office  sunrise  on:true  bri:254  tr-before:06:00
+  Office  sunrise  on:true  bri:254  tr-before:civil_dawn+5
   ~~~
 
-  Here the transition starts 10 minutes before sunrise to smoothly turn on the light to full brightness until the sun has risen.
+  In the first example, the transition starts 30 minutes before sunrise, while in the last example it starts 5 minutes after ``civil_dawn`` to smoothly turn on the light to full brightness until the sun has risen. 
+  
+  > Note: The given start time expression must be before the defined start of the state, otherwise the transition-before property is ignored.
+  // TODO: Add more details
 
   What makes `tr-before` especially useful is that Hue Scheduler automatically adjusts the transition time to the remaining duration if the light is turned on at later point. And most importantly, it also calculates the mid-transition state based on the elapsed time. Consider, for example:
 

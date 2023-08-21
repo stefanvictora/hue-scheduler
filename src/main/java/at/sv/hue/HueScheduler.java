@@ -391,7 +391,7 @@ public final class HueScheduler implements Runnable {
     }
     
     private void putAdditionalInterpolatedStateIfNeeded(ScheduledState state) {
-        if (state.getTransitionTimeBefore() == null) {
+        if (state.getTransitionTimeBeforeString() == null) {
             return;
         }
         ScheduledState previousState = getPreviousState(state);

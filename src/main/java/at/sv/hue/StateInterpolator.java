@@ -25,7 +25,7 @@ public final class StateInterpolator {
 			return null; // the state is already reached
 		}
 		PutCall interpolatedPutCall;
-		if (timeUntilThisState == state.getTransitionTimeBefore()) {
+		if (timeUntilThisState == state.getTransitionTimeBefore(now)) {
 			interpolatedPutCall = previousState.getPutCall(now); // directly at start, just use previous put call
 		} else {
 			interpolatedPutCall = interpolate();
