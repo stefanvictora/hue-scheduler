@@ -236,15 +236,14 @@ Desk  15:00  x:0.1652  y=0.3103
 > if not specified otherwise, you have to explicitly set `tr:0` if you want to set multiple properties for Ikea Tradfri light bulbs.
 > Another workaround is to only set one property per state and offset the state changes accordingly to the used transition time.
 
-The transition time between two light states, defined as a multiple of 100ms: [``0``-``65535``]. For example: `tr:1` equals a transition time of 100ms. The maximally supported value ``65535`` equals roughly 1 hour and 48 min.
-
-To simplify the definition, you can use the ``s`` (seconds) and ``min`` (minutes) units. For example: ``tr:10s`` or ``tr:2min``.
+The transition time between two light states, defined as a multiple of 100ms. For example: `tr:1` equals a transition time of 100ms.
+To simplify the definition, you can use the ``s`` (seconds), ``min`` (minutes) and ``h`` (hours) units. For example: ``tr:10s``, ``tr:2min`` or ``tr:1h``.
 
 Hue Scheduler offers two different transition time properties, which can be combined to create the desired transition behavior:
 
-- ``tr``: defines the transition time used at or *after* the defined start time. The default transition used by the Hue System. Default: `4` (400ms).
+- ``tr``: defines the transition time used at or *after* the defined start time [``0``-``60000``]. The default transition used by the Hue System. Default: `4` (400ms). The maximally supported value ``60000`` equals 100 min. 
 
-- ``tr-before``: defines the transition time used *before* the defined start time. The additional transition provided by Hue Scheduler. In addition to the seconds and minute shorthand from above, ``tr-before`` also supports setting absolute times, including dynamic sun times (see _Start Time Expression_). For example:
+- ``tr-before``: defines the transition time used *before* the defined start time [``0``-``?``]. The additional transition provided by Hue Scheduler. In addition to the seconds and minute shorthand from above, ``tr-before`` also supports setting absolute times, including dynamic sun times (see _Start Time Expression_ section):
 
   ~~~yacas
   Office  sunrise  on:true  bri:254  tr-before:30min

@@ -6,6 +6,7 @@ import at.sv.hue.api.LightState;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.ZonedDateTime;
 import java.util.EnumSet;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -625,6 +626,7 @@ class ScheduledStateTest {
     }
     
     private static void assertLightStateDiffers(ScheduledState scheduledState, LightState lightState, boolean expected) {
+        scheduledState.setLastPutCall(scheduledState.getPutCall(ZonedDateTime.now())); // fake last execution
         assertThat(scheduledState.lightStateDiffers(lightState)).isEqualTo(expected);
     }
 }

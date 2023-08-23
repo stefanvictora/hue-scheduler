@@ -22,18 +22,21 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.function.Consumer;
 
-@Getter
-@Setter
 final class ScheduledState {
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
     private static final String MULTI_COLOR_LOOP = "multi_colorloop";
     private static final String COLOR_LOOP = "colorloop";
     public static final int MAX_HUE_VALUE = 65535;
     public static final int MIDDLE_HUE_VALUE = 32768;
-
+    /**
+     * Max transition time as a multiple of 100ms
+     */
+    public static final int MAX_TRANSITION_TIME = 60000;
+    public static final int MAX_TRANSITION_TIME_MS = MAX_TRANSITION_TIME * 100;
+    
     private final String name;
+    @Getter
     private final int updateId;
     private final String startString;
     private final Integer brightness;
@@ -44,26 +47,37 @@ final class ScheduledState {
     private final Integer sat;
     private final Boolean on;
     private final Integer transitionTime;
+    @Getter
     private final String transitionTimeBeforeString;
     private final StartTimeProvider startTimeProvider;
     private final String effect;
     private final EnumSet<DayOfWeek> daysOfWeek;
+    @Getter
     private final boolean groupState;
     private final Boolean force;
+    @Getter
+    private final boolean temporary;
     private final List<Integer> groupLights;
+    @Getter
     private final LightCapabilities capabilities;
+    @Getter
+    @Setter
     private ZonedDateTime end;
+    @Getter
     private ZonedDateTime lastStart;
-    private boolean temporary;
+    @Getter
+    @Setter
+    private boolean retryAfterPowerOnState;
+    @Getter
     private ZonedDateTime lastSeen;
-    private Consumer<ZonedDateTime> lastSeenSync;
     private ScheduledState originalState;
+    private PutCall lastPutCall;
 
     @Builder
     public ScheduledState(String name, int updateId, String startString, Integer brightness, Integer ct, Double x, Double y,
             Integer hue, Integer sat, String effect, Boolean on, String transitionTimeBeforeString, Integer transitionTime,
                           Set<DayOfWeek> daysOfWeek, StartTimeProvider startTimeProvider, boolean groupState,
-                          List<Integer> groupLights, LightCapabilities capabilities, Boolean force) {
+                          List<Integer> groupLights, LightCapabilities capabilities, Boolean force, boolean temporary) {
         this.name = name;
         this.updateId = updateId;
         this.startString = startString;
@@ -87,8 +101,9 @@ final class ScheduledState {
         this.transitionTimeBeforeString = transitionTimeBeforeString;
         this.startTimeProvider = startTimeProvider;
         this.force = force;
-        temporary = false;
+        this.temporary = temporary;
         originalState = this;
+        retryAfterPowerOnState = false;
         assertColorCapabilities();
     }
     
@@ -100,17 +115,19 @@ final class ScheduledState {
         return createTemporaryCopy(state, state.startString, state.lastStart, end, state.transitionTimeBeforeString);
     }
     
+    public static ScheduledState createTemporaryCopy(ScheduledState state) {
+        return createTemporaryCopy(state, state.getEnd());
+    }
+    
     private static ScheduledState createTemporaryCopy(ScheduledState state, String start, ZonedDateTime lastStart, ZonedDateTime end,
             String transitionTimeBefore) {
         ScheduledState copy = new ScheduledState(state.name, state.updateId, start,
                 state.brightness, state.ct, state.x, state.y, state.hue, state.sat, state.effect, state.on, transitionTimeBefore,
                 state.transitionTime, state.daysOfWeek, state.startTimeProvider, state.groupState, state.groupLights,
-                state.capabilities, state.force);
+                state.capabilities, state.force, true);
         copy.end = end;
-        copy.temporary = true;
         copy.lastStart = lastStart;
         copy.lastSeen = state.lastSeen;
-        copy.lastSeenSync = state::setLastSeen;
         copy.originalState = state.originalState;
         return copy;
     }
@@ -187,8 +204,8 @@ final class ScheduledState {
     }
 
     private Integer assertValidTransitionTime(Integer transitionTime) {
-        if (transitionTime != null && (transitionTime > 65535 || transitionTime < 0)) {
-            throw new InvalidTransitionTime("Invalid transition time '" + transitionTime + ". Allowed integer range: 0-65535");
+        if (transitionTime != null && (transitionTime > MAX_TRANSITION_TIME || transitionTime < 0)) {
+            throw new InvalidTransitionTime("Invalid transition time '" + transitionTime + ". Allowed integer range: 0-" + MAX_TRANSITION_TIME);
         }
         return transitionTime;
     }
@@ -314,7 +331,7 @@ final class ScheduledState {
         if (adjustedTrBefore == 0) {
             return transitionTime;
         }
-        return adjustedTrBefore; // todo: it could be now that this value is too big for the Hue API
+        return adjustedTrBefore;
     }
 
     public int getAdjustedTransitionTimeBefore(ZonedDateTime now) {
@@ -333,6 +350,38 @@ final class ScheduledState {
             return getStartWithoutTransitionTimeBefore(lastStart.plusDays(1));
         }
         return definedStart;
+    }
+    
+    public PutCall getInterpolatedPutCall(ZonedDateTime dateTime, ScheduledState previousState) {
+        return new StateInterpolator(this, previousState, dateTime).getInterpolatedPutCall();
+    }
+    
+    public boolean shouldSplitLongBeforeTransition(ZonedDateTime now) {
+        return getAdjustedTransitionTimeBefore(now) > ScheduledState.MAX_TRANSITION_TIME;
+    }
+    
+    public ZonedDateTime calculateNextPowerOnEnd(ZonedDateTime now) {
+        if (shouldSplitLongBeforeTransition(now)) {
+            return getNextTransitionTimeSplitStart(now).minusSeconds(1);
+        } else {
+            return getEnd();
+        }
+    }
+    
+    public PutCall getNextInterpolatedSplitPutCall(ZonedDateTime now, ScheduledState previousState) {
+        ZonedDateTime nextSplitStart = getNextTransitionTimeSplitStart(now);
+        PutCall interpolatedSplitPutCall = getInterpolatedPutCall(nextSplitStart, previousState);
+        long splitTransitionTime = Duration.between(now, nextSplitStart).toMillis();
+        interpolatedSplitPutCall.setTransitionTime((int) splitTransitionTime / 100);
+        return interpolatedSplitPutCall;
+    }
+    
+    private ZonedDateTime getNextTransitionTimeSplitStart(ZonedDateTime now) {
+        ZonedDateTime splitStart = getStart(now).plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS);
+        while (splitStart.isBefore(now) || splitStart.isEqual(now)) {
+            splitStart = splitStart.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS);
+        }
+        return splitStart;
     }
     
     /**
@@ -378,11 +427,11 @@ final class ScheduledState {
     }
     
     private boolean brightnessDiffers(LightState currentState) {
-        return brightness != null && currentState.isBrightnessSupported() && !brightness.equals(currentState.getBrightness());
+        return lastPutCall.getBri() != null && currentState.isBrightnessSupported() && !lastPutCall.getBri().equals(currentState.getBrightness());
     }
     
     private boolean colorModeOrValuesDiffer(LightState currentState) {
-        ColorMode colorMode = getColorMode();
+        ColorMode colorMode = lastPutCall.getColorMode();
         if (colorMode == ColorMode.NONE) {
             return false; // if no color mode scheduled, always treat as equal
         }
@@ -394,27 +443,16 @@ final class ScheduledState {
         }
         switch (colorMode) {
             case CT:
-                return ct != null && !ct.equals(currentState.getColorTemperature());
+                return lastPutCall.getCt() != null && !lastPutCall.getCt().equals(currentState.getColorTemperature());
             case HS:
-                return hue != null && !hue.equals(currentState.getHue()) ||
-                        sat != null && !sat.equals(currentState.getSat());
+                return lastPutCall.getHue() != null && !lastPutCall.getHue().equals(currentState.getHue()) ||
+                        lastPutCall.getSat() != null && !lastPutCall.getSat().equals(currentState.getSat());
             case XY:
-                return doubleValueDiffers(x, currentState.getX()) ||
-                        doubleValueDiffers(y, currentState.getY());
+                return doubleValueDiffers(lastPutCall.getX(), currentState.getX()) ||
+                        doubleValueDiffers(lastPutCall.getY(), currentState.getY());
             default:
                 return false; // should not happen, but as a fallback we just ignore unknown color modes
         }
-    }
-    
-    public ColorMode getColorMode() {
-        if (ct != null) {
-            return ColorMode.CT;
-        } else if (x != null) {
-            return ColorMode.XY;
-        } else if (hue != null || sat != null) {
-            return ColorMode.HS;
-        }
-        return ColorMode.NONE;
     }
     
     private static boolean colorModeNotSupportedByState(ColorMode colorMode, LightState currentState) {
@@ -428,12 +466,13 @@ final class ScheduledState {
     }
     
     private boolean effectDiffers(LightState currentState) {
-        if (getEffect() == null) {
+        String lastEffect = lastPutCall.getEffect();
+        if (lastEffect == null) {
             return false; // if no effect scheduled, always treat as equal
         } else if (currentState.getEffect() == null) {
-            return !"none".equals(getEffect()); // if effect scheduled, but none set, only consider "none" to be equal
+            return !"none".equals(lastEffect); // if effect scheduled, but none set, only consider "none" to be equal
         } else {
-            return !getEffect().equals(currentState.getEffect()); // otherwise, effects have to be exactly the same
+            return !lastEffect.equals(currentState.getEffect()); // otherwise, effects have to be exactly the same
         }
     }
 
@@ -453,15 +492,26 @@ final class ScheduledState {
 
     public void setLastSeen(ZonedDateTime lastSeen) {
         this.lastSeen = lastSeen;
-        if (lastSeenSync != null) {
-            lastSeenSync.accept(lastSeen);
+        if (originalState != this) {
+            originalState.setLastSeen(lastSeen);
         }
     }
-
+    
+    public void setLastPutCall(PutCall lastPutCall) {
+        this.lastPutCall = lastPutCall;
+        if (originalState != this) {
+            originalState.setLastPutCall(lastPutCall);
+        }
+    }
+    
+    public boolean isNotSameState(ScheduledState state) {
+        return this != state && (originalState == null || originalState != state);
+    }
+    
     public boolean isForced() {
         return force == Boolean.TRUE;
     }
-
+    
     public PutCall getPutCall(ZonedDateTime now) {
         return PutCall.builder().id(updateId)
                       .bri(brightness)
@@ -472,20 +522,17 @@ final class ScheduledState {
                       .sat(sat)
                       .on(on)
                       .effect(getEffect())
-                .transitionTime(getTransitionTime(now)) // todo: this transition time could be too big, think about some splitting logic maybe
-                .groupState(groupState)
+                      .transitionTime(getTransitionTime(now))
+                      .groupState(groupState)
                       .build();
-    }
-    
-    public PutCall getInterpolatedPutCall(ZonedDateTime now, ScheduledState previousState) {
-        return new StateInterpolator(this, previousState, now).getInterpolatedPutCall();
     }
 
     @Override
     public String toString() {
         return getFormattedName() + " {" +
-                "id=" + getUpdateId() +
-                (temporary ? ", temporary" : "") +
+                "id=" + updateId +
+                (temporary && !retryAfterPowerOnState ? ", temporary" : "") +
+                (retryAfterPowerOnState ? ", power-on-event" : "") +
                 ", start=" + getFormattedStart() +
                 ", end=" + getFormattedEnd() +
                 getFormattedPropertyIfSet("on", on) +

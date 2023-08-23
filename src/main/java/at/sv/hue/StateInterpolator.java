@@ -11,22 +11,22 @@ public final class StateInterpolator {
 	
 	private final ScheduledState state;
 	private final ScheduledState previousState;
-	private final ZonedDateTime now;
+	private final ZonedDateTime dateTime;
 	
-	public StateInterpolator(ScheduledState state, ScheduledState previousState, ZonedDateTime now) {
+	public StateInterpolator(ScheduledState state, ScheduledState previousState, ZonedDateTime dateTime) {
 		this.state = state;
 		this.previousState = previousState;
-		this.now = now;
+		this.dateTime = dateTime;
 	}
 	
 	public PutCall getInterpolatedPutCall() {
-		int timeUntilThisState = state.getAdjustedTransitionTimeBefore(now);
+		int timeUntilThisState = state.getAdjustedTransitionTimeBefore(dateTime);
 		if (timeUntilThisState == 0) {
 			return null; // the state is already reached
 		}
 		PutCall interpolatedPutCall;
-		if (timeUntilThisState == state.getTransitionTimeBefore(now)) {
-			interpolatedPutCall = previousState.getPutCall(now); // directly at start, just use previous put call
+		if (timeUntilThisState == state.getTransitionTimeBefore(dateTime)) {
+			interpolatedPutCall = previousState.getPutCall(dateTime); // directly at start, just use previous put call
 		} else {
 			interpolatedPutCall = interpolate();
 		}
@@ -48,11 +48,11 @@ public final class StateInterpolator {
 	 * P = P0 + t(P1 - P0)
 	 */
 	private PutCall interpolate() {
-		BigDecimal interpolatedTime = state.getInterpolatedTime(now);
-		PutCall previous = previousState.getPutCall(now);
-		PutCall target = state.getPutCall(now);
+		BigDecimal interpolatedTime = state.getInterpolatedTime(dateTime);
+		PutCall previous = previousState.getPutCall(dateTime);
+		PutCall target = state.getPutCall(dateTime);
 		
-		convertColorModeIfNeeded(previous);
+		convertColorModeIfNeeded(previous, target);
 		
 		previous.setBri(interpolateInteger(interpolatedTime, target.getBri(), previous.getBri()));
 		previous.setCt(interpolateInteger(interpolatedTime, target.getCt(), previous.getCt()));
@@ -63,9 +63,9 @@ public final class StateInterpolator {
 		return previous;
 	}
 	
-	private void convertColorModeIfNeeded(PutCall previousPutCall) {
+	private void convertColorModeIfNeeded(PutCall previousPutCall, PutCall target) {
 		Double[][] colorGamut = previousState.getCapabilities().getColorGamut();
-		ColorModeConverter.convertIfNeeded(previousPutCall, colorGamut, previousState.getColorMode(), state.getColorMode());
+		ColorModeConverter.convertIfNeeded(previousPutCall, colorGamut, previousPutCall.getColorMode(), target.getColorMode());
 	}
 	
 	private static Integer interpolateInteger(BigDecimal interpolatedTime, Integer target, Integer previous) {

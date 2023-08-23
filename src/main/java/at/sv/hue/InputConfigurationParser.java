@@ -214,6 +214,9 @@ public final class InputConfigurationParser {
         } else if (s.endsWith("min")) {
             value = s.substring(0, s.length() - 3);
             modifier = 600;
+        } else if (s.endsWith("h")) {
+            value = s.substring(0, s.length() - 1);
+            modifier = 36000;
         }
         return parseInteger(value.trim(), parameter) * modifier;
     }
@@ -232,7 +235,7 @@ public final class InputConfigurationParser {
             groupLights = null;
         }
         return new ScheduledState(name, id, start, brightness, ct, x, y, hue, sat, effect, on, transitionTimeBefore,
-                transitionTime, dayOfWeeks, startTimeProvider, groupState, groupLights, capabilities, force);
+                transitionTime, dayOfWeeks, startTimeProvider, groupState, groupLights, capabilities, force, false);
     }
 
     private List<Integer> getGroupLights(int groupId) {

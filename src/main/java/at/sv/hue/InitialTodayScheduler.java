@@ -35,7 +35,7 @@ public final class InitialTodayScheduler {
         for (int i = 0; i < todaysStates.size(); i++) {
             ScheduledState state = todaysStates.get(i);
             schedule.accept(state);
-            if (state.isInThePastOrNow(now) && hasMorePastStates(i)) {
+            if (state.isInThePastOrNow(now) && hasMorePastStates(i) && nextStateDoesNotStartAtSameTime(i, state)) {
                 addRemainingTodayStatesTheNextDay(i);
                 break;
             }
@@ -76,6 +76,10 @@ public final class InitialTodayScheduler {
 
     private boolean hasMorePastStates(int i) {
         return todaysStates.size() > i + 1;
+    }
+    
+    private boolean nextStateDoesNotStartAtSameTime(int i, ScheduledState state) {
+        return !todaysStates.get(i + 1).getStart(now).equals(state.getStart(now));
     }
 
     private void addRemainingTodayStatesTheNextDay(int i) {

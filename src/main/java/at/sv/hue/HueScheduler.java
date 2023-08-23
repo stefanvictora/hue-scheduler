@@ -346,7 +346,7 @@ public final class HueScheduler implements Runnable {
             if (state.isOff()) {
                 LOG.info("Turned off {}, or was already off", state.getFormattedName());
             } else {
-                retryWhenBackOn(ScheduledState.createTemporaryCopy(state, state.getEnd()));
+                retryWhenBackOn(createPowerOnCopy(state));
             }
             if (shouldAdjustMultiColorLoopOffset(state)) {
                 scheduleMultiColorLoopOffsetAdjustments(state.getGroupLights(), 1);
@@ -358,7 +358,7 @@ public final class HueScheduler implements Runnable {
     }
     
     private boolean shouldEnforceNextDay(ScheduledState state) {
-        LocalTime currentLocalTime = this.currentTime.get().toLocalTime().truncatedTo(ChronoUnit.SECONDS).plusSeconds(1);
+        LocalTime currentLocalTime = currentTime.get().toLocalTime().truncatedTo(ChronoUnit.SECONDS).plusSeconds(1);
         LocalTime stateStartLocalTime = state.getLastStart().toLocalTime().truncatedTo(ChronoUnit.SECONDS);
         return currentLocalTime.isAfter(stateStartLocalTime) || currentLocalTime.equals(stateStartLocalTime);
     }
@@ -394,8 +394,8 @@ public final class HueScheduler implements Runnable {
         if (state.getTransitionTimeBeforeString() == null) {
             return;
         }
-        ScheduledState previousState = getPreviousState(state);
-        if (previousState == null || previousState.isNullState()) {
+        ScheduledState previousState = getPreviousStateIgnoringNullStates(state);
+        if (previousState == null) {
             return;
         }
         PutCall interpolatedPutCall = state.getInterpolatedPutCall(currentTime.get(), previousState);
@@ -403,7 +403,7 @@ public final class HueScheduler implements Runnable {
             return;
         }
         LOG.trace("Perform interpolation from previous state: {}", previousState);
-        interpolatedPutCall.setTransitionTime(interpolationTransitionTime);
+        interpolatedPutCall.setTransitionTime(interpolationTransitionTime); // todo: use tr from previous state
         putState(previousState, interpolatedPutCall);
         sleepIfNeeded();
     }
@@ -416,7 +416,15 @@ public final class HueScheduler implements Runnable {
         Thread.sleep(interpolationTransitionTime * 100L);
     }
     
-    private ScheduledState getPreviousState(ScheduledState currentState) {
+    private ScheduledState getPreviousStateIgnoringNullStates(ScheduledState currentState) {
+        ScheduledState previousState = findPreviousState(currentState);
+        if (previousState == null || previousState.isNullState()) {
+            return null;
+        }
+        return previousState;
+    }
+    
+    private ScheduledState findPreviousState(ScheduledState currentState) {
         List<ScheduledState> lightStatesForId = getLightStatesForId(currentState);
         List<ScheduledState> calculatedStateOrderAscending = lightStatesForId.stream()
                                                            .sorted(Comparator.comparing(state -> state.getStart(currentTime.get())))
@@ -428,7 +436,7 @@ public final class HueScheduler implements Runnable {
         ZonedDateTime yesterday = currentTime.get().minusDays(1);
         return lightStatesForId.stream()
                 .filter(state -> state.isScheduledOn(yesterday))
-                .filter(state -> state != currentState && currentState.getOriginalState() != state)
+                .filter(currentState::isNotSameState)
                 .max(Comparator.comparing(state -> state.getStart(yesterday)))
                 .orElse(null);
     }
@@ -502,39 +510,65 @@ public final class HueScheduler implements Runnable {
     private long getMs(long seconds) {
         return seconds * 1000L;
     }
-
-    private boolean putState(ScheduledState state) {
-        return putState(state, state.getPutCall(currentTime.get()));
-    }
-
-    private boolean putState(ScheduledState state, PutCall putCall) {
-        if (state.isGroupState() && controlGroupLightsIndividually) {
-            for (Integer id : state.getGroupLights()) {
-                try {
-                    if (!putState(putCall.toBuilder()
-                                         .id(id)
-                                         .groupState(false)
-                                         .build())) {
-                        LOG.trace("Group light with id {} is off, could not update state", id);
-                    }
-                } catch (HueApiFailure e) {
-                    LOG.trace("Unsupported api call for light id {}: {}", id, e.getLocalizedMessage());
-                }
+    
+    private void putState(ScheduledState state) {
+        if (state.shouldSplitLongBeforeTransition(currentTime.get())) {
+            PutCall interpolatedSplitPutCall = getInterpolatedSplitPutCall(state);
+            if (interpolatedSplitPutCall == null) {
+                logMissingPreviousStateWarning(state);
+                return;
             }
-            return true;
+            performPutApiCall(state, interpolatedSplitPutCall);
+            if (!state.isRetryAfterPowerOnState()) { // schedule follow-up split
+                schedule(ScheduledState.createTemporaryCopy(state), ScheduledState.MAX_TRANSITION_TIME_MS);
+            }
         } else {
-            return putState(putCall);
+            putState(state, state.getPutCall(currentTime.get()));
         }
     }
     
-    private boolean putState(PutCall putCall) {
-        return hueApi.putState(putCall);
+    private PutCall getInterpolatedSplitPutCall(ScheduledState state) {
+        ScheduledState previousState = getPreviousStateIgnoringNullStates(state);
+        if (previousState == null) { // todo: missing test case for null
+            return null;
+        }
+		return state.getNextInterpolatedSplitPutCall(currentTime.get(), previousState);
+    }
+    
+    private static void logMissingPreviousStateWarning(ScheduledState state) {
+        LOG.warn("Warning: Can't set {} with extended transition time. No previous state for required interpolation found!", state.getFormattedName());
+    }
+    
+    private void putState(ScheduledState state, PutCall putCall) {
+        if (state.isGroupState() && controlGroupLightsIndividually) {
+            for (Integer id : state.getGroupLights()) {
+                try {
+					performPutApiCall(state, putCall.toBuilder().id(id).groupState(false).build());
+				} catch (HueApiFailure e) {
+                    LOG.trace("Unsupported api call for light id {}: {}", id, e.getLocalizedMessage());
+                }
+            }
+        } else {
+            performPutApiCall(state, putCall);
+        }
+    }
+    
+    private void performPutApiCall(ScheduledState state, PutCall putCall) {
+        LOG.trace("{}", putCall);
+        state.setLastPutCall(putCall);
+        hueApi.putState(putCall);
     }
 
     private void retry(ScheduledState state, long delayInMs) {
         schedule(state, delayInMs);
     }
-
+    
+    private ScheduledState createPowerOnCopy(ScheduledState state) {
+        ScheduledState powerOnCopy = ScheduledState.createTemporaryCopy(state, state.calculateNextPowerOnEnd(currentTime.get()));
+        powerOnCopy.setRetryAfterPowerOnState(true);
+        return powerOnCopy;
+    }
+    
     private void retryWhenBackOn(ScheduledState state) {
         onStateWaitingList.computeIfAbsent(state.getIdV1(), id -> new ArrayList<>()).add(() -> schedule(state, powerOnRescheduleDelayInMs));
     }
