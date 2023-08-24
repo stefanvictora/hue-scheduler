@@ -253,8 +253,7 @@ Hue Scheduler offers two different transition time properties, which can be comb
 
   In the first example, the transition starts 30 minutes before sunrise, while in the last example it starts 5 minutes after ``civil_dawn`` to smoothly turn on the light to full brightness until the sun has risen. 
   
-  > Note: The given start time expression must be before the defined start of the state, otherwise the transition-before property is ignored.
-  // TODO: Add more details
+  > Note: The given start time expression for ``tr-before`` must be before the defined start of the state, otherwise the property is ignored.
 
   What makes `tr-before` especially useful is that Hue Scheduler automatically adjusts the transition time to the remaining duration if the light is turned on at later point. And most importantly, it also calculates the mid-transition state based on the elapsed time. Consider, for example:
 
@@ -268,6 +267,8 @@ Hue Scheduler offers two different transition time properties, which can be comb
   2. If you turn on the lights at `08:45`, Hue Scheduler **automatically shortens the transition time** to the remaining 15 minutes until its start and **interpolates the ``ct`` value** to `300`, making sure the lights always have the desired color temperature regardless when they are turned on during the transition.
 
   3. If you turn on the lights at any time after `09:00`, Hue Scheduler ignores `tr-before` and instead uses the transition time defined via ``tr`` instead. If no explicit ``tr`` is defined, Hue lights automatically use a transition time of 400ms.
+
+  > Note: Hue Scheduler uses the ``tr`` property of the previous state to determine the transition time for the interpolated call. If you want to disable the transition time for interpolated calls, make sure to set ``tr:0`` for the previous state. If no ``tr`` property is defined for the previous state, Hue Scheduler uses the default value defined via the ``--default-interpolation-transition-time`` (default: `4` = 400ms) global configuration option. 
 
 To summarize: `tr-before` allows you to define longer and smoother transitions that always match the desired state, regardless of when they are turned on during the transition. Those interpolations are available for all color modes (CT, XY/RGB, Hue/Sat).
 The starting point for those interpolations is always the previously defined state. If the color mode differs between the states, then Hue Scheduler automatically performs a conversion between them. This allows us to transition, e.g., from a color temperature to some color value.
@@ -293,10 +294,24 @@ Flag to globally disable tracking of user modifications of lights. Per default H
 
 **Default**: false
 
-### `--interpolation-transition-time`
+### `--default-interpolation-transition-time`
 
-Flag to configure the transition time as a multiple of 100ms used for the interpolated call when turning a light on during a `tr-before` transition.
-This does not affect the actual longer transition used for the `tr-before` state, but just the interpolated call before.
+Flag to configure the default transition time as a multiple of 100ms used for the interpolated call when turning a light on during a `tr-before` transition. If the previous state already contains a ``tr`` property, Hue Scheduler reuses the customer value instead.
+
+~~~yacas
+# Default value used:
+Desk  06:00  bri:50%
+Desk  07:00  bri:100%  tr-before:20min
+
+# Defined tr reused:
+Desk  06:00  bri:50%  tr:10s
+Desk  07:00  bri:100%  tr-before:20min
+
+# Disabled interpolation transition:
+Desk  06:00  bri:50%  tr:0
+Desk  07:00  bri:100%  tr-before:20min
+~~~
+
 Note: This option behaves the same as the other `tr` related state properties, i.e., you can use, e.g., `5s` for convenience.
 
 **Default**: `4` (= 400 ms)

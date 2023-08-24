@@ -81,14 +81,15 @@ public final class HueScheduler implements Runnable {
             description = "Globally disable tracking of user modifications which would pause their schedules until they are turned off and on again." +
                     " Default: ${DEFAULT-VALUE}")
     boolean disableUserModificationTracking;
-    @Option(names = "--interpolation-transition-time", paramLabel = "<tr>", defaultValue = "4",
-            description = "The transition time in defined as a multiple of 100ms used for the interpolated call when turning a light on during a tr-before transition."
-                    + " Default: ${DEFAULT-VALUE} (=400 ms). You can also use, e.g., 2s for convenience.")
-    String interpolationTransitionTimeString;
+    @Option(names = "--default-interpolation-transition-time", paramLabel = "<tr>", defaultValue = "4",
+            description = "The default transition time in defined as a multiple of 100ms used for the interpolated call" +
+                    " when turning a light on during a tr-before transition. Default: ${DEFAULT-VALUE} (=400 ms)." +
+                    " You can also use, e.g., 2s for convenience.")
+    String defaultInterpolationTransitionTimeString;
     /**
      * The converted transition time as a multiple of 100ms.
      */
-    Integer interpolationTransitionTime = 4;
+    Integer defaultInterpolationTransitionTime = 4;
     @Option(names = "--power-on-reschedule-delay", paramLabel = "<delay>", defaultValue = "150",
             description = "The delay in ms after the light on-event was received and the current state should be rescheduled again. Default: ${DEFAULT-VALUE} ms.")
     int powerOnRescheduleDelayInMs;
@@ -127,7 +128,7 @@ public final class HueScheduler implements Runnable {
     public HueScheduler(HueApi hueApi, StateScheduler stateScheduler,
                         StartTimeProvider startTimeProvider, Supplier<ZonedDateTime> currentTime,
                         double requestsPerSecond, boolean controlGroupLightsIndividually,
-                        boolean disableUserModificationTracking, String interpolationTransitionTimeString, int powerOnRescheduleDelayInMs,
+                        boolean disableUserModificationTracking, String defaultInterpolationTransitionTimeString, int powerOnRescheduleDelayInMs,
                         int bridgeFailureRetryDelayInSeconds, int multiColorAdjustmentDelay) {
         this();
         this.hueApi = hueApi;
@@ -137,11 +138,11 @@ public final class HueScheduler implements Runnable {
         this.requestsPerSecond = requestsPerSecond;
         this.controlGroupLightsIndividually = controlGroupLightsIndividually;
         this.disableUserModificationTracking = disableUserModificationTracking;
-        this.interpolationTransitionTimeString = interpolationTransitionTimeString;
+        this.defaultInterpolationTransitionTimeString = defaultInterpolationTransitionTimeString;
         this.powerOnRescheduleDelayInMs = powerOnRescheduleDelayInMs;
         this.bridgeFailureRetryDelayInSeconds = bridgeFailureRetryDelayInSeconds;
         this.multiColorAdjustmentDelay = multiColorAdjustmentDelay;
-        interpolationTransitionTime = parseInterpolationTransitionTime(interpolationTransitionTimeString);
+        defaultInterpolationTransitionTime = parseInterpolationTransitionTime(defaultInterpolationTransitionTimeString);
         apiCacheInvalidationIntervalInMinutes = 15;
     }
     
@@ -167,7 +168,7 @@ public final class HueScheduler implements Runnable {
         startTimeProvider = createStartTimeProvider(latitude, longitude, elevation);
         stateScheduler = createStateScheduler();
         currentTime = ZonedDateTime::now;
-        interpolationTransitionTime = parseInterpolationTransitionTime(interpolationTransitionTimeString);
+        defaultInterpolationTransitionTime = parseInterpolationTransitionTime(defaultInterpolationTransitionTimeString);
         new LightStateEventTrackerImpl(ip, username, httpsClient, new HueRawEventHandler(hueEventListener), eventStreamReadTimeoutInMinutes).start();
         assertInputIsReadable();
         assertConnectionAndStart();
@@ -305,9 +306,7 @@ public final class HueScheduler implements Runnable {
 
     private void schedule(ScheduledState state, long delayInMs) {
         if (state.isNullState()) return;
-        if (shouldLogScheduleDebugMessage(delayInMs)) {
-            LOG.debug("Schedule {} in {}", state, Duration.ofMillis(delayInMs));
-        }
+        LOG.debug("Schedule {} in {}", state, Duration.ofMillis(delayInMs));
         stateScheduler.schedule(() -> {
             if (state.endsAfter(currentTime.get())) {
                 LOG.debug("{} already ended", state);
@@ -403,19 +402,28 @@ public final class HueScheduler implements Runnable {
             return;
         }
         LOG.trace("Perform interpolation from previous state: {}", previousState);
-        interpolatedPutCall.setTransitionTime(interpolationTransitionTime); // todo: use tr from previous state
+        Integer interpolationTransitionTime = getInterpolationTransitionTime(previousState);
+        interpolatedPutCall.setTransitionTime(interpolationTransitionTime);
         putState(previousState, interpolatedPutCall);
-        sleepIfNeeded();
+        sleepIfNeeded(interpolationTransitionTime);
     }
-    
+
+    private Integer getInterpolationTransitionTime(ScheduledState previousState) {
+        Integer definedTransitionTime = previousState.getDefinedTransitionTime();
+        if (definedTransitionTime == null) {
+            return defaultInterpolationTransitionTime;
+        }
+        return definedTransitionTime;
+    }
+
     @SneakyThrows(InterruptedException.class)
-    private void sleepIfNeeded() {
-        if (interpolationTransitionTime == null) {
+    private void sleepIfNeeded(Integer sleepTime) {
+        if (sleepTime == null) {
             return;
         }
-        Thread.sleep(interpolationTransitionTime * 100L);
+        Thread.sleep(sleepTime * 100L);
     }
-    
+
     private ScheduledState getPreviousStateIgnoringNullStates(ScheduledState currentState) {
         ScheduledState previousState = findPreviousState(currentState);
         if (previousState == null || previousState.isNullState()) {
@@ -439,10 +447,6 @@ public final class HueScheduler implements Runnable {
                 .filter(currentState::isNotSameState)
                 .max(Comparator.comparing(state -> state.getStart(yesterday)))
                 .orElse(null);
-    }
-
-    private boolean shouldLogScheduleDebugMessage(long delayInMs) {
-        return delayInMs == 0 || delayInMs > 5000 && delayInMs != getMs(bridgeFailureRetryDelayInSeconds);
     }
 
     private void reschedule(ScheduledState state) {

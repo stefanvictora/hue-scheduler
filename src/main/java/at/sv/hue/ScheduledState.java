@@ -46,7 +46,8 @@ final class ScheduledState {
     private final Integer hue;
     private final Integer sat;
     private final Boolean on;
-    private final Integer transitionTime;
+    @Getter
+    private final Integer definedTransitionTime;
     @Getter
     private final String transitionTimeBeforeString;
     private final StartTimeProvider startTimeProvider;
@@ -75,7 +76,7 @@ final class ScheduledState {
 
     @Builder
     public ScheduledState(String name, int updateId, String startString, Integer brightness, Integer ct, Double x, Double y,
-            Integer hue, Integer sat, String effect, Boolean on, String transitionTimeBeforeString, Integer transitionTime,
+            Integer hue, Integer sat, String effect, Boolean on, String transitionTimeBeforeString, Integer definedTransitionTime,
                           Set<DayOfWeek> daysOfWeek, StartTimeProvider startTimeProvider, boolean groupState,
                           List<Integer> groupLights, LightCapabilities capabilities, Boolean force, boolean temporary) {
         this.name = name;
@@ -97,7 +98,7 @@ final class ScheduledState {
         this.hue = assertValidHueValue(hue);
         this.sat = assertValidSaturationValue(sat);
         this.on = on;
-        this.transitionTime = assertValidTransitionTime(transitionTime);
+        this.definedTransitionTime = assertValidTransitionTime(definedTransitionTime);
         this.transitionTimeBeforeString = transitionTimeBeforeString;
         this.startTimeProvider = startTimeProvider;
         this.force = force;
@@ -123,7 +124,7 @@ final class ScheduledState {
             String transitionTimeBefore) {
         ScheduledState copy = new ScheduledState(state.name, state.updateId, start,
                 state.brightness, state.ct, state.x, state.y, state.hue, state.sat, state.effect, state.on, transitionTimeBefore,
-                state.transitionTime, state.daysOfWeek, state.startTimeProvider, state.groupState, state.groupLights,
+                state.definedTransitionTime, state.daysOfWeek, state.startTimeProvider, state.groupState, state.groupLights,
                 state.capabilities, state.force, true);
         copy.end = end;
         copy.lastStart = lastStart;
@@ -329,7 +330,7 @@ final class ScheduledState {
     public Integer getTransitionTime(ZonedDateTime now) {
         int adjustedTrBefore = getAdjustedTransitionTimeBefore(now);
         if (adjustedTrBefore == 0) {
-            return transitionTime;
+            return definedTransitionTime;
         }
         return adjustedTrBefore;
     }
@@ -545,7 +546,7 @@ final class ScheduledState {
                 getFormattedPropertyIfSet("effect", effect) +
                 getFormattedDaysOfWeek() +
                 getFormattedTransitionTimeBefore() +
-                getFormattedTransitionTimeIfSet("transitionTime", transitionTime) +
+                getFormattedTransitionTimeIfSet("transitionTime", definedTransitionTime) +
                 getFormattedPropertyIfSet("lastSeen", getFormattedTime(lastSeen)) +
                 getFormattedPropertyIfSet("force", force) +
                 '}';
