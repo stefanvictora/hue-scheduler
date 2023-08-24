@@ -34,7 +34,7 @@ public final class StateInterpolator {
 	}
 	
 	private PutCall modifyProperties(PutCall interpolatedPutCall) {
-		interpolatedPutCall.setOn(null); // do not reuse "on" property for interpolation
+		interpolatedPutCall.setOn(null); // do not per default reuse "on" property for interpolation
 		if (interpolatedPutCall.isNullCall()) {
 			return null; // no relevant properties set, don't perform interpolations
 		}

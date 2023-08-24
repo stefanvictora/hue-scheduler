@@ -111,15 +111,15 @@ final class ScheduledState {
     public static ScheduledState createTemporaryCopyNow(ScheduledState state, ZonedDateTime now, ZonedDateTime end) {
         return createTemporaryCopy(state, now.toLocalTime().toString(), now, end, null);
     }
-    
-    public static ScheduledState createTemporaryCopy(ScheduledState state, ZonedDateTime end) {
-        return createTemporaryCopy(state, state.startString, state.lastStart, end, state.transitionTimeBeforeString);
-    }
-    
+
     public static ScheduledState createTemporaryCopy(ScheduledState state) {
         return createTemporaryCopy(state, state.getEnd());
     }
-    
+
+    public static ScheduledState createTemporaryCopy(ScheduledState state, ZonedDateTime end) {
+        return createTemporaryCopy(state, state.startString, state.lastStart, end, state.transitionTimeBeforeString);
+    }
+
     private static ScheduledState createTemporaryCopy(ScheduledState state, String start, ZonedDateTime lastStart, ZonedDateTime end,
             String transitionTimeBefore) {
         ScheduledState copy = new ScheduledState(state.name, state.updateId, start,

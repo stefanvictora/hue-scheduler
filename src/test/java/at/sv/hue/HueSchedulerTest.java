@@ -1057,7 +1057,7 @@ class HueSchedulerTest {
     // todo: test what happens if we use very long transitions of like 24 hours. What if we use even more?
     
     // todo: write test with long transitions and day crossovers; also with single states
-    
+
     @Test
     void parse_transitionTimeBefore_shiftsGivenStartByThatTime_afterPowerCycle_sameStateAgainWithTransitionTime() {
         addKnownLightIdsWithDefaultCapabilities(1);
@@ -1228,8 +1228,8 @@ class HueSchedulerTest {
         
         setCurrentTimeTo(scheduledRunnables.get(1));
         scheduledRunnables.get(1).run();
-        
-        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).build()); // interpolated call
+
+        // no interpolation as previous state = last seen state
         assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 10).transitionTime(3000).build());
         
         ScheduledRunnable nextDay2 = ensureRunnable(now.plusDays(1), now.plusDays(2).minusMinutes(5)); // next day
@@ -1238,31 +1238,45 @@ class HueSchedulerTest {
         
         setCurrentTimeTo(nextDay1);
         nextDay1.run();
-        
-        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 10).build()); // "previous" state from day before
+
+        // no interpolation as previous state = last seen state
         assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).transitionTime(3000).build());
         
         ScheduledRunnable nextDay3 = ensureRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(5)); // next day
         
         setCurrentTimeTo(nextDay2);
         nextDay2.run();
-        
-        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).build()); // interpolated call
+
+        // no interpolation as previous state = last seen state
         assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 10).transitionTime(3000).build());
         
         ScheduledRunnable nextDay4 = ensureRunnable(now.plusDays(1), now.plusDays(2).minusMinutes(5)); // next day
         
-        // repeat next day, turned on at different times
-        
+        // repeat next day
+
         setCurrentTimeTo(nextDay3);
+        nextDay3.run();
+
+        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).transitionTime(3000).build());
+
+        ensureRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(5)); // next day
+
+        // turn on again, 2 minutes after start
+
         advanceCurrentTime(Duration.ofMinutes(2));
-        
-        nextDay3.run(); // "turned on" 2 minutes after start
-        
+        simulateLightOnEvent();
+
+        List<ScheduledRunnable> powerOnRunnables = ensureScheduledStates(5);
+        assertScheduleStart(powerOnRunnables.get(0), now, initialNow.plusMinutes(5)); // already ended
+        assertScheduleStart(powerOnRunnables.get(1), now, initialNow.plusDays(1)); // already ended
+        assertScheduleStart(powerOnRunnables.get(2), now, initialNow.plusDays(1).plusMinutes(5)); // already ended
+        assertScheduleStart(powerOnRunnables.get(3), now, initialNow.plusDays(2)); // already ended
+        assertScheduleStart(powerOnRunnables.get(4), now, initialNow.plusDays(2).plusMinutes(5));
+
+        powerOnRunnables.get(4).run();
+
         assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 6).build()); // adjusted interpolated call
         assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).transitionTime(1800).build());
-        
-        ensureRunnable(now.plusDays(1).minusMinutes(2), now.plusDays(1).plusMinutes(3)); // next day
         
         setCurrentTimeTo(nextDay4);
         advanceCurrentTime(Duration.ofMinutes(5)); // "turned on" at defined start, i.e., no interpolation and transition time expected
@@ -1565,6 +1579,51 @@ class HueSchedulerTest {
         
         ensureRunnable(initialNow.plusDays(1).plusMinutes(20), initialNow.plusDays(2));
     }
+
+    @Test
+    void parse_transitionTimeBefore_multipleStates_ct_noInterpolationWhenPreviousStatesSetCorrectly() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addStateNow(1, "bri:" + DEFAULT_BRIGHTNESS, "ct:" + DEFAULT_CT);
+        addState(1, now.plusMinutes(40), "bri:" + (DEFAULT_BRIGHTNESS + 20), "ct:" + (DEFAULT_CT + 20), "tr-before:20min");
+        addState(1, now.plusMinutes(60), "bri:" + (DEFAULT_BRIGHTNESS + 30), "ct:" + (DEFAULT_CT + 30), "tr-before:10min");
+
+        startScheduler();
+
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(3);
+        ScheduledRunnable firstTrBeforeRunnable = scheduledRunnables.get(1);
+        ScheduledRunnable secondTrBeforeRunnable = scheduledRunnables.get(2);
+
+        setCurrentTimeTo(firstTrBeforeRunnable);
+
+        firstTrBeforeRunnable.run();
+
+        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).ct(DEFAULT_CT).build()); // sets previous state again
+        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 20).ct(DEFAULT_CT + 20).transitionTime(12000).build());
+
+        ensureRunnable(initialNow.plusDays(1).plusMinutes(20), initialNow.plusDays(1).plusMinutes(50)); // next day
+
+        setCurrentTimeTo(secondTrBeforeRunnable);
+
+        secondTrBeforeRunnable.run();
+
+        // does not set previous state again
+        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 30).ct(DEFAULT_CT + 30).transitionTime(6000).build());
+
+        ensureRunnable(initialNow.plusDays(1).plusMinutes(50), initialNow.plusDays(2)); // next day
+
+        // after power on -> perform interpolation again
+
+        simulateLightOnEvent();
+
+        List<ScheduledRunnable> powerOnRunnables = ensureScheduledStates(2);
+        assertScheduleStart(powerOnRunnables.get(0), now, initialNow.plusMinutes(50)); // already ended
+        assertScheduleStart(powerOnRunnables.get(1), now, initialNow.plusDays(1));
+
+        powerOnRunnables.get(1).run();
+
+        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 20).ct(DEFAULT_CT + 20).build());
+        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 30).ct(DEFAULT_CT + 30).transitionTime(6000).build());
+    }
     
     @Test
     void parse_transitionTimeBefore_multipleStates_ct_lightTurnedOnAfter_performsCorrectInterpolation() {
@@ -1572,7 +1631,7 @@ class HueSchedulerTest {
         addStateNow(1, "ct:400");
         addState(1, now.plusHours(3), "ct:200", "tr-before:30min");
         
-        setCurrentTimeTo(now.plusHours(2).plusMinutes(45));
+        setCurrentTimeTo(now.plusHours(2).plusMinutes(45)); // 15 minutes after start
         
         startScheduler();
         
@@ -1589,7 +1648,7 @@ class HueSchedulerTest {
     }
 
     @Test
-    void parse_transitionTimeBefore_multipleStates_ct_lightTurnedOnExactlyAtStart_noAdditionalPutCall() {
+    void parse_transitionTimeBefore_multipleStates_ct_lightTurnedOnExactlyAtDefinedStart_noAdditionalPutCall() {
         addKnownLightIdsWithDefaultCapabilities(1);
         addStateNow(1, "bri:" + DEFAULT_BRIGHTNESS, "ct:" + DEFAULT_CT);
         addState(1, now.plusMinutes(40), "bri:" + (DEFAULT_BRIGHTNESS + 20), "ct:" + (DEFAULT_CT + 20), "tr-before:20min");
@@ -1599,7 +1658,7 @@ class HueSchedulerTest {
         List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(2);
         ScheduledRunnable trBeforeRunnable = scheduledRunnables.get(1);
 
-        setCurrentTimeTo(now.plusMinutes(40));
+        setCurrentTimeTo(now.plusMinutes(40)); // at defined start
 
         trBeforeRunnable.run();
 
@@ -1643,7 +1702,7 @@ class HueSchedulerTest {
         List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(2);
         ScheduledRunnable trBeforeRunnable = scheduledRunnables.get(1);
         
-        setCurrentTimeTo(now.plusMinutes(30));
+        setCurrentTimeTo(now.plusMinutes(30)); // 10 minutes after start
         
         trBeforeRunnable.run();
         
