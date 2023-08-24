@@ -41,5 +41,8 @@ public final class LightState {
     public boolean isBrightnessSupported() {
         return capabilities.contains(Capability.BRIGHTNESS);
     }
-    
+
+    public boolean isOnOffSupported() {
+        return capabilities.contains(Capability.ON_OFF);
+    }
 }

@@ -424,13 +424,14 @@ final class ScheduledState {
     public boolean lightStateDiffers(LightState currentState) {
         return brightnessDiffers(currentState) ||
                 colorModeOrValuesDiffer(currentState) ||
-                effectDiffers(currentState);
+                effectDiffers(currentState) ||
+                onStateDiffers(currentState);
     }
-    
+
     private boolean brightnessDiffers(LightState currentState) {
         return lastPutCall.getBri() != null && currentState.isBrightnessSupported() && !lastPutCall.getBri().equals(currentState.getBrightness());
     }
-    
+
     private boolean colorModeOrValuesDiffer(LightState currentState) {
         ColorMode colorMode = lastPutCall.getColorMode();
         if (colorMode == ColorMode.NONE) {
@@ -455,13 +456,13 @@ final class ScheduledState {
                 return false; // should not happen, but as a fallback we just ignore unknown color modes
         }
     }
-    
+
     private static boolean colorModeNotSupportedByState(ColorMode colorMode, LightState currentState) {
         return colorMode == ColorMode.CT && !currentState.isCtSupported()
                 || colorMode == ColorMode.HS && !currentState.isColorSupported()
                 || colorMode == ColorMode.XY && !currentState.isColorSupported();
     }
-    
+
     private static boolean colorModeDiffers(ColorMode colorMode, LightState currentState) {
         return !Objects.equals(colorMode, currentState.getColormode());
     }
@@ -475,6 +476,15 @@ final class ScheduledState {
         } else {
             return !lastEffect.equals(currentState.getEffect()); // otherwise, effects have to be exactly the same
         }
+    }
+
+    /**
+     * We only detect any changes if the state itself has "on:true". This is specifically meant for detecting turning
+     * off lights inside a group, when the "on:true" state is enforced via the state.
+     */
+    private boolean onStateDiffers(LightState currentState) {
+        return lastPutCall.getOn() != null && currentState.isOnOffSupported() && lastPutCall.getOn() &&
+                !lastPutCall.getOn().equals(currentState.isOn());
     }
 
     private boolean doubleValueDiffers(Double scheduled, Double current) {

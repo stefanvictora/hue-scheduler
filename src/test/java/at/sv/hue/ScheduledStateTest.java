@@ -561,7 +561,75 @@ class ScheduledStateTest {
 
         assertLightStateDiffers(scheduledState, lightState, true);
     }
+
+    @Test
+    void lightStateDiffers_onState_stateIsOn_sameState_false() {
+        ScheduledState scheduledState = ScheduledState.builder()
+                .on(true)
+                .capabilities(defaultCapabilities)
+                .build();
+        LightState lightState = LightState.builder()
+                .on(true)
+                .capabilities(EnumSet.of(Capability.ON_OFF))
+                .build();
+
+        assertLightStateDiffers(scheduledState, lightState, false);
+    }
     
+    @Test
+    void lightStateDiffers_onState_stateIsOn_differentState_true() {
+        ScheduledState scheduledState = ScheduledState.builder()
+                .on(true)
+                .capabilities(defaultCapabilities)
+                .build();
+        LightState lightState = LightState.builder()
+                .on(false)
+                .capabilities(EnumSet.of(Capability.ON_OFF))
+                .build();
+
+        assertLightStateDiffers(scheduledState, lightState, true);
+    }
+
+    @Test
+    void lightStateDiffers_onState_stateIsOff_differentState_false() {
+        ScheduledState scheduledState = ScheduledState.builder()
+                .on(false)
+                .capabilities(defaultCapabilities)
+                .build();
+        LightState lightState = LightState.builder()
+                .on(true)
+                .capabilities(EnumSet.of(Capability.ON_OFF))
+                .build();
+
+        assertLightStateDiffers(scheduledState, lightState, false);
+    }
+
+    @Test
+    void lightStateDiffers_onState_stateHasNoOnStateDefined_false() {
+        ScheduledState scheduledState = ScheduledState.builder()
+                .capabilities(defaultCapabilities)
+                .build();
+        LightState lightState = LightState.builder()
+                .on(false)
+                .capabilities(EnumSet.of(Capability.ON_OFF))
+                .build();
+
+        assertLightStateDiffers(scheduledState, lightState, false);
+    }
+
+    @Test
+    void lightStateDiffers_differentCapabilities_doesNotSupportOnOff_stateHasNoOnStateDefined_false() {
+        ScheduledState scheduledState = ScheduledState.builder()
+                .capabilities(defaultCapabilities)
+                .on(true)
+                .build();
+        LightState lightState = LightState.builder()
+                .capabilities(EnumSet.noneOf(Capability.class))
+                .build();
+
+        assertLightStateDiffers(scheduledState, lightState, false);
+    }
+
     @Test
     void lightStateDiffers_differentCapabilities_doesNotSupportBrightness_false() {
         ScheduledState scheduledState = ScheduledState.builder()
