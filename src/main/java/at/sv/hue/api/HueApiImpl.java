@@ -481,26 +481,6 @@ public final class HueApiImpl implements HueApi {
     private static final class Group {
         String name;
         Integer[] lights = new Integer[0];
-        StateOfGroup state;
-        Action action;
-    }
-    
-    @Data
-    private static final class Action {
-        Integer bri;
-        Integer ct;
-        Double[] xy;
-        Integer hue;
-        Integer sat;
-        String effect;
-        String colormode;
-        Boolean on;
-    }
-    
-    @Data
-    private static final class StateOfGroup {
-        Boolean all_on;
-        Boolean any_on;
     }
 
     @Data
