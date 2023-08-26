@@ -404,7 +404,12 @@ final class ScheduledState {
         interpolatedSplitPutCall.setTransitionTime((int) splitTransitionTime / 100);
         return interpolatedSplitPutCall;
     }
-    
+
+    public long getNextInterpolationSplitTransitionTime(ZonedDateTime now) {
+        ZonedDateTime nextSplitStart = getNextTransitionTimeSplitStart(now);
+        return Duration.between(now, nextSplitStart).toMillis();
+    }
+
     private ZonedDateTime getNextTransitionTimeSplitStart(ZonedDateTime now) {
         ZonedDateTime splitStart = lastStart.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS);
         while (splitStart.isBefore(now) || splitStart.isEqual(now)) {
@@ -544,7 +549,11 @@ final class ScheduledState {
     }
     
     public boolean isNotSameState(ScheduledState state) {
-        return this != state && (originalState == null || originalState != state);
+        return !isSameState(state);
+    }
+
+    public boolean isSameState(ScheduledState state) {
+        return this == state || (originalState != null && originalState == state);
     }
     
     public boolean isForced() {

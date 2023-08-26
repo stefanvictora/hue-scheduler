@@ -380,8 +380,9 @@ public final class HueScheduler implements Runnable {
             return;
         }
         ScheduledState lastSeenState = getLastSeenState(state);
-        if (lastSeenState == previousState && !manualOverrideTracker.shouldEnforceSchedule(state.getIdV1())) {
-            return; // skip interpolations if the previous state was the last state set without any power cycles
+        if ((lastSeenState == previousState || state.isSameState(lastSeenState))
+                && !manualOverrideTracker.shouldEnforceSchedule(state.getIdV1())) {
+            return; // skip interpolations if the previous or current state was the last state set without any power cycles
         }
         PutCall interpolatedPutCall = state.getInterpolatedPutCall(currentTime.get(), previousState);
         if (interpolatedPutCall == null) {
@@ -487,7 +488,8 @@ public final class HueScheduler implements Runnable {
     }
     
     private void putState(ScheduledState state) {
-        if (state.shouldSplitLongBeforeTransition(currentTime.get())) {
+        ZonedDateTime now = currentTime.get();
+        if (state.shouldSplitLongBeforeTransition(now)) {
             PutCall interpolatedSplitPutCall = getInterpolatedSplitPutCall(state);
             if (interpolatedSplitPutCall == null) {
                 logMissingPreviousStateWarning(state);
@@ -495,10 +497,10 @@ public final class HueScheduler implements Runnable {
             }
             performPutApiCall(state, interpolatedSplitPutCall);
             if (!state.isRetryAfterPowerOnState()) { // schedule follow-up split
-                schedule(ScheduledState.createTemporaryCopy(state), ScheduledState.MAX_TRANSITION_TIME_MS);
+                schedule(ScheduledState.createTemporaryCopy(state), state.getNextInterpolationSplitTransitionTime(now));
             }
         } else {
-            putState(state, state.getPutCall(currentTime.get()));
+            putState(state, state.getPutCall(now));
         }
     }
     
