@@ -137,8 +137,8 @@ public final class InputConfigurationParser {
                 }
             }
             String start = parts[1];
-            states.add(createState(name, id, start, bri, ct, x, y, hue, sat, effect, on, transitionTimeBefore,
-                    transitionTime, dayOfWeeks, capabilities, groupState, force));
+            states.add(new ScheduledState(name, id, start, bri, ct, x, y, hue, sat, effect, on, transitionTimeBefore,
+                    transitionTime, dayOfWeeks, startTimeProvider, capabilities, force, groupState, false));
         }
         return states;
     }
@@ -223,22 +223,5 @@ public final class InputConfigurationParser {
 
     private Integer convertToMiredCt(Integer kelvin) {
         return 1_000_000 / kelvin;
-    }
-
-    private ScheduledState createState(String name, int id, String start, Integer brightness, Integer ct, Double x, Double y,
-                                       Integer hue, Integer sat, String effect, Boolean on, String transitionTimeBefore, Integer transitionTime,
-                                       EnumSet<DayOfWeek> dayOfWeeks, LightCapabilities capabilities, boolean groupState, Boolean force) {
-        List<Integer> groupLights;
-        if (groupState) {
-            groupLights = getGroupLights(id);
-        } else {
-            groupLights = null;
-        }
-        return new ScheduledState(name, id, start, brightness, ct, x, y, hue, sat, effect, on, transitionTimeBefore,
-                transitionTime, dayOfWeeks, startTimeProvider, groupState, groupLights, capabilities, force, false);
-    }
-
-    private List<Integer> getGroupLights(int groupId) {
-        return hueApi.getGroupLights(groupId);
     }
 }

@@ -457,13 +457,6 @@ class HueSchedulerTest {
 
         assertThrows(GroupNotFoundException.class, () -> addStateNow("g1"));
     }
-
-    @Test
-    void parse_emptyGroup_exception() {
-        when(mockedHueApi.getGroupLights(1)).thenThrow(new EmptyGroupException("No lights found"));
-
-        assertThrows(EmptyGroupException.class, () -> addStateNow("g1"));
-    }
     
     @Test
     void parse_group_brightness_missingCapabilities_exception() {
@@ -1359,7 +1352,34 @@ class HueSchedulerTest {
         
         ensureRunnable(now.plusDays(1), now.plusDays(2)); // next day (Thursday)
     }
-    
+
+    @Test
+    void parse_transitionTimeBefore_withDaysOfWeek_onlyOnMonday_todayIsMonday_crossesOverToPreviousDay_stillScheduled() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        setupTimeWithDayOfWeek(DayOfWeek.MONDAY);
+        addState(1, now, "bri:" + (DEFAULT_BRIGHTNESS + 10), "tr-before:10min", "days:MO");
+
+        startAndGetSingleRunnable(now, now.plusDays(1));
+    }
+
+    @Test
+    void parse_transitionTimeBefore_withDaysOfWeek_onlyOnTuesday_todayIsMonday_crossesOverToPreviousDay_scheduledAtEndOfDay() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        setupTimeWithDayOfWeek(DayOfWeek.MONDAY);
+        addState(1, now, "bri:" + (DEFAULT_BRIGHTNESS + 10), "tr-before:10min", "days:TU");
+
+        startAndGetSingleRunnable(now.plusDays(1).minusMinutes(10), now.plusDays(2));
+    }
+
+    @Test
+    void parse_transitionTimeBefore_withDaysOfWeek_onlyOnSunday_todayIsMonday_crossesOverToPreviousDay_scheduledNextWeek() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        setupTimeWithDayOfWeek(DayOfWeek.MONDAY);
+        addState(1, now, "bri:" + (DEFAULT_BRIGHTNESS + 10), "tr-before:10min", "days:SU");
+
+        startAndGetSingleRunnable(now.plusDays(6).minusMinutes(10), now.plusDays(7));
+    }
+
     @Test
     void parse_transitionTimeBefore_withDaysOfWeek_secondExample() {
         addKnownLightIdsWithDefaultCapabilities(1);
@@ -1434,10 +1454,6 @@ class HueSchedulerTest {
 
         ensureNextDayRunnable(initialNow);
     }
-
-    // todo: test day of week scheduling with long durations -> basically we need to make sure that this makes sense:
-    //  if we just adjust the local time, we basically say that the state is starting next day, but tr-before adjusts it to this day
-    //  but this would mean that the start would also need to be scheduled the day after today
 
     @Test
     void parse_transitionTimeBefore_longDuration_dayCrossOver_correctlyScheduled() {
@@ -3204,17 +3220,15 @@ class HueSchedulerTest {
     }
 
     @Test
-    void run_execution_putReturnsFalse_toSignalLightOff_triesAgainAfterPowerOn_withoutCallingGetStatus() {
+    void run_execution_triesAgainAfterPowerOn_withoutCallingGetStatus() {
         ScheduledRunnable scheduledRunnable = startWithDefaultState();
 
-        mockPutReturnValue(false);
         runAndAssertPutCall(scheduledRunnable, DEFAULT_PUT_CALL);
         
         ensureNextDayRunnable();
 
         ScheduledRunnable powerOnRunnable = simulateLightOnEventAndEnsureSingleScheduledState();
         
-        mockPutReturnValue(true);
         advanceTimeAndRunAndAssertPutCall(powerOnRunnable, DEFAULT_PUT_CALL);
     }
 
@@ -3317,11 +3331,11 @@ class HueSchedulerTest {
     }
 
     @Test
-    void run_execution_off_putReturnsFalse_doesNotRetryAfterPowerOn() {
+    void run_execution_offState_doesNotRetryAfterPowerOn() {
         addOffState();
+
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
-        mockPutReturnValue(false);
         runAndAssertPutCall(scheduledRunnable, expectedPutCall(1).on(false).build());
         
         ensureNextDayRunnable();
@@ -3821,8 +3835,21 @@ class HueSchedulerTest {
 
         setCurrentTimeTo(scheduledRunnable);
         scheduledRunnable.run();
-        
-        ensureRunnable(initialNow.plusDays(1));
+
+        ScheduledRunnable nextDayRunnable = ensureRunnable(initialNow.plusDays(1));
+
+        setCurrentTimeTo(nextDayRunnable);
+        advanceCurrentTime(Duration.ofMinutes(10)); // some delay
+
+        nextDayRunnable.run();
+
+        ensureRunnable(initialNow.plusDays(2));
+
+        // no power-on events have been scheduled
+
+        simulateLightOnEvent();
+
+        ensureScheduledStates(0);
     }
 
     private static PutCall.PutCallBuilder expectedPutCall(int id) {

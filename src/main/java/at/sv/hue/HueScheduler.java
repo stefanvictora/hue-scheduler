@@ -303,8 +303,8 @@ public final class HueScheduler implements Runnable {
             }
             if (lightHasBeenManuallyOverriddenBefore(state)) {
                 if (state.isOff()) {
-                    LOG.info("{} state has been manually overridden before, skip off-state for this day: {}", state.getFormattedName(), state);
-                    reschedule(state); // todo: we removed the "force next day" here. Is this still needed?
+                    LOG.info("{} state has been manually overridden before, skip off-state for this day.", state.getFormattedName());
+                    reschedule(state);
                 } else {
                     LOG.info("{} state has been manually overridden before, skip update and retry when back online", state.getFormattedName());
                     retryWhenBackOn(state);
@@ -336,7 +336,7 @@ public final class HueScheduler implements Runnable {
                 retryWhenBackOn(createPowerOnCopy(state));
             }
             if (shouldAdjustMultiColorLoopOffset(state)) {
-                scheduleMultiColorLoopOffsetAdjustments(state.getGroupLights(), 1);
+                scheduleMultiColorLoopOffsetAdjustments(state);
             }
             state.setLastSeen(currentTime.get());
             manualOverrideTracker.onAutomaticallyAssigned(state.getIdV1());
@@ -506,7 +506,7 @@ public final class HueScheduler implements Runnable {
     
     private PutCall getInterpolatedSplitPutCall(ScheduledState state) {
         ScheduledState previousState = getPreviousStateIgnoringNullStates(state);
-        if (previousState == null) { // todo: missing test case for null
+        if (previousState == null) {
             return null;
         }
 		return state.getNextInterpolatedSplitPutCall(currentTime.get(), previousState);
@@ -519,7 +519,7 @@ public final class HueScheduler implements Runnable {
     
     private void putState(ScheduledState state, PutCall putCall) {
         if (state.isGroupState() && controlGroupLightsIndividually) {
-            for (Integer id : state.getGroupLights()) {
+            for (Integer id : getGroupLights(state)) {
                 try {
 					performPutApiCall(state, putCall.toBuilder().id(id).groupState(false).build());
 				} catch (HueApiFailure e) {
@@ -530,7 +530,11 @@ public final class HueScheduler implements Runnable {
             performPutApiCall(state, putCall);
         }
     }
-    
+
+    private List<Integer> getGroupLights(ScheduledState state) {
+        return hueApi.getGroupLights(state.getUpdateId());
+    }
+
     private void performPutApiCall(ScheduledState state, PutCall putCall) {
         LOG.trace("{}", putCall);
         state.setLastPutCall(putCall);
@@ -552,7 +556,11 @@ public final class HueScheduler implements Runnable {
     }
 
     private boolean shouldAdjustMultiColorLoopOffset(ScheduledState state) {
-        return state.isMultiColorLoop() && state.getGroupLights().size() > 1;
+        return state.isMultiColorLoop() && getGroupLights(state).size() > 1;
+    }
+
+    private void scheduleMultiColorLoopOffsetAdjustments(ScheduledState state) {
+        scheduleMultiColorLoopOffsetAdjustments(getGroupLights(state), 1);
     }
 
     private void scheduleMultiColorLoopOffsetAdjustments(List<Integer> groupLights, int i) {

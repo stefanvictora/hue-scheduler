@@ -53,7 +53,6 @@ final class ScheduledState {
     private final Boolean force;
     @Getter
     private final boolean temporary;
-    private final List<Integer> groupLights;
     @Getter
     private final LightCapabilities capabilities;
     @Getter
@@ -74,8 +73,8 @@ final class ScheduledState {
     @Builder
     public ScheduledState(String name, int updateId, String startString, Integer brightness, Integer ct, Double x, Double y,
             Integer hue, Integer sat, String effect, Boolean on, String transitionTimeBeforeString, Integer definedTransitionTime,
-                          Set<DayOfWeek> daysOfWeek, StartTimeProvider startTimeProvider, boolean groupState,
-                          List<Integer> groupLights, LightCapabilities capabilities, Boolean force, boolean temporary) {
+                          Set<DayOfWeek> daysOfWeek, StartTimeProvider startTimeProvider, LightCapabilities capabilities,
+                          Boolean force, boolean groupState, boolean temporary) {
         this.name = name;
         this.updateId = updateId;
         this.startString = startString;
@@ -85,7 +84,6 @@ final class ScheduledState {
             this.daysOfWeek = EnumSet.copyOf(daysOfWeek);
         }
         this.groupState = groupState;
-        this.groupLights = groupLights;
         this.capabilities = capabilities;
         this.effect = assertValidEffectValue(effect);
         this.brightness = assertValidBrightnessValue(brightness);
@@ -117,8 +115,8 @@ final class ScheduledState {
                                                       String transitionTimeBefore) {
         ScheduledState copy = new ScheduledState(state.name, state.updateId, start,
                 state.brightness, state.ct, state.x, state.y, state.hue, state.sat, state.effect, state.on, transitionTimeBefore,
-                state.definedTransitionTime, state.daysOfWeek, state.startTimeProvider, state.groupState, state.groupLights,
-                state.capabilities, state.force, true);
+                state.definedTransitionTime, state.daysOfWeek, state.startTimeProvider, state.capabilities, state.force, state.groupState,
+                true);
         copy.end = end;
         copy.lastStart = state.lastStart;
         copy.lastDefinedStart = state.lastDefinedStart;
@@ -398,9 +396,8 @@ final class ScheduledState {
     
     public PutCall getNextInterpolatedSplitPutCall(ZonedDateTime now, ScheduledState previousState) {
         ZonedDateTime nextSplitStart = getNextTransitionTimeSplitStart(now);
-        PutCall interpolatedSplitPutCall = getInterpolatedPutCall(nextSplitStart, previousState);
-        // todo: interpolated call can be null?
         long splitTransitionTime = Duration.between(now, nextSplitStart).toMillis();
+        PutCall interpolatedSplitPutCall = getInterpolatedPutCall(nextSplitStart, previousState);
         interpolatedSplitPutCall.setTransitionTime((int) splitTransitionTime / 100);
         return interpolatedSplitPutCall;
     }
@@ -431,10 +428,6 @@ final class ScheduledState {
 
     public boolean endsBefore(ZonedDateTime now) {
         return now.isAfter(end);
-    }
-
-    public List<Integer> getGroupLights() {
-        return new ArrayList<>(groupLights); // todo: maybe fetch this dynamically
     }
 
     public boolean isNullState() {
