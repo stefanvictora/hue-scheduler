@@ -1029,8 +1029,44 @@ class HueSchedulerTest {
         
         assertScheduleStart(nextDayRunnable, initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)); // next day
     }
-    
-    // todo: test what happens if we use very long transitions of like 24 hours. What if we use even more?
+
+    @Test
+    void parse_transitionTimeBefore_24Hours_zeroLengthStateBefore_performsInterpolationOverWholeDay() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now, "bri:1");
+        addState(1, now, "bri:254", "tr-before:24h");
+        // 86400000 ms = 24 h
+        // 1440 min = 24 h
+
+        startScheduler();
+
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(2);
+        assertScheduleStart(scheduledRunnables.get(0), now, now.plusDays(1));
+        assertScheduleStart(scheduledRunnables.get(1), now.plusDays(1), now.plusDays(1)); // zero length state
+
+        scheduledRunnables.get(0).run();
+
+        assertPutCall(expectedPutCall(1).bri(1).build());
+        assertPutCall(expectedPutCall(1).bri(19).transitionTime(ScheduledState.MAX_TRANSITION_TIME).build());
+
+        List<ScheduledRunnable> followUpStates = ensureScheduledStates(2);
+
+        assertScheduleStart(followUpStates.get(0), now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), now.plusDays(1)); // next split
+        assertScheduleStart(followUpStates.get(1), now.plusDays(1), now.plusDays(2)); // next day
+    }
+
+    @Test
+    void parse_transitionTimeBefore_moreThan24Hours_25hours_overAdjusts_treatedAs23Hours_correctlyScheduled() { // todo: this is not officially supported, but there is no validation right now
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now, "bri:1");
+        addState(1, now, "bri:" + DEFAULT_BRIGHTNESS, "tr-before:25h");
+        
+        startScheduler();
+
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(2);
+        assertScheduleStart(scheduledRunnables.get(0), now, now.plusDays(1));
+        assertScheduleStart(scheduledRunnables.get(1), now.plusDays(1), now.plusDays(1).minusHours(1)); // strange artifact
+    }
 
     @Test
     void parse_transitionTimeBefore_shiftsGivenStartByThatTime_afterPowerCycle_sameStateAgainWithTransitionTime() {

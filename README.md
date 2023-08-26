@@ -243,7 +243,7 @@ Hue Scheduler offers two different transition time properties, which can be comb
 
 - ``tr``: defines the transition time used at or *after* the defined start time [``0``-``60000``]. The default transition used by the Hue System. Default: `4` (400ms). The maximally supported value ``60000`` equals 100 min. 
 
-- ``tr-before``: defines the transition time used *before* the defined start time [``0``-``?``]. The additional transition provided by Hue Scheduler. In addition to the seconds and minute shorthand from above, ``tr-before`` also supports setting absolute times, including dynamic sun times (see _Start Time Expression_ section):
+- ``tr-before``: defines the transition time used *before* the defined start time [``0``-``864000``]. The additional transition provided by Hue Scheduler. The maximally supported value ``864000`` equals 24 hours. In addition to the seconds and minute shorthand from above, ``tr-before`` also supports setting absolute times, including dynamic sun times (see _Start Time Expression_ section):
 
   ~~~yacas
   Office  sunrise  on:true  bri:254  tr-before:30min
@@ -253,7 +253,7 @@ Hue Scheduler offers two different transition time properties, which can be comb
 
   In the first example, the transition starts 30 minutes before sunrise, while in the last example it starts 5 minutes after ``civil_dawn`` to smoothly turn on the light to full brightness until the sun has risen. 
   
-  > Note: The given start time expression for ``tr-before`` must be before the defined start of the state, otherwise the property is ignored.
+  > Note: The given start time expression for ``tr-before`` must be before the defined start of the state, otherwise the property is ignored. Setting ``tr-before`` to more than 24 hours is not supported and will lead to unexpected results during scheduling.
 
   What makes `tr-before` especially useful is that Hue Scheduler automatically adjusts the transition time to the remaining duration if the light is turned on at later point. And most importantly, it also calculates the mid-transition state based on the elapsed time. Consider, for example:
 

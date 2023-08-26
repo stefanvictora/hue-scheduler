@@ -13,7 +13,7 @@
 - Added ``h`` shorthand unit for ``tr`` and ``tr-before``
 
 ### Changed
-- Removed max value for ``tr-before`` by **splitting up long-running transitions into multiple calls** and interpolating between them
+- Increased max value for ``tr-before`` to 24 hours by **splitting up long-running transitions into multiple calls** and interpolating between them.
 - Improved **manual modification tracking for groups**: Rather than only comparing with the state of the first light in the group, Hue Scheduler now compares the state of all contained lights. While handling special cases for contained lights with different capabilities, as we can't expect, e.g., color temperature lights to display color.
 - Improved **turn-on tracking for groups**: Hue Scheduler now uses group-on events instead of listening for the first contained light being turned on. To still detect groups being physically turned on, now every physically turned-on light inside a group also triggers a group-on event. This is necessary, as the Hue bridge currently does not generate any group-specific events in such cases.
 - Improved support for 'On/Off plug-in unit' type of lights
