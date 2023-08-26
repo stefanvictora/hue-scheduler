@@ -336,7 +336,7 @@ class HueSchedulerTest {
         expectedPutCalls = 0;
         mockPutReturnValue(true); // defaults to true, to signal success
         setCurrentAndInitialTimeTo(ZonedDateTime.of(2021, 1, 1, 0, 0, 0,
-                0, ZoneId.systemDefault()));
+                0, ZoneId.of("Europe/Vienna")));
         startTimeProvider = new StartTimeProviderImpl(new SunTimesProviderImpl(48.20, 16.39, 165));
         stateScheduler = new TestStateScheduler();
         nowTimeString = now.toLocalTime().toString();
