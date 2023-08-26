@@ -16,12 +16,7 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 
 final class ScheduledState {
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
@@ -67,6 +62,8 @@ final class ScheduledState {
     @Getter
     private ZonedDateTime lastStart;
     @Getter
+    private ZonedDateTime lastDefinedStart;
+    @Getter
     @Setter
     private boolean retryAfterPowerOnState;
     @Getter
@@ -107,27 +104,24 @@ final class ScheduledState {
         retryAfterPowerOnState = false;
         assertColorCapabilities();
     }
-    
-    public static ScheduledState createTemporaryCopyNow(ScheduledState state, ZonedDateTime now, ZonedDateTime end) {
-        return createTemporaryCopy(state, now.toLocalTime().toString(), now, end, null);
-    }
 
     public static ScheduledState createTemporaryCopy(ScheduledState state) {
         return createTemporaryCopy(state, state.getEnd());
     }
 
     public static ScheduledState createTemporaryCopy(ScheduledState state, ZonedDateTime end) {
-        return createTemporaryCopy(state, state.startString, state.lastStart, end, state.transitionTimeBeforeString);
+        return createTemporaryCopy(state, state.startString, end, state.transitionTimeBeforeString);
     }
 
-    private static ScheduledState createTemporaryCopy(ScheduledState state, String start, ZonedDateTime lastStart, ZonedDateTime end,
-            String transitionTimeBefore) {
+    private static ScheduledState createTemporaryCopy(ScheduledState state, String start, ZonedDateTime end,
+                                                      String transitionTimeBefore) {
         ScheduledState copy = new ScheduledState(state.name, state.updateId, start,
                 state.brightness, state.ct, state.x, state.y, state.hue, state.sat, state.effect, state.on, transitionTimeBefore,
                 state.definedTransitionTime, state.daysOfWeek, state.startTimeProvider, state.groupState, state.groupLights,
                 state.capabilities, state.force, true);
         copy.end = end;
-        copy.lastStart = lastStart;
+        copy.lastStart = state.lastStart;
+        copy.lastDefinedStart = state.lastDefinedStart;
         copy.lastSeen = state.lastSeen;
         copy.originalState = state.originalState;
         return copy;
@@ -222,24 +216,42 @@ final class ScheduledState {
         return x != null || y != null || hue != null || sat != null || effect != null;
     }
 
-    public long getDelayInSeconds(ZonedDateTime now) {
-        Duration between = Duration.between(now, getStart(now));
+    /**
+     * Returns if the state should have already started at the start calculated for the given day.
+     *
+     * @param now the current day used for comparison
+     * @param day the date used for calculating the next start for comparison, in most cases the current or next day
+     * @return true if the state should have already started at given day, false otherwise
+     */
+    public boolean stateAlreadyStarted(ZonedDateTime now, ZonedDateTime day) {
+        return getDelayUntilStart(now, getStart(day)) == 0;
+    }
+
+    /**
+     * Returns the milliseconds until the state should be scheduled based on the previously calculated start, i.e.,
+     * the lastStart property.
+     *
+     * @param now the current time
+     * @return the delay in ms until this state should be scheduled, not negative.
+     * Returning 0 if it should be directly scheduled.
+     */
+    public long getDelayUntilStart(ZonedDateTime now) {
+        return getDelayUntilStart(now, lastStart);
+    }
+
+    private long getDelayUntilStart(ZonedDateTime now, ZonedDateTime start) {
+        Duration between = Duration.between(now, start);
         if (between.isNegative()) {
             return 0;
         } else {
-            return between.getSeconds();
+            return between.toMillis();
         }
     }
 
-    public boolean isInThePastOrNow(ZonedDateTime now) {
-        return getDelayInSeconds(now) == 0;
-    }
-
     public ZonedDateTime getStart(ZonedDateTime dateTime) {
-        ZonedDateTime definedStart = getStartWithoutTransitionTimeBefore(dateTime);
+        ZonedDateTime definedStart = getDefinedStart(dateTime);
         if (transitionTimeBeforeString != null) {
-            int transitionTimeBefore = getTransitionTimeBefore(dateTime);
-            return definedStart.with(definedStart.toLocalTime().minus(transitionTimeBefore * 100L, ChronoUnit.MILLIS));
+            return definedStart.minus(getTransitionTimeBefore(dateTime) * 100L, ChronoUnit.MILLIS);
         }
         return definedStart;
     }
@@ -255,30 +267,54 @@ final class ScheduledState {
         try {
             return InputConfigurationParser.parseTransitionTime("tr-before", transitionTimeBeforeString);
         } catch (Exception e) {
-            return parseStartTimeBasedTransitionTime(dateTime);
+            return parseDateTimeBasedTransitionTime(dateTime);
         }
     }
-    
-    private int parseStartTimeBasedTransitionTime(ZonedDateTime dateTime) {
+
+    private int parseDateTimeBasedTransitionTime(ZonedDateTime dateTime) {
         ZonedDateTime transitionTimeBeforeStart = startTimeProvider.getStart(transitionTimeBeforeString, dateTime);
-        ZonedDateTime definedStart = getStartWithoutTransitionTimeBefore(dateTime);
+        ZonedDateTime definedStart = getDefinedStart(dateTime);
         Duration duration = Duration.between(transitionTimeBeforeStart, definedStart);
         if (duration.isNegative()) {
             return 0;
         }
         return (int) (duration.toMillis() / 100L);
     }
-    
-    private ZonedDateTime getStartWithoutTransitionTimeBefore(ZonedDateTime now) {
+
+    /**
+     * The start without any transition time before adjustments, i.e., the start as defined via the start time
+     * expression used in the configuration file.
+     *
+     * @param dateTime the date the defined start for this state should be calculated for
+     * @return the defined start for the given date
+     */
+    public ZonedDateTime getDefinedStart(ZonedDateTime dateTime) {
         DayOfWeek day;
-        DayOfWeek today = DayOfWeek.from(now);
+        DayOfWeek today = DayOfWeek.from(dateTime);
         if (daysOfWeek.contains(today)) {
             day = today;
         } else {
             day = getNextDayAfterTodayOrFirstNextWeek(today);
         }
-        now = now.with(TemporalAdjusters.nextOrSame(day));
-        return startTimeProvider.getStart(startString, now);
+        dateTime = dateTime.with(TemporalAdjusters.nextOrSame(day));
+        return startTimeProvider.getStart(startString, dateTime);
+    }
+
+    /**
+     * Returns the next defined start after the last one, starting from the given dateTime.
+     * We loop over getDefinedStart with increased days until we find the first start that is after the last one.
+     *
+     * @param dateTime the start date the next defined start should be calculated for
+     * @return the next defined start
+     */
+    public ZonedDateTime getNextDefinedStart(ZonedDateTime dateTime) {
+        ZonedDateTime last = lastDefinedStart;
+        ZonedDateTime next = getDefinedStart(dateTime);
+        while (next.isBefore(last) || next.equals(last)) {
+            dateTime = dateTime.plusDays(1);
+            next = getDefinedStart(dateTime);
+        }
+        return next;
     }
 
     private DayOfWeek getNextDayAfterTodayOrFirstNextWeek(DayOfWeek today) {
@@ -339,20 +375,11 @@ final class ScheduledState {
         if (transitionTimeBeforeString == null) {
             return 0;
         }
-        ZonedDateTime definedStart = getDefinedStartInTheFuture();
-        Duration between = Duration.between(now, definedStart);
+        Duration between = Duration.between(now, lastDefinedStart);
         if (between.isZero() || between.isNegative()) return 0;
         return (int) between.toMillis() / 100;
     }
-    
-    private ZonedDateTime getDefinedStartInTheFuture() { // todo: write more tests to verify this behavior
-        ZonedDateTime definedStart = getStartWithoutTransitionTimeBefore(lastStart);
-        if (definedStart.isBefore(lastStart)) {
-            return getStartWithoutTransitionTimeBefore(lastStart.plusDays(1));
-        }
-        return definedStart;
-    }
-    
+
     public PutCall getInterpolatedPutCall(ZonedDateTime dateTime, ScheduledState previousState) {
         return new StateInterpolator(this, previousState, dateTime).getInterpolatedPutCall();
     }
@@ -372,32 +399,32 @@ final class ScheduledState {
     public PutCall getNextInterpolatedSplitPutCall(ZonedDateTime now, ScheduledState previousState) {
         ZonedDateTime nextSplitStart = getNextTransitionTimeSplitStart(now);
         PutCall interpolatedSplitPutCall = getInterpolatedPutCall(nextSplitStart, previousState);
+        // todo: interpolated call can be null?
         long splitTransitionTime = Duration.between(now, nextSplitStart).toMillis();
         interpolatedSplitPutCall.setTransitionTime((int) splitTransitionTime / 100);
         return interpolatedSplitPutCall;
     }
     
     private ZonedDateTime getNextTransitionTimeSplitStart(ZonedDateTime now) {
-        ZonedDateTime splitStart = getStart(now).plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS);
+        ZonedDateTime splitStart = lastStart.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS);
         while (splitStart.isBefore(now) || splitStart.isEqual(now)) {
             splitStart = splitStart.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS);
         }
         return splitStart;
     }
-    
+
     /**
      * t = (current_time - start_time) / (end_time - start_time)
      */
     public BigDecimal getInterpolatedTime(ZonedDateTime now) {
-        ZonedDateTime startTime = getStart(now).with(now.toLocalDate());
-        Duration durationAfterStart = Duration.between(startTime, now);
-        ZonedDateTime endTime = getDefinedStartInTheFuture();
-        Duration totalDuration = Duration.between(startTime, endTime);
+        Duration durationAfterStart = Duration.between(lastStart, now);
+        ZonedDateTime endTime = lastDefinedStart;
+        Duration totalDuration = Duration.between(lastStart, endTime);
         return BigDecimal.valueOf(durationAfterStart.toMillis())
                 .divide(BigDecimal.valueOf(totalDuration.toMillis()), 7, RoundingMode.HALF_UP);
     }
-    
-    public boolean endsAfter(ZonedDateTime now) {
+
+    public boolean endsBefore(ZonedDateTime now) {
         return now.isAfter(end);
     }
 
@@ -419,6 +446,7 @@ final class ScheduledState {
 
     public void updateLastStart(ZonedDateTime now) {
         this.lastStart = getStart(now);
+        this.lastDefinedStart = getDefinedStart(now);
     }
     
     public boolean lightStateDiffers(LightState currentState) {
