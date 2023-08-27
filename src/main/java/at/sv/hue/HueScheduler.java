@@ -237,13 +237,15 @@ public final class HueScheduler implements Runnable {
 
     /**
      * Schedule the given states. To correctly schedule cross-over states, i.e., states that already started yesterday,
-     * we initially calculate all end times using the day before, and reschedule them if needed afterward.
+     * we initially calculate all end times using yesterday, and reschedule them if needed afterward.
      */
     private void scheduleInitialStartup(List<ScheduledState> states, ZonedDateTime now) {
-        calculateAndSetEndTimes(states, now.minusDays(1));
+        ZonedDateTime yesterday = now.minusDays(1);
+        states.forEach(state -> state.setPreviousStateLookup(this::getPreviousStateIgnoringNullStates));
+        calculateAndSetEndTimes(states, yesterday);
         states.stream()
-                .sorted(Comparator.comparing(state -> state.getStart(now.minusDays(1))))
-                .forEach(this::initialSchedule);
+                .sorted(Comparator.comparing(state -> state.getDefinedStart(yesterday)))
+                .forEach(state -> initialSchedule(state, now));
     }
 
     private void calculateAndSetEndTimes(List<ScheduledState> states, ZonedDateTime now) {
@@ -275,15 +277,16 @@ public final class HueScheduler implements Runnable {
                 (day, dayOfWeeks) -> getStatesStartingOnDay(states, day, dayOfWeeks)).calculateAndSetEndTime();
     }
 
-    private void initialSchedule(ScheduledState state) {
-        ZonedDateTime now = currentTime.get();
+    private void initialSchedule(ScheduledState state, ZonedDateTime now) {
         ZonedDateTime yesterday = now.minusDays(1);
-        state.updateLastStart(yesterday);
         if (state.endsBefore(now)) {
+            state.updateLastStart(yesterday);
             reschedule(state); // no cross-over state, reschedule normally today
         } else if (doesNotStartOn(state, yesterday)) {
+            state.updateLastStart(now);
             schedule(state, state.getDelayUntilStart(now)); // state was already scheduled at a future time, reuse calculated start time
         } else {
+            state.updateLastStart(yesterday);
             schedule(state, 0); // schedule cross-over states, i.e., states already starting yesterday immediately
         }
     }
@@ -375,7 +378,7 @@ public final class HueScheduler implements Runnable {
         if (state.getTransitionTimeBeforeString() == null) {
             return;
         }
-        ScheduledState previousState = getPreviousStateIgnoringNullStates(state);
+        ScheduledState previousState = getPreviousStateIgnoringNullStates(state, currentTime.get());
         if (previousState == null) {
             return;
         }
@@ -411,28 +414,28 @@ public final class HueScheduler implements Runnable {
         Thread.sleep(sleepTime * 100L);
     }
 
-    private ScheduledState getPreviousStateIgnoringNullStates(ScheduledState currentState) {
-        ScheduledState previousState = findPreviousState(currentState);
+    private ScheduledState getPreviousStateIgnoringNullStates(ScheduledState currentState, ZonedDateTime dateTime) {
+        ScheduledState previousState = findPreviousState(currentState, dateTime);
         if (previousState == null || previousState.isNullState()) {
             return null;
         }
         return previousState;
     }
     
-    private ScheduledState findPreviousState(ScheduledState currentState) {
+    private ScheduledState findPreviousState(ScheduledState currentState, ZonedDateTime dateTime) {
         List<ScheduledState> lightStatesForId = getLightStatesForId(currentState);
         List<ScheduledState> calculatedStateOrderAscending = lightStatesForId.stream()
-                                                           .sorted(Comparator.comparing(state -> state.getStart(currentTime.get())))
-                                                           .collect(Collectors.toList());
+                                                                             .sorted(Comparator.comparing(state -> state.getDefinedStart(dateTime)))
+                                                                             .collect(Collectors.toList());
         int position = calculatedStateOrderAscending.indexOf(currentState.getOriginalStateOrThis());
         if (position > 0) {
             return calculatedStateOrderAscending.get(position - 1);
         }
-        ZonedDateTime yesterday = currentTime.get().minusDays(1);
+        ZonedDateTime yesterday = dateTime.minusDays(1);
         return lightStatesForId.stream()
                 .filter(state -> state.isScheduledOn(yesterday))
                 .filter(currentState::isNotSameState)
-                .max(Comparator.comparing(state -> state.getStart(yesterday)))
+                .max(Comparator.comparing(state -> state.getDefinedStart(yesterday)))
                 .orElse(null);
     }
 
@@ -505,7 +508,7 @@ public final class HueScheduler implements Runnable {
     }
     
     private PutCall getInterpolatedSplitPutCall(ScheduledState state) {
-        ScheduledState previousState = getPreviousStateIgnoringNullStates(state);
+        ScheduledState previousState = getPreviousStateIgnoringNullStates(state, currentTime.get());
         if (previousState == null) {
             return null;
         }

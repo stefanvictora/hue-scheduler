@@ -16,7 +16,11 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
-import java.util.*;
+import java.util.Arrays;
+import java.util.EnumSet;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.BiFunction;
 
 final class ScheduledState {
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
@@ -37,6 +41,7 @@ final class ScheduledState {
      * could be that incorrect manual overrides are detected.
      */
     public static final int MAX_TRANSITION_TIME_WITH_BUFFER = MAX_TRANSITION_TIME - MAX_TRANSITION_TIME_BUFFER;
+    public static final int MIN_MULTIPLE_TR_BEFORE_GAP_IN_MINUTES = 2;
 
     private final String name;
     @Getter
@@ -66,9 +71,7 @@ final class ScheduledState {
     @Getter
     @Setter
     private ZonedDateTime end;
-    @Getter
     private ZonedDateTime lastStart;
-    @Getter
     private ZonedDateTime lastDefinedStart;
     @Getter
     @Setter
@@ -77,6 +80,8 @@ final class ScheduledState {
     private ZonedDateTime lastSeen;
     private ScheduledState originalState;
     private PutCall lastPutCall;
+    @Setter
+    private BiFunction<ScheduledState, ZonedDateTime, ScheduledState> previousStateLookup;
 
     @Builder
     public ScheduledState(String name, int updateId, String startString, Integer brightness, Integer ct, Double x, Double y,
@@ -108,6 +113,7 @@ final class ScheduledState {
         this.temporary = temporary;
         originalState = this;
         retryAfterPowerOnState = false;
+        previousStateLookup = (state, dateTime) -> null;
         assertColorCapabilities();
     }
 
@@ -130,6 +136,7 @@ final class ScheduledState {
         copy.lastDefinedStart = state.lastDefinedStart;
         copy.lastSeen = state.lastSeen;
         copy.originalState = state.originalState;
+        // todo: previous state lookup is currently not copied, write test if needed
         return copy;
     }
 
@@ -257,11 +264,29 @@ final class ScheduledState {
     public ZonedDateTime getStart(ZonedDateTime dateTime) {
         ZonedDateTime definedStart = getDefinedStart(dateTime);
         if (transitionTimeBeforeString != null) {
-            return definedStart.minus(getTransitionTimeBefore(dateTime) * 100L, ChronoUnit.MILLIS);
+            ZonedDateTime start = definedStart.minus(getTransitionTimeBefore(dateTime) * 100L, ChronoUnit.MILLIS);
+            return ensureGapBetweenMultipleTrBeforeStates(dateTime, start, definedStart);
         }
         return definedStart;
     }
-    
+
+    private ZonedDateTime ensureGapBetweenMultipleTrBeforeStates(ZonedDateTime dateTime, ZonedDateTime start,
+                                                                 ZonedDateTime definedStart) {
+        ScheduledState previousState = previousStateLookup.apply(this, dateTime); // todo: should we pass in the start?
+        if (previousState == null || previousState.getTransitionTimeBeforeString() == null) {
+            return start;
+        }
+        long minutesBetween = Duration.between(previousState.getDefinedStart(start), start).abs().toMinutes();
+        if (minutesBetween >= MIN_MULTIPLE_TR_BEFORE_GAP_IN_MINUTES) {
+            return start; // enough gap
+        }
+        if (start.plusMinutes(MIN_MULTIPLE_TR_BEFORE_GAP_IN_MINUTES).isAfter(definedStart)) {
+            return definedStart; // too short tr-before to add gap without changing the defined start
+        } else {
+            return start.plusMinutes(MIN_MULTIPLE_TR_BEFORE_GAP_IN_MINUTES);
+        }
+    }
+
     /**
      * Returns the calculated transition time before as multiple of 100ms, to be directly used by the Hue API.
      * To get the actual ms, multiply the returned value by 100.
@@ -445,9 +470,9 @@ final class ScheduledState {
         return on == Boolean.TRUE;
     }
 
-    public void updateLastStart(ZonedDateTime now) {
-        this.lastStart = getStart(now);
-        this.lastDefinedStart = getDefinedStart(now);
+    public void updateLastStart(ZonedDateTime dateTime) {
+        lastStart = getStart(dateTime);
+        lastDefinedStart = getDefinedStart(dateTime);
     }
     
     public boolean lightStateDiffers(LightState currentState) {
