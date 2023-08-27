@@ -253,7 +253,7 @@ public final class HueScheduler implements Runnable {
             List<ScheduledState> statesStartingOnDay = getStatesStartingOnDay(states, day, DayOfWeek.from(day));
             statesStartingOnDay.stream()
                                .filter(state -> !alreadyProcessedStates.contains(state))
-                    .forEach(state -> calculateAndSetEndTime(state, states, state.getDefinedStart(now)));
+                               .forEach(state -> calculateAndSetEndTime(state, states, state.getDefinedStart(now)));
             alreadyProcessedStates.addAll(statesStartingOnDay);
         }
     }

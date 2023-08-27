@@ -290,9 +290,6 @@ final class ScheduledState {
     /**
      * The start without any transition time before adjustments, i.e., the start as defined via the start time
      * expression used in the configuration file.
-     *
-     * @param dateTime the date the defined start for this state should be calculated for
-     * @return the defined start for the given date
      */
     public ZonedDateTime getDefinedStart(ZonedDateTime dateTime) {
         DayOfWeek day;
@@ -309,9 +306,6 @@ final class ScheduledState {
     /**
      * Returns the next defined start after the last one, starting from the given dateTime.
      * We loop over getDefinedStart with increased days until we find the first start that is after the last one.
-     *
-     * @param dateTime the start date the next defined start should be calculated for
-     * @return the next defined start
      */
     public ZonedDateTime getNextDefinedStart(ZonedDateTime dateTime) {
         ZonedDateTime last = lastDefinedStart;
@@ -339,16 +333,12 @@ final class ScheduledState {
         return daysOfWeek.stream().findFirst().get();
     }
 
-    public Set<DayOfWeek> getDaysOfWeek() {
-        return EnumSet.copyOf(daysOfWeek);
-    }
-
     public boolean isScheduledOn(ZonedDateTime day) {
         return isScheduledOn(DayOfWeek.from(day));
     }
 
     public boolean isScheduledOn(DayOfWeek... day) {
-        return getDaysOfWeek().containsAll(Arrays.asList(day));
+        return daysOfWeek.containsAll(Arrays.asList(day));
     }
     
     public String getIdV1() {
@@ -358,7 +348,7 @@ final class ScheduledState {
         return "/lights/" + updateId;
     }
 
-    public String getEffect() {
+    private String getEffect() {
         if (isMultiColorLoop()) {
             return COLOR_LOOP;
         }
@@ -369,7 +359,7 @@ final class ScheduledState {
         return MULTI_COLOR_LOOP.equals(effect);
     }
 
-    public Integer getTransitionTime(ZonedDateTime now) {
+    private Integer getTransitionTime(ZonedDateTime now) {
         int adjustedTrBefore = getAdjustedTransitionTimeBefore(now);
         if (adjustedTrBefore == 0) {
             return definedTransitionTime;
