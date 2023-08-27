@@ -294,7 +294,7 @@ public final class HueScheduler implements Runnable {
 
     private void schedule(ScheduledState state, long delayInMs) {
         if (state.isNullState()) return;
-        LOG.debug("Schedule {} in {}", state, Duration.ofMillis(delayInMs));
+        LOG.debug("Schedule {} in {}", state, Duration.ofMillis(delayInMs).withNanos(0));
         stateScheduler.schedule(() -> {
             if (state.endsBefore(currentTime.get())) {
                 LOG.debug("{} already ended", state);

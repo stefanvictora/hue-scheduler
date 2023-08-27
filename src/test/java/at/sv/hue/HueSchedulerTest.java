@@ -586,7 +586,7 @@ class HueSchedulerTest {
     }
     
     @Test
-    void parse_canParseTransitionTime_withSunTime() {
+    void parse_canParseTransitionTimeBefore_withSunTime() {
         addKnownLightIdsWithDefaultCapabilities(1);
         addState("1", "civil_dusk", "bri:" + DEFAULT_BRIGHTNESS, "tr-before:sunset+10"); // tr-before:16:24:29
         ZonedDateTime sunset = startTimeProvider.getStart("sunset", now); // 16:14:29
@@ -608,9 +608,23 @@ class HueSchedulerTest {
         
         ensureRunnable(nextDaySunset.plusMinutes(10), nextNextDaySunset.plusMinutes(10));
     }
-    
+
     @Test
-    void parse_canParseTransitionTime_negativeDuration_ignored() {
+    void parse_canParseTransitionTimeBefore_withAbsoluteTime() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState("1", "01:00", "bri:1");
+        addState("1", "12:00", "bri:254", "tr-before:01:00");
+
+        startScheduler();
+
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(2);
+
+        assertScheduleStart(scheduledRunnables.get(0), now, now.plusHours(1)); // from previous day
+        assertScheduleStart(scheduledRunnables.get(1), now.plusHours(1), now.plusHours(1)); // zero length state
+    }
+
+    @Test
+    void parse_canParseTransitionTimeBefore_negativeDuration_ignored() {
         addKnownLightIdsWithDefaultCapabilities(1);
         addState("1", "golden_hour", "bri:" + DEFAULT_BRIGHTNESS, "tr-before:sunset"); // referenced time is AFTER start
         ZonedDateTime goldenHour = startTimeProvider.getStart("golden_hour", now);
@@ -631,7 +645,7 @@ class HueSchedulerTest {
     }
     
     @Test
-    void parse_canParseTransitionTime_maxDuration_doesNotPerformAdditionalInterpolation() {
+    void parse_canParseTransitionTimeBefore_maxDuration_doesNotPerformAdditionalInterpolation() {
         addKnownLightIdsWithDefaultCapabilities(1);
         addState(1, now); // null state
         addState(1, now.plusHours(1).plusMinutes(50), "bri:200", "tr-before:" + ScheduledState.MAX_TRANSITION_TIME);
@@ -646,7 +660,7 @@ class HueSchedulerTest {
     }
     
     @Test
-    void parse_canParseTransitionTime_tooLongDuration_noPreviousState_ignored() {
+    void parse_canParseTransitionTimeBefore_tooLongDuration_noPreviousState_ignored() {
         addKnownLightIdsWithDefaultCapabilities(1);
         addState(1, now); // null state
         addState(1, now.plusHours(3).plusMinutes(40), "bri:200", "tr-before:210min");
@@ -661,7 +675,7 @@ class HueSchedulerTest {
     }
     
     @Test
-    void parse_canParseTransitionTime_longDuration_splitsCallIntoMultipleParts_interpolatesPropertiesCorrectly() {
+    void parse_canParseTransitionTimeBefore_longDuration_splitsCallIntoMultipleParts_interpolatesPropertiesCorrectly() {
         addKnownLightIdsWithDefaultCapabilities(1);
         int initialBrightness = 40;
         addState(1, now, "bri:" + initialBrightness);
@@ -764,7 +778,7 @@ class HueSchedulerTest {
     }
     
     @Test
-    void parse_canParseTransitionTime_longTransition_manuallyOverridden_stillCorrectlyScheduled() {
+    void parse_canParseTransitionTimeBefore_longTransition_manuallyOverridden_stillCorrectlyScheduled() {
         enableUserModificationTracking();
         create();
         addKnownLightIdsWithDefaultCapabilities(1);
@@ -819,7 +833,7 @@ class HueSchedulerTest {
     }
     
     @Test
-    void parse_canParseTransitionTime_longTransition_detectsManualOverrides_skipsFirstSplit_correctlyInterpolated() {
+    void parse_canParseTransitionTimeBefore_longTransition_detectsManualOverrides_skipsFirstSplit_correctlyInterpolated() {
         enableUserModificationTracking();
         create();
         addKnownLightIdsWithDefaultCapabilities(1);
@@ -893,7 +907,7 @@ class HueSchedulerTest {
     }
     
     @Test
-    void parse_canParseTransitionTime_longTransition_detectsManualOverrides_skipsSecondSplit_correctlyInterpolated() {
+    void parse_canParseTransitionTimeBefore_longTransition_detectsManualOverrides_skipsSecondSplit_correctlyInterpolated() {
         enableUserModificationTracking();
         create();
         addKnownLightIdsWithDefaultCapabilities(1);
@@ -975,7 +989,7 @@ class HueSchedulerTest {
     }
     
     @Test
-    void parse_canParseTransitionTime_longTransition_detectsManualOverrides_skipsFirstAndSecondSplit_correctlyInterpolated() {
+    void parse_canParseTransitionTimeBefore_longTransition_detectsManualOverrides_skipsFirstAndSecondSplit_correctlyInterpolated() {
         enableUserModificationTracking();
         create();
         addKnownLightIdsWithDefaultCapabilities(1);
@@ -1031,7 +1045,7 @@ class HueSchedulerTest {
     }
 
     @Test
-    void parse_transitionTimeBefore_24Hours_zeroLengthStateBefore_performsInterpolationOverWholeDay() {
+    void parse_transitionTimeBeforeBefore_24Hours_zeroLengthStateBefore_performsInterpolationOverWholeDay() {
         addKnownLightIdsWithDefaultCapabilities(1);
         addState(1, now, "bri:1");
         addState(1, now, "bri:254", "tr-before:24h");
