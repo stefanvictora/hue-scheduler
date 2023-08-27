@@ -25,11 +25,19 @@ final class ScheduledState {
     public static final int MAX_HUE_VALUE = 65535;
     public static final int MIDDLE_HUE_VALUE = 32768;
     /**
-     * Max transition time as a multiple of 100ms
+     * Max transition time as a multiple of 100ms. Value =  1h40min
      */
     public static final int MAX_TRANSITION_TIME = 60000;
     public static final int MAX_TRANSITION_TIME_MS = MAX_TRANSITION_TIME * 100;
-    
+    private static final int MAX_TRANSITION_TIME_BUFFER = 1200;
+    private static final int MAX_TRANSITION_TIME_BUFFER_IN_MS = MAX_TRANSITION_TIME_BUFFER * 100;
+    /**
+     * The MAX_TRANSITION_TIME minus a buffer of 2 minutes for the max transition time. This is needed as otherwise
+     * the Hue bridge would not have yet reported the correct end value of the long transitions. Without this buffer it
+     * could be that incorrect manual overrides are detected.
+     */
+    public static final int MAX_TRANSITION_TIME_WITH_BUFFER = MAX_TRANSITION_TIME - MAX_TRANSITION_TIME_BUFFER;
+
     private final String name;
     @Getter
     private final int updateId;
@@ -397,17 +405,18 @@ final class ScheduledState {
     }
     
     public PutCall getNextInterpolatedSplitPutCall(ZonedDateTime now, ScheduledState previousState) {
-        ZonedDateTime nextSplitStart = getNextTransitionTimeSplitStart(now);
-        long splitTransitionTime = Duration.between(now, nextSplitStart).toMillis();
+        ZonedDateTime nextSplitStart = getNextTransitionTimeSplitStart(now)
+                .minus(MAX_TRANSITION_TIME_BUFFER_IN_MS, ChronoUnit.MILLIS); // add buffer of 2 minutes
         PutCall interpolatedSplitPutCall = getInterpolatedPutCall(nextSplitStart, previousState, false);
         if (interpolatedSplitPutCall == null) {
             return null;
         }
+        long splitTransitionTime = Duration.between(now, nextSplitStart).toMillis();
         interpolatedSplitPutCall.setTransitionTime((int) splitTransitionTime / 100);
         return interpolatedSplitPutCall;
     }
 
-    public long getNextInterpolationSplitTransitionTime(ZonedDateTime now) {
+    public long getNextInterpolationSplitDelayInMs(ZonedDateTime now) {
         ZonedDateTime nextSplitStart = getNextTransitionTimeSplitStart(now);
         return Duration.between(now, nextSplitStart).toMillis();
     }
@@ -425,8 +434,7 @@ final class ScheduledState {
      */
     public BigDecimal getInterpolatedTime(ZonedDateTime now) {
         Duration durationAfterStart = Duration.between(lastStart, now);
-        ZonedDateTime endTime = lastDefinedStart;
-        Duration totalDuration = Duration.between(lastStart, endTime);
+        Duration totalDuration = Duration.between(lastStart, lastDefinedStart);
         return BigDecimal.valueOf(durationAfterStart.toMillis())
                 .divide(BigDecimal.valueOf(totalDuration.toMillis()), 7, RoundingMode.HALF_UP);
     }

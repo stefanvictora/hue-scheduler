@@ -497,7 +497,7 @@ public final class HueScheduler implements Runnable {
             }
             performPutApiCall(state, interpolatedSplitPutCall);
             if (!state.isRetryAfterPowerOnState()) { // schedule follow-up split
-                schedule(ScheduledState.createTemporaryCopy(state), state.getNextInterpolationSplitTransitionTime(now));
+                schedule(ScheduledState.createTemporaryCopy(state), state.getNextInterpolationSplitDelayInMs(now));
             }
         } else {
             putState(state, state.getPutCall(now));

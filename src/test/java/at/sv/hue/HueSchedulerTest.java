@@ -699,7 +699,7 @@ class HueSchedulerTest {
         trRunnable.run();
         
         assertPutCall(expectedPutCall(1).bri(initialBrightness).build()); // previous state call as interpolation start
-        assertPutCall(expectedPutCall(1).bri(initialBrightness + 100).transitionTime(ScheduledState.MAX_TRANSITION_TIME).build()); // first split of transition
+        assertPutCall(expectedPutCall(1).bri(initialBrightness + 100 - 2).transitionTime(ScheduledState.MAX_TRANSITION_TIME_WITH_BUFFER).build()); // first split of transition
         
         List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(2);
         ScheduledRunnable followUpRunnable = followUpRunnables.get(0);
@@ -715,7 +715,7 @@ class HueSchedulerTest {
         followUpRunnable.run();
         
         // no interpolation as "initialBrightness + 100" already set at end of first part
-        assertPutCall(expectedPutCall(1).bri(initialBrightness + 200).transitionTime(ScheduledState.MAX_TRANSITION_TIME).build()); // second split of transition
+        assertPutCall(expectedPutCall(1).bri(initialBrightness + 200 - 2).transitionTime(ScheduledState.MAX_TRANSITION_TIME_WITH_BUFFER).build()); // second split of transition
         
         ScheduledRunnable finalSplit = ensureScheduledStates(1).get(0);
         
@@ -736,7 +736,7 @@ class HueSchedulerTest {
         // creates another power-on runnable but with adjusted end -> see "already ended" runnable for second power-on
         
         assertPutCall(expectedPutCall(1).bri(initialBrightness + 105).build()); // adjusted to five minutes after
-        assertPutCall(expectedPutCall(1).bri(initialBrightness + 200).transitionTime(ScheduledState.MAX_TRANSITION_TIME - 3000).build());
+        assertPutCall(expectedPutCall(1).bri(initialBrightness + 200 - 2).transitionTime(ScheduledState.MAX_TRANSITION_TIME_WITH_BUFFER - 3000).build());
         
         ensureScheduledStates(0);
         
@@ -805,7 +805,7 @@ class HueSchedulerTest {
         powerOnRunnable.run();
         
         assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).build()); // previous state call as interpolation start
-        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 100).transitionTime(ScheduledState.MAX_TRANSITION_TIME).build()); // first split of transition
+        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 100 - 2).transitionTime(ScheduledState.MAX_TRANSITION_TIME_WITH_BUFFER).build()); // first split of transition
         
         List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(2);
         ScheduledRunnable followUpRunnable = followUpRunnables.get(0);
@@ -819,7 +819,7 @@ class HueSchedulerTest {
         
         setCurrentTimeTo(followUpRunnable);
         LightState sameStateAsSplitCall = LightState.builder()
-                .brightness(DEFAULT_BRIGHTNESS + 100)
+                .brightness(DEFAULT_BRIGHTNESS + 100 - 2)
                 .reachable(true)
                 .on(true)
                 .capabilities(EnumSet.allOf(Capability.class))
@@ -881,7 +881,7 @@ class HueSchedulerTest {
         powerOnRunnables.get(1).run();
         
         assertPutCall(expectedPutCall(1).bri(initialBrightness + 100).build()); // end of firs split, which was skipped
-        assertPutCall(expectedPutCall(1).bri(initialBrightness + 200).transitionTime(ScheduledState.MAX_TRANSITION_TIME).build()); // second split of transition
+        assertPutCall(expectedPutCall(1).bri(initialBrightness + 200 - 2).transitionTime(ScheduledState.MAX_TRANSITION_TIME_WITH_BUFFER).build()); // second split of transition
         
         List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(2);
         ScheduledRunnable finalSplit = followUpRunnables.get(0);
@@ -893,7 +893,7 @@ class HueSchedulerTest {
         
         setCurrentTimeTo(finalSplit);
         LightState sameAsSecondSplit = LightState.builder()
-                .brightness(initialBrightness + 200)
+                .brightness(initialBrightness + 200 - 2)
                 .reachable(true)
                 .on(true)
                 .capabilities(EnumSet.allOf(Capability.class))
@@ -952,7 +952,7 @@ class HueSchedulerTest {
         powerOnRunnables.get(1).run();
 
         assertPutCall(expectedPutCall(1).bri(initialBrightness).build()); // previous state call as interpolation start
-        assertPutCall(expectedPutCall(1).bri(initialBrightness + 100).transitionTime(ScheduledState.MAX_TRANSITION_TIME).build()); // first split of transition
+        assertPutCall(expectedPutCall(1).bri(initialBrightness + 100 - 2).transitionTime(ScheduledState.MAX_TRANSITION_TIME_WITH_BUFFER).build()); // first split of transition
 
         List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(2);
         ScheduledRunnable followUpRunnable = followUpRunnables.get(0);
@@ -1061,7 +1061,7 @@ class HueSchedulerTest {
         scheduledRunnables.get(0).run();
 
         assertPutCall(expectedPutCall(1).bri(1).build());
-        assertPutCall(expectedPutCall(1).bri(19).transitionTime(ScheduledState.MAX_TRANSITION_TIME).build());
+        assertPutCall(expectedPutCall(1).bri(19 - 1).transitionTime(ScheduledState.MAX_TRANSITION_TIME_WITH_BUFFER).build());
 
         List<ScheduledRunnable> followUpStates = ensureScheduledStates(2);
 
@@ -1530,30 +1530,31 @@ class HueSchedulerTest {
 
         ZonedDateTime trBeforeStart = sunrise.minusHours(8);
         Duration initialStartOffset = Duration.between(trBeforeStart, now);
-        long adjustedSplitDuration = ScheduledState.MAX_TRANSITION_TIME_MS - initialStartOffset.toMillis();
+        long adjustedSplitDuration = ScheduledState.MAX_TRANSITION_TIME_WITH_BUFFER * 100 - initialStartOffset.toMillis();
+        long adjustedNextStart = ScheduledState.MAX_TRANSITION_TIME_MS - initialStartOffset.toMillis();
 
         assertPutCall(expectedPutCall(1).bri(19).build()); // interpolated call
-        assertPutCall(expectedPutCall(1).bri(61).transitionTime((int) (adjustedSplitDuration / 100)).build()); // first split call
+        assertPutCall(expectedPutCall(1).bri(61 - 1).transitionTime((int) (adjustedSplitDuration / 100)).build()); // first split call
 
         List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(2);
         ScheduledRunnable firstSplitCall = followUpRunnables.get(0);
         ScheduledRunnable nextDaySunriseState = followUpRunnables.get(1);
 
-        assertScheduleStart(firstSplitCall, now.plus(adjustedSplitDuration, ChronoUnit.MILLIS), sunset); // next split call
+        assertScheduleStart(firstSplitCall, now.plus(adjustedNextStart, ChronoUnit.MILLIS), sunset); // next split call
         assertScheduleStart(nextDaySunriseState, nextDaySunrise.minusHours(8), nextDaySunset); // sunrise rescheduled for the next day
 
         advanceTimeAndRunAndAssertPutCall(firstSplitCall,
-                expectedPutCall(1).bri(112).transitionTime(ScheduledState.MAX_TRANSITION_TIME).build());
+                expectedPutCall(1).bri(112 - 1).transitionTime(ScheduledState.MAX_TRANSITION_TIME_WITH_BUFFER).build());
 
         ScheduledRunnable secondSplitCall = ensureRunnable(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), sunset);
 
         advanceTimeAndRunAndAssertPutCall(secondSplitCall,
-                expectedPutCall(1).bri(163).transitionTime(ScheduledState.MAX_TRANSITION_TIME).build());
+                expectedPutCall(1).bri(163 - 2).transitionTime(ScheduledState.MAX_TRANSITION_TIME_WITH_BUFFER).build());
 
         ScheduledRunnable thirdSplitCall = ensureRunnable(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), sunset);
 
         advanceTimeAndRunAndAssertPutCall(thirdSplitCall,
-                expectedPutCall(1).bri(213).transitionTime(ScheduledState.MAX_TRANSITION_TIME).build());
+                expectedPutCall(1).bri(213 - 1).transitionTime(ScheduledState.MAX_TRANSITION_TIME_WITH_BUFFER).build());
 
         ScheduledRunnable fourthSplitCall = ensureRunnable(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), sunset);
 
