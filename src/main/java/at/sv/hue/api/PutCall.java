@@ -24,7 +24,7 @@ public final class PutCall {
     boolean groupState;
     
     public boolean isNullCall() {
-        return Stream.of(bri, ct, x, y, hue, sat, on, effect, transitionTime).allMatch(Objects::isNull);
+        return Stream.of(bri, ct, x, y, hue, sat, on, effect).allMatch(Objects::isNull);
     }
     
     public ColorMode getColorMode() {

@@ -1920,7 +1920,7 @@ class HueSchedulerTest {
     @Test
     void parse_transitionTimeBefore_longDuration_multipleStates_multipleProperty_followStateHasBrightnessOnly_noInterpolation() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        addStateNow(1, "ct:166", "x:0.4", "y:0.5", "hue:2000");
+        addStateNow(1, "ct:166", "x:0.4", "y:0.5", "hue:2000", "tr:2s");
         addState(1, "12:00", "bri:" + DEFAULT_BRIGHTNESS, "tr-before:00:00");
 
         startScheduler();
@@ -1933,7 +1933,7 @@ class HueSchedulerTest {
 
         trBeforeRunnable.run();
 
-        assertPutCall(expectedPutCall(1).ct(166).x(0.4).y(0.5).hue(2000).build());
+        assertPutCall(expectedPutCall(1).ct(166).x(0.4).y(0.5).hue(2000).transitionTime(20).build());
         // no long interpolations expected, just warning
 
         ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(2));
