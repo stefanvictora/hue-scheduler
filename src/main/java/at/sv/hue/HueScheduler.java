@@ -301,6 +301,7 @@ public final class HueScheduler implements Runnable {
                 reschedule(state);
                 return;
             }
+            LOG.info("Set {}", state);
             if (lightHasBeenManuallyOverriddenBefore(state)) {
                 if (state.isOff()) {
                     LOG.info("{} state has been manually overridden before, skip off-state for this day.", state.getFormattedName());
@@ -312,7 +313,6 @@ public final class HueScheduler implements Runnable {
                 return;
             }
             try {
-                LOG.info("Set {}", state);
                 if (stateIsNotEnforced(state) && stateHasBeenManuallyOverriddenSinceLastSeen(state)) {
                     LOG.info("{} state has been manually overridden, pause update until light is turned off and on again", state.getFormattedName());
                     manualOverrideTracker.onManuallyOverridden(state.getIdV1());
@@ -384,7 +384,7 @@ public final class HueScheduler implements Runnable {
                 && !manualOverrideTracker.shouldEnforceSchedule(state.getIdV1())) {
             return; // skip interpolations if the previous or current state was the last state set without any power cycles
         }
-        PutCall interpolatedPutCall = state.getInterpolatedPutCall(currentTime.get(), previousState);
+        PutCall interpolatedPutCall = state.getInterpolatedPutCall(currentTime.get(), previousState, true);
         if (interpolatedPutCall == null) {
             return;
         }
@@ -513,8 +513,8 @@ public final class HueScheduler implements Runnable {
     }
     
     private static void logMissingPreviousStateWarning(ScheduledState state) {
-        LOG.warn("Warning: Can't set {} with extended transition time. No previous state for required interpolation" +
-                " found!", state.getFormattedName());
+        LOG.warn("Warning: Can't set {} with extended transition time. No previous state found or missing source " +
+                "properties for required interpolation!", state.getFormattedName());
     }
     
     private void putState(ScheduledState state, PutCall putCall) {

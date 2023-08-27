@@ -378,8 +378,10 @@ final class ScheduledState {
         return (int) between.toMillis() / 100;
     }
 
-    public PutCall getInterpolatedPutCall(ZonedDateTime dateTime, ScheduledState previousState) {
-        return new StateInterpolator(this, previousState, dateTime).getInterpolatedPutCall();
+    public PutCall getInterpolatedPutCall(ZonedDateTime dateTime, ScheduledState previousState,
+                                          boolean keepPreviousPropertiesForNullTargets) {
+        return new StateInterpolator(this, previousState, dateTime, keepPreviousPropertiesForNullTargets)
+                .getInterpolatedPutCall();
     }
     
     public boolean shouldSplitLongBeforeTransition(ZonedDateTime now) {
@@ -397,7 +399,10 @@ final class ScheduledState {
     public PutCall getNextInterpolatedSplitPutCall(ZonedDateTime now, ScheduledState previousState) {
         ZonedDateTime nextSplitStart = getNextTransitionTimeSplitStart(now);
         long splitTransitionTime = Duration.between(now, nextSplitStart).toMillis();
-        PutCall interpolatedSplitPutCall = getInterpolatedPutCall(nextSplitStart, previousState);
+        PutCall interpolatedSplitPutCall = getInterpolatedPutCall(nextSplitStart, previousState, false);
+        if (interpolatedSplitPutCall == null) {
+            return null;
+        }
         interpolatedSplitPutCall.setTransitionTime((int) splitTransitionTime / 100);
         return interpolatedSplitPutCall;
     }

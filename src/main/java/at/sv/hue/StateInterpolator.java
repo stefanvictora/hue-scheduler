@@ -8,17 +8,20 @@ import java.math.RoundingMode;
 import java.time.ZonedDateTime;
 
 public final class StateInterpolator {
-	
+
 	private final ScheduledState state;
 	private final ScheduledState previousState;
 	private final ZonedDateTime dateTime;
-	
-	public StateInterpolator(ScheduledState state, ScheduledState previousState, ZonedDateTime dateTime) {
+	private final boolean keepPreviousPropertiesForNullTargets;
+
+	public StateInterpolator(ScheduledState state, ScheduledState previousState, ZonedDateTime dateTime,
+							 boolean keepPreviousPropertiesForNullTargets) {
 		this.state = state;
 		this.previousState = previousState;
 		this.dateTime = dateTime;
+		this.keepPreviousPropertiesForNullTargets = keepPreviousPropertiesForNullTargets;
 	}
-	
+
 	public PutCall getInterpolatedPutCall() {
 		int timeUntilThisState = state.getAdjustedTransitionTimeBefore(dateTime);
 		if (timeUntilThisState == 0) {
@@ -32,7 +35,7 @@ public final class StateInterpolator {
 		}
 		return modifyProperties(interpolatedPutCall);
 	}
-	
+
 	private PutCall modifyProperties(PutCall interpolatedPutCall) {
 		interpolatedPutCall.setOn(null); // do not per default reuse "on" property for interpolation
 		if (interpolatedPutCall.isNullCall()) {
@@ -43,7 +46,7 @@ public final class StateInterpolator {
 		}
 		return interpolatedPutCall;
 	}
-	
+
 	/**
 	 * P = P0 + t(P1 - P0)
 	 */
@@ -67,12 +70,15 @@ public final class StateInterpolator {
 		Double[][] colorGamut = previousState.getCapabilities().getColorGamut();
 		ColorModeConverter.convertIfNeeded(previousPutCall, colorGamut, previousPutCall.getColorMode(), target.getColorMode());
 	}
-	
-	private static Integer interpolateInteger(BigDecimal interpolatedTime, Integer target, Integer previous) {
-		if (target == null) {
+
+	private Integer interpolateInteger(BigDecimal interpolatedTime, Integer target, Integer previous) {
+		if (shouldReturnPrevious(target)) {
 			return previous;
 		}
-		if (previous == null) {
+        if (target == null) {
+            return null;
+        }
+        if (previous == null) {
 			return null;
 		}
 		BigDecimal diff = BigDecimal.valueOf(target - previous);
@@ -81,12 +87,15 @@ public final class StateInterpolator {
 				.setScale(0, RoundingMode.HALF_UP)
 				.intValue();
 	}
-	
-	private static Double interpolateDouble(BigDecimal interpolatedTime, Double target, Double previous) {
-		if (target == null) {
+
+	private Double interpolateDouble(BigDecimal interpolatedTime, Double target, Double previous) {
+		if (shouldReturnPrevious(target)) {
 			return previous;
 		}
-		if (previous == null) {
+        if (target == null) {
+            return null;
+        }
+        if (previous == null) {
 			return null;
 		}
 		BigDecimal diff = BigDecimal.valueOf(target - previous);
@@ -95,16 +104,19 @@ public final class StateInterpolator {
 				.setScale(5, RoundingMode.HALF_UP)
 				.doubleValue();
 	}
-	
+
 	/**
 	 * Perform special interpolation for hue values, as they wrap around i.e. 0 and 65535 are both considered red.
 	 * This means that we need to decide in which direction we want to interpolate, to get the smoothest transition.
 	 */
-	private static Integer interpolateHue(BigDecimal interpolatedTime, Integer target, Integer previous) {
-		if (target == null) {
+	private Integer interpolateHue(BigDecimal interpolatedTime, Integer target, Integer previous) {
+		if (shouldReturnPrevious(target)) {
 			return previous;
 		}
-		if (previous == null) {
+        if (target == null) {
+            return null;
+        }
+        if (previous == null) {
 			return null;
 		}
 		if (previous == 0 && target == ScheduledState.MAX_HUE_VALUE || previous == ScheduledState.MAX_HUE_VALUE && target == 0) {
@@ -115,5 +127,9 @@ public final class StateInterpolator {
 				.add(interpolatedTime.multiply(BigDecimal.valueOf(diff)))
 				.setScale(0, RoundingMode.HALF_UP)
 				.intValue();
+	}
+
+	private boolean shouldReturnPrevious(Object target) {
+		return target == null && keepPreviousPropertiesForNullTargets;
 	}
 }
