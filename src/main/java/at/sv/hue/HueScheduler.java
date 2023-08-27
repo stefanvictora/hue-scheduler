@@ -424,7 +424,7 @@ public final class HueScheduler implements Runnable {
         List<ScheduledState> calculatedStateOrderAscending = lightStatesForId.stream()
                                                            .sorted(Comparator.comparing(state -> state.getStart(currentTime.get())))
                                                            .collect(Collectors.toList());
-        int position = calculatedStateOrderAscending.indexOf(currentState);
+        int position = calculatedStateOrderAscending.indexOf(currentState.getOriginalStateOrThis());
         if (position > 0) {
             return calculatedStateOrderAscending.get(position - 1);
         }

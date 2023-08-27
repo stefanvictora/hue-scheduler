@@ -1104,24 +1104,32 @@ class HueSchedulerTest {
     void parse_transitionTimeBefore_allowsBackToBack_zeroLengthState_usedOnlyForInterpolation() {
         create();
         addKnownLightIdsWithDefaultCapabilities(1);
-        addState(1, now, "bri:" + DEFAULT_BRIGHTNESS);
+        addState(1, now, "bri:" + DEFAULT_BRIGHTNESS); // zero length
         addState(1, now.plusMinutes(10), "bri:" + (DEFAULT_BRIGHTNESS + 10), "tr-before:10min"); // basically the same start as initial
-        
+        addState(1, now.plusMinutes(10), "bri:" + (DEFAULT_BRIGHTNESS + 20)); // second zero length
+        addState(1, now.plusMinutes(20), "bri:" + (DEFAULT_BRIGHTNESS + 30), "tr-before:10min"); // same start as second zero length
+
         startScheduler();
         
-        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(2);
-        ScheduledRunnable trRunnable = scheduledRunnables.get(0);
-        ScheduledRunnable zeroLengthRunnable = scheduledRunnables.get(1);
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(4);
+        ScheduledRunnable firstTrBeforeRunnable = scheduledRunnables.get(0);
+        ScheduledRunnable secondZeroLengthRunnable = scheduledRunnables.get(1);
+        ScheduledRunnable secondTrBeforeRunnable = scheduledRunnables.get(2);
+        ScheduledRunnable firstZeroLengthRunnable = scheduledRunnables.get(3);
 
-        assertScheduleStart(trRunnable, now, now.plusDays(1)); // can start at the same time
-        assertScheduleStart(zeroLengthRunnable, now.plusDays(1), now.plusDays(1)); // zero length state, scheduled next day
+        assertScheduleStart(firstTrBeforeRunnable, now, now.plusMinutes(10));
+        assertScheduleStart(secondZeroLengthRunnable, now.plusMinutes(10), now.plusMinutes(10)); // zero length state, scheduled next day
+        assertScheduleStart(secondTrBeforeRunnable, now.plusMinutes(10), now.plusDays(1));
+        assertScheduleStart(firstZeroLengthRunnable, now.plusDays(1), now.plusDays(1)); // zero length state, scheduled next day
 
-        trRunnable.run();
+        // first tr-before runnable
+        setCurrentTimeTo(firstTrBeforeRunnable);
+        firstTrBeforeRunnable.run();
         
         assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).build());
         assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 10).transitionTime(6000).build());
         
-        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(2)); // next day
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(10)); // next day
         
         // power on after 5 minutes -> correct interpolation
         
@@ -1129,21 +1137,33 @@ class HueSchedulerTest {
         
         ScheduledRunnable powerOnRunnable = simulateLightOnEventAndEnsureSingleScheduledState();
         
-        assertScheduleStart(powerOnRunnable, now, initialNow.plusDays(1));
+        assertScheduleStart(powerOnRunnable, now, initialNow.plusMinutes(10));
         
         powerOnRunnable.run();
         
         assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 5).build());
         assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 10).transitionTime(3000).build());
 
+        // second tr-before
+
+        setCurrentTimeTo(secondTrBeforeRunnable);
+        secondTrBeforeRunnable.run();
+
+        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 20).build());
+        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 30).transitionTime(6000).build());
+
+        ensureRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)); // next day
+
         // run zero length runnable -> no interaction
 
-        setCurrentTimeTo(zeroLengthRunnable);
-        zeroLengthRunnable.run();
+        setCurrentTimeTo(firstZeroLengthRunnable);
+        firstZeroLengthRunnable.run();
 
         ensureRunnable(now.plusDays(1), now.plusDays(1)); // next day, again zero length
     }
-    
+
+    // todo: more tests for power on and previous states, there was a bug here that was not covered
+
     @Test
     void parse_transitionTimeBefore_performsInterpolationsAfterPowerCycles_usesTransitionFromPreviousState() {
         create();

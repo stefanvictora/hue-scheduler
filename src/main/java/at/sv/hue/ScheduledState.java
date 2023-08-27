@@ -561,6 +561,13 @@ final class ScheduledState {
     public boolean isSameState(ScheduledState state) {
         return this == state || (originalState != null && originalState == state);
     }
+
+    public ScheduledState getOriginalStateOrThis() {
+        if (originalState != null) {
+            return originalState;
+        }
+        return this;
+    }
     
     public boolean isForced() {
         return force == Boolean.TRUE;
