@@ -474,12 +474,15 @@ final class ScheduledState {
         lastStart = getStart(dateTime);
         lastDefinedStart = getDefinedStart(dateTime);
     }
-    
+
     public boolean lightStateDiffers(LightState currentState) {
-        return brightnessDiffers(currentState) ||
+        if (currentState.isOff() && !isOnAndStateDiffers(currentState)) {
+            return false; // don't compare state if light is off, unless it's an on state
+        }
+        return isOnAndStateDiffers(currentState) ||
+                brightnessDiffers(currentState) ||
                 colorModeOrValuesDiffer(currentState) ||
-                effectDiffers(currentState) ||
-                onStateDiffers(currentState);
+                effectDiffers(currentState);
     }
 
     private boolean brightnessDiffers(LightState currentState) {
@@ -537,9 +540,8 @@ final class ScheduledState {
      * We only detect any changes if the state itself has "on:true". This is specifically meant for detecting turning
      * off lights inside a group, when the "on:true" state is enforced via the state.
      */
-    private boolean onStateDiffers(LightState currentState) {
-        return lastPutCall.getOn() != null && currentState.isOnOffSupported() && lastPutCall.getOn() &&
-                !lastPutCall.getOn().equals(currentState.isOn());
+    private boolean isOnAndStateDiffers(LightState currentState) {
+        return lastPutCall.getOn() != null && currentState.isOnOffSupported() && lastPutCall.isOn() && !currentState.isOn();
     }
 
     private boolean doubleValueDiffers(Double scheduled, Double current) {

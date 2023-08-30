@@ -38,6 +38,11 @@ public final class PutCall {
         return ColorMode.NONE;
     }
 
+    public boolean isOn() {
+        return on == Boolean.TRUE;
+    }
+
+
     @Override
     public String toString() {
         return "PutCall {" +
