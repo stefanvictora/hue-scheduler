@@ -300,30 +300,31 @@ public final class HueScheduler implements Runnable {
         LOG.debug("Schedule {} in {}", state, Duration.ofMillis(delayInMs).withNanos(0));
         stateScheduler.schedule(() -> {
             if (state.endsBefore(currentTime.get())) {
-                LOG.debug("{} already ended", state);
+                LOG.debug("Already ended: {}", state);
                 reschedule(state);
                 return;
             }
             LOG.info("Set {}", state);
-            if (lightHasBeenManuallyOverriddenBefore(state)) {
+            if (lightHasBeenManuallyOverriddenBefore(state) || lightHasBeenConsideredOffBeforeAndDoesNotTurnOn(state)) {
                 if (state.isOff()) {
-                    LOG.info("{} state has been manually overridden before, skip off-state for this day.", state.getFormattedName());
+                    LOG.info("{} is off or state has been manually overridden before, skip off-state for this day.", state.getFormattedName());
                     reschedule(state);
                 } else {
-                    LOG.info("{} state has been manually overridden before, skip update and retry when back online", state.getFormattedName());
+                    LOG.info("{} is off or state has been manually overridden before, skip update and retry when back online", state.getFormattedName());
                     retryWhenBackOn(state);
                 }
                 return;
             }
+            boolean success;
             try {
                 if (stateIsNotEnforced(state) && stateHasBeenManuallyOverriddenSinceLastSeen(state)) {
-                    LOG.info("{} state has been manually overridden, pause update until light is turned off and on again", state.getFormattedName());
+                    LOG.info("{} state has been manually overridden, pause updates until light is turned off and on again", state.getFormattedName());
                     manualOverrideTracker.onManuallyOverridden(state.getIdV1());
                     retryWhenBackOn(state);
                     return;
                 }
                 putAdditionalInterpolatedStateIfNeeded(state);
-                putState(state);
+                success = putState(state);
             } catch (BridgeConnectionFailure e) {
                 LOG.warn("Bridge not reachable, retrying in {}s.", bridgeFailureRetryDelayInSeconds);
                 retry(state, getMs(bridgeFailureRetryDelayInSeconds));
@@ -333,6 +334,13 @@ public final class HueScheduler implements Runnable {
                 retry(state, getMs(bridgeFailureRetryDelayInSeconds));
                 return;
             }
+            if (success) {
+                state.setLastSeen(currentTime.get());
+                manualOverrideTracker.onAutomaticallyAssigned(state.getIdV1());
+            } else {
+                manualOverrideTracker.onLightOff(state.getIdV1());
+                LOG.info("{} is off, pause updates until light is turned on again", state.getFormattedName());
+            }
             if (state.isOff()) {
                 LOG.info("Turned off {}, or was already off", state.getFormattedName());
             } else {
@@ -341,14 +349,16 @@ public final class HueScheduler implements Runnable {
             if (shouldAdjustMultiColorLoopOffset(state)) {
                 scheduleMultiColorLoopOffsetAdjustments(state);
             }
-            state.setLastSeen(currentTime.get());
-            manualOverrideTracker.onAutomaticallyAssigned(state.getIdV1());
             reschedule(state);
         }, currentTime.get().plus(delayInMs, ChronoUnit.MILLIS), state.getEnd());
     }
 
     private boolean lightHasBeenManuallyOverriddenBefore(ScheduledState state) {
-        return !disableUserModificationTracking && manualOverrideTracker.isManuallyOverridden(state.getIdV1());
+        return manualOverrideTracker.isManuallyOverridden(state.getIdV1());
+    }
+
+    private boolean lightHasBeenConsideredOffBeforeAndDoesNotTurnOn(ScheduledState state) {
+        return manualOverrideTracker.isOff(state.getIdV1()) && !state.isOn();
     }
 
     private boolean stateIsNotEnforced(ScheduledState state) {
@@ -490,20 +500,21 @@ public final class HueScheduler implements Runnable {
         return seconds * 1000L;
     }
     
-    private void putState(ScheduledState state) {
+    private boolean putState(ScheduledState state) {
         ZonedDateTime now = currentTime.get();
         if (state.shouldSplitLongBeforeTransition(now)) {
             PutCall interpolatedSplitPutCall = getInterpolatedSplitPutCall(state);
             if (interpolatedSplitPutCall == null) {
                 logMissingPreviousStateWarning(state);
-                return;
+                return false; // todo: test
             }
             performPutApiCall(state, interpolatedSplitPutCall);
             if (!state.isRetryAfterPowerOnState()) { // schedule follow-up split
                 schedule(ScheduledState.createTemporaryCopy(state), state.getNextInterpolationSplitDelayInMs(now));
             }
+            return true; // todo: test if we need actually false value here as well?
         } else {
-            putState(state, state.getPutCall(now));
+            return putState(state, state.getPutCall(now));
         }
     }
     
@@ -520,7 +531,7 @@ public final class HueScheduler implements Runnable {
                 "properties for required interpolation!", state.getFormattedName());
     }
     
-    private void putState(ScheduledState state, PutCall putCall) {
+    private boolean putState(ScheduledState state, PutCall putCall) {
         if (state.isGroupState() && controlGroupLightsIndividually) {
             for (Integer id : getGroupLights(state)) {
                 try {
@@ -529,8 +540,9 @@ public final class HueScheduler implements Runnable {
                     LOG.trace("Unsupported api call for light id {}: {}", id, e.getLocalizedMessage());
                 }
             }
+            return false; // todo: write test?
         } else {
-            performPutApiCall(state, putCall);
+            return performPutApiCall(state, putCall);
         }
     }
 
@@ -538,10 +550,10 @@ public final class HueScheduler implements Runnable {
         return hueApi.getGroupLights(state.getUpdateId());
     }
 
-    private void performPutApiCall(ScheduledState state, PutCall putCall) {
+    private boolean performPutApiCall(ScheduledState state, PutCall putCall) {
         LOG.trace("{}", putCall);
-        state.setLastPutCall(putCall);
-        hueApi.putState(putCall);
+        state.setLastPutCall(putCall); // todo: shouldn't we set the last put call only on success? -> it's only relevant for change detection, which is lso controlled by last seen
+        return hueApi.putState(putCall);
     }
 
     private void retry(ScheduledState state, long delayInMs) {

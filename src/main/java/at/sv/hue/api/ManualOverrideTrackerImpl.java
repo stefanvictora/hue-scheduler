@@ -28,7 +28,18 @@ public class ManualOverrideTrackerImpl implements ManualOverrideTracker {
     public void onLightTurnedOn(String id) {
         TrackedState trackedState = getOrCreateTrackedState(id);
         trackedState.setManuallyOverridden(false);
+        trackedState.setLightIsOff(false);
         trackedState.setEnforceSchedule(true);
+    }
+
+    @Override
+    public void onLightOff(String id) {
+        getOrCreateTrackedState(id).setLightIsOff(true);
+    }
+
+    @Override
+    public boolean isOff(String id) {
+        return getOrDefaultState(id).isLightIsOff();
     }
 
     @Override
@@ -55,5 +66,6 @@ public class ManualOverrideTrackerImpl implements ManualOverrideTracker {
     private static final class TrackedState {
         private boolean manuallyOverridden;
         private boolean enforceSchedule;
+        private boolean lightIsOff;
     }
 }

@@ -483,7 +483,8 @@ final class ScheduledState {
     }
 
     private boolean brightnessDiffers(LightState currentState) {
-        return lastPutCall.getBri() != null && currentState.isBrightnessSupported() && !lastPutCall.getBri().equals(currentState.getBrightness());
+        return lastPutCall.getBri() != null && currentState.isBrightnessSupported() &&
+                !lastPutCall.getBri().equals(currentState.getBrightness());
     }
 
     private boolean colorModeOrValuesDiffer(LightState currentState) {
@@ -581,7 +582,7 @@ final class ScheduledState {
         if (originalState != null) {
             return originalState;
         }
-        return this;
+        return this; // todo: this does not have any coverage
     }
     
     public boolean isForced() {
@@ -612,7 +613,7 @@ final class ScheduledState {
                 ", start=" + getFormattedStart() +
                 ", end=" + getFormattedEnd() +
                 getFormattedPropertyIfSet("on", on) +
-                getFormattedPropertyIfSet("brightness", brightness) +
+                getFormattedPropertyIfSet("bri", brightness) +
                 getFormattedPropertyIfSet("ct", ct) +
                 getFormattedPropertyIfSet("x", x) +
                 getFormattedPropertyIfSet("y", y) +
@@ -621,7 +622,7 @@ final class ScheduledState {
                 getFormattedPropertyIfSet("effect", effect) +
                 getFormattedDaysOfWeek() +
                 getFormattedTransitionTimeBefore() +
-                getFormattedTransitionTimeIfSet("transitionTime", definedTransitionTime) +
+                getFormattedTransitionTimeIfSet("tr", definedTransitionTime) +
                 getFormattedPropertyIfSet("lastSeen", getFormattedTime(lastSeen)) +
                 getFormattedPropertyIfSet("force", force) +
                 '}';
@@ -658,10 +659,10 @@ final class ScheduledState {
             return "";
         }
         if (lastStart != null) {
-            return formatPropertyName("transitionTimeBefore") + transitionTimeBeforeString +
+            return formatPropertyName("tr-before") + transitionTimeBeforeString +
                     " (" + formatTransitionTime(getTransitionTimeBefore(lastStart)) + ")";
         }
-        return formatPropertyName("transitionTimeBefore") + transitionTimeBeforeString;
+        return formatPropertyName("tr-before") + transitionTimeBeforeString;
     }
     
     private String getFormattedPropertyIfSet(String name, Object property) {
