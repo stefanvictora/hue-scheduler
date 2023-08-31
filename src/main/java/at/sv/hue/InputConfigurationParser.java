@@ -17,10 +17,12 @@ public final class InputConfigurationParser {
 
     private final StartTimeProvider startTimeProvider;
     private final HueApi hueApi;
+    private final int minTrBeforeGapInMinutes;
 
-    public InputConfigurationParser(StartTimeProvider startTimeProvider, HueApi hueApi) {
+    public InputConfigurationParser(StartTimeProvider startTimeProvider, HueApi hueApi, int minTrBeforeGapInMinutes) {
         this.startTimeProvider = startTimeProvider;
         this.hueApi = hueApi;
+        this.minTrBeforeGapInMinutes = minTrBeforeGapInMinutes;
     }
 
     public List<ScheduledState> parse(String input) {
@@ -138,7 +140,8 @@ public final class InputConfigurationParser {
             }
             String start = parts[1];
             states.add(new ScheduledState(name, id, start, bri, ct, x, y, hue, sat, effect, on, transitionTimeBefore,
-                    transitionTime, dayOfWeeks, startTimeProvider, capabilities, force, groupState, false));
+                    transitionTime, dayOfWeeks, startTimeProvider, capabilities, minTrBeforeGapInMinutes, force,
+                    groupState, false));
         }
         return states;
     }

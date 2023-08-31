@@ -33,15 +33,6 @@ final class ScheduledState {
      */
     public static final int MAX_TRANSITION_TIME = 60000;
     public static final int MAX_TRANSITION_TIME_MS = MAX_TRANSITION_TIME * 100;
-    private static final int MAX_TRANSITION_TIME_BUFFER = 1200;
-    private static final int MAX_TRANSITION_TIME_BUFFER_IN_MS = MAX_TRANSITION_TIME_BUFFER * 100;
-    /**
-     * The MAX_TRANSITION_TIME minus a buffer of 2 minutes for the max transition time. This is needed as otherwise
-     * the Hue bridge would not have yet reported the correct end value of the long transitions. Without this buffer it
-     * could be that incorrect manual overrides are detected.
-     */
-    public static final int MAX_TRANSITION_TIME_WITH_BUFFER = MAX_TRANSITION_TIME - MAX_TRANSITION_TIME_BUFFER;
-    public static final int MIN_MULTIPLE_TR_BEFORE_GAP_IN_MINUTES = 2;
 
     private final String name;
     @Getter
@@ -68,6 +59,7 @@ final class ScheduledState {
     private final boolean temporary;
     @Getter
     private final LightCapabilities capabilities;
+    private final int minTrBeforeGapInMinutes;
     @Getter
     @Setter
     private ZonedDateTime end;
@@ -85,9 +77,9 @@ final class ScheduledState {
 
     @Builder
     public ScheduledState(String name, int updateId, String startString, Integer brightness, Integer ct, Double x, Double y,
-            Integer hue, Integer sat, String effect, Boolean on, String transitionTimeBeforeString, Integer definedTransitionTime,
+                          Integer hue, Integer sat, String effect, Boolean on, String transitionTimeBeforeString, Integer definedTransitionTime,
                           Set<DayOfWeek> daysOfWeek, StartTimeProvider startTimeProvider, LightCapabilities capabilities,
-                          Boolean force, boolean groupState, boolean temporary) {
+                          int minTrBeforeGapInMinutes, Boolean force, boolean groupState, boolean temporary) {
         this.name = name;
         this.updateId = updateId;
         this.startString = startString;
@@ -109,6 +101,7 @@ final class ScheduledState {
         this.definedTransitionTime = assertValidTransitionTime(definedTransitionTime);
         this.transitionTimeBeforeString = transitionTimeBeforeString;
         this.startTimeProvider = startTimeProvider;
+        this.minTrBeforeGapInMinutes = minTrBeforeGapInMinutes;
         this.force = force;
         this.temporary = temporary;
         originalState = this;
@@ -129,8 +122,8 @@ final class ScheduledState {
                                                       String transitionTimeBefore) {
         ScheduledState copy = new ScheduledState(state.name, state.updateId, start,
                 state.brightness, state.ct, state.x, state.y, state.hue, state.sat, state.effect, state.on, transitionTimeBefore,
-                state.definedTransitionTime, state.daysOfWeek, state.startTimeProvider, state.capabilities, state.force, state.groupState,
-                true);
+                state.definedTransitionTime, state.daysOfWeek, state.startTimeProvider, state.capabilities,
+                state.minTrBeforeGapInMinutes, state.force, state.groupState, true);
         copy.end = end;
         copy.lastStart = state.lastStart;
         copy.lastDefinedStart = state.lastDefinedStart;
@@ -277,13 +270,13 @@ final class ScheduledState {
             return start;
         }
         long minutesBetween = Duration.between(previousState.getDefinedStart(start), start).abs().toMinutes();
-        if (minutesBetween >= MIN_MULTIPLE_TR_BEFORE_GAP_IN_MINUTES) {
+        if (minutesBetween >= minTrBeforeGapInMinutes) {
             return start; // enough gap
         }
-        if (start.plusMinutes(MIN_MULTIPLE_TR_BEFORE_GAP_IN_MINUTES).isAfter(definedStart)) {
+        if (start.plusMinutes(minTrBeforeGapInMinutes).isAfter(definedStart)) {
             return definedStart; // too short tr-before to add gap without changing the defined start
         } else {
-            return start.plusMinutes(MIN_MULTIPLE_TR_BEFORE_GAP_IN_MINUTES);
+            return start.plusMinutes(minTrBeforeGapInMinutes);
         }
     }
 
@@ -421,7 +414,7 @@ final class ScheduledState {
     
     public PutCall getNextInterpolatedSplitPutCall(ZonedDateTime now, ScheduledState previousState) {
         ZonedDateTime nextSplitStart = getNextTransitionTimeSplitStart(now)
-                .minus(MAX_TRANSITION_TIME_BUFFER_IN_MS, ChronoUnit.MILLIS); // add buffer of 2 minutes
+                .minusMinutes(minTrBeforeGapInMinutes); // add buffer
         PutCall interpolatedSplitPutCall = getInterpolatedPutCall(nextSplitStart, previousState, false);
         if (interpolatedSplitPutCall == null) {
             return null;

@@ -92,6 +92,14 @@ public final class HueScheduler implements Runnable {
                     "Default: ${DEFAULT-VALUE} minutes."
     )
     int apiCacheInvalidationIntervalInMinutes;
+    @Option(
+            names = "--min-tr-before-gap", paramLabel = "<gap>", defaultValue = "2",
+            description = "The minimum gap between multiple tr-before states in minutes. This is needed as otherwise " +
+                    "the hue bridge does not yet recognise the end value of the transition and an incorrectly marks " +
+                    "the light as manually overridden. This gap is automatically added between back-to-back " +
+                    "tr-before states. Default: ${DEFAULT-VALUE} minutes."
+    )
+    int minTrBeforeGapInMinutes;
     private HueApi hueApi;
     private StateScheduler stateScheduler;
     private final ManualOverrideTracker manualOverrideTracker;
@@ -110,7 +118,8 @@ public final class HueScheduler implements Runnable {
                         StartTimeProvider startTimeProvider, Supplier<ZonedDateTime> currentTime,
                         double requestsPerSecond, boolean controlGroupLightsIndividually,
                         boolean disableUserModificationTracking, String defaultInterpolationTransitionTimeString,
-                        int powerOnRescheduleDelayInMs, int bridgeFailureRetryDelayInSeconds, int multiColorAdjustmentDelay) {
+                        int powerOnRescheduleDelayInMs, int bridgeFailureRetryDelayInSeconds, int multiColorAdjustmentDelay,
+                        int minTrBeforeGapInMinutes1) {
         this();
         this.hueApi = hueApi;
         this.stateScheduler = stateScheduler;
@@ -123,6 +132,7 @@ public final class HueScheduler implements Runnable {
         this.powerOnRescheduleDelayInMs = powerOnRescheduleDelayInMs;
         this.bridgeFailureRetryDelayInSeconds = bridgeFailureRetryDelayInSeconds;
         this.multiColorAdjustmentDelay = multiColorAdjustmentDelay;
+        this.minTrBeforeGapInMinutes = minTrBeforeGapInMinutes1;
         defaultInterpolationTransitionTime = parseInterpolationTransitionTime(defaultInterpolationTransitionTimeString);
         apiCacheInvalidationIntervalInMinutes = 15;
     }
@@ -224,7 +234,7 @@ public final class HueScheduler implements Runnable {
     }
 
     public void addState(String input) {
-        new InputConfigurationParser(startTimeProvider, hueApi).parse(input).forEach(state ->
+        new InputConfigurationParser(startTimeProvider, hueApi, minTrBeforeGapInMinutes).parse(input).forEach(state ->
                 lightStates.computeIfAbsent(state.getIdV1(), key -> new ArrayList<>()).add(state));
     }
 
