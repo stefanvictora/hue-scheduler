@@ -307,20 +307,20 @@ public final class HueScheduler implements Runnable {
 
     private void schedule(ScheduledState state, long delayInMs) {
         if (state.isNullState()) return;
-        LOG.debug("Schedule {} in {}", state, Duration.ofMillis(delayInMs).withNanos(0));
+        LOG.debug("Schedule: {} in {}", state, Duration.ofMillis(delayInMs).withNanos(0));
         stateScheduler.schedule(() -> {
             if (state.endsBefore(currentTime.get())) {
                 LOG.debug("Already ended: {}", state);
                 reschedule(state);
                 return;
             }
-            LOG.info("Set {}", state);
+            LOG.info("Set: {}", state);
             if (lightHasBeenManuallyOverriddenBefore(state) || lightHasBeenConsideredOffBeforeAndDoesNotTurnOn(state)) {
                 if (state.isOff()) {
-                    LOG.info("{} is off or state has been manually overridden before, skip off-state for this day.", state.getFormattedName());
+                    LOG.info("{} is off or manually overridden, skip off-state for this day.", state.getFormattedName());
                     reschedule(state);
                 } else {
-                    LOG.info("{} is off or state has been manually overridden before, skip update and retry when back online", state.getFormattedName());
+                    LOG.info("{} is off or manually overridden, skip update and retry when back online", state.getFormattedName());
                     retryWhenBackOn(state);
                 }
                 return;
@@ -328,7 +328,7 @@ public final class HueScheduler implements Runnable {
             boolean success;
             try {
                 if (stateIsNotEnforced(state) && stateHasBeenManuallyOverriddenSinceLastSeen(state)) {
-                    LOG.info("{} state has been manually overridden, pause updates until light is turned off and on again", state.getFormattedName());
+                    LOG.info("Manually overridden: Pause updates for {} until turned off and on again", state.getFormattedName());
                     manualOverrideTracker.onManuallyOverridden(state.getIdV1());
                     retryWhenBackOn(state);
                     return;
@@ -352,7 +352,7 @@ public final class HueScheduler implements Runnable {
                 LOG.info("{} is off, pause updates until light is turned on again", state.getFormattedName());
             }
             if (state.isOff()) {
-                LOG.info("Turned off {}, or was already off", state.getFormattedName());
+                LOG.info("{} turned off, or was already off", state.getFormattedName());
             } else {
                 retryWhenBackOn(createPowerOnCopy(state));
             }
