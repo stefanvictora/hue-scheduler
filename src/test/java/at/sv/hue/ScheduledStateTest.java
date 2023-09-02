@@ -327,6 +327,22 @@ class ScheduledStateTest {
     }
 
     @Test
+    void lightStateDiffers_xy_missingXYProperties_true() {
+        ScheduledState scheduledState = ScheduledState.builder()
+                                                      .x(0.123)
+                                                      .y(0.777)
+                                                      .capabilities(defaultCapabilities)
+                                                      .build();
+        LightState lightState = LightState.builder()
+                                          .on(true)
+                                          .colormode("xy")
+                                          .lightCapabilities(COLOR_LIGHT_ONLY)
+                                          .build();
+
+        assertLightStateDiffers(scheduledState, lightState, true);
+    }
+
+    @Test
     void lightStateDiffers_hs_sameHueAndSaturation_sameColorMode_ignoresOtherProperties_false() {
         ScheduledState scheduledState = ScheduledState.builder()
                                                       .hue(1000)

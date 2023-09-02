@@ -14,11 +14,14 @@
 
 ### Changed
 - Increased max value for ``tr-before`` to 24 hours by **splitting up long-running transitions into multiple calls** and interpolating between them.
+- Added automatic short gaps for back-to-back tr-before states: Otherwise, the Hue bridge may not yet report the light state correctly causing incorrect manual modification detections.
 - Improved **manual modification tracking for groups**: Rather than only comparing with the state of the first light in the group, Hue Scheduler now compares the state of all contained lights. While handling special cases for contained lights with different capabilities, as we can't expect, e.g., color temperature lights to display color.
+- Improved modification tracking for color states: Now the color gamut of the light is also used during the comparison
 - Improved **turn-on tracking for groups**: Hue Scheduler now uses group-on events instead of listening for the first contained light being turned on. To still detect groups being physically turned on, now every physically turned-on light inside a group also triggers a group-on event. This is necessary, as the Hue bridge currently does not generate any group-specific events in such cases.
 - Improved support for 'On/Off plug-in unit' type of lights
 - Improved ``tr-before`` support for crossovers between multiple days
 - Reduced max value for ``tr`` to ``60000``, i.e., 100min to conform with the max value supported by API v2
+- Improved log messages
 
 ### Removed
 - Removed obsolete reachable checks after each state update: Those became obsolete after switching to the Hue API v2 event stream and some further optimizations implemented in v0.9.0

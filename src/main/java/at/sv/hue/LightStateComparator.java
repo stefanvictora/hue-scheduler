@@ -4,7 +4,6 @@ import at.sv.hue.api.LightCapabilities;
 import at.sv.hue.api.LightState;
 import at.sv.hue.api.PutCall;
 import at.sv.hue.color.XYColorGamutCorrection;
-import lombok.Data;
 import lombok.RequiredArgsConstructor;
 
 import java.math.BigDecimal;
@@ -67,9 +66,6 @@ public class LightStateComparator {
     }
 
     private boolean ctDiffers() {
-        if (lastPutCall.getCt() == null) {
-            return false;
-        }
         if (currentState.getColorTemperature() == null) {
             return true;
         }
@@ -88,10 +84,7 @@ public class LightStateComparator {
     }
 
     private boolean xyDiffers() {
-        if (lastPutCall.getX() == null && currentState.getX() == null) {
-            return false;
-        }
-        if (lastPutCall.getX() == null || currentState.getX() == null) {
+        if (currentState.getX() == null) {
             return true;
         }
         XY current = getAdjustedXY(currentState.getX(), currentState.getY());
@@ -136,7 +129,7 @@ public class LightStateComparator {
         return lastPutCall.getOn() != null && currentState.isOnOffSupported() && lastPutCall.isOn() && !currentState.isOn();
     }
 
-    @Data
+    @RequiredArgsConstructor
     private static final class XY {
         public final double x;
         public final double y;
