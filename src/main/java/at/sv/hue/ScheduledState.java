@@ -550,6 +550,14 @@ final class ScheduledState {
         return "Light '" + name + "'";
     }
 
+    public String getContextName() {
+        String context = name;
+        if (isRetryAfterPowerOnState()) {
+            context += " (power-on)";
+        }
+        return context;
+    }
+
     private String getFormattedStart() {
         if (lastStart != null) {
             return startString + " (" + getFormattedTime(lastStart) + ")";

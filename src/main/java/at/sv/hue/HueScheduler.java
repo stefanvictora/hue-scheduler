@@ -8,6 +8,7 @@ import lombok.SneakyThrows;
 import okhttp3.OkHttpClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -25,6 +26,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -154,6 +156,7 @@ public final class HueScheduler implements Runnable {
 
     @Override
     public void run() {
+        MDC.put("context", "init");
         OkHttpClient httpsClient = createHttpsClient();
         hueApi = new HueApiImpl(new HttpsResourceProviderImpl(httpsClient), ip, username, RateLimiter.create(requestsPerSecond));
         startTimeProvider = createStartTimeProvider(latitude, longitude, elevation);
@@ -180,7 +183,8 @@ public final class HueScheduler implements Runnable {
     }
 
     private StateSchedulerImpl createStateScheduler() {
-        return new StateSchedulerImpl(Executors.newScheduledThreadPool(Runtime.getRuntime().availableProcessors()), ZonedDateTime::now);
+        ScheduledExecutorService executorService = Executors.newScheduledThreadPool(Runtime.getRuntime().availableProcessors());
+        return new StateSchedulerImpl(executorService, ZonedDateTime::now);
     }
 
     private void assertInputIsReadable() {
@@ -309,6 +313,7 @@ public final class HueScheduler implements Runnable {
         if (state.isNullState()) return;
         LOG.debug("Schedule: {} in {}", state, Duration.ofMillis(delayInMs).withNanos(0));
         stateScheduler.schedule(() -> {
+            MDC.put("context", state.getContextName());
             if (state.endsBefore(currentTime.get())) {
                 LOG.debug("Already ended: {}", state);
                 reschedule(state);
@@ -317,10 +322,10 @@ public final class HueScheduler implements Runnable {
             LOG.info("Set: {}", state);
             if (lightHasBeenManuallyOverriddenBefore(state) || lightHasBeenConsideredOffBeforeAndDoesNotTurnOn(state)) {
                 if (state.isOff()) {
-                    LOG.info("{} is off or manually overridden, skip off-state for this day.", state.getFormattedName());
+                    LOG.info("Off or manually overridden: Skip off-state for this day.");
                     reschedule(state);
                 } else {
-                    LOG.info("{} is off or manually overridden, skip update and retry when back online", state.getFormattedName());
+                    LOG.info("Off or manually overridden: Skip update and retry when back online");
                     retryWhenBackOn(state);
                 }
                 return;
@@ -328,7 +333,7 @@ public final class HueScheduler implements Runnable {
             boolean success;
             try {
                 if (stateIsNotEnforced(state) && stateHasBeenManuallyOverriddenSinceLastSeen(state)) {
-                    LOG.info("Manually overridden: Pause updates for {} until turned off and on again", state.getFormattedName());
+                    LOG.info("Manually overridden: Pause updates until turned off and on again");
                     manualOverrideTracker.onManuallyOverridden(state.getIdV1());
                     retryWhenBackOn(state);
                     return;
@@ -349,10 +354,10 @@ public final class HueScheduler implements Runnable {
                 manualOverrideTracker.onAutomaticallyAssigned(state.getIdV1());
             } else {
                 manualOverrideTracker.onLightOff(state.getIdV1());
-                LOG.info("{} is off, pause updates until light is turned on again", state.getFormattedName());
+                LOG.info("Off: Pause updates until light is turned on again");
             }
             if (state.isOff()) {
-                LOG.info("{} turned off, or was already off", state.getFormattedName());
+                LOG.info("Turned off, or was already off");
             } else {
                 retryWhenBackOn(createPowerOnCopy(state));
             }

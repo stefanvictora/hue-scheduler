@@ -8,6 +8,7 @@ import com.launchdarkly.eventsource.MessageEvent;
 import com.launchdarkly.eventsource.background.BackgroundEventHandler;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,11 +28,13 @@ public final class HueRawEventHandler implements BackgroundEventHandler {
 
     @Override
     public void onOpen() {
+        MDC.put("context", "events");
         log.trace("Hue event stream handler opened");
     }
 
     @Override
     public void onClosed() {
+        MDC.put("context", "events");
         log.trace("Hue event stream handler closed");
     }
 
@@ -55,6 +58,7 @@ public final class HueRawEventHandler implements BackgroundEventHandler {
 
     @Override
     public void onError(Throwable t) {
+        MDC.put("context", "events");
         log.error("An error occurred during event stream processing: {}", t.getLocalizedMessage());
     }
 
