@@ -6,10 +6,10 @@ import at.sv.hue.api.PutCall;
 import static at.sv.hue.ColorMode.*;
 
 public final class ColorModeConverter {
-    
+
     private ColorModeConverter() {
     }
-    
+
     public static void convertIfNeeded(PutCall putCall, Double[][] colorGamut, ColorMode source, ColorMode target) {
         if (source == CT && target == HS) {
             int[] rgb = convertCtToRgb(putCall);

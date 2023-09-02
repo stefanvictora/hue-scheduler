@@ -5,10 +5,10 @@ package at.sv.hue.color;
  * How to Convert Temperature (K) to RGB: Algorithm and Sample Code</a> from Tanner Helland (c) 2012
  */
 final class CTToRGBConverter {
-    
+
     private CTToRGBConverter() {
     }
-    
+
     private static final int MIN_KELVIN = 1000;
     private static final int MAX_KELVIN = 6700;
     private static final int STEP = 50;

@@ -56,25 +56,25 @@ public final class HueApiImpl implements HueApi {
             throw new HueApiFailure("Failed to parse light state response '" + response + "' for id " + id + ": " + e.getLocalizedMessage());
         }
     }
-    
+
     private LightState createLightState(Light light) {
         State state = light.state;
         return new LightState(
                 state.bri, state.ct, getX(state.xy), getY(state.xy), state.hue, state.sat, state.effect, state.colormode, state.reachable, state.on,
                 createLightCapabilities(light));
     }
-    
+
     @Override
     public List<LightState> getGroupStates(int id) {
         List<Integer> groupLights = getGroupLights(id);
         Map<Integer, Light> currentLights = lookupLights();
         return groupLights.stream()
-                .map(currentLights::get)
-                .filter(Objects::nonNull)
-                .map(this::createLightState)
-                .collect(Collectors.toList());
+                          .map(currentLights::get)
+                          .filter(Objects::nonNull)
+                          .map(this::createLightState)
+                          .collect(Collectors.toList());
     }
-    
+
     private String getResourceAndAssertNoErrors(URL url) {
         return assertNoErrors(resourceProvider.getResource(url));
     }
@@ -179,16 +179,16 @@ public final class HueApiImpl implements HueApi {
         }
         return Arrays.asList(lights);
     }
-    
+
     @Override
     public List<Integer> getAssignedGroups(int lightId) {
         return getOrLookupGroups().entrySet()
-                .stream()
-                .filter(entry -> Arrays.asList(entry.getValue().getLights()).contains(lightId))
-                .map(Map.Entry::getKey)
-                .collect(Collectors.toList());
+                                  .stream()
+                                  .filter(entry -> Arrays.asList(entry.getValue().getLights()).contains(lightId))
+                                  .map(Map.Entry::getKey)
+                                  .collect(Collectors.toList());
     }
-    
+
     private Map<Integer, Group> getOrLookupGroups() {
         synchronized (groupMapLock) {
             if (availableGroups == null || availableGroupsInvalidated) {
@@ -237,7 +237,7 @@ public final class HueApiImpl implements HueApi {
     public String getGroupName(int groupId) {
         return getAndAssertGroupExists(groupId).name;
     }
-    
+
     private Group getAndAssertGroupExists(int groupId) {
         Group group = getOrLookupGroups().get(groupId);
         if (group == null) {
@@ -245,7 +245,7 @@ public final class HueApiImpl implements HueApi {
         }
         return group;
     }
-    
+
     @Override
     public int getLightId(String name) {
         Integer lightId = getOrLookupLightNameToIdMap().get(name);
@@ -291,7 +291,7 @@ public final class HueApiImpl implements HueApi {
         Light light = getAndAssertLightExists(id);
         return light.name;
     }
-    
+
     private Light getAndAssertLightExists(int id) {
         Light light = getOrLookupLights().get(id);
         if (light == null) {
@@ -339,13 +339,13 @@ public final class HueApiImpl implements HueApi {
                 .map(this::getLightCapabilities)
                 .collect(Collectors.toList());
         return LightCapabilities.builder()
-                .ctMin(getMinCtMin(lightCapabilities))
-                .ctMax(getMaxCtMax(lightCapabilities))
-                .colorGamut(getMaxGamut(lightCapabilities))
-                .capabilities(getMaxCapabilities(lightCapabilities))
-                .build();
+                                .ctMin(getMinCtMin(lightCapabilities))
+                                .ctMax(getMaxCtMax(lightCapabilities))
+                                .colorGamut(getMaxGamut(lightCapabilities))
+                                .capabilities(getMaxCapabilities(lightCapabilities))
+                                .build();
     }
-    
+
     @Override
     public void clearCaches() {
         synchronized (lightMapLock) {
@@ -357,15 +357,16 @@ public final class HueApiImpl implements HueApi {
             groupNameToIdMapInvalidated = true;
         }
     }
-    
+
     private static Double[][] getMaxGamut(List<LightCapabilities> lightCapabilities) {
         Map<String, Double[][]> colorGamutMap = lightCapabilities.stream()
-                .filter(c -> c.getColorGamut() != null)
-                .collect(Collectors.toMap(LightCapabilities::getColorGamutType, LightCapabilities::getColorGamut,
-                        (gamut1, gamut2) -> gamut1));
+                                                                 .filter(c -> c.getColorGamut() != null)
+                                                                 .collect(Collectors.toMap(LightCapabilities::getColorGamutType,
+                                                                         LightCapabilities::getColorGamut,
+                                                                         (gamut1, gamut2) -> gamut1));
         return colorGamutMap.getOrDefault("C", colorGamutMap.getOrDefault("B", colorGamutMap.getOrDefault("A", null)));
     }
-    
+
     private static EnumSet<Capability> getMaxCapabilities(List<LightCapabilities> lightCapabilities) {
         return EnumSet.copyOf(lightCapabilities
                 .stream()
@@ -373,23 +374,23 @@ public final class HueApiImpl implements HueApi {
                 .flatMap(Collection::stream)
                 .collect(Collectors.toSet()));
     }
-    
+
     private Integer getMinCtMin(List<LightCapabilities> lightCapabilities) {
         return lightCapabilities.stream()
-                .map(LightCapabilities::getCtMin)
-                .filter(Objects::nonNull)
-                .min(Integer::compareTo)
-                .orElse(null);
+                                .map(LightCapabilities::getCtMin)
+                                .filter(Objects::nonNull)
+                                .min(Integer::compareTo)
+                                .orElse(null);
     }
-    
+
     private Integer getMaxCtMax(List<LightCapabilities> lightCapabilities) {
         return lightCapabilities.stream()
-                .map(LightCapabilities::getCtMax)
-                .filter(Objects::nonNull)
-                .max(Integer::compareTo)
-                .orElse(null);
+                                .map(LightCapabilities::getCtMax)
+                                .filter(Objects::nonNull)
+                                .max(Integer::compareTo)
+                                .orElse(null);
     }
-    
+
     private EnumSet<Capability> getCapabilities(String type) {
         if (type == null) {
             return EnumSet.noneOf(Capability.class);
@@ -409,7 +410,7 @@ public final class HueApiImpl implements HueApi {
                 return EnumSet.noneOf(Capability.class);
         }
     }
-    
+
     @Override
     public void assertConnection() {
         getOrLookupLights();

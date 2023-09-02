@@ -25,7 +25,7 @@ public final class LightState {
     public ColorMode getColormode() {
         return ColorMode.parse(colormode);
     }
-    
+
     public boolean isColorLoopEffect() {
         return "colorloop".equals(getEffect());
     }
@@ -33,11 +33,11 @@ public final class LightState {
     public boolean isColorSupported() {
         return getCapabilities().contains(Capability.COLOR);
     }
-    
+
     public boolean isCtSupported() {
         return getCapabilities().contains(Capability.COLOR_TEMPERATURE);
     }
-    
+
     public boolean isBrightnessSupported() {
         return getCapabilities().contains(Capability.BRIGHTNESS);
     }

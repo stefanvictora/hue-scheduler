@@ -55,12 +55,12 @@ public final class InputConfigurationParser {
                 }
             }
             LightCapabilities capabilities;
-			if (groupState) {
-				capabilities = hueApi.getGroupCapabilities(id);
-			} else {
-				capabilities = hueApi.getLightCapabilities(id);
-			}
-			Integer bri = null;
+            if (groupState) {
+                capabilities = hueApi.getGroupCapabilities(id);
+            } else {
+                capabilities = hueApi.getLightCapabilities(id);
+            }
+            Integer bri = null;
             Integer ct = null;
             Boolean on = null;
             Boolean force = null;
@@ -145,21 +145,21 @@ public final class InputConfigurationParser {
         }
         return states;
     }
-    
+
     private Integer parseBrightness(String value) {
         if (value.endsWith("%")) {
             return parseBrightnessPercentValue(value);
         }
         return parseInteger(value, "bri");
     }
-    
+
     private Integer parseSaturation(String value) {
         if (value.endsWith("%")) {
             return parseSaturationPercentValue(value);
         }
         return parseInteger(value, "sat");
     }
-    
+
     /**
      * Calculates the brightness value [1-254]. This uses an adapted percentage range of [1%-100%]. Treating 1% as the min value. To make sure, we
      * also handle the special case of 0% and treat is as 1%.
@@ -175,7 +175,7 @@ public final class InputConfigurationParser {
         }
         return (int) Math.round((254.0 - 1.0) * (percent - 1) / 99.0 + 1.0);
     }
-    
+
     private int parseSaturationPercentValue(String value) {
         String percentString = value.replace("%", "").trim();
         Double percent = parseDouble(percentString, "sat");
@@ -187,7 +187,7 @@ public final class InputConfigurationParser {
         }
         return (int) Math.round(254.0 * percent / 100.0);
     }
-    
+
     private static Integer parseInteger(String value, String parameter) {
         return parseValueWithErrorHandling(value, parameter, "integer", Integer::valueOf);
     }

@@ -7,9 +7,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class HueRawEventHandlerTest {
@@ -195,7 +193,7 @@ class HueRawEventHandlerTest {
 
         verify(hueEventListener).onLightOff("/lights/36", "d37eb9c4-d7eb-42ee-9a13-fa9148f8d403");
     }
-    
+
     @Test
     void onMessage_onEvent_forGroup_triggersGroupOn() throws Exception {
         handler.onMessage("", new MessageEvent("[\n"
@@ -234,10 +232,10 @@ class HueRawEventHandlerTest {
                 + "    \"type\": \"update\"\n"
                 + "  }\n"
                 + "]"));
-        
+
         verify(hueEventListener).onLightOn("/groups/13", "560cd8f7-c498-4358-8dba-19734b4173f7", false);
     }
-    
+
     @Test
     void onMessage_offEvent_forGroup_triggersGroupOff() throws Exception {
         handler.onMessage("", new MessageEvent("[\n"
@@ -276,10 +274,10 @@ class HueRawEventHandlerTest {
                 + "    \"type\": \"update\"\n"
                 + "  }\n"
                 + "]"));
-        
+
         verify(hueEventListener).onLightOff("/groups/13", "560cd8f7-c498-4358-8dba-19734b4173f7");
     }
-    
+
     @Test
     void onMessage_multipleEvents_correctlyParsed() throws Exception {
         handler.onMessage("", new MessageEvent("[\n" +

@@ -22,11 +22,11 @@ public final class PutCall {
     String effect;
     Integer transitionTime;
     boolean groupState;
-    
+
     public boolean isNullCall() {
         return Stream.of(bri, ct, x, y, hue, sat, on, effect).allMatch(Objects::isNull);
     }
-    
+
     public ColorMode getColorMode() {
         if (ct != null) {
             return ColorMode.CT;

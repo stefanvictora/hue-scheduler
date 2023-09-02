@@ -12,9 +12,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 class HueApiTest {
     private static final Double[][] GAMUT_A = new Double[][]{{0.704, 0.296}, {0.2151, 0.7106}, {0.138, 0.08}};
@@ -23,7 +21,7 @@ class HueApiTest {
     private HueApi api;
     private String baseUrl;
     private HttpResourceProvider resourceProviderMock;
-    
+
     @BeforeEach
     void setUp() {
         String ip = "localhost";
@@ -48,11 +46,11 @@ class HueApiTest {
 
         assertThrows(BridgeAuthenticationFailure.class, () -> api.assertConnection());
     }
-    
+
     @Test
     void getState_networkFailure_exception() {
         when(resourceProviderMock.getResource(any())).thenThrow(new BridgeConnectionFailure("Failed"));
-        
+
         assertThrows(BridgeConnectionFailure.class, () -> getLightState(1));
     }
 
@@ -223,7 +221,7 @@ class HueApiTest {
                                                     .build())
                 .build());
     }
-    
+
     @Test
     void getState_onOffBulbOnly_noNullPointerException() {
         int lightId = 11;
@@ -235,7 +233,7 @@ class HueApiTest {
                 + "  \"name\": \"Name 2\",\n"
                 + "  \"type\": \"On/Off plug-in unit\"\n"
                 + "}");
-        
+
         LightState lightState = getLightState(lightId);
 
         assertLightState(lightState, LightState
@@ -247,7 +245,7 @@ class HueApiTest {
                                                     .build())
                 .build());
     }
-    
+
     @Test
     void getGroupState_returnsListOfLightStates_ignoresUnknownLights() {
         setGetResponse("/groups", "{\n"
@@ -367,7 +365,7 @@ class HueApiTest {
                 + "    }\n"
                 + "  }\n"
                 + "}");
-        
+
         assertThat(api.getGroupStates(17)).containsExactly(
                 LightState.builder()
                           .on(true)
@@ -421,7 +419,7 @@ class HueApiTest {
                           .build()
         );
     }
-    
+
     @Test
     void getGroupLights_returnsLightIdsForGroup_reusesSameForName() {
         setGetResponse("/groups", "{\n"
@@ -440,11 +438,11 @@ class HueApiTest {
                 + "      \"5\"\n"
                 + "    ]\n"
                 + "  }}");
-        
+
         assertThat(getGroupLights(2)).containsExactly(4, 5);
         assertThat(api.getGroupName(2)).isEqualTo("Group 2");
     }
-    
+
     @Test
     void getAssignedGroups_givenLightId_returnsGroupIds() {
         setGetResponse("/groups", "{\n"
@@ -464,7 +462,7 @@ class HueApiTest {
                 + "      \"3\"\n"
                 + "    ]\n"
                 + "  }}");
-        
+
         assertThat(api.getAssignedGroups(2)).containsExactly(1);
         assertThat(api.getAssignedGroups(3)).containsExactly(1, 2);
         assertThat(api.getAssignedGroups(777)).isEmpty();
@@ -473,7 +471,7 @@ class HueApiTest {
         assertThat(api.getAssignedGroups(2)).containsExactly(1);
         verify(resourceProviderMock, times(2)).getResource(any());
     }
-    
+
     @Test
     void getGroupLights_emptyLights_exception() {
         setGetResponse("/groups", "{\n"
@@ -522,7 +520,7 @@ class HueApiTest {
 
         String name1 = api.getGroupName(1);
         String name2 = api.getGroupName(2);
-        
+
         assertThat(name1).isEqualTo("Group 1");
         assertThat(name2).isEqualTo("Group 2");
     }
@@ -551,7 +549,7 @@ class HueApiTest {
                 + "    \"name\": \"Lamp 2\"\n"
                 + "  }\n"
                 + "}");
-        
+
         assertThat(api.getLightId("Lamp 1")).isEqualTo(7);
         assertThat(api.getLightId("Lamp 2")).isEqualTo(1234);
         verify(resourceProviderMock).getResource(any());
@@ -560,7 +558,7 @@ class HueApiTest {
         assertThat(api.getLightId("Lamp 1")).isEqualTo(7);
         verify(resourceProviderMock, times(2)).getResource(any());
     }
-    
+
     @Test
     void getLightId_unknownName_exception() {
         setGetResponse("/lights", "{}");
@@ -593,7 +591,7 @@ class HueApiTest {
                 + "    ]\n"
                 + "  }\n"
                 + "}");
-        
+
         assertThat(api.getGroupId("Group 1")).isEqualTo(11);
         assertThat(api.getGroupId("Group 2")).isEqualTo(789);
         verify(resourceProviderMock).getResource(any());
@@ -602,7 +600,7 @@ class HueApiTest {
         assertThat(api.getGroupId("Group 1")).isEqualTo(11);
         verify(resourceProviderMock, times(2)).getResource(any());
     }
-    
+
     @Test
     void getGroupId_unknownName_exception() {
         setGetResponse("/groups", "{}");
@@ -627,7 +625,7 @@ class HueApiTest {
                 + "    \"name\": \"Lamp 2\"\n"
                 + "  }\n"
                 + "}");
-        
+
         assertThat(api.getLightName(7)).isEqualTo("Lamp 1");
         assertThat(api.getLightName(1234)).isEqualTo("Lamp 2");
         verify(resourceProviderMock).getResource(any());
@@ -689,18 +687,18 @@ class HueApiTest {
         assertCapabilities(
                 capabilities,
                 LightCapabilities.builder()
-                        .colorGamutType("C")
+                                 .colorGamutType("C")
                                  .colorGamut(GAMUT_C)
-                        .ctMin(153)
-                        .ctMax(500)
-                        .capabilities(EnumSet.allOf(Capability.class))
-                        .build()
+                                 .ctMin(153)
+                                 .ctMax(500)
+                                 .capabilities(EnumSet.allOf(Capability.class))
+                                 .build()
         );
         assertThat(capabilities.isColorSupported()).isTrue();
         assertThat(capabilities.isCtSupported()).isTrue();
         assertThat(capabilities.isBrightnessSupported()).isTrue();
     }
-    
+
     @Test
     void getCapabilities_colorOnly() {
         setGetResponse("/lights", "{\n" +
@@ -729,7 +727,7 @@ class HueApiTest {
                 "}\n" +
                 "}\n" +
                 "}");
-        
+
         LightCapabilities capabilities = api.getLightCapabilities(22);
 
         assertCapabilities(
@@ -760,13 +758,13 @@ class HueApiTest {
                 + "}");
 
         LightCapabilities capabilities = api.getLightCapabilities(7);
-        
+
         assertCapabilities(capabilities, LightCapabilities.builder().capabilities(EnumSet.of(Capability.BRIGHTNESS, Capability.ON_OFF)).build());
         assertThat(capabilities.isColorSupported()).isFalse();
         assertThat(capabilities.isCtSupported()).isFalse();
         assertThat(capabilities.isBrightnessSupported()).isTrue();
     }
-    
+
     @Test
     void getCapabilities_colorTemperatureOnly() {
         setGetResponse("/lights", "{\n"
@@ -802,21 +800,21 @@ class HueApiTest {
                 + "    }\n"
                 + "  }\n"
                 + "}");
-        
+
         LightCapabilities capabilities = api.getLightCapabilities(42);
-        
+
         assertCapabilities(
                 capabilities,
                 LightCapabilities.builder()
-                        .ctMin(153)
-                        .ctMax(454)
-                        .capabilities(EnumSet.of(Capability.COLOR_TEMPERATURE, Capability.BRIGHTNESS, Capability.ON_OFF)).build()
+                                 .ctMin(153)
+                                 .ctMax(454)
+                                 .capabilities(EnumSet.of(Capability.COLOR_TEMPERATURE, Capability.BRIGHTNESS, Capability.ON_OFF)).build()
         );
         assertThat(capabilities.isColorSupported()).isFalse();
         assertThat(capabilities.isCtSupported()).isTrue();
         assertThat(capabilities.isBrightnessSupported()).isTrue();
     }
-    
+
     @Test
     void getCapabilities_onOffOnly() {
         setGetResponse("/lights", "{\n"
@@ -842,9 +840,9 @@ class HueApiTest {
                 + "    }\n"
                 + "  }\n"
                 + "}");
-        
+
         LightCapabilities capabilities = api.getLightCapabilities(24);
-        
+
         assertCapabilities(capabilities, LightCapabilities.builder().capabilities(EnumSet.of(Capability.ON_OFF)).build());
         assertThat(capabilities.isColorSupported()).isFalse();
         assertThat(capabilities.isCtSupported()).isFalse();
@@ -857,7 +855,7 @@ class HueApiTest {
 
         assertThrows(LightNotFoundException.class, () -> api.getLightCapabilities(1234));
     }
-    
+
     @Test
     void getGroupCapabilities_returnsMaxOfAllContainedLights() {
         setGetResponse("/lights", "{\n"
@@ -1037,51 +1035,51 @@ class HueApiTest {
                 api.getGroupCapabilities(1),
                 LightCapabilities.builder()
                                  .colorGamut(GAMUT_C)
-                        .ctMin(100)
-                        .ctMax(500)
-                        .capabilities(EnumSet.allOf(Capability.class))
-                        .build()
+                                 .ctMin(100)
+                                 .ctMax(500)
+                                 .capabilities(EnumSet.allOf(Capability.class))
+                                 .build()
         );
         assertCapabilities(
                 api.getGroupCapabilities(2),
                 LightCapabilities.builder()
                                  .colorGamut(GAMUT_C)
-                        .capabilities(EnumSet.of(Capability.COLOR, Capability.BRIGHTNESS, Capability.ON_OFF))
-                        .build());
+                                 .capabilities(EnumSet.of(Capability.COLOR, Capability.BRIGHTNESS, Capability.ON_OFF))
+                                 .build());
         assertCapabilities(
                 api.getGroupCapabilities(3),
                 LightCapabilities.builder()
-                        .ctMin(100)
-                        .ctMax(454)
-                        .capabilities(EnumSet.of(Capability.COLOR_TEMPERATURE, Capability.BRIGHTNESS, Capability.ON_OFF))
-                        .build()
+                                 .ctMin(100)
+                                 .ctMax(454)
+                                 .capabilities(EnumSet.of(Capability.COLOR_TEMPERATURE, Capability.BRIGHTNESS, Capability.ON_OFF))
+                                 .build()
         );
         assertCapabilities(
                 api.getGroupCapabilities(4),
                 LightCapabilities.builder()
-                        .capabilities(EnumSet.of(Capability.ON_OFF))
-                        .build()
+                                 .capabilities(EnumSet.of(Capability.ON_OFF))
+                                 .build()
         );
         assertCapabilities(
                 api.getGroupCapabilities(5),
                 LightCapabilities.builder()
                                  .colorGamut(GAMUT_A)
-                        .capabilities(EnumSet.of(Capability.COLOR, Capability.BRIGHTNESS, Capability.ON_OFF))
-                        .build());
+                                 .capabilities(EnumSet.of(Capability.COLOR, Capability.BRIGHTNESS, Capability.ON_OFF))
+                                 .build());
         assertCapabilities(
                 api.getGroupCapabilities(6),
                 LightCapabilities.builder()
                                  .colorGamut(GAMUT_C)
-                        .capabilities(EnumSet.of(Capability.COLOR, Capability.BRIGHTNESS, Capability.ON_OFF))
-                        .build());
+                                 .capabilities(EnumSet.of(Capability.COLOR, Capability.BRIGHTNESS, Capability.ON_OFF))
+                                 .build());
         assertCapabilities(
                 api.getGroupCapabilities(7),
                 LightCapabilities.builder()
                                  .colorGamut(GAMUT_B)
-                        .capabilities(EnumSet.of(Capability.COLOR, Capability.BRIGHTNESS, Capability.ON_OFF))
-                        .build());
+                                 .capabilities(EnumSet.of(Capability.COLOR, Capability.BRIGHTNESS, Capability.ON_OFF))
+                                 .build());
     }
-    
+
     @Test
     void putState_brightness_success_callsCorrectUrl() {
         setPutResponse("/lights/" + 15 + "/state", "{\"bri\":200}",
@@ -1094,7 +1092,7 @@ class HueApiTest {
                         "]");
 
         boolean success = performPutCall(PutCall.builder().id(15).bri(200).build());
-        
+
         assertThat(success).isTrue();
     }
 
@@ -1110,7 +1108,7 @@ class HueApiTest {
                         "]");
 
         boolean success = performPutCall(PutCall.builder().id(9).bri(200).groupState(true).build());
-        
+
         assertThat(success).isTrue();
     }
 
@@ -1119,7 +1117,7 @@ class HueApiTest {
         setPutResponse("/lights/" + 16 + "/state", "{\"ct\":100}", "[success]");
 
         boolean success = performPutCall(PutCall.builder().id(16).ct(100).build());
-        
+
         assertThat(success).isTrue();
     }
 
@@ -1130,7 +1128,7 @@ class HueApiTest {
         setPutResponse("/lights/" + 16 + "/state", "{\"xy\":[" + x + "," + y + "]}", "[success]");
 
         boolean success = performPutCall(PutCall.builder().id(16).x(x).y(y).build());
-        
+
         assertThat(success).isTrue();
     }
 
@@ -1141,7 +1139,7 @@ class HueApiTest {
         setPutResponse("/lights/" + 16 + "/state", "{\"hue\":" + hue + ",\"sat\":" + sat + "}", "[success]");
 
         boolean success = performPutCall(PutCall.builder().id(16).hue(hue).sat(sat).build());
-        
+
         assertThat(success).isTrue();
     }
 
@@ -1150,7 +1148,7 @@ class HueApiTest {
         setPutResponse("/lights/" + 16 + "/state", "{\"on\":true}", "[success]");
 
         boolean success = performPutCall(PutCall.builder().id(16).on(true).build());
-        
+
         assertThat(success).isTrue();
     }
 
@@ -1159,7 +1157,7 @@ class HueApiTest {
         setPutResponse("/lights/" + 16 + "/state", "{\"transitiontime\":2}", "[success]");
 
         boolean success = performPutCall(PutCall.builder().id(16).transitionTime(2).build());
-        
+
         assertThat(success).isTrue();
     }
 
@@ -1168,7 +1166,7 @@ class HueApiTest {
         setPutResponse("/lights/" + 16 + "/state", "{}", "[success]");
 
         boolean success = performPutCall(PutCall.builder().id(16).transitionTime(4).build());
-        
+
         assertThat(success).isTrue();
     }
 
@@ -1177,7 +1175,7 @@ class HueApiTest {
         setPutResponse("/lights/" + 1 + "/state", "{\"effect\":\"colorloop\"}", "[success]");
 
         boolean success = performPutCall(PutCall.builder().id(1).effect("colorloop").build());
-        
+
         assertThat(success).isTrue();
     }
 
@@ -1231,7 +1229,7 @@ class HueApiTest {
     @Test
     void putState_connectionFailure_exception() {
         when(resourceProviderMock.putResource(any(), any())).thenThrow(new BridgeConnectionFailure("Failed"));
-        
+
         assertThrows(BridgeConnectionFailure.class, () -> performPutCall(PutCall.builder().id(123).bri(100).build()));
     }
 
@@ -1242,7 +1240,7 @@ class HueApiTest {
                         "]");
 
         boolean success = performPutCall(PutCall.builder().id(123).bri(100).build());
-        
+
         assertThat(success).isTrue();
     }
 
@@ -1277,14 +1275,14 @@ class HueApiTest {
                 "]");
 
         boolean reachable = performPutCall(PutCall.builder().id(777).bri(200).build());
-        
+
         assertThat(reachable).isFalse();
     }
-    
+
     private void setGetResponse(String expectedUrl, String response) {
         when(resourceProviderMock.getResource(getUrl(expectedUrl))).thenReturn(response);
     }
-    
+
     private URL getUrl(String expectedUrl) {
         try {
             return new URL(baseUrl + expectedUrl);
@@ -1292,27 +1290,27 @@ class HueApiTest {
             throw new IllegalArgumentException("Could not create URL", e);
         }
     }
-    
+
     private void setPutResponse(String expectedUrl, String expectedBody, String response) {
         when(resourceProviderMock.putResource(getUrl(expectedUrl), expectedBody)).thenReturn(response);
     }
-    
+
     private LightState getLightState(int lightId) {
         return api.getLightState(lightId);
     }
-    
+
     private void assertLightState(LightState lightState, LightState expected) {
         assertThat(lightState).isEqualTo(expected);
     }
-    
+
     private boolean performPutCall(PutCall putCall) {
         return api.putState(putCall);
     }
-    
+
     private List<Integer> getGroupLights(int groupId) {
         return api.getGroupLights(groupId);
     }
-    
+
     private void assertCapabilities(LightCapabilities capabilities, LightCapabilities expected) {
         assertThat(capabilities).isEqualTo(expected);
     }

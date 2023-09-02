@@ -143,27 +143,27 @@ final class ScheduledState {
     }
 
     private Integer assertValidBrightnessValue(Integer brightness) {
-		if (brightness == null) {
-			return null;
-		}
+        if (brightness == null) {
+            return null;
+        }
         assertBrightnessSupported();
         if (brightness > 254 || brightness < 1) {
             throw new InvalidBrightnessValue("Invalid brightness value '" + brightness + "'. Allowed integer range: 1-254");
         }
         return brightness;
     }
-    
+
     private void assertBrightnessSupported() {
         if (!capabilities.isBrightnessSupported()) {
             throw new BrightnessNotSupported(getFormattedName() + "' does not support setting brightness! "
                     + "Capabilities: " + capabilities.getCapabilities());
         }
     }
-    
+
     private Integer assertCtSupportAndValue(Integer ct) {
         if (ct == null) {
-			return null;
-		}
+            return null;
+        }
         assertCtSupported();
         if (capabilities.getCtMax() == null || capabilities.getCtMin() == null) {
             return ct;
@@ -357,7 +357,7 @@ final class ScheduledState {
     public boolean isScheduledOn(DayOfWeek... day) {
         return daysOfWeek.containsAll(Arrays.asList(day));
     }
-    
+
     public String getIdV1() {
         if (groupState) {
             return "/groups/" + updateId;
@@ -398,11 +398,11 @@ final class ScheduledState {
         return new StateInterpolator(this, previousState, dateTime, keepPreviousPropertiesForNullTargets)
                 .getInterpolatedPutCall();
     }
-    
+
     public boolean shouldSplitLongBeforeTransition(ZonedDateTime now) {
         return getAdjustedTransitionTimeBefore(now) > ScheduledState.MAX_TRANSITION_TIME;
     }
-    
+
     public ZonedDateTime calculateNextPowerOnEnd(ZonedDateTime now) {
         if (shouldSplitLongBeforeTransition(now)) {
             return getNextTransitionTimeSplitStart(now).minusSeconds(1);
@@ -410,7 +410,7 @@ final class ScheduledState {
             return getEnd();
         }
     }
-    
+
     public PutCall getNextInterpolatedSplitPutCall(ZonedDateTime now, ScheduledState previousState) {
         ZonedDateTime nextSplitStart = getNextTransitionTimeSplitStart(now)
                 .minusMinutes(minTrBeforeGapInMinutes); // add buffer
@@ -443,7 +443,7 @@ final class ScheduledState {
         Duration durationAfterStart = Duration.between(lastStart, now);
         Duration totalDuration = Duration.between(lastStart, lastDefinedStart);
         return BigDecimal.valueOf(durationAfterStart.toMillis())
-                .divide(BigDecimal.valueOf(totalDuration.toMillis()), 7, RoundingMode.HALF_UP);
+                         .divide(BigDecimal.valueOf(totalDuration.toMillis()), 7, RoundingMode.HALF_UP);
     }
 
     public boolean endsBefore(ZonedDateTime now) {
@@ -457,7 +457,7 @@ final class ScheduledState {
     public boolean isOff() {
         return on == Boolean.FALSE;
     }
-    
+
     public boolean isOn() {
         return on == Boolean.TRUE;
     }
@@ -477,14 +477,14 @@ final class ScheduledState {
             originalState.setLastSeen(lastSeen);
         }
     }
-    
+
     public void setLastPutCall(PutCall lastPutCall) {
         this.lastPutCall = lastPutCall;
         if (originalState != this) {
             originalState.setLastPutCall(lastPutCall);
         }
     }
-    
+
     public boolean isNotSameState(ScheduledState state) {
         return !isSameState(state);
     }
@@ -499,11 +499,11 @@ final class ScheduledState {
         }
         return this; // todo: this does not have any coverage
     }
-    
+
     public boolean isForced() {
         return force == Boolean.TRUE;
     }
-    
+
     public PutCall getPutCall(ZonedDateTime now) {
         return PutCall.builder().id(updateId)
                       .bri(brightness)
@@ -576,7 +576,7 @@ final class ScheduledState {
         if (end == null) return "<ERROR: not set>";
         return end.toLocalDateTime().toString();
     }
-    
+
     private String getFormattedTransitionTimeBefore() {
         if (transitionTimeBeforeString == null) {
             return "";
@@ -587,7 +587,7 @@ final class ScheduledState {
         }
         return formatPropertyName("tr-before") + transitionTimeBeforeString;
     }
-    
+
     private String getFormattedPropertyIfSet(String name, Object property) {
         if (property == null) return "";
         return formatPropertyName(name) + property;
@@ -606,7 +606,7 @@ final class ScheduledState {
         if (transitionTime == null) return "";
         return formatPropertyName(name) + formatTransitionTime(transitionTime);
     }
-    
+
     private static String formatTransitionTime(Integer transitionTime) {
         return Duration.ofMillis(transitionTime * 100L).toString();
     }

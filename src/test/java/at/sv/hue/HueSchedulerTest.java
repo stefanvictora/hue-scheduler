@@ -1,6 +1,15 @@
 package at.sv.hue;
 
-import at.sv.hue.api.*;
+import at.sv.hue.api.BridgeConnectionFailure;
+import at.sv.hue.api.Capability;
+import at.sv.hue.api.GroupNotFoundException;
+import at.sv.hue.api.HueApi;
+import at.sv.hue.api.HueApiFailure;
+import at.sv.hue.api.LightCapabilities;
+import at.sv.hue.api.LightNotFoundException;
+import at.sv.hue.api.LightState;
+import at.sv.hue.api.ManualOverrideTracker;
+import at.sv.hue.api.PutCall;
 import at.sv.hue.time.InvalidStartTimeExpression;
 import at.sv.hue.time.StartTimeProviderImpl;
 import at.sv.hue.time.SunTimesProviderImpl;
@@ -12,7 +21,11 @@ import org.mockito.InOrder;
 import org.mockito.Mockito;
 import org.mockito.stubbing.OngoingStubbing;
 
-import java.time.*;
+import java.time.DayOfWeek;
+import java.time.Duration;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
 import java.util.Arrays;
@@ -4251,7 +4264,7 @@ class HueSchedulerTest {
         assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 10).build());
 
         ensureRunnable(initialNow.plusDays(1).plusHours(1)); // for next day
-        
+
         // third state is run normally again
 
         advanceTimeAndRunAndAssertPutCall(thirdState, expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 20).build());

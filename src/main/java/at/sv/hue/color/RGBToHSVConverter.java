@@ -1,10 +1,10 @@
 package at.sv.hue.color;
 
 final class RGBToHSVConverter {
-    
+
     private RGBToHSVConverter() {
     }
-    
+
     /**
      * Converts the given rgb values to Philips Hue compatible hue, saturation and brightness values.
      * This means that the values are directly converted to the ranges the Hue API accepts.

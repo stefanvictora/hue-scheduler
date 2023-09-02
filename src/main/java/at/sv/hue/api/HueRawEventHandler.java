@@ -93,15 +93,15 @@ public final class HueRawEventHandler implements BackgroundEventHandler {
         public boolean isOnEvent() {
             return on != null && on.isOn() || "zigbee_connectivity".equals(type) && "connected".equals(getStatus());
         }
-        
+
         public boolean isPhysical() {
             return "zigbee_connectivity".equals(type);
         }
-        
+
         public boolean isLightOrGroup() {
             return isLight() || isGroup();
         }
-        
+
         public boolean isLight() {
             return "light".equals(type) || id_v1 != null && id_v1.startsWith("/lights/");
         }
@@ -109,7 +109,7 @@ public final class HueRawEventHandler implements BackgroundEventHandler {
         public boolean isGroup() {
             return "grouped_light".equals(type) || id_v1 != null && id_v1.startsWith("/groups/");
         }
-        
+
         @Data
         private static final class On {
             private boolean on;

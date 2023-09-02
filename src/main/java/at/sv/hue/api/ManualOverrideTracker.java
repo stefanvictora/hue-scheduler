@@ -5,6 +5,7 @@ public interface ManualOverrideTracker {
     void onManuallyOverridden(String id);
 
     boolean isManuallyOverridden(String id);
+
     void onLightTurnedOn(String id);
 
     void onLightOff(String id);
