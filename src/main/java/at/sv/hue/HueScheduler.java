@@ -541,13 +541,13 @@ public final class HueScheduler implements Runnable {
             PutCall interpolatedSplitPutCall = getInterpolatedSplitPutCall(state);
             if (interpolatedSplitPutCall == null) {
                 logMissingPreviousStateWarning(state);
-                return false; // todo: test
+                return true;
             }
-            performPutApiCall(state, interpolatedSplitPutCall);
+            boolean success = performPutApiCall(state, interpolatedSplitPutCall);
             if (!state.isRetryAfterPowerOnState()) { // schedule follow-up split
                 schedule(ScheduledState.createTemporaryCopy(state), state.getNextInterpolationSplitDelayInMs(now));
             }
-            return true; // todo: test if we need actually false value here as well?
+            return success;
         } else {
             return putState(state, state.getPutCall(now));
         }
@@ -575,7 +575,7 @@ public final class HueScheduler implements Runnable {
                     LOG.trace("Unsupported api call for light id {}: {}", id, e.getLocalizedMessage());
                 }
             }
-            return false; // todo: write test?
+            return true;
         } else {
             return performPutApiCall(state, putCall);
         }

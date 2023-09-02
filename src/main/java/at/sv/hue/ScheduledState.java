@@ -554,6 +554,8 @@ final class ScheduledState {
         String context = name;
         if (isRetryAfterPowerOnState()) {
             context += " (power-on)";
+        } else if (temporary) {
+            context += " (temporary)";
         }
         return context;
     }
