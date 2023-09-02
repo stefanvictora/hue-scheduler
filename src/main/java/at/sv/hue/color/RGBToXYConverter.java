@@ -45,9 +45,9 @@ public final class RGBToXYConverter {
             y = Y / sum;
         }
         if (gamut != null) {
-            Point point = new XYColorGamutCorrection(x, y, gamut).adjustIfNeeded();
-            x = point.x;
-            y = point.y;
+            XYColorGamutCorrection correction = new XYColorGamutCorrection(x, y, gamut);
+            x = correction.getX();
+            y = correction.getY();
         }
         return new XYColor(getDoubleValueWithFixedPrecision(x), getDoubleValueWithFixedPrecision(y), (int) (Y * 255f));
     }
@@ -64,9 +64,9 @@ public final class RGBToXYConverter {
      */
     public static int[] convert(double x, double y, int brightness, Double[][] gamut) {
         if (gamut != null) {
-            Point point = new XYColorGamutCorrection(x, y, gamut).adjustIfNeeded();
-            x = point.x;
-            y = point.y;
+            XYColorGamutCorrection correction = new XYColorGamutCorrection(x, y, gamut);
+            x = correction.getX();
+            y = correction.getY();
         }
         double Y = brightness / 255.0;
         if (Y == 0.0) {

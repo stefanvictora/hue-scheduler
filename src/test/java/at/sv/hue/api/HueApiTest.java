@@ -17,6 +17,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class HueApiTest {
+    private static final Double[][] GAMUT_A = new Double[][]{{0.704, 0.296}, {0.2151, 0.7106}, {0.138, 0.08}};
+    private static final Double[][] GAMUT_B = new Double[][]{{0.675, 0.322}, {0.409, 0.518}, {0.167, 0.04}};
+    private static final Double[][] GAMUT_C = new Double[][]{{0.6915, 0.3083}, {0.17, 0.7}, {0.1532, 0.0475}};
     private HueApi api;
     private String baseUrl;
     private HttpResourceProvider resourceProviderMock;
@@ -126,9 +129,10 @@ class HueApiTest {
                 + "\n");
 
         LightState lightState = getLightState(lightId);
-        
+
         assertLightState(
-                lightState, LightState.builder()
+                lightState, LightState
+                        .builder()
                         .on(true)
                         .reachable(true)
                         .x(x)
@@ -138,7 +142,9 @@ class HueApiTest {
                         .hue(hue)
                         .sat(sat)
                         .effect("colorloop")
-                        .capabilities(EnumSet.allOf(Capability.class))
+                        .lightCapabilities(LightCapabilities.builder()
+                                                            .capabilities(EnumSet.allOf(Capability.class))
+                                                            .build())
                         .build()
         );
     }
@@ -172,20 +178,22 @@ class HueApiTest {
                 + "\n");
 
         LightState lightState = getLightState(lightId);
-        
-        assertLightState(
-                lightState, LightState.builder()
-                        .on(false)
-                        .reachable(false)
-                        .x(x)
-                        .y(y)
-                        .colorTemperature(ct)
-                        .brightness(bri)
-                        .hue(hue)
-                        .sat(sat)
-                        .effect("none")
-                        .capabilities(EnumSet.allOf(Capability.class))
-                        .build()
+
+        assertLightState(lightState, LightState
+                .builder()
+                .on(false)
+                .reachable(false)
+                .x(x)
+                .y(y)
+                .colorTemperature(ct)
+                .brightness(bri)
+                .hue(hue)
+                .sat(sat)
+                .effect("none")
+                .lightCapabilities(LightCapabilities.builder()
+                                                    .capabilities(EnumSet.allOf(Capability.class))
+                                                    .build())
+                .build()
         );
     }
 
@@ -204,12 +212,15 @@ class HueApiTest {
                 + "}");
 
         LightState lightState = getLightState(lightId);
-        
-        assertLightState(lightState, LightState.builder()
+
+        assertLightState(lightState, LightState
+                .builder()
                 .on(true)
                 .reachable(true)
                 .brightness(bri)
-                .capabilities(EnumSet.of(Capability.BRIGHTNESS, Capability.ON_OFF))
+                .lightCapabilities(LightCapabilities.builder()
+                                                    .capabilities(EnumSet.of(Capability.BRIGHTNESS, Capability.ON_OFF))
+                                                    .build())
                 .build());
     }
     
@@ -226,8 +237,15 @@ class HueApiTest {
                 + "}");
         
         LightState lightState = getLightState(lightId);
-        
-        assertLightState(lightState, LightState.builder().on(true).reachable(true).capabilities(EnumSet.of(Capability.ON_OFF)).build());
+
+        assertLightState(lightState, LightState
+                .builder()
+                .on(true)
+                .reachable(true)
+                .lightCapabilities(LightCapabilities.builder()
+                                                    .capabilities(EnumSet.of(Capability.ON_OFF))
+                                                    .build())
+                .build());
     }
     
     @Test
@@ -352,40 +370,55 @@ class HueApiTest {
         
         assertThat(api.getGroupStates(17)).containsExactly(
                 LightState.builder()
-                        .on(true)
-                        .brightness(43)
-                        .hue(692)
-                        .sat(204)
-                        .effect("none")
-                        .x(0.6189)
-                        .y(0.3303)
-                        .colorTemperature(500)
-                        .colormode("xy")
-                        .reachable(true)
-                        .capabilities(EnumSet.allOf(Capability.class))
-                        .build(),
+                          .on(true)
+                          .brightness(43)
+                          .hue(692)
+                          .sat(204)
+                          .effect("none")
+                          .x(0.6189)
+                          .y(0.3303)
+                          .colorTemperature(500)
+                          .colormode("xy")
+                          .reachable(true)
+                          .lightCapabilities(LightCapabilities.builder()
+                                                              .colorGamutType("C")
+                                                              .colorGamut(GAMUT_C)
+                                                              .ctMin(153)
+                                                              .ctMax(500)
+                                                              .capabilities(EnumSet.allOf(Capability.class))
+                                                              .build())
+                          .build(),
                 LightState.builder()
-                        .on(false)
-                        .brightness(127)
-                        .reachable(true)
-                        .capabilities(EnumSet.of(Capability.BRIGHTNESS, Capability.ON_OFF))
-                        .build(),
+                          .on(false)
+                          .brightness(127)
+                          .reachable(true)
+                          .lightCapabilities(LightCapabilities.builder()
+                                                              .capabilities(EnumSet.of(Capability.BRIGHTNESS, Capability.ON_OFF))
+                                                              .build())
+                          .build(),
                 LightState.builder()
-                        .on(false)
-                        .brightness(184)
-                        .colorTemperature(366)
-                        .colormode("ct")
-                        .reachable(true)
-                        .capabilities(EnumSet.of(Capability.COLOR_TEMPERATURE, Capability.BRIGHTNESS, Capability.ON_OFF))
-                        .build()
+                          .on(false)
+                          .brightness(184)
+                          .colorTemperature(366)
+                          .colormode("ct")
+                          .reachable(true)
+                          .lightCapabilities(LightCapabilities.builder()
+                                                              .ctMin(153)
+                                                              .ctMax(454)
+                                                              .capabilities(EnumSet.of(Capability.COLOR_TEMPERATURE,
+                                                                      Capability.BRIGHTNESS, Capability.ON_OFF))
+                                                              .build())
+                          .build()
         );
-        
+
         assertThat(api.getGroupStates(18)).containsExactly(
                 LightState.builder()
-                        .on(false)
-                        .reachable(true)
-                        .capabilities(EnumSet.of(Capability.ON_OFF))
-                        .build()
+                          .on(false)
+                          .reachable(true)
+                          .lightCapabilities(LightCapabilities.builder()
+                                                              .capabilities(EnumSet.of(Capability.ON_OFF))
+                                                              .build())
+                          .build()
         );
     }
     
@@ -653,12 +686,11 @@ class HueApiTest {
 
         LightCapabilities capabilities = api.getLightCapabilities(22);
 
-        Double[][] gamut = {{0.6915, 0.3083}, {0.17, 0.7}, {0.1532, 0.0475}};
         assertCapabilities(
                 capabilities,
                 LightCapabilities.builder()
                         .colorGamutType("C")
-                        .colorGamut(gamut)
+                                 .colorGamut(GAMUT_C)
                         .ctMin(153)
                         .ctMax(500)
                         .capabilities(EnumSet.allOf(Capability.class))
@@ -699,15 +731,14 @@ class HueApiTest {
                 "}");
         
         LightCapabilities capabilities = api.getLightCapabilities(22);
-        
-        Double[][] gamut = { { 0.6915, 0.3083 }, { 0.17, 0.7 }, { 0.1532, 0.0475 } };
+
         assertCapabilities(
                 capabilities,
                 LightCapabilities.builder()
-                        .colorGamutType("C")
-                        .colorGamut(gamut)
-                        .capabilities(EnumSet.of(Capability.COLOR, Capability.BRIGHTNESS, Capability.ON_OFF))
-                        .build()
+                                 .colorGamutType("C")
+                                 .colorGamut(GAMUT_C)
+                                 .capabilities(EnumSet.of(Capability.COLOR, Capability.BRIGHTNESS, Capability.ON_OFF))
+                                 .build()
         );
         assertThat(capabilities.isColorSupported()).isTrue();
         assertThat(capabilities.isCtSupported()).isFalse();
@@ -1001,14 +1032,11 @@ class HueApiTest {
                 + "    ]\n"
                 + "  }\n"
                 + "}");
-        Double[][] gamutA = { { 0.704, 0.296 }, { 0.2151, 0.7106 }, { 0.138, 0.08 } };
-        Double[][] gamutB = { { 0.675, 0.322 }, { 0.409, 0.518 }, { 0.167, 0.04 } };
-        Double[][] gamutC = { { 0.6915, 0.3083 }, { 0.17, 0.7 }, { 0.1532, 0.0475 } };
-        
+
         assertCapabilities(
                 api.getGroupCapabilities(1),
                 LightCapabilities.builder()
-                        .colorGamut(gamutC)
+                                 .colorGamut(GAMUT_C)
                         .ctMin(100)
                         .ctMax(500)
                         .capabilities(EnumSet.allOf(Capability.class))
@@ -1017,7 +1045,7 @@ class HueApiTest {
         assertCapabilities(
                 api.getGroupCapabilities(2),
                 LightCapabilities.builder()
-                        .colorGamut(gamutC)
+                                 .colorGamut(GAMUT_C)
                         .capabilities(EnumSet.of(Capability.COLOR, Capability.BRIGHTNESS, Capability.ON_OFF))
                         .build());
         assertCapabilities(
@@ -1037,19 +1065,19 @@ class HueApiTest {
         assertCapabilities(
                 api.getGroupCapabilities(5),
                 LightCapabilities.builder()
-                        .colorGamut(gamutA)
+                                 .colorGamut(GAMUT_A)
                         .capabilities(EnumSet.of(Capability.COLOR, Capability.BRIGHTNESS, Capability.ON_OFF))
                         .build());
         assertCapabilities(
                 api.getGroupCapabilities(6),
                 LightCapabilities.builder()
-                        .colorGamut(gamutC)
+                                 .colorGamut(GAMUT_C)
                         .capabilities(EnumSet.of(Capability.COLOR, Capability.BRIGHTNESS, Capability.ON_OFF))
                         .build());
         assertCapabilities(
                 api.getGroupCapabilities(7),
                 LightCapabilities.builder()
-                        .colorGamut(gamutB)
+                                 .colorGamut(GAMUT_B)
                         .capabilities(EnumSet.of(Capability.COLOR, Capability.BRIGHTNESS, Capability.ON_OFF))
                         .build());
     }

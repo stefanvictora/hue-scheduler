@@ -1,5 +1,7 @@
 package at.sv.hue.color;
 
+import lombok.Getter;
+
 /**
  * Code adapted from <a href="https://github.com/home-assistant/core/blob/dev/homeassistant/util/color.py">Home Assistant color.py</a>
  * License: Apache-2.0 License
@@ -7,21 +9,26 @@ package at.sv.hue.color;
  * Which in turn adapted the code from <a href="https://github.com/benknight/hue-python-rgb-converter">benknight/hue-python-rgb-converter</a>
  * License: MIT License
  */
-final class XYColorGamutCorrection {
+public final class XYColorGamutCorrection {
 
     private final Point p;
     private final ColorGamut gamut;
+    @Getter
+    private final double x;
+    @Getter
+    private final double y;
 
     public XYColorGamutCorrection(double x, double y, Double[][] gamut) {
         p = new Point(x, y);
         this.gamut = new ColorGamut(gamut);
-    }
-
-    public Point adjustIfNeeded() {
         if (!isInRange()) {
-            return getClosestPointToPoint();
+            Point result = getClosestPointToPoint();
+            this.x = result.getX();
+            this.y = result.getY();
+        } else {
+            this.x = x;
+            this.y = y;
         }
-        return p;
     }
 
     private boolean isInRange() {

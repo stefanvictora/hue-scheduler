@@ -3,8 +3,10 @@ package at.sv.hue;
 import at.sv.hue.api.LightCapabilities;
 import at.sv.hue.api.LightState;
 import at.sv.hue.api.PutCall;
+import at.sv.hue.color.XYColorGamutCorrection;
 import at.sv.hue.time.StartTimeProvider;
 import lombok.Builder;
+import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -496,13 +498,12 @@ final class ScheduledState {
         }
         switch (colorMode) {
             case CT:
-                return lastPutCall.getCt() != null && !lastPutCall.getCt().equals(currentState.getColorTemperature());
+                return ctDiffers(currentState);
             case HS:
                 return lastPutCall.getHue() != null && !lastPutCall.getHue().equals(currentState.getHue()) ||
                         lastPutCall.getSat() != null && !lastPutCall.getSat().equals(currentState.getSat());
             case XY:
-                return doubleValueDiffers(lastPutCall.getX(), currentState.getX()) ||
-                        doubleValueDiffers(lastPutCall.getY(), currentState.getY());
+                return xyDiffers(currentState);
             default:
                 return false; // should not happen, but as a fallback we just ignore unknown color modes
         }
@@ -517,7 +518,61 @@ final class ScheduledState {
     private static boolean colorModeDiffers(ColorMode colorMode, LightState currentState) {
         return !Objects.equals(colorMode, currentState.getColormode());
     }
-    
+
+    private boolean ctDiffers(LightState currentState) {
+        if (lastPutCall.getCt() == null) {
+            return false;
+        }
+        if (currentState.getColorTemperature() == null) {
+            return true;
+        }
+        int ct = getAdjustedLastCt(currentState.getLightCapabilities());
+        if (ct == currentState.getColorTemperature()) {
+            return false;
+        }
+        return true;
+    }
+
+    private int getAdjustedLastCt(LightCapabilities lightCapabilities) {
+        Integer currentMin = lightCapabilities.getCtMin();
+        Integer currentMax = lightCapabilities.getCtMax();
+        if (currentMin != null && currentMax != null) {
+            return Math.min(Math.max(lastPutCall.getCt(), currentMin), currentMax);
+        } else {
+            return lastPutCall.getCt();
+        }
+    }
+
+    private boolean xyDiffers(LightState currentState) {
+        if (lastPutCall.getX() == null && currentState.getX() == null) {
+            return false;
+        }
+        if (lastPutCall.getX() == null || currentState.getX() == null) {
+            return true;
+        }
+        Double[][] currentGamut = currentState.getLightCapabilities().getColorGamut();
+        XY current = getAdjustedXY(currentState.getX(), currentState.getY(), currentGamut);
+        XY adjustedLast = getAdjustedXY(lastPutCall.getX(), lastPutCall.getY(), currentGamut);
+        return doubleDiffers(adjustedLast.x, current.x) || doubleDiffers(adjustedLast.y, current.y);
+    }
+
+    private static XY getAdjustedXY(double x, double y, Double[][] gamut) {
+        if (gamut == null) {
+            return new XY(x, y);
+        }
+        XYColorGamutCorrection correction = new XYColorGamutCorrection(x, y, gamut);
+        return new XY(correction.getX(), correction.getY());
+    }
+
+    private static boolean doubleDiffers(double last, double current) {
+        return getBigDecimal(last).setScale(2, RoundingMode.HALF_UP)
+                                  .compareTo(getBigDecimal(current).setScale(2, RoundingMode.HALF_UP)) != 0;
+    }
+
+    private static BigDecimal getBigDecimal(Double value) {
+        return new BigDecimal(value.toString()).setScale(3, RoundingMode.HALF_UP);
+    }
+
     private boolean effectDiffers(LightState currentState) {
         String lastEffect = lastPutCall.getEffect();
         if (lastEffect == null) {
@@ -535,20 +590,6 @@ final class ScheduledState {
      */
     private boolean isOnAndStateDiffers(LightState currentState) {
         return lastPutCall.getOn() != null && currentState.isOnOffSupported() && lastPutCall.isOn() && !currentState.isOn();
-    }
-
-    private boolean doubleValueDiffers(Double scheduled, Double current) {
-        if (scheduled == null && current == null) {
-            return false;
-        }
-        if (scheduled == null || current == null) {
-            return true;
-        }
-        return getBigDecimal(scheduled).compareTo(getBigDecimal(current)) != 0;
-    }
-
-    private static BigDecimal getBigDecimal(Double value) {
-        return new BigDecimal(value.toString()).setScale(3, RoundingMode.HALF_UP);
     }
 
     public void setLastSeen(ZonedDateTime lastSeen) {
@@ -681,5 +722,11 @@ final class ScheduledState {
     
     private static String formatTransitionTime(Integer transitionTime) {
         return Duration.ofMillis(transitionTime * 100L).toString();
+    }
+
+    @Data
+    private static class XY {
+        public final double x;
+        public final double y;
     }
 }

@@ -20,7 +20,7 @@ public final class LightState {
     private final boolean reachable;
     private final boolean on;
     @Builder.Default
-    private final EnumSet<Capability> capabilities = EnumSet.noneOf(Capability.class);
+    private final LightCapabilities lightCapabilities = LightCapabilities.NO_CAPABILITIES;
 
     public ColorMode getColormode() {
         return ColorMode.parse(colormode);
@@ -29,21 +29,25 @@ public final class LightState {
     public boolean isColorLoopEffect() {
         return "colorloop".equals(getEffect());
     }
-    
+
     public boolean isColorSupported() {
-        return capabilities.contains(Capability.COLOR);
+        return getCapabilities().contains(Capability.COLOR);
     }
     
     public boolean isCtSupported() {
-        return capabilities.contains(Capability.COLOR_TEMPERATURE);
+        return getCapabilities().contains(Capability.COLOR_TEMPERATURE);
     }
     
     public boolean isBrightnessSupported() {
-        return capabilities.contains(Capability.BRIGHTNESS);
+        return getCapabilities().contains(Capability.BRIGHTNESS);
     }
 
     public boolean isOnOffSupported() {
-        return capabilities.contains(Capability.ON_OFF);
+        return getCapabilities().contains(Capability.ON_OFF);
+    }
+
+    private EnumSet<Capability> getCapabilities() {
+        return lightCapabilities.getCapabilities();
     }
 
     public boolean isOff() {

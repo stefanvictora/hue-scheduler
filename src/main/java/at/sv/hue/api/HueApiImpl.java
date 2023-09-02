@@ -61,7 +61,7 @@ public final class HueApiImpl implements HueApi {
         State state = light.state;
         return new LightState(
                 state.bri, state.ct, getX(state.xy), getY(state.xy), state.hue, state.sat, state.effect, state.colormode, state.reachable, state.on,
-                getCapabilities(light.type));
+                createLightCapabilities(light));
     }
     
     @Override
@@ -303,13 +303,35 @@ public final class HueApiImpl implements HueApi {
     @Override
     public LightCapabilities getLightCapabilities(int id) {
         Light light = getAndAssertLightExists(id);
-        if (light.capabilities == null || light.capabilities.control == null) return LightCapabilities.NO_CAPABILITIES;
-        Control control = light.capabilities.control;
-        return new LightCapabilities(
-                control.colorgamuttype,
-                control.colorgamut, getMinCtOrNull(control), getMaxCtOrNull(control), getCapabilities(light.type));
+        return createLightCapabilities(light);
     }
-    
+
+    private LightCapabilities createLightCapabilities(Light light) {
+        return new LightCapabilities(
+                getGamutTypeOrNull(light.capabilities), getColorGamutOrNull(light.capabilities),
+                getMinCtOrNull(light.capabilities), getMaxCtOrNull(light.capabilities), getCapabilities(light.type));
+    }
+
+    private static String getGamutTypeOrNull(Capabilities capabilities) {
+        if (capabilities == null || capabilities.control == null) return null;
+        return capabilities.control.colorgamuttype;
+    }
+
+    private static Double[][] getColorGamutOrNull(Capabilities capabilities) {
+        if (capabilities == null || capabilities.control == null) return null;
+        return capabilities.control.colorgamut;
+    }
+
+    private Integer getMinCtOrNull(Capabilities capabilities) {
+        if (capabilities == null || capabilities.control.ct == null) return null;
+        return capabilities.control.ct.min;
+    }
+
+    private Integer getMaxCtOrNull(Capabilities capabilities) {
+        if (capabilities == null || capabilities.control.ct == null) return null;
+        return capabilities.control.ct.max;
+    }
+
     @Override
     public LightCapabilities getGroupCapabilities(int id) {
         List<LightCapabilities> lightCapabilities = getGroupLights(id)
@@ -391,16 +413,6 @@ public final class HueApiImpl implements HueApi {
     @Override
     public void assertConnection() {
         getOrLookupLights();
-    }
-
-    private Integer getMinCtOrNull(Control control) {
-        if (control.ct == null) return null;
-        return control.ct.min;
-    }
-
-    private Integer getMaxCtOrNull(Control control) {
-        if (control.ct == null) return null;
-        return control.ct.max;
     }
 
     private URL getLightsUrl() {
