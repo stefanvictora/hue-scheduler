@@ -542,6 +542,16 @@ class HueSchedulerTest {
     }
 
     @Test
+    void parse_trimsProperty() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState("1\t" + nowTimeString + "\t bri:" + DEFAULT_BRIGHTNESS + "  \tct:" + DEFAULT_CT);
+
+        startScheduler();
+
+        ensureScheduledStates(1);
+    }
+
+    @Test
     void parse_missingParts_atLeastIdAndTimeNeedsToBeSet() {
         addKnownLightIdsWithDefaultCapabilities(1);
         assertThrows(InvalidConfigurationLine.class, () -> addState("1\t"));
