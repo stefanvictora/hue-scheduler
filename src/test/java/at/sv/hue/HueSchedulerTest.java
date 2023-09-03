@@ -1242,8 +1242,6 @@ class HueSchedulerTest {
         ensureRunnable(now.plusDays(1), now.plusDays(1)); // next day, again zero length
     }
 
-    // todo: more tests for power on and previous states, there was a bug here that was not covered
-
     @Test
     void parse_transitionTimeBefore_performsInterpolationsAfterPowerCycles_usesTransitionFromPreviousState() {
         create();
@@ -4257,6 +4255,136 @@ class HueSchedulerTest {
         advanceTimeAndRunAndAssertPutCall(fourthState, expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 30).build());
 
         ensureRunnable(initialNow.plusDays(1).plusHours(3)); // for next day
+    }
+
+    @Test
+    void run_execution_manualOverride_firstCallFailed_powerOn_lastSeenCorrectlySet_usedForModificationTracking_detectedCorrectly() {
+        enableUserModificationTracking();
+        create();
+
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now, "bri:" + DEFAULT_BRIGHTNESS);
+        addState(1, now.plusHours(1), "bri:" + (DEFAULT_BRIGHTNESS + 10));
+
+        startScheduler();
+
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(2);
+        ScheduledRunnable firstState = scheduledRunnables.get(0);
+        ScheduledRunnable secondState = scheduledRunnables.get(1);
+
+        mockPutReturnValue(false);
+        firstState.run(); // not marked as seen
+        mockPutReturnValue(true);
+
+        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).build());
+
+        ensureRunnable(now.plusDays(1), now.plusDays(1).plusHours(1)); // next day
+
+        // Power on -> reruns first state
+
+        ScheduledRunnable powerOnRunnable = simulateLightOnEventExpectingSingleScheduledState(now, now.plusHours(1));
+
+        powerOnRunnable.run();
+
+        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).build());
+
+        // Second state -> detects manual override
+
+        addLightStateResponse(1, LightState.builder()
+                                           .on(true)
+                                           .reachable(true)
+                                           .brightness(DEFAULT_BRIGHTNESS - 10) // overridden
+                                           .lightCapabilities(defaultCapabilities)
+                                           .build());
+
+        setCurrentTimeTo(secondState);
+        secondState.run(); // detected as overridden -> no put calls or next day runnable
+        assertAllPutCallsAsserted();
+        ensureScheduledStates(0);
+    }
+
+    @Test
+    void run_execution_manualOverride_transitionTimeBefore_longDuration_detectsChangesCorrectly() {
+        enableUserModificationTracking();
+        create();
+
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now, "bri:" + DEFAULT_BRIGHTNESS);
+        addState(1, now.plusHours(6), "bri:" + (DEFAULT_BRIGHTNESS + 50), "tr-before:6h");
+
+        startScheduler();
+
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(2);
+        ScheduledRunnable trBeforeRunnable = scheduledRunnables.get(0);
+        assertScheduleStart(trBeforeRunnable, now, now.plusDays(1));
+        assertScheduleStart(scheduledRunnables.get(1), now.plusDays(1), now.plusDays(1)); // zero length
+
+        trBeforeRunnable.run();
+
+        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).build()); // interpolated call
+        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 14).transitionTime(MAX_TRANSITION_TIME_WITH_BUFFER).build()); // first split call
+
+        List<ScheduledRunnable> followUpStates = ensureScheduledStates(2);
+        ScheduledRunnable secondSplit = followUpStates.get(0);
+        assertScheduleStart(secondSplit, now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), now.plusDays(1)); // next split
+        assertScheduleStart(followUpStates.get(1), now.plusDays(1), now.plusDays(2)); // next day
+
+        // second split -> no override detected
+
+        addLightStateResponse(1, LightState.builder() // same as first
+                                           .on(true)
+                                           .reachable(true)
+                                           .brightness(DEFAULT_BRIGHTNESS + 14)
+                                           .lightCapabilities(defaultCapabilities)
+                                           .build());
+
+        setCurrentTimeTo(secondSplit);
+        secondSplit.run();
+
+        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 28).transitionTime(MAX_TRANSITION_TIME_WITH_BUFFER).build());
+
+        ScheduledRunnable thirdSplit = ensureRunnable(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)); // next split
+
+        // third split -> still no override detected
+
+        addLightStateResponse(1, LightState.builder() // same as second
+                                           .on(true)
+                                           .reachable(true)
+                                           .brightness(DEFAULT_BRIGHTNESS + 28)
+                                           .lightCapabilities(defaultCapabilities)
+                                           .build());
+
+        setCurrentTimeTo(thirdSplit);
+        thirdSplit.run();
+
+        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 41).transitionTime(MAX_TRANSITION_TIME_WITH_BUFFER).build());
+
+        ScheduledRunnable fourthSplit = ensureRunnable(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)); // next split
+
+        // fourth split -> detects override
+
+        addLightStateResponse(1, LightState.builder()
+                                           .on(true)
+                                           .reachable(true)
+                                           .brightness(DEFAULT_BRIGHTNESS + 42) // overridden
+                                           .lightCapabilities(defaultCapabilities)
+                                           .build());
+
+        setCurrentTimeTo(fourthSplit);
+        fourthSplit.run(); // detects override
+
+        // simulate light on -> re run fourth (and last) split
+
+        List<ScheduledRunnable> powerOnEvents = simulateLightOnEvent(4);
+        assertScheduleStart(powerOnEvents.get(0), now, initialNow.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS)); // already ended
+        assertScheduleStart(powerOnEvents.get(1), now, initialNow.plus(ScheduledState.MAX_TRANSITION_TIME_MS * 2, ChronoUnit.MILLIS)); // already ended
+        assertScheduleStart(powerOnEvents.get(2), now, initialNow.plus(ScheduledState.MAX_TRANSITION_TIME_MS * 3, ChronoUnit.MILLIS)); // already ended
+        assertScheduleStart(powerOnEvents.get(3), now, initialNow.plusDays(1)); // fourth split again
+
+        powerOnEvents.get(3).run();
+
+        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 42).build()); // interpolated call
+        assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 50).transitionTime(36000).build()); // last split part
     }
 
     @Test
