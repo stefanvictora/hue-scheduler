@@ -22,12 +22,13 @@ public class HueEventListenerImpl implements HueEventListener {
 
     @Override
     public void onLightOn(String idv1, String uuid, boolean physical) {
-        MDC.put("context", "on-event " + idv1);
         if (physical) { // only lights can be turned on physically
+            MDC.put("context", "on-event " + idv1);
             // if light has been physically turned on, we additionally signal to each group the light is assigned
             lightToGroupAssignmentLookup.apply(idv1)
                                         .forEach(groupId -> onLightOn(groupId, null, false));
         }
+        MDC.put("context", "on-event " + idv1);
         manualOverrideTracker.onLightTurnedOn(idv1);
         List<Runnable> waitingList = waitingListProvider.apply(idv1);
         if (waitingList != null) {

@@ -315,6 +315,14 @@ Desk  07:00  bri:100%  tr-before:20min
 Note: This option behaves the same as the other `tr` related state properties, i.e., you can use, e.g., `5s` for convenience.
 
 **Default**: `4` (= 400 ms)
+        
+### `--min-tr-before-gap`
+
+The minimum gap between multiple back-to-back tr-before states in minutes. This is needed as otherwise the hue bridge may not yet recognize the end value of the transition and incorrectly marks
+the light as manually overridden.
+This gap is automatically added between back-to-back tr-before states.
+
+**Default**: `2` minutes
 
 ### `--max-requests-per-second`
 

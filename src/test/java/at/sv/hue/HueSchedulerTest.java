@@ -1738,7 +1738,7 @@ class HueSchedulerTest {
         addKnownLightIdsWithDefaultCapabilities(1);
         addState(1, now, "bri:10"); // zero length
         addState(1, "01:00", "bri:100", "tr-before:1h"); // gap not relevant
-        addState(1, "01:30", "bri:254", "tr-before:28min"); // gap of 2 minutes
+        addState(1, "01:30", "bri:254", "tr-before:28min"); // gap of 2 minutes added
 
         startScheduler();
 
@@ -1775,8 +1775,8 @@ class HueSchedulerTest {
         addKnownLightIdsWithDefaultCapabilities(1);
         addState(1, now, "bri:10"); // zero length
         addState(1, "00:02", "bri:100", "tr-before:2min"); // 00:00 gap not relevant
-        addState(1, "00:04", "bri:254", "tr-before:2min"); // 00:02 -> 00:04, gap removed
-        addState(1, "00:05", "bri:254", "tr-before:1min"); // 00:04 -> 00:05, not possible to adjust TODO: shouldn't we keep it at 00:04 then?
+        addState(1, "00:04", "bri:254", "tr-before:2min"); // 00:02 -> 00:04, tr-before removed to ensure gap
+        addState(1, "00:05", "bri:100", "tr-before:1min"); // 00:04 -> 00:05, not possible to adjust TODO: shouldn't we keep it at 00:04 then?
 
         startScheduler();
 

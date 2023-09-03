@@ -116,8 +116,8 @@ public final class HueScheduler implements Runnable {
     int apiCacheInvalidationIntervalInMinutes;
     @Option(
             names = "--min-tr-before-gap", paramLabel = "<gap>", defaultValue = "2",
-            description = "The minimum gap between multiple tr-before states in minutes. This is needed as otherwise " +
-                    "the hue bridge does not yet recognise the end value of the transition and an incorrectly marks " +
+            description = "The minimum gap between multiple back-to-back tr-before states in minutes. This is needed as otherwise " +
+                    "the hue bridge may not yet recognise the end value of the transition and incorrectly marks " +
                     "the light as manually overridden. This gap is automatically added between back-to-back " +
                     "tr-before states. Default: ${DEFAULT-VALUE} minutes."
     )
