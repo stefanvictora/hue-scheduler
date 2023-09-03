@@ -665,6 +665,66 @@ class HueSchedulerTest {
     }
 
     @Test
+    void parse_canParseInterpolateProperty_correctlyScheduled() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState("1", "00:00", "bri:1", "interpolate:true");
+        addState("1", "12:00", "bri:254", "interpolate:true");
+        addState("1", "14:00", "bri:100", "interpolate:true");
+        addState("1", "20:00", "bri:5", "interpolate:true");
+
+        startScheduler();
+
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(4);
+
+        assertScheduleStart(scheduledRunnables.get(0), now, now.plusHours(12));
+        assertScheduleStart(scheduledRunnables.get(1), now.plusHours(12), now.plusHours(14));
+        assertScheduleStart(scheduledRunnables.get(2), now.plusHours(14), now.plusHours(20));
+        assertScheduleStart(scheduledRunnables.get(3), now.plusHours(20), now.plusDays(1));
+    }
+
+    @Test
+    void parse_canParseInterpolateProperty_singleState_ignored() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState("1", "00:00", "bri:1", "interpolate:true");
+
+        startAndGetSingleRunnable(now, now.plusDays(1));
+    }
+
+    @Test
+    void parse_canParseInterpolateProperty_withSunTimes_correctlyUsesSunTimesFromDayBefore() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        ZonedDateTime sunrise = startTimeProvider.getStart("sunrise", now);
+        ZonedDateTime noon = startTimeProvider.getStart("noon", now);
+        ZonedDateTime sunset = startTimeProvider.getStart("sunset", now);
+        ZonedDateTime nextDaySunrise = startTimeProvider.getStart("sunrise", now.plusDays(1));
+        addState("1", "sunrise", "bri:1", "interpolate:true");
+        addState("1", "noon", "bri:254", "interpolate:true");
+        addState("1", "sunset", "bri:100", "interpolate:true");
+
+        startScheduler();
+
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(3);
+
+        assertScheduleStart(scheduledRunnables.get(0), now, sunrise); // from previous day
+        assertScheduleStart(scheduledRunnables.get(1), sunrise, noon);
+        assertScheduleStart(scheduledRunnables.get(2), noon, sunset);
+
+        scheduledRunnables.get(0).run();
+
+        assertPutCall(expectedPutCall(1).bri(47).transitionTime(18910).build());
+        assertAllPutCallsAsserted();
+
+        List<ScheduledRunnable> followUpStates = ensureScheduledStates(2);
+
+        assertScheduleStart(followUpStates.get(0), now.plus(1891000 + 120000, ChronoUnit.MILLIS), sunrise); // next split start
+        assertScheduleStart(followUpStates.get(1), sunset, nextDaySunrise);
+    }
+
+    // todo: write test with interpolate and multiple split calls -> we need to copy the interpolate property
+
+    // todo: should we allow day crossovers also for absolute times in tr-before (see next test)? We need this for interpolate:true now anywas
+
+    @Test
     void parse_canParseTransitionTimeBefore_negativeDuration_ignored() {
         addKnownLightIdsWithDefaultCapabilities(1);
         addState("1", "golden_hour", "bri:" + DEFAULT_BRIGHTNESS, "tr-before:sunset"); // referenced time is AFTER start
@@ -1164,7 +1224,7 @@ class HueSchedulerTest {
         List<ScheduledRunnable> powerOnRunnables2 = simulateLightOnEvent(2);
         assertScheduleStart(powerOnRunnables2.get(0), now, initialNow.plusMinutes(10).plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS)); // already ended power on for first split
         assertScheduleStart(powerOnRunnables2.get(1), now, initialNow.plusMinutes(10).plus(ScheduledState.MAX_TRANSITION_TIME_MS * 2, ChronoUnit.MILLIS));
-        
+
         powerOnRunnables2.get(1).run();
 
         Duration untilThirdSplit = Duration.between(now, thirdSplit.getStart()).minusMinutes(TR_GAP);
@@ -1979,7 +2039,7 @@ class HueSchedulerTest {
 
         assertPutCall(expectedPutCall(1).bri(243).transitionTime(MAX_TRANSITION_TIME_WITH_BUFFER).build()); // first split call
         assertAllPutCallsAsserted();
-        
+
         List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(2);
         assertScheduleStart(followUpRunnables.get(0), now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1).plusMinutes(30));
         assertScheduleStart(followUpRunnables.get(1), initialNow.plusDays(1).plusHours(1).plusMinutes(TR_GAP), initialNow.plusDays(2).plusMinutes(30)); // next day

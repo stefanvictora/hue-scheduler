@@ -54,6 +54,7 @@ final class ScheduledState {
     @Getter
     private final boolean groupState;
     private final Boolean force;
+    private final Boolean interpolate;
     @Getter
     private final boolean temporary;
     @Getter
@@ -74,16 +75,17 @@ final class ScheduledState {
     private ScheduledState originalState;
     private PutCall lastPutCall;
     @Setter
-    private BiFunction<ScheduledState, ZonedDateTime, ScheduledState> previousStateLookup;
+    private BiFunction<ScheduledState, ZonedDateTime, PreviousScheduledState> previousStateLookup;
 
     @Builder
     public ScheduledState(String name, int updateId, String startString, Integer brightness, Integer ct, Double x, Double y,
                           Integer hue, Integer sat, String effect, Boolean on, String transitionTimeBeforeString, Integer definedTransitionTime,
                           Set<DayOfWeek> daysOfWeek, StartTimeProvider startTimeProvider, LightCapabilities capabilities,
-                          int minTrBeforeGapInMinutes, Boolean force, boolean groupState, boolean temporary) {
+                          int minTrBeforeGapInMinutes, Boolean force, Boolean interpolate, boolean groupState, boolean temporary) {
         this.name = name;
         this.updateId = updateId;
         this.startString = startString;
+        this.interpolate = interpolate;
         if (daysOfWeek == null || daysOfWeek.isEmpty()) {
             this.daysOfWeek = EnumSet.allOf(DayOfWeek.class);
         } else {
@@ -124,13 +126,14 @@ final class ScheduledState {
         ScheduledState copy = new ScheduledState(state.name, state.updateId, start,
                 state.brightness, state.ct, state.x, state.y, state.hue, state.sat, state.effect, state.on, transitionTimeBefore,
                 state.definedTransitionTime, state.daysOfWeek, state.startTimeProvider, state.capabilities,
-                state.minTrBeforeGapInMinutes, state.force, state.groupState, true);
+                state.minTrBeforeGapInMinutes, state.force, false, state.groupState, true);
         copy.end = end;
         copy.lastStart = state.lastStart;
         copy.lastDefinedStart = state.lastDefinedStart;
         copy.lastSeen = state.lastSeen;
         copy.originalState = state.originalState;
         // todo: previous state lookup is currently not copied, write test if needed
+        // todo: we should also copy the interpolate property -> write test
         return copy;
     }
 
@@ -257,8 +260,9 @@ final class ScheduledState {
 
     public ZonedDateTime getStart(ZonedDateTime dateTime) {
         ZonedDateTime definedStart = getDefinedStart(dateTime);
-        if (transitionTimeBeforeString != null) {
-            ZonedDateTime start = definedStart.minus(getTransitionTimeBefore(dateTime) * 100L, ChronoUnit.MILLIS);
+        if (transitionTimeBeforeString != null || interpolate == Boolean.TRUE) {
+            int transitionTimeBefore = getTransitionTimeBefore(dateTime, definedStart);
+            ZonedDateTime start = definedStart.minus(transitionTimeBefore, ChronoUnit.MILLIS);
             return ensureGapBetweenMultipleTrBeforeStates(dateTime, start, definedStart);
         }
         return definedStart;
@@ -266,11 +270,11 @@ final class ScheduledState {
 
     private ZonedDateTime ensureGapBetweenMultipleTrBeforeStates(ZonedDateTime dateTime, ZonedDateTime start,
                                                                  ZonedDateTime definedStart) {
-        ScheduledState previousState = previousStateLookup.apply(this, dateTime); // todo: should we pass in the start?
+        PreviousScheduledState previousState = previousStateLookup.apply(this, dateTime); // todo: should we pass in the start?
         if (previousState == null || previousState.getTransitionTimeBeforeString() == null) {
             return start;
         }
-        long minutesBetween = Duration.between(previousState.getDefinedStart(start), start).abs().toMinutes();
+        long minutesBetween = Duration.between(previousState.getDefinedStart(), start).abs().toMinutes();
         if (minutesBetween >= minTrBeforeGapInMinutes) {
             return start; // enough gap
         }
@@ -281,16 +285,29 @@ final class ScheduledState {
         }
     }
 
-    /**
-     * Returns the calculated transition time before as multiple of 100ms, to be directly used by the Hue API.
-     * To get the actual ms, multiply the returned value by 100.
-     *
-     * @param dateTime the date time used as input for calculating sun-based transition before times.
-     * @return the calculated transition time before as multiple of 100ms
-     */
-    private Integer getTransitionTimeBefore(ZonedDateTime dateTime) {
+    private int getTransitionTimeBefore(ZonedDateTime dateTime, ZonedDateTime definedStart) {
+        if (interpolate == Boolean.TRUE) {
+            return getTimeUntilPreviousState(dateTime, definedStart);
+        } else {
+            return parseTransitionTimeBefore(dateTime);
+        }
+    }
+
+    private int getTimeUntilPreviousState(ZonedDateTime dateTime, ZonedDateTime definedStart) {
+        PreviousScheduledState previousState = previousStateLookup.apply(this, dateTime);
+        if (previousState == null) {
+            return 0;
+        }
+        Duration between = Duration.between(previousState.getDefinedStart(), definedStart);
+        if (between.isNegative()) {
+            between = Duration.ofDays(1).plus(between);
+        }
+        return (int) between.toMillis();
+    }
+
+    private int parseTransitionTimeBefore(ZonedDateTime dateTime) {
         try {
-            return InputConfigurationParser.parseTransitionTime("tr-before", transitionTimeBeforeString);
+            return InputConfigurationParser.parseTransitionTime("tr-before", transitionTimeBeforeString) * 100;
         } catch (Exception e) {
             return parseDateTimeBasedTransitionTime(dateTime);
         }
@@ -303,7 +320,7 @@ final class ScheduledState {
         if (duration.isNegative()) {
             return 0;
         }
-        return (int) (duration.toMillis() / 100L);
+        return (int) duration.toMillis();
     }
 
     /**
@@ -586,7 +603,7 @@ final class ScheduledState {
         }
         if (lastStart != null) {
             return formatPropertyName("tr-before") + transitionTimeBeforeString +
-                    " (" + formatTransitionTime(getTransitionTimeBefore(lastStart)) + ")";
+                    " (" + formatTransitionTime(parseTransitionTimeBefore(lastStart)) + ")";
         }
         return formatPropertyName("tr-before") + transitionTimeBeforeString;
     }

@@ -64,6 +64,7 @@ public final class InputConfigurationParser {
             Integer ct = null;
             Boolean on = null;
             Boolean force = null;
+            Boolean interpolate = null;
             Double x = null;
             Double y = null;
             Integer hue = null;
@@ -134,6 +135,9 @@ public final class InputConfigurationParser {
                     case "force":
                         force = parseBoolean(value, parameter);
                         break;
+                    case "interpolate":
+                        interpolate = parseBoolean(value, parameter);
+                        break;
                     default:
                         throw new UnknownStateProperty("Unknown state property '" + parameter + "' with value '" + value + "'");
                 }
@@ -141,7 +145,7 @@ public final class InputConfigurationParser {
             String start = parts[1];
             states.add(new ScheduledState(name, id, start, bri, ct, x, y, hue, sat, effect, on, transitionTimeBefore,
                     transitionTime, dayOfWeeks, startTimeProvider, capabilities, minTrBeforeGapInMinutes, force,
-                    groupState, false));
+                    interpolate, groupState, false));
         }
         return states;
     }
@@ -208,7 +212,7 @@ public final class InputConfigurationParser {
         }
     }
 
-    public static Integer parseTransitionTime(String parameter, String s) {
+    public static int parseTransitionTime(String parameter, String s) {
         String value = s;
         int modifier = 1;
         if (s.endsWith("s")) {

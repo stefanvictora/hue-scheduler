@@ -423,10 +423,11 @@ public final class HueScheduler implements Runnable {
         if (state.getTransitionTimeBeforeString() == null) {
             return;
         }
-        ScheduledState previousState = getPreviousStateIgnoringNullStates(state, currentTime.get());
-        if (previousState == null) {
+        PreviousScheduledState previousScheduledState = getPreviousStateIgnoringNullStates(state, currentTime.get());
+        if (previousScheduledState == null) {
             return;
         }
+        ScheduledState previousState = previousScheduledState.getScheduledState();
         ScheduledState lastSeenState = getLastSeenState(state);
         if ((lastSeenState == previousState || state.isSameState(lastSeenState))
                 && !manualOverrideTracker.shouldEnforceSchedule(state.getIdV1())) {
@@ -459,28 +460,29 @@ public final class HueScheduler implements Runnable {
         Thread.sleep(sleepTime * 100L);
     }
 
-    private ScheduledState getPreviousStateIgnoringNullStates(ScheduledState currentState, ZonedDateTime dateTime) {
-        ScheduledState previousState = findPreviousState(currentState, dateTime);
+    private PreviousScheduledState getPreviousStateIgnoringNullStates(ScheduledState currentState, ZonedDateTime dateTime) {
+        PreviousScheduledState previousState = findPreviousState(currentState, dateTime);
         if (previousState == null || previousState.isNullState()) {
             return null;
         }
         return previousState;
     }
 
-    private ScheduledState findPreviousState(ScheduledState currentState, ZonedDateTime dateTime) {
+    private PreviousScheduledState findPreviousState(ScheduledState currentState, ZonedDateTime dateTime) {
         List<ScheduledState> lightStatesForId = getLightStatesForId(currentState);
         List<ScheduledState> calculatedStateOrderAscending = lightStatesForId.stream()
                                                                              .sorted(Comparator.comparing(state -> state.getDefinedStart(dateTime)))
                                                                              .collect(Collectors.toList());
         int position = calculatedStateOrderAscending.indexOf(currentState.getOriginalStateOrThis());
         if (position > 0) {
-            return calculatedStateOrderAscending.get(position - 1);
+            return new PreviousScheduledState(calculatedStateOrderAscending.get(position - 1), dateTime);
         }
         ZonedDateTime yesterday = dateTime.minusDays(1);
         return lightStatesForId.stream()
                                .filter(state -> state.isScheduledOn(yesterday))
                                .filter(currentState::isNotSameState)
                                .max(Comparator.comparing(state -> state.getDefinedStart(yesterday)))
+                               .map(previousState -> new PreviousScheduledState(previousState, yesterday))
                                .orElse(null);
     }
 
@@ -554,11 +556,11 @@ public final class HueScheduler implements Runnable {
     }
 
     private PutCall getInterpolatedSplitPutCall(ScheduledState state) {
-        ScheduledState previousState = getPreviousStateIgnoringNullStates(state, currentTime.get());
+        PreviousScheduledState previousState = getPreviousStateIgnoringNullStates(state, currentTime.get());
         if (previousState == null) {
             return null;
         }
-        return state.getNextInterpolatedSplitPutCall(currentTime.get(), previousState);
+        return state.getNextInterpolatedSplitPutCall(currentTime.get(), previousState.getScheduledState());
     }
 
     private static void logSplitCallSkippedWarning() {
