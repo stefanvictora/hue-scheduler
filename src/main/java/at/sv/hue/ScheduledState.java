@@ -62,7 +62,9 @@ final class ScheduledState {
     @Getter
     @Setter
     private ZonedDateTime end;
+    @Getter
     private ZonedDateTime lastStart;
+    @Getter
     private ZonedDateTime lastDefinedStart;
     @Getter
     @Setter
@@ -286,7 +288,7 @@ final class ScheduledState {
      * @param dateTime the date time used as input for calculating sun-based transition before times.
      * @return the calculated transition time before as multiple of 100ms
      */
-    public Integer getTransitionTimeBefore(ZonedDateTime dateTime) {
+    private Integer getTransitionTimeBefore(ZonedDateTime dateTime) {
         try {
             return InputConfigurationParser.parseTransitionTime("tr-before", transitionTimeBeforeString);
         } catch (Exception e) {
@@ -384,7 +386,7 @@ final class ScheduledState {
         return adjustedTrBefore;
     }
 
-    public int getAdjustedTransitionTimeBefore(ZonedDateTime now) {
+    private int getAdjustedTransitionTimeBefore(ZonedDateTime now) {
         if (transitionTimeBeforeString == null) {
             return 0;
         }

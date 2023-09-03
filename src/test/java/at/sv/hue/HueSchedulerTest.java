@@ -757,6 +757,7 @@ class HueSchedulerTest {
 
         // no interpolation as "initialBrightness + 100" already set at end of first part
         assertPutCall(expectedPutCall(1).bri(initialBrightness + 200 - 2).transitionTime(MAX_TRANSITION_TIME_WITH_BUFFER).build()); // second split of transition
+        assertAllPutCallsAsserted();
 
         ScheduledRunnable finalSplit = ensureScheduledStates(1).get(0);
 
@@ -786,6 +787,7 @@ class HueSchedulerTest {
 
         // no interpolation as "initialBrightness + 200" already set at end of second part
         assertPutCall(expectedPutCall(1).bri(initialBrightness + 210).transitionTime(6000).build()); // remaining 10 minutes
+        assertAllPutCallsAsserted();
 
         // simulate second power on, five minutes later: adjusts calls from above
 
@@ -1920,6 +1922,7 @@ class HueSchedulerTest {
         firstTrRunnable.run();
 
         assertPutCall(expectedPutCall(1).bri(100).build()); // no transition or interpolation, as state is already reached
+        assertAllPutCallsAsserted();
 
         ensureRunnable(now.plusDays(1).minusHours(1), now.plusDays(1).plusMinutes(TR_GAP)); // next day
 
@@ -1929,6 +1932,7 @@ class HueSchedulerTest {
         secondTrRunnable.run();
 
         assertPutCall(expectedPutCall(1).bri(254).transitionTime(16800).build());
+        assertAllPutCallsAsserted();
 
         ensureRunnable(now.plusDays(1), initialNow.plusDays(2).minusHours(1)); // next day
     }
@@ -1955,6 +1959,7 @@ class HueSchedulerTest {
 
         // no interpolation, as state already started
         assertPutCall(expectedPutCall(1).bri(100).build());
+        assertAllPutCallsAsserted();
 
         ScheduledRunnable nextDayFirst = ensureRunnable(now.plusHours(1).plusMinutes(TR_GAP), initialNow.plusDays(1).plusMinutes(30));
 
@@ -1973,7 +1978,8 @@ class HueSchedulerTest {
         nextDayFirst.run();
 
         assertPutCall(expectedPutCall(1).bri(243).transitionTime(MAX_TRANSITION_TIME_WITH_BUFFER).build()); // first split call
-
+        assertAllPutCallsAsserted();
+        
         List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(2);
         assertScheduleStart(followUpRunnables.get(0), now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1).plusMinutes(30));
         assertScheduleStart(followUpRunnables.get(1), initialNow.plusDays(1).plusHours(1).plusMinutes(TR_GAP), initialNow.plusDays(2).plusMinutes(30)); // next day
@@ -2220,6 +2226,7 @@ class HueSchedulerTest {
         trBeforeRunnable.run();
 
         assertPutCall(expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 20).ct(DEFAULT_CT + 20).build());
+        assertAllPutCallsAsserted();
 
         ensureRunnable(initialNow.plusDays(1).plusMinutes(20), initialNow.plusDays(2));
     }

@@ -6,6 +6,7 @@ import at.sv.hue.color.ColorModeConverter;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
 
 public final class StateInterpolator {
 
@@ -23,17 +24,22 @@ public final class StateInterpolator {
     }
 
     public PutCall getInterpolatedPutCall() {
-        int timeUntilThisState = state.getAdjustedTransitionTimeBefore(dateTime);
-        if (timeUntilThisState == 0) {
+        ZonedDateTime lastDefinedStart = state.getLastDefinedStart();
+        if (lastDefinedStart.isBefore(dateTime) || lastDefinedStart.isEqual(dateTime)) {
             return null; // the state is already reached
         }
         PutCall interpolatedPutCall;
-        if (timeUntilThisState == state.getTransitionTimeBefore(dateTime)) {
+        if (isDirectlyAtStartOfState()) {
             interpolatedPutCall = previousState.getPutCall(dateTime); // directly at start, just use previous put call
         } else {
             interpolatedPutCall = interpolate();
         }
         return modifyProperties(interpolatedPutCall);
+    }
+
+    private boolean isDirectlyAtStartOfState() {
+        return state.getLastStart().truncatedTo(ChronoUnit.SECONDS)
+                    .isEqual(dateTime.truncatedTo(ChronoUnit.SECONDS));
     }
 
     private PutCall modifyProperties(PutCall interpolatedPutCall) {
