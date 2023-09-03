@@ -399,12 +399,12 @@ final class ScheduledState {
                 .getInterpolatedPutCall();
     }
 
-    public boolean shouldSplitLongBeforeTransition(ZonedDateTime now) {
-        return getAdjustedTransitionTimeBefore(now) > ScheduledState.MAX_TRANSITION_TIME;
+    public boolean isInsideSplitCallWindow(ZonedDateTime now) {
+        return getNextTransitionTimeSplitStart(now).isBefore(lastDefinedStart);
     }
 
     public ZonedDateTime calculateNextPowerOnEnd(ZonedDateTime now) {
-        if (shouldSplitLongBeforeTransition(now)) {
+        if (isInsideSplitCallWindow(now)) {
             return getNextTransitionTimeSplitStart(now).minusSeconds(1);
         } else {
             return getEnd();
@@ -412,14 +412,16 @@ final class ScheduledState {
     }
 
     public PutCall getNextInterpolatedSplitPutCall(ZonedDateTime now, ScheduledState previousState) {
-        ZonedDateTime nextSplitStart = getNextTransitionTimeSplitStart(now)
-                .minusMinutes(minTrBeforeGapInMinutes); // add buffer
+        ZonedDateTime nextSplitStart = getNextTransitionTimeSplitStart(now).minusMinutes(minTrBeforeGapInMinutes); // add buffer
         PutCall interpolatedSplitPutCall = getInterpolatedPutCall(nextSplitStart, previousState, false);
         if (interpolatedSplitPutCall == null) {
-            return null;
+            return null; // no interpolation possible
         }
-        long splitTransitionTime = Duration.between(now, nextSplitStart).toMillis();
-        interpolatedSplitPutCall.setTransitionTime((int) splitTransitionTime / 100);
+        Duration between = Duration.between(now, nextSplitStart);
+        if (between.isZero() || between.isNegative()) {
+            return null; // we are inside the required gap, skip split call
+        }
+        interpolatedSplitPutCall.setTransitionTime((int) between.toMillis() / 100);
         return interpolatedSplitPutCall;
     }
 

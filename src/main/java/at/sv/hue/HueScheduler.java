@@ -537,10 +537,10 @@ public final class HueScheduler implements Runnable {
 
     private boolean putState(ScheduledState state) {
         ZonedDateTime now = currentTime.get();
-        if (state.shouldSplitLongBeforeTransition(now)) {
+        if (state.isInsideSplitCallWindow(now)) {
             PutCall interpolatedSplitPutCall = getInterpolatedSplitPutCall(state);
             if (interpolatedSplitPutCall == null) {
-                logMissingPreviousStateWarning(state);
+                logSplitCallSkippedWarning();
                 return true;
             }
             boolean success = performPutApiCall(state, interpolatedSplitPutCall);
@@ -561,9 +561,8 @@ public final class HueScheduler implements Runnable {
         return state.getNextInterpolatedSplitPutCall(currentTime.get(), previousState);
     }
 
-    private static void logMissingPreviousStateWarning(ScheduledState state) {
-        LOG.warn("Warning: Can't set {} with extended transition time. No previous state found or missing source " +
-                "properties for required interpolation!", state.getFormattedName());
+    private static void logSplitCallSkippedWarning() {
+        LOG.warn("Warning: Skipped extended transition call. No previous state found, missing source properties or required pause.");
     }
 
     private boolean putState(ScheduledState state, PutCall putCall) {
@@ -587,7 +586,7 @@ public final class HueScheduler implements Runnable {
 
     private boolean performPutApiCall(ScheduledState state, PutCall putCall) {
         LOG.trace("{}", putCall);
-        state.setLastPutCall(putCall); // todo: shouldn't we set the last put call only on success? -> it's only relevant for change detection, which is lso controlled by last seen
+        state.setLastPutCall(putCall);
         return hueApi.putState(putCall);
     }
 
