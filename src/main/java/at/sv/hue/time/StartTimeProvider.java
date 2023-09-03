@@ -12,7 +12,5 @@ public interface StartTimeProvider {
      */
     ZonedDateTime getStart(String input, ZonedDateTime dateTime);
 
-    default String toDebugString(ZonedDateTime dateTime) {
-        return null;
-    }
+    String toDebugString(ZonedDateTime dateTime);
 }

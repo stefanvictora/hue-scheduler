@@ -494,10 +494,7 @@ final class ScheduledState {
     }
 
     public ScheduledState getOriginalStateOrThis() {
-        if (originalState != null) {
-            return originalState;
-        }
-        return this; // todo: this does not have any coverage
+        return originalState; // original state is if not overridden always this
     }
 
     public boolean isForced() {

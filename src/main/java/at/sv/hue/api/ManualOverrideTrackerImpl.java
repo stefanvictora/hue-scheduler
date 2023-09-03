@@ -1,6 +1,7 @@
 package at.sv.hue.api;
 
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.util.HashMap;
 
@@ -62,7 +63,8 @@ public class ManualOverrideTrackerImpl implements ManualOverrideTracker {
         return trackedStatesPerId.getOrDefault(id, DEFAULT_STATE);
     }
 
-    @Data
+    @Getter
+    @Setter
     private static final class TrackedState {
         private boolean manuallyOverridden;
         private boolean enforceSchedule;

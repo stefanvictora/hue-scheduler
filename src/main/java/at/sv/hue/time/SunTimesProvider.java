@@ -28,7 +28,5 @@ public interface SunTimesProvider {
 
     ZonedDateTime getAstronomicalStart(ZonedDateTime dateTime);
 
-    default String toDebugString(ZonedDateTime dateTime) {
-        return null;
-    }
+    String toDebugString(ZonedDateTime dateTime);
 }
