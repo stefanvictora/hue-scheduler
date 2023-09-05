@@ -237,7 +237,7 @@ Desk  15:00  x:0.1652  y=0.3103
 > Another workaround is to only set one property per state and offset the state changes accordingly to the used transition time.
 
 The transition time between two light states, defined as a multiple of 100ms. For example: `tr:1` equals a transition time of 100ms.
-To simplify the definition, you can use the ``s`` (seconds), ``min`` (minutes) and ``h`` (hours) units. For example: ``tr:10s``, ``tr:2min`` or ``tr:1h``.
+To simplify the definition, you can use the ``s`` (seconds), ``min`` (minutes) and ``h`` (hours) units. For example: ``tr:10s``, ``tr:2min`` or ``tr:1h``. Any combination is also possible, like ``1h20min5s10``, as long as the order is kept from largest to smallest unit. The input itself is case-insensitive.
 
 Hue Scheduler offers two different transition time properties, which can be combined to create the desired transition behavior:
 

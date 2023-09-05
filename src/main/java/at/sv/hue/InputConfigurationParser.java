@@ -12,8 +12,13 @@ import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class InputConfigurationParser {
+
+    private static final Pattern TR_PATTERN = Pattern.compile("(?:(\\d+)h)?(?:(\\d+)min)?(?:(\\d+)s)?(\\d*)?",
+            Pattern.CASE_INSENSITIVE);
 
     private final StartTimeProvider startTimeProvider;
     private final HueApi hueApi;
@@ -213,19 +218,19 @@ public final class InputConfigurationParser {
     }
 
     public static int parseTransitionTime(String parameter, String s) {
-        String value = s;
-        int modifier = 1;
-        if (s.endsWith("s")) {
-            value = s.substring(0, s.length() - 1);
-            modifier = 10;
-        } else if (s.endsWith("min")) {
-            value = s.substring(0, s.length() - 3);
-            modifier = 600;
-        } else if (s.endsWith("h")) {
-            value = s.substring(0, s.length() - 1);
-            modifier = 36000;
+        Matcher matcher = TR_PATTERN.matcher(s);
+        if (!matcher.matches()) {
+            throw new InvalidPropertyValue("Invalid transition time '" + s + "' for property '" + parameter + "'.");
         }
-        return parseInteger(value.trim(), parameter) * modifier;
+        int hours = getIntFromGroup(matcher.group(1), parameter);
+        int minutes = getIntFromGroup(matcher.group(2), parameter);
+        int seconds = getIntFromGroup(matcher.group(3), parameter);
+        int milliseconds = getIntFromGroup(matcher.group(4), parameter);
+        return hours * 36000 + minutes * 600 + seconds * 10 + milliseconds;
+    }
+
+    private static int getIntFromGroup(String group, String parameter) {
+        return (group == null || group.isEmpty()) ? 0 : parseInteger(group, parameter);
     }
 
     private Integer convertToMiredCt(Integer kelvin) {

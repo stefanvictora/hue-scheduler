@@ -627,6 +627,20 @@ class HueSchedulerTest {
     }
 
     @Test
+    void parse_canParseTransitionTime_withTimeUnits_hoursAndMinutesAndSeconds() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addStateNow("1", "bri:" + DEFAULT_BRIGHTNESS, "tr:1H20min5s10");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        advanceTimeAndRunAndAssertPutCall(scheduledRunnable,
+                expectedPutCall(ID).bri(DEFAULT_BRIGHTNESS).transitionTime(48060).build()
+        );
+
+        ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
     void parse_canParseTransitionTimeBefore_withSunTime() {
         addKnownLightIdsWithDefaultCapabilities(1);
         addState("1", "civil_dusk", "bri:" + DEFAULT_BRIGHTNESS, "tr-before:sunset+10"); // tr-before:16:24:29
@@ -3533,9 +3547,9 @@ class HueSchedulerTest {
     }
 
     @Test
-    void parse_invalidTransitionTime_tooLow_exception() {
+    void parse_invalidTransitionTime_tooLow_invalidProperty_exception() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        assertThrows(InvalidTransitionTime.class, () -> addStateNow("1", "tr:" + -1));
+        assertThrows(InvalidPropertyValue.class, () -> addStateNow("1", "tr:" + -1));
     }
 
     @Test
