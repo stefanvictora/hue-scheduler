@@ -15,10 +15,6 @@ public class PreviousScheduledState {
         return scheduledState.isNullState();
     }
 
-    public String getTransitionTimeBeforeString() {
-        return scheduledState.getTransitionTimeBeforeString();
-    }
-
     public ZonedDateTime getDefinedStart() {
         return scheduledState.getDefinedStart(startDate);
     }

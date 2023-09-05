@@ -46,7 +46,6 @@ final class ScheduledState {
     private final Boolean on;
     @Getter
     private final Integer definedTransitionTime;
-    @Getter
     private final String transitionTimeBeforeString;
     private final StartTimeProvider startTimeProvider;
     private final String effect;
@@ -118,15 +117,14 @@ final class ScheduledState {
     }
 
     public static ScheduledState createTemporaryCopy(ScheduledState state, ZonedDateTime end) {
-        return createTemporaryCopy(state, state.startString, end, state.transitionTimeBeforeString);
+        return createTemporaryCopy(state, state.startString, end);
     }
 
-    private static ScheduledState createTemporaryCopy(ScheduledState state, String start, ZonedDateTime end,
-                                                      String transitionTimeBefore) {
+    private static ScheduledState createTemporaryCopy(ScheduledState state, String start, ZonedDateTime end) {
         ScheduledState copy = new ScheduledState(state.name, state.updateId, start,
-                state.brightness, state.ct, state.x, state.y, state.hue, state.sat, state.effect, state.on, transitionTimeBefore,
-                state.definedTransitionTime, state.daysOfWeek, state.startTimeProvider, state.capabilities,
-                state.minTrBeforeGapInMinutes, state.force, false, state.groupState, true);
+                state.brightness, state.ct, state.x, state.y, state.hue, state.sat, state.effect, state.on,
+                state.transitionTimeBeforeString, state.definedTransitionTime, state.daysOfWeek, state.startTimeProvider,
+                state.capabilities, state.minTrBeforeGapInMinutes, state.force, null, state.groupState, true);
         copy.end = end;
         copy.lastStart = state.lastStart;
         copy.lastDefinedStart = state.lastDefinedStart;
@@ -260,7 +258,7 @@ final class ScheduledState {
 
     public ZonedDateTime getStart(ZonedDateTime dateTime) {
         ZonedDateTime definedStart = getDefinedStart(dateTime);
-        if (transitionTimeBeforeString != null || interpolate == Boolean.TRUE) {
+        if (hasTransitionBefore()) {
             int transitionTimeBefore = getTransitionTimeBefore(dateTime, definedStart);
             ZonedDateTime start = definedStart.minus(transitionTimeBefore, ChronoUnit.MILLIS);
             return ensureGapBetweenMultipleTrBeforeStates(dateTime, start, definedStart);
@@ -268,10 +266,15 @@ final class ScheduledState {
         return definedStart;
     }
 
+    public boolean hasTransitionBefore() {
+        return transitionTimeBeforeString != null || interpolate == Boolean.TRUE;
+    }
+
+    // todo: we only need those gaps when modification tracking is enabled
     private ZonedDateTime ensureGapBetweenMultipleTrBeforeStates(ZonedDateTime dateTime, ZonedDateTime start,
                                                                  ZonedDateTime definedStart) {
         PreviousScheduledState previousState = previousStateLookup.apply(this, dateTime); // todo: should we pass in the start?
-        if (previousState == null || previousState.getTransitionTimeBeforeString() == null) {
+        if (previousState == null || previousState.getScheduledState().transitionTimeBeforeString == null) {
             return start;
         }
         long minutesBetween = Duration.between(previousState.getDefinedStart(), start).abs().toMinutes();
@@ -404,7 +407,7 @@ final class ScheduledState {
     }
 
     private int getAdjustedTransitionTimeBefore(ZonedDateTime now) {
-        if (transitionTimeBeforeString == null) {
+        if (!hasTransitionBefore()) {
             return 0;
         }
         Duration between = Duration.between(now, lastDefinedStart);
@@ -558,6 +561,7 @@ final class ScheduledState {
                 getFormattedTransitionTimeIfSet("tr", definedTransitionTime) +
                 getFormattedPropertyIfSet("lastSeen", getFormattedTime(lastSeen)) +
                 getFormattedPropertyIfSet("force", force) +
+                getFormattedPropertyIfSet("interpolate", interpolate) +
                 '}';
     }
 

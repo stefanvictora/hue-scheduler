@@ -670,16 +670,26 @@ class HueSchedulerTest {
         addState("1", "00:00", "bri:1", "interpolate:true");
         addState("1", "12:00", "bri:254", "interpolate:true");
         addState("1", "14:00", "bri:100", "interpolate:true");
+        addState("1", "15:00", "bri:50", "interpolate:true");
         addState("1", "20:00", "bri:5", "interpolate:true");
 
         startScheduler();
 
-        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(4);
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(5);
 
-        assertScheduleStart(scheduledRunnables.get(0), now, now.plusHours(12));
-        assertScheduleStart(scheduledRunnables.get(1), now.plusHours(12), now.plusHours(14));
-        assertScheduleStart(scheduledRunnables.get(2), now.plusHours(14), now.plusHours(20));
-        assertScheduleStart(scheduledRunnables.get(3), now.plusHours(20), now.plusDays(1));
+        assertScheduleStart(scheduledRunnables.get(0), now, now.plusHours(12)); // second state
+        assertScheduleStart(scheduledRunnables.get(1), now.plusHours(12), now.plusHours(14)); // third state
+        assertScheduleStart(scheduledRunnables.get(2), now.plusHours(14), now.plusHours(15)); // fourth state
+        assertScheduleStart(scheduledRunnables.get(3), now.plusHours(15), now.plusHours(20)); // fifth state
+        assertScheduleStart(scheduledRunnables.get(4), now.plusHours(20), now.plusDays(1)); // first state
+
+        setCurrentTimeTo(scheduledRunnables.get(2));
+        scheduledRunnables.get(2).run();
+
+        assertPutCall(expectedPutCall(1).bri(100).build()); // interpolated call
+        assertPutCall(expectedPutCall(1).bri(50).transitionTime(36000).build()); // todo: there needs to be a gap. WIP
+
+        ensureRunnable(now.plusDays(1), now.plusDays(1).plusHours(1));
     }
 
     @Test
@@ -705,12 +715,14 @@ class HueSchedulerTest {
 
         List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(3);
 
-        assertScheduleStart(scheduledRunnables.get(0), now, sunrise); // from previous day
+        ScheduledRunnable previousDaySunriseState = scheduledRunnables.get(0);
+        assertScheduleStart(previousDaySunriseState, now, sunrise); // from previous day
         assertScheduleStart(scheduledRunnables.get(1), sunrise, noon);
         assertScheduleStart(scheduledRunnables.get(2), noon, sunset);
 
-        scheduledRunnables.get(0).run();
+        previousDaySunriseState.run();
 
+        assertPutCall(expectedPutCall(1).bri(50).build()); // interpolated call
         assertPutCall(expectedPutCall(1).bri(47).transitionTime(18910).build());
         assertAllPutCallsAsserted();
 

@@ -422,7 +422,7 @@ public final class HueScheduler implements Runnable {
     }
 
     private void putAdditionalInterpolatedStateIfNeeded(ScheduledState state) {
-        if (state.getTransitionTimeBeforeString() == null) {
+        if (!state.hasTransitionBefore()) {
             return;
         }
         PreviousScheduledState previousScheduledState = getPreviousStateIgnoringNullStates(state, currentTime.get());
