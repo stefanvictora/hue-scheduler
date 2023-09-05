@@ -4592,6 +4592,51 @@ class HueSchedulerTest {
     }
 
     @Test
+    void run_execution_offState_forceProperty_reschedulesOffState_alsoIfAlreadyOverridden() {
+        enableUserModificationTracking();
+        create();
+
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now, "on:false", "force:true");
+        manualOverrideTracker.onManuallyOverridden("/lights/1"); // start directly with overridden state
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        scheduledRunnable.run(); // overridden -> reschedules on power on
+        assertAllPutCallsAsserted();
+
+        // first power on after overridden -> turned off again
+
+        ScheduledRunnable powerOnRunnable1 = simulateLightOnEventExpectingSingleScheduledState(now, now.plusDays(1));
+
+        powerOnRunnable1.run();
+
+        assertPutCall(expectedPutCall(1).on(false).build());
+
+        ScheduledRunnable nextDay = ensureRunnable(now.plusDays(1)); // next day
+
+        // next day -> runs through normally
+
+        setCurrentTimeTo(nextDay);
+
+        nextDay.run();
+
+        assertPutCall(expectedPutCall(1).on(false).build());
+
+        ensureRunnable(now.plusDays(1)); // next day
+
+        // second power on after normal run through -> also rescheduled for power on
+
+        List<ScheduledRunnable> powerOnRunnables = simulateLightOnEvent(2);
+        assertScheduleStart(powerOnRunnables.get(0), now, now); // already ended
+        assertScheduleStart(powerOnRunnables.get(1), now, now.plusDays(1));
+
+        powerOnRunnables.get(1).run();
+
+        assertPutCall(expectedPutCall(1).on(false).build());
+    }
+
+    @Test
     void run_execution_offState_putReturnedFalse_signaledOff_offStateIsNotRescheduledWhenOn_skippedAllTogether() {
         addOffState();
 

@@ -19,6 +19,7 @@
 - Improved modification tracking for color states: Now the color gamut of the light is also used during the comparison
 - Improved **turn-on tracking for groups**: Hue Scheduler now uses group-on events instead of listening for the first contained light being turned on. To still detect groups being physically turned on, now every physically turned-on light inside a group also triggers a group-on event. This is necessary, as the Hue bridge currently does not generate any group-specific events in such cases.
 - Improved support for 'On/Off plug-in unit' type of lights
+- The ``force:true`` property now can be used to reschedule ``on:false`` states on power on, effectively forcing lights to be off during a certain time period. 
 - Improved ``tr-before`` support for crossovers between multiple days
 - Reduced max value for ``tr`` to ``60000``, i.e., 100min to conform with the max value supported by API v2
 - Improved log messages

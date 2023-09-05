@@ -274,6 +274,7 @@ public final class HueScheduler implements Runnable {
      * we initially calculate all end times using yesterday, and reschedule them if needed afterward.
      */
     private void scheduleInitialStartup(List<ScheduledState> states, ZonedDateTime now) {
+        MDC.put("context", "init");
         ZonedDateTime yesterday = now.minusDays(1);
         states.forEach(state -> state.setPreviousStateLookup(this::getPreviousStateIgnoringNullStates));
         calculateAndSetEndTimes(states, yesterday);
@@ -341,12 +342,12 @@ public final class HueScheduler implements Runnable {
             }
             LOG.info("Set: {}", state);
             if (lightHasBeenManuallyOverriddenBefore(state) || lightHasBeenConsideredOffBeforeAndDoesNotTurnOn(state)) {
-                if (state.isOff()) {
-                    LOG.info("Off or manually overridden: Skip off-state for this day.");
-                    reschedule(state);
-                } else {
+                if (shouldRetryOnPowerOn(state)) {
                     LOG.info("Off or manually overridden: Skip update and retry when back online");
                     retryWhenBackOn(state);
+                } else {
+                    LOG.info("Off or manually overridden: Skip state for this day.");
+                    reschedule(state);
                 }
                 return;
             }
@@ -378,7 +379,8 @@ public final class HueScheduler implements Runnable {
             }
             if (state.isOff()) {
                 LOG.info("Turned off, or was already off");
-            } else {
+            }
+            if (shouldRetryOnPowerOn(state)){
                 retryWhenBackOn(createPowerOnCopy(state));
             }
             if (shouldAdjustMultiColorLoopOffset(state)) {
@@ -602,6 +604,10 @@ public final class HueScheduler implements Runnable {
         return powerOnCopy;
     }
 
+    private static boolean shouldRetryOnPowerOn(ScheduledState state) {
+        return !state.isOff() || state.isForced();
+    }
+
     private void retryWhenBackOn(ScheduledState state) {
         onStateWaitingList.computeIfAbsent(state.getIdV1(), id -> new ArrayList<>()).add(() -> schedule(state, powerOnRescheduleDelayInMs));
     }
@@ -658,6 +664,7 @@ public final class HueScheduler implements Runnable {
     }
 
     private void logSunDataInfo() {
+        MDC.put("context", "info");
         LOG.info("Current sun times:\n{}", startTimeProvider.toDebugString(currentTime.get()));
     }
 
