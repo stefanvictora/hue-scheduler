@@ -124,14 +124,12 @@ final class ScheduledState {
         ScheduledState copy = new ScheduledState(state.name, state.updateId, start,
                 state.brightness, state.ct, state.x, state.y, state.hue, state.sat, state.effect, state.on,
                 state.transitionTimeBeforeString, state.definedTransitionTime, state.daysOfWeek, state.startTimeProvider,
-                state.capabilities, state.minTrBeforeGapInMinutes, state.force, null, state.groupState, true);
+                state.capabilities, state.minTrBeforeGapInMinutes, state.force, state.interpolate, state.groupState, true);
         copy.end = end;
         copy.lastStart = state.lastStart;
         copy.lastDefinedStart = state.lastDefinedStart;
         copy.lastSeen = state.lastSeen;
         copy.originalState = state.originalState;
-        // todo: previous state lookup is currently not copied, write test if needed
-        // todo: we should also copy the interpolate property -> write test
         return copy;
     }
 

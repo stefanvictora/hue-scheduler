@@ -779,21 +779,20 @@ class HueSchedulerTest {
         assertScheduleStart(followUpStates.get(1), sunset, nextDaySunrise);
     }
 
-    // todo: write test with interpolate and multiple split calls -> we need to copy the interpolate property
-
     // todo: should we allow day crossovers also for absolute times in tr-before (see next test)? We need this for interpolate:true now anyways
 
     @Test
     void parse_canParseTransitionTimeBefore_negativeDuration_ignored() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        addState("1", "golden_hour", "bri:" + DEFAULT_BRIGHTNESS, "tr-before:sunset"); // referenced time is AFTER start
         ZonedDateTime goldenHour = startTimeProvider.getStart("golden_hour", now);
         ZonedDateTime nextDayGoldenHour = startTimeProvider.getStart("golden_hour", now.plusDays(1));
         ZonedDateTime nextNextDayGoldenHour = startTimeProvider.getStart("golden_hour", now.plusDays(2));
 
+        addState("1", "golden_hour", "bri:" + DEFAULT_BRIGHTNESS, "tr-before:sunset"); // referenced t-before time is AFTER start
+
         ScheduledRunnable crossOverState = startAndGetSingleRunnable(now, goldenHour);
 
-        // not transition time as state already reached
+        // no transition time as state already reached
         advanceTimeAndRunAndAssertPutCall(crossOverState, expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).build());
 
         ScheduledRunnable trBeforeRunnable = ensureRunnable(goldenHour, nextDayGoldenHour);
@@ -930,6 +929,59 @@ class HueSchedulerTest {
         normalPowerOn.run();
 
         assertPutCall(expectedPutCall(1).bri(initialBrightness + 210).build()); // no transition anymore
+    }
+
+    @Test
+    void parse_transitionTimeBefore_usingInterpolate_longTransition_correctSplitCalls() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        int initialBrightness = 40;
+        addState(1, now, "bri:" + initialBrightness);
+        addState(1, now.plusHours(3).plusMinutes(30), "bri:" + (initialBrightness + 210), "interpolate:true");
+        // 3h30min -> split to: 100min + 100min + 10min
+
+        startScheduler();
+
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(2);
+        ScheduledRunnable trRunnable = scheduledRunnables.get(0);
+
+        assertScheduleStart(trRunnable, now, initialNow.plusDays(1));
+
+        // first split
+
+        setCurrentTimeTo(trRunnable);
+        trRunnable.run();
+
+        assertPutCall(expectedPutCall(1).bri(initialBrightness).build()); // previous state call as interpolation start
+        assertPutCall(expectedPutCall(1).bri(initialBrightness + 100 - 2).transitionTime(MAX_TRANSITION_TIME_WITH_BUFFER).build()); // first split of transition
+
+        List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(2);
+        ScheduledRunnable followUpRunnable = followUpRunnables.get(0);
+        ScheduledRunnable nextDayRunnable = followUpRunnables.get(1);
+
+        assertScheduleStart(followUpRunnable, now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS),
+                initialNow.plusDays(1)); // scheduled second split of transition
+        assertScheduleStart(nextDayRunnable, initialNow.plusDays(1), initialNow.plusDays(2)); // next day
+
+        // run follow-up call for the second split
+
+        setCurrentTimeTo(followUpRunnable);
+        followUpRunnable.run();
+
+        // no interpolation as "initialBrightness + 100" already set at end of first part
+        assertPutCall(expectedPutCall(1).bri(initialBrightness + 200 - 2).transitionTime(MAX_TRANSITION_TIME_WITH_BUFFER).build()); // second split of transition
+        assertAllPutCallsAsserted();
+
+        ScheduledRunnable finalSplit = ensureScheduledStates(1).get(0);
+
+        assertScheduleStart(finalSplit, now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS),
+                initialNow.plusDays(1)); // scheduled third split of transition
+
+        setCurrentTimeTo(finalSplit);
+        finalSplit.run();
+
+        // no interpolation as "initialBrightness + 200" already set at end of second part
+        assertPutCall(expectedPutCall(1).bri(initialBrightness + 210).transitionTime(6000).build()); // remaining 10 minutes
+        assertAllPutCallsAsserted();
     }
 
     @Test
