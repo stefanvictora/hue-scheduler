@@ -67,6 +67,7 @@ class HueSchedulerTest {
     private String defaultInterpolationTransitionTimeInMs;
     private int minTrGap = 2; // in minutes
     private final int MAX_TRANSITION_TIME_WITH_BUFFER = ScheduledState.MAX_TRANSITION_TIME - minTrGap * 600;
+    private boolean interpolateAll;
 
     private void setCurrentTimeToAndRun(ScheduledRunnable scheduledRunnable) {
         setCurrentTimeTo(scheduledRunnable);
@@ -108,7 +109,7 @@ class HueSchedulerTest {
         scheduler = new HueScheduler(mockedHueApi, stateScheduler, startTimeProvider,
                 () -> now, 10.0, controlGroupLightsIndividually, disableUserModificationTracking,
                 defaultInterpolationTransitionTimeInMs, 0, connectionFailureRetryDelay,
-                multiColorAdjustmentDelay, minTrGap);
+                multiColorAdjustmentDelay, minTrGap, interpolateAll);
         manualOverrideTracker = scheduler.getManualOverrideTracker();
     }
 
@@ -387,6 +388,7 @@ class HueSchedulerTest {
         controlGroupLightsIndividually = false;
         disableUserModificationTracking = true;
         defaultInterpolationTransitionTimeInMs = null;
+        interpolateAll = false;
         when(mockedHueApi.getLightName(ID)).thenReturn("Test");
         create();
     }
@@ -737,6 +739,32 @@ class HueSchedulerTest {
         assertPutCall(expectedPutCall(1).bri(254).transitionTime(tr("1h")).build());
 
         ensureRunnable(now.plusDays(1), initialNow.plusDays(2)); // next day
+    }
+
+    @Test
+    void parse_defaultInterpolateSet_interpolatesAllStatesUnlessExplicitlyDisabled() {
+        interpolateAll = true;
+        create();
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState("1", "00:00", "bri:1"); // 12:00 (previous day) - 00:00
+        addState("1", "01:00", "bri:254"); // 00:00-12:00
+        addState("1", "12:00", "bri:100", "interpolate:false"); // zero length state
+
+        startScheduler();
+
+        List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(3);
+
+        assertScheduleStart(scheduledRunnables.get(0), now, now.plusHours(12)); // second state
+        assertScheduleStart(scheduledRunnables.get(1), now.plusHours(12), now.plusDays(1));  // cross over state
+        assertScheduleStart(scheduledRunnables.get(2), now.plusHours(12), now.plusHours(12)); // zero length
+
+        setCurrentTimeTo(scheduledRunnables.get(0));
+        scheduledRunnables.get(0).run();
+
+        assertPutCall(expectedPutCall(1).bri(1).build()); // interpolated call
+        assertPutCall(expectedPutCall(1).bri(254).transitionTime(tr("1h")).build());
+
+        ensureRunnable(now.plusDays(1), initialNow.plusDays(1).plusHours(12)); // next day
     }
 
     @Test
@@ -1426,13 +1454,13 @@ class HueSchedulerTest {
     }
 
     @Test
-    void parse_transitionTimeBefore_allowsBackToBack_zeroLengthState_usedOnlyForInterpolation() { // todo: write a similar test with interpolate:true
+    void parse_transitionTimeBefore_allowsBackToBack_zeroLengthState_usedOnlyForInterpolation() {
         enableUserModificationTracking();
         addKnownLightIdsWithDefaultCapabilities(1);
         addState(1, now, "bri:" + DEFAULT_BRIGHTNESS); // 00:00, zero length
         addState(1, now.plusMinutes(10), "bri:" + (DEFAULT_BRIGHTNESS + 10), "tr-before:10min"); // 00:00, same start as initial
         addState(1, now.plusMinutes(10), "bri:" + (DEFAULT_BRIGHTNESS + 20)); // 10:00, second zero length
-        addState(1, now.plusMinutes(20), "bri:" + (DEFAULT_BRIGHTNESS + 30), "tr-before:10min"); // 10:00 same start as second zero length
+        addState(1, now.plusMinutes(20), "bri:" + (DEFAULT_BRIGHTNESS + 30), "interpolate:true"); // 10:00 same start as second zero length
 
         startScheduler();
 
@@ -2280,8 +2308,6 @@ class HueSchedulerTest {
         assertScheduleStart(followUpRunnables.get(0), now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1).plusMinutes(30));
         assertScheduleStart(followUpRunnables.get(1), initialNow.plusDays(1).plusHours(1), initialNow.plusDays(2).plusMinutes(30)); // next day
     }
-
-    // todo: add test for temporary copy and gap (but probably not needed right now, as we only have the split calls as temporary now)
 
     @Test
     void parse_transitionTimeBefore_group_lightTurnedOnLater_stillBeforeStart_transitionTimeIsShortenedToRemainingTimeBefore() {

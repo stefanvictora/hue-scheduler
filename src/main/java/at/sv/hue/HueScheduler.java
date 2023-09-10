@@ -84,11 +84,15 @@ public final class HueScheduler implements Runnable {
             description = "Globally disable tracking of user modifications which would pause their schedules until they are turned off and on again." +
                     " Default: ${DEFAULT-VALUE}")
     boolean disableUserModificationTracking;
+    @Option(names = "--interpolate-all", defaultValue = "false",
+            description = "Globally sets 'interpolate:true' for all states, unless explicitly set otherwise." +
+                    " Default: ${DEFAULT-VALUE}")
+    private boolean interpolateAll;
     @Option(names = "--default-interpolation-transition-time", paramLabel = "<tr>", defaultValue = "4",
-            description = "The default transition time in defined as a multiple of 100ms used for the interpolated call" +
+            description = "The default transition time defined as a multiple of 100ms used for the interpolated call" +
                     " when turning a light on during a tr-before transition. Default: ${DEFAULT-VALUE} (=400 ms)." +
                     " You can also use, e.g., 2s for convenience.")
-    String defaultInterpolationTransitionTimeString;
+    String defaultInterpolationTransitionTimeString; // todo: should we really use this?
     /**
      * The converted transition time as a multiple of 100ms.
      */
@@ -142,7 +146,7 @@ public final class HueScheduler implements Runnable {
                         double requestsPerSecond, boolean controlGroupLightsIndividually,
                         boolean disableUserModificationTracking, String defaultInterpolationTransitionTimeString,
                         int powerOnRescheduleDelayInMs, int bridgeFailureRetryDelayInSeconds, int multiColorAdjustmentDelay,
-                        int minTrBeforeGapInMinutes1) {
+                        int minTrBeforeGapInMinutes1, boolean interpolateAll) {
         this();
         this.hueApi = hueApi;
         this.stateScheduler = stateScheduler;
@@ -157,6 +161,7 @@ public final class HueScheduler implements Runnable {
         this.multiColorAdjustmentDelay = multiColorAdjustmentDelay;
         this.minTrBeforeGapInMinutes = minTrBeforeGapInMinutes1;
         defaultInterpolationTransitionTime = parseInterpolationTransitionTime(defaultInterpolationTransitionTimeString);
+        this.interpolateAll = interpolateAll;
         apiCacheInvalidationIntervalInMinutes = 15;
     }
 
@@ -259,8 +264,9 @@ public final class HueScheduler implements Runnable {
     }
 
     public void addState(String input) {
-        new InputConfigurationParser(startTimeProvider, hueApi, minTrBeforeGapInMinutes).parse(input).forEach(state ->
-                lightStates.computeIfAbsent(state.getIdV1(), key -> new ArrayList<>()).add(state));
+        new InputConfigurationParser(startTimeProvider, hueApi, minTrBeforeGapInMinutes, interpolateAll)
+                .parse(input)
+                .forEach(state -> lightStates.computeIfAbsent(state.getIdV1(), key -> new ArrayList<>()).add(state));
     }
 
     public void start() {

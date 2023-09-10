@@ -278,7 +278,7 @@ Hue Scheduler offers two different transition time properties, which can be comb
   To summarize: `tr-before` allows you to define longer and smoother transitions that always match the desired state, regardless of when they are turned on during the transition. Those interpolations are available for all color modes (CT, XY/RGB, Hue/Sat).
   The starting point for those interpolations is always the previously defined state. If the color mode differs between the states, then Hue Scheduler automatically performs a conversion between them. This allows us to transition, e.g., from a color temperature to some color value.
  
-- ``interpolate:true``: A convenient extension to ``tr-before`` that dynamically performs a transition from the previous state.
+- ``interpolate:true``: A convenient extension to ``tr-before`` that dynamically performs a transition from the previous state. See also the ``--interpolate-all`` command line flag, to set ``interpolate:true`` per default to all states.
   ~~~yacas
   # Instead of:
   Office  sunrise  bri:100
@@ -299,7 +299,7 @@ Hue Scheduler offers two different transition time properties, which can be comb
 
 ### Advanced Properties
 
-- `force`: defines whether Hue Scheduler should **enforce the state despite user modifications**: [`true`|`false`]. This is only relevant if user modification tracking is not disabled (see `--track-user-changes`). Default: `false`.
+- `force`: defines whether Hue Scheduler should **enforce the state despite user modifications**: [`true`|`false`]. This is only relevant if user modification tracking is not disabled (see `--disable-user-modification-tracking`). Default: `false`.
 
   ~~~yacas
   Office  09:00  bri:254  ct:6500
@@ -308,9 +308,15 @@ Hue Scheduler offers two different transition time properties, which can be comb
   
   In this example, the sunset state would always be set, even if the light has been manually adjusted since the morning.
     
-  **Note**: Lights that are turned off and on again are always enforced, regardless of the `force` property. The `force` property is only relevant if you want to reset manual adjustments while the lights are continuously on.
+  **Note**: The `force` property can also be used to enforce the ``on:false`` state of a light, as otherwise such states are not rescheduled when turning a light off and on again. Beware that his means that such light can't be turned on at all during such schedules, as it will always be immediately scheduled to turn off again.
 
 ## Advanced Command Line Options
+
+### `--interpolate-all`
+
+Flag to globally set ``interpolate:true`` for all states, unless explicitly disabled with ``interpolate:false``. This is useful if the primary goal is to have interpolations between all or most of the states.
+
+**Default**: false
      
 ### `--disable-user-modification-tracking`
                  
@@ -342,9 +348,8 @@ Note: This option behaves the same as the other `tr` related state properties, i
         
 ### `--min-tr-before-gap`
 
-The minimum gap between multiple back-to-back tr-before states in minutes. This is needed as otherwise the hue bridge may not yet recognize the end value of the transition and incorrectly marks
-the light as manually overridden.
-This gap is automatically added between back-to-back tr-before states.
+Only relevant and active if user modification tracking is not disabled (see `--disable-user-modification-tracking`). When using transitions, this defines the minimum gap between multiple back-to-back states in minutes. This is needed as otherwise the hue bridge may not yet recognize the target value of the transition and incorrectly marks the light as manually overridden.
+This gap is automatically ensured by shortening transitions between back-to-back states.
 
 **Default**: `2` minutes
 

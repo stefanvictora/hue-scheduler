@@ -23,11 +23,14 @@ public final class InputConfigurationParser {
     private final StartTimeProvider startTimeProvider;
     private final HueApi hueApi;
     private final int minTrBeforeGapInMinutes;
+    private final boolean interpolateAll;
 
-    public InputConfigurationParser(StartTimeProvider startTimeProvider, HueApi hueApi, int minTrBeforeGapInMinutes) {
+    public InputConfigurationParser(StartTimeProvider startTimeProvider, HueApi hueApi, int minTrBeforeGapInMinutes,
+                                    boolean interpolateAll) {
         this.startTimeProvider = startTimeProvider;
         this.hueApi = hueApi;
         this.minTrBeforeGapInMinutes = minTrBeforeGapInMinutes;
+        this.interpolateAll = interpolateAll;
     }
 
     public List<ScheduledState> parse(String input) {
@@ -77,6 +80,9 @@ public final class InputConfigurationParser {
             String transitionTimeBefore = null;
             Integer transitionTime = null;
             String effect = null;
+            if (interpolateAll) {
+                interpolate = Boolean.TRUE;
+            }
             EnumSet<DayOfWeek> dayOfWeeks = EnumSet.noneOf(DayOfWeek.class);
             for (int i = 2; i < parts.length; i++) {
                 String part = parts[i].trim();
