@@ -41,15 +41,16 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Command(name = "HueScheduler", version = "0.9.0", mixinStandardHelpOptions = true, sortOptions = false)
 public final class HueScheduler implements Runnable {
@@ -276,40 +277,63 @@ public final class HueScheduler implements Runnable {
     private void scheduleInitialStartup(List<ScheduledState> states, ZonedDateTime now) {
         MDC.put("context", "init");
         ZonedDateTime yesterday = now.minusDays(1);
-        states.forEach(state -> state.setPreviousStateLookup(this::getPreviousStateIgnoringNullStates));
+        states.forEach(state -> state.setPreviousStateDefinedStartLookup(this::getPreviousStateDefinedStart));
         calculateAndSetEndTimes(states, yesterday);
         states.stream()
               .sorted(Comparator.comparing(state -> state.getDefinedStart(yesterday)))
               .forEach(state -> initialSchedule(state, now));
     }
 
+    private ZonedDateTime getPreviousStateDefinedStart(ScheduledState currentState, ZonedDateTime dateTime) {
+        return Optional.ofNullable(getPreviousState(currentState, dateTime))
+                       .map(ScheduledStateSnapshot::getDefinedStart)
+                       .orElse(null);
+    }
+
+    private ScheduledStateSnapshot getPreviousState(ScheduledState currentState, ZonedDateTime dateTime) {
+        ZonedDateTime definedStart = currentState.getDefinedStart(dateTime);
+        List<ScheduledStateSnapshot> previousStates = getPreviousStatesListIgnoringCurrent(currentState, definedStart);
+        return previousStates.stream()
+                             .filter(snapshot -> snapshot.getDefinedStart().isBefore(definedStart))
+                             .findFirst()
+                             .orElse(null);
+    }
+
+    private List<ScheduledStateSnapshot> getPreviousStatesListIgnoringCurrent(ScheduledState currentState, ZonedDateTime definedStart) {
+        ZonedDateTime theDayBefore = definedStart.minusDays(1).truncatedTo(ChronoUnit.DAYS).withEarlierOffsetAtOverlap();
+        return getLightStatesForId(currentState)
+                .stream()
+                .flatMap(state -> Stream.of(state.getSnapshot(theDayBefore), state.getSnapshot(definedStart)))
+                .sorted(Comparator.comparing(ScheduledStateSnapshot::getDefinedStart, Comparator.reverseOrder())
+                                  .thenComparing(snapshot -> snapshot.getScheduledState().hasTransitionBefore()))
+                .distinct()
+                .filter(snapshot -> currentState.isNotSameState(snapshot.getScheduledState()))
+                .collect(Collectors.toList());
+    }
+
     private void calculateAndSetEndTimes(List<ScheduledState> states, ZonedDateTime now) {
-        HashSet<ScheduledState> alreadyProcessedStates = new HashSet<>();
-        for (int i = 0; i < 7; i++) {
-            ZonedDateTime day = now.plusDays(i);
-            List<ScheduledState> statesStartingOnDay = getStatesStartingOnDay(states, day, DayOfWeek.from(day));
-            statesStartingOnDay.stream()
-                               .filter(state -> !alreadyProcessedStates.contains(state))
-                               .forEach(state -> calculateAndSetEndTime(state, states, state.getDefinedStart(now)));
-            alreadyProcessedStates.addAll(statesStartingOnDay);
-        }
-    }
-
-    private List<ScheduledState> getStatesStartingOnDay(List<ScheduledState> states, ZonedDateTime dateTime,
-                                                        DayOfWeek... days) {
-        return states.stream()
-                     .filter(state -> state.isScheduledOn(days))
-                     .sorted(Comparator.comparing(scheduledState -> scheduledState.getStart(dateTime)))
-                     .collect(Collectors.toList());
-    }
-
-    private List<ScheduledState> getStatesStartingOnDay(ScheduledState state, ZonedDateTime dateTime) {
-        return getStatesStartingOnDay(getLightStatesForId(state), dateTime, DayOfWeek.from(dateTime));
+        states.forEach(state -> calculateAndSetEndTime(state, states, state.getDefinedStart(now)));
     }
 
     private void calculateAndSetEndTime(ScheduledState state, List<ScheduledState> states, ZonedDateTime definedStart) {
-        new EndTimeAdjuster(state, definedStart,
-                (day, dayOfWeeks) -> getStatesStartingOnDay(states, day, dayOfWeeks)).calculateAndSetEndTime();
+        new EndTimeAdjuster(state, getNextState(states, definedStart), definedStart).calculateAndSetEndTime();
+    }
+
+    private ScheduledStateSnapshot getNextState(List<ScheduledState> states, ZonedDateTime definedStart) {
+        List<ScheduledStateSnapshot> nextStates = getNextStatesList(states, definedStart);
+        return nextStates.stream()
+                         .filter(snapshot -> snapshot.getDefinedStart().isAfter(definedStart))
+                         .findFirst()
+                         .orElse(null);
+    }
+
+    private List<ScheduledStateSnapshot> getNextStatesList(List<ScheduledState> states, ZonedDateTime definedStart) {
+        ZonedDateTime theDayAfter = definedStart.plusDays(1).truncatedTo(ChronoUnit.DAYS).withEarlierOffsetAtOverlap();
+        return states.stream()
+                     .flatMap(state -> Stream.of(state.getSnapshot(definedStart), state.getSnapshot(theDayAfter)))
+                     .sorted(Comparator.comparing(ScheduledStateSnapshot::getStart))
+                     .distinct()
+                     .collect(Collectors.toList());
     }
 
     private void initialSchedule(ScheduledState state, ZonedDateTime now) {
@@ -380,7 +404,7 @@ public final class HueScheduler implements Runnable {
             if (state.isOff()) {
                 LOG.info("Turned off, or was already off");
             }
-            if (shouldRetryOnPowerOn(state)){
+            if (shouldRetryOnPowerOn(state)) {
                 retryWhenBackOn(createPowerOnCopy(state));
             }
             if (shouldAdjustMultiColorLoopOffset(state)) {
@@ -425,7 +449,8 @@ public final class HueScheduler implements Runnable {
         if (!state.hasTransitionBefore()) {
             return;
         }
-        PreviousScheduledState previousScheduledState = getPreviousStateIgnoringNullStates(state, currentTime.get());
+        ZonedDateTime dateTime = currentTime.get();
+        ScheduledStateSnapshot previousScheduledState = getPreviousState(state, dateTime);
         if (previousScheduledState == null) {
             return;
         }
@@ -462,32 +487,6 @@ public final class HueScheduler implements Runnable {
         Thread.sleep(sleepTime * 100L);
     }
 
-    private PreviousScheduledState getPreviousStateIgnoringNullStates(ScheduledState currentState, ZonedDateTime dateTime) {
-        PreviousScheduledState previousState = findPreviousState(currentState, dateTime);
-        if (previousState == null || previousState.isNullState()) {
-            return null;
-        }
-        return previousState;
-    }
-
-    private PreviousScheduledState findPreviousState(ScheduledState currentState, ZonedDateTime dateTime) {
-        List<ScheduledState> lightStatesForId = getLightStatesForId(currentState);
-        List<ScheduledState> calculatedStateOrderAscending = lightStatesForId.stream()
-                                                                             .sorted(Comparator.comparing(state -> state.getDefinedStart(dateTime)))
-                                                                             .collect(Collectors.toList());
-        int position = calculatedStateOrderAscending.indexOf(currentState.getOriginalStateOrThis());
-        if (position > 0) {
-            return new PreviousScheduledState(calculatedStateOrderAscending.get(position - 1), dateTime);
-        }
-        ZonedDateTime yesterday = dateTime.minusDays(1);
-        return lightStatesForId.stream()
-                               .filter(state -> state.isScheduledOn(yesterday))
-                               .filter(currentState::isNotSameState)
-                               .max(Comparator.comparing(state -> state.getDefinedStart(yesterday)))
-                               .map(previousState -> new PreviousScheduledState(previousState, yesterday))
-                               .orElse(null);
-    }
-
     private void reschedule(ScheduledState state) {
         if (state.isTemporary()) return;
         ZonedDateTime now = currentTime.get();
@@ -498,37 +497,17 @@ public final class HueScheduler implements Runnable {
     }
 
     private ZonedDateTime getNextDefinedStart(ScheduledState state, ZonedDateTime now) {
-        ZonedDateTime date;
-        if (shouldScheduleNextDay(state, now)) {
-            date = now.plusDays(1);
+        ZonedDateTime nextDefinedStart = state.getNextDefinedStart(now);
+        if (shouldScheduleNextDay(state, nextDefinedStart, now)) {
+            return state.getNextDefinedStart(now.plusDays(1));
         } else {
-            date = now;
+            return nextDefinedStart;
         }
-        return state.getNextDefinedStart(date);
     }
 
-    private boolean shouldScheduleNextDay(ScheduledState state, ZonedDateTime now) {
-        List<ScheduledState> todaysStates = getStatesStartingOnDay(state, now);
-        if (isLastState(state, todaysStates)) {
-            return firstStateOfNextDayAlreadyStarted(state, now);
-        }
-        return nextStateAlreadyStarted(state, todaysStates, now);
-    }
-
-    private boolean isLastState(ScheduledState state, List<ScheduledState> todaysStates) {
-        return todaysStates.indexOf(state) == todaysStates.size() - 1;
-    }
-
-    private boolean firstStateOfNextDayAlreadyStarted(ScheduledState state, ZonedDateTime now) {
-        List<ScheduledState> nextDayStates = getStatesStartingOnDay(state, now.plusDays(1));
-        if (nextDayStates.isEmpty()) {
-            return false;
-        }
-        return nextDayStates.get(0).stateAlreadyStarted(now, now.plusDays(1));
-    }
-
-    private static boolean nextStateAlreadyStarted(ScheduledState state, List<ScheduledState> todaysStates, ZonedDateTime now) {
-        return todaysStates.get(todaysStates.indexOf(state) + 1).stateAlreadyStarted(now, now);
+    private boolean shouldScheduleNextDay(ScheduledState state, ZonedDateTime nextDefinedStart, ZonedDateTime now) {
+        ScheduledStateSnapshot nextState = getNextState(getLightStatesForId(state), nextDefinedStart);
+        return nextState.getStart().isBefore(now) || nextState.getStart().isEqual(now);
     }
 
     private List<ScheduledState> getLightStatesForId(ScheduledState state) {
@@ -553,12 +532,13 @@ public final class HueScheduler implements Runnable {
             }
             return success;
         } else {
-            return putState(state, state.getPutCall(now));
+            return putState(state, getPutCallWithAdjustedTr(state, now));
         }
     }
 
     private PutCall getInterpolatedSplitPutCall(ScheduledState state) {
-        PreviousScheduledState previousState = getPreviousStateIgnoringNullStates(state, currentTime.get());
+        ZonedDateTime dateTime = currentTime.get();
+        ScheduledStateSnapshot previousState = getPreviousState(state, dateTime);
         if (previousState == null) {
             return null;
         }
@@ -592,6 +572,38 @@ public final class HueScheduler implements Runnable {
         LOG.trace("{}", putCall);
         state.setLastPutCall(putCall);
         return hueApi.putState(putCall);
+    }
+
+    private PutCall getPutCallWithAdjustedTr(ScheduledState state, ZonedDateTime now) {
+        PutCall putCall = state.getPutCall(now);
+        if (putCall.getTransitionTime() == null) {
+            return putCall;
+        }
+        ScheduledStateSnapshot nextState = getNextState(getLightStatesForId(state), state.getLastDefinedStart());
+        if (nextState == null) {
+            return putCall;
+        }
+        Duration duration = Duration.between(now, nextState.getStart()).abs();
+        Duration tr = Duration.ofMillis(putCall.getTransitionTime() * 100);
+        long differenceInMinutes = duration.minus(tr).toMinutes();
+        if (differenceInMinutes < minTrBeforeGapInMinutes) {
+            putCall.setTransitionTime(getAdjustedTransitionTime(duration, nextState.isForced()));
+        }
+        return putCall;
+    }
+
+    private Integer getAdjustedTransitionTime(Duration duration, boolean forced) {
+        if (shouldEnsureGap(forced)) {
+            duration = duration.minusMinutes(minTrBeforeGapInMinutes);
+        }
+        if (duration.isZero() || duration.isNegative()) {
+            return null;
+        }
+        return (int) (duration.toMillis() / 100);
+    }
+
+    private boolean shouldEnsureGap(boolean forced) {
+        return !disableUserModificationTracking && !forced;
     }
 
     private void retry(ScheduledState state, long delayInMs) {

@@ -74,7 +74,7 @@ final class ScheduledState {
     private ScheduledState originalState;
     private PutCall lastPutCall;
     @Setter
-    private BiFunction<ScheduledState, ZonedDateTime, PreviousScheduledState> previousStateLookup;
+    private BiFunction<ScheduledState, ZonedDateTime, ZonedDateTime> previousStateDefinedStartLookup;
 
     @Builder
     public ScheduledState(String name, int updateId, String startString, Integer brightness, Integer ct, Double x, Double y,
@@ -108,7 +108,7 @@ final class ScheduledState {
         this.temporary = temporary;
         originalState = this;
         retryAfterPowerOnState = false;
-        previousStateLookup = (state, dateTime) -> null;
+        previousStateDefinedStartLookup = (state, dateTime) -> null;
         assertColorCapabilities();
     }
 
@@ -225,17 +225,6 @@ final class ScheduledState {
     }
 
     /**
-     * Returns if the state should have already started at the start calculated for the given day.
-     *
-     * @param now the current day used for comparison
-     * @param day the date used for calculating the next start for comparison, in most cases the current or next day
-     * @return true if the state should have already started at given day, false otherwise
-     */
-    public boolean stateAlreadyStarted(ZonedDateTime now, ZonedDateTime day) {
-        return getDelayUntilStart(now, getStart(day)) == 0;
-    }
-
-    /**
      * Returns the milliseconds until the state should be scheduled based on the previously calculated start, i.e.,
      * the lastStart property.
      *
@@ -260,8 +249,7 @@ final class ScheduledState {
         ZonedDateTime definedStart = getDefinedStart(dateTime);
         if (hasTransitionBefore()) {
             int transitionTimeBefore = getTransitionTimeBefore(dateTime, definedStart);
-            ZonedDateTime start = definedStart.minus(transitionTimeBefore, ChronoUnit.MILLIS);
-            return ensureGapBetweenMultipleTrBeforeStates(dateTime, start, definedStart);
+            return definedStart.minus(transitionTimeBefore, ChronoUnit.MILLIS);
         }
         return definedStart;
     }
@@ -270,38 +258,20 @@ final class ScheduledState {
         return transitionTimeBeforeString != null || interpolate == Boolean.TRUE;
     }
 
-    // todo: we only need those gaps when modification tracking is enabled
-    private ZonedDateTime ensureGapBetweenMultipleTrBeforeStates(ZonedDateTime dateTime, ZonedDateTime start,
-                                                                 ZonedDateTime definedStart) {
-        PreviousScheduledState previousState = previousStateLookup.apply(this, dateTime); // todo: should we pass in the start?
-        if (previousState == null || previousState.getScheduledState().transitionTimeBeforeString == null) {
-            return start;
-        }
-        long minutesBetween = Duration.between(previousState.getDefinedStart(), start).abs().toMinutes();
-        if (minutesBetween >= minTrBeforeGapInMinutes) {
-            return start; // enough gap
-        }
-        if (start.plusMinutes(minTrBeforeGapInMinutes).isAfter(definedStart)) {
-            return definedStart; // too short tr-before to add gap without changing the defined start
-        } else {
-            return start.plusMinutes(minTrBeforeGapInMinutes);
-        }
-    }
-
     private int getTransitionTimeBefore(ZonedDateTime dateTime, ZonedDateTime definedStart) {
-        if (interpolate == Boolean.TRUE) {
-            return getTimeUntilPreviousState(dateTime, definedStart);
-        } else {
+        if (transitionTimeBeforeString != null) {
             return parseTransitionTimeBefore(dateTime);
+        } else {
+            return getTimeUntilPreviousState(dateTime, definedStart);
         }
     }
 
     private int getTimeUntilPreviousState(ZonedDateTime dateTime, ZonedDateTime definedStart) {
-        PreviousScheduledState previousState = previousStateLookup.apply(this, dateTime);
-        if (previousState == null) {
+        ZonedDateTime previousStateDefinedStart = previousStateDefinedStartLookup.apply(this, dateTime);
+        if (previousStateDefinedStart == null) {
             return 0;
         }
-        Duration between = Duration.between(previousState.getDefinedStart(), definedStart);
+        Duration between = Duration.between(previousStateDefinedStart, definedStart);
         if (between.isNegative()) {
             between = Duration.ofDays(1).plus(between);
         }
@@ -324,6 +294,11 @@ final class ScheduledState {
             return 0;
         }
         return (int) duration.toMillis();
+    }
+
+    public ScheduledStateSnapshot getSnapshot(ZonedDateTime dateTime) {
+        ZonedDateTime definedStart = getDefinedStart(dateTime);
+        return new ScheduledStateSnapshot(this, definedStart);
     }
 
     /**
@@ -514,11 +489,7 @@ final class ScheduledState {
     }
 
     public boolean isSameState(ScheduledState state) {
-        return this == state || (originalState != null && originalState == state);
-    }
-
-    public ScheduledState getOriginalStateOrThis() {
-        return originalState; // original state is if not overridden always this
+        return this == state || originalState == state;
     }
 
     public boolean isForced() {
@@ -607,7 +578,7 @@ final class ScheduledState {
         }
         if (lastStart != null) {
             return formatPropertyName("tr-before") + transitionTimeBeforeString +
-                    " (" + formatTransitionTime(parseTransitionTimeBefore(lastStart)) + ")";
+                    " (" + formatTransitionTimeBefore(parseTransitionTimeBefore(lastStart)) + ")";
         }
         return formatPropertyName("tr-before") + transitionTimeBeforeString;
     }
@@ -633,5 +604,9 @@ final class ScheduledState {
 
     private static String formatTransitionTime(Integer transitionTime) {
         return Duration.ofMillis(transitionTime * 100L).toString();
+    }
+
+    private static String formatTransitionTimeBefore(Integer transitionTime) {
+        return Duration.ofMillis(transitionTime).toString();
     }
 }
