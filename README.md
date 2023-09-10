@@ -11,12 +11,17 @@ Compared to other approaches, such as Apple's Adaptive Lighting, Hue Scheduler l
 ## Demo
 
 ~~~yacas
-# Energize
-Office        sunrise     bri:254  ct:6500  tr:10s  days:Mo-Fr
-# Concentrate
-Office	      sunrise+90  ct:5000  tr-before:20min  days:Mo-Fr
-# Wind down
+# Energize > Concentrate > Wind down
+Office        sunrise     bri:254  ct:6500  tr:10s                    days:Mo-Fr
+Office	      sunrise+90  ct:5000           tr-before:20min           days:Mo-Fr
 Office        sunset      bri:80%  ct:3000  tr-before:golden_hour+10  days:Mo-Fr
+
+# Easy interpolations
+Home          sunrise      bri:100%  ct:6500             tr-before:civil_dawn
+Home          noon         bri:100%  ct:5000             interpolate:true
+Home          sunset       bri:80%   ct:3000             tr-before:golden_hour
+Home          civil_dusk   bri:40%   ct:2000             interpolate:true
+Home          00:00        bri:20%   x:0.6024  y:0.3433  interpolate:true
 
 # Garden lights
 Garden        civil_dusk  on:true  bri:100%  tr:1min
@@ -27,9 +32,9 @@ Living room   22:00       bri:100  sat:150  effect:multi_colorloop  days:Fr,Sa
 Kitchen       22:00       color:#00835C     days:Fr,Sa
 ~~~
 
-In this example, the lights in your (home) office are set to a bright and blue white at sunrise for an energetic start to your day. Ninety minutes after sunrise, the color temperature is set to a more neutral white for prolonged concentrated work. Finally, the light is dimmed slightly to a warmer temperature as the sun sets. Each time with a smooth 20-minute transition. Should the lights be turned on in the middle of those transitions, Hue Scheduler automatically calculates the mid-transition state and continues the transition from this point on. With this simple configuration, you can create fine-grained schedules that are enforced by Hue Scheduler.
+In the first example, the lights in your (home) office are set to a bright and blue white at sunrise for an energetic start to your day. Ninety minutes after sunrise, the color temperature is set to a more neutral white for prolonged concentrated work. Finally, the light is dimmed slightly to a warmer temperature as the sun sets. Each time with a smooth 20-minute transition. Should the lights be turned on in the middle of those transitions, Hue Scheduler automatically calculates the mid-transition state and continues the transition from this point on. With this simple configuration, you can create fine-grained schedules that are enforced by Hue Scheduler.
 
-Since version 0.8.0 Hue Scheduler also **keeps track of any manual adjustments** to your lights and automatically disables the schedule for the affected lights, until they have been turned off and on again. This gives you the convenience of automatic schedules while still retaining manual control of certain lights when needed. After the manually adjusted lights have been turned off and on, Hue Scheduler automatically reschedules the expected state again. 
+Since version 0.8.0 Hue Scheduler also **keeps track of any manual adjustments** to your lights and automatically disables the schedule for the affected lights, until they have been turned off and on again. This gives you the convenience of automatic schedules while still retaining manual control of certain lights when needed. After the manually adjusted lights have been turned off and on, Hue Scheduler automatically reschedules the expected state again.
 
 *Note: Hue Scheduler does not automatically turn on your lights (unless explicitly told with ``on:true``), so you retain control over the state of your lights, while Hue Scheduler does all the heavy lifting of adjusting them to your defined schedule.*
 
@@ -270,8 +275,27 @@ Hue Scheduler offers two different transition time properties, which can be comb
 
   > Note: Hue Scheduler uses the ``tr`` property of the previous state to determine the transition time for the interpolated call. If you want to disable the transition time for interpolated calls, make sure to set ``tr:0`` for the previous state. If no ``tr`` property is defined for the previous state, Hue Scheduler uses the default value defined via the ``--default-interpolation-transition-time`` (default: `4` = 400ms) global configuration option. 
 
-To summarize: `tr-before` allows you to define longer and smoother transitions that always match the desired state, regardless of when they are turned on during the transition. Those interpolations are available for all color modes (CT, XY/RGB, Hue/Sat).
-The starting point for those interpolations is always the previously defined state. If the color mode differs between the states, then Hue Scheduler automatically performs a conversion between them. This allows us to transition, e.g., from a color temperature to some color value.
+  To summarize: `tr-before` allows you to define longer and smoother transitions that always match the desired state, regardless of when they are turned on during the transition. Those interpolations are available for all color modes (CT, XY/RGB, Hue/Sat).
+  The starting point for those interpolations is always the previously defined state. If the color mode differs between the states, then Hue Scheduler automatically performs a conversion between them. This allows us to transition, e.g., from a color temperature to some color value.
+ 
+- ``interpolate:true``: A convenient extension to ``tr-before`` that dynamically performs a transition from the previous state.
+  ~~~yacas
+  # Instead of:
+  Office  sunrise  bri:100
+  Office  noon     bri:254  tr-before:sunrise
+  Office  sunset   bri:50   tr-before:noon
+  # You can write:
+  Office  sunrise  bri:100
+  Office  noon     bri:254  interpolate:true
+  Office  sunset   bri:50   interpolate:true
+  ~~~ 
+  Furthermore, ``interpolate:true`` also enables interpolations crossing over between days:
+  ~~~yacas
+  Office  sunrise  bri:100  interpolate:true
+  Office  noon     bri:254  interpolate:true
+  Office  sunset   bri:50   interpolate:true
+  ~~~ 
+  In this example, Hue Scheduler also interpolates between `sunset` and `sunrise`.
 
 ### Advanced Properties
 
@@ -515,7 +539,7 @@ Yes, but you should probably use a third-party app like iConnectHue to configure
 - [x] **Conditional states** -- set light state only if it has not been manually changed since its previously scheduled state
 - [x] **Enforce states** -- ensure that a state is always set; allow no manual override
 - [x] **Interpolate between states** -- support more advanced interpolations between states when using `tr-before`
-- [ ] **Advanced state interpolations** -- easily create full day state interpolations without explicitly using `tr-before`
+- [x] **Advanced state interpolations** -- easily create full day state interpolations without explicitly using `tr-before`
 - [ ] **Date-based scheduling** -- schedule state only during a specific date range
 - [ ] **Support for gradients** -- support setting gradients to supported lights
 - [ ] **Support for scenes** -- support scheduling scenes for groups
@@ -525,7 +549,7 @@ Yes, but you should probably use a third-party app like iConnectHue to configure
 ## License
 
 ```
-Copyright 2021 Stefan Victora
+Copyright 2021-2023 Stefan Victora
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

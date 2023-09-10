@@ -8,6 +8,7 @@
 - Added **interpolations for tr-before** states (#4): For any states using `tr-before`, if the light is turned on in the middle of the transition, Hue Scheduler now calculates the mid-transition state based on the previous state and elapsed time, and continues the transition from this point. To transition between multiple color modes, Hue Scheduler is now capable of converting values among all color modes, including CT, XY, and Hue/Sat.
 - Added ability to define ``tr-before`` using absolute times including sun time constants, e.g., ``tr-before:sunset+10``
 - Added new `--interpolation-transition-time` global configuration flag (default `4` = 400 ms) to configure the transition time as a multiple of 100ms. This is used for the interpolated calls mentioned above.
+- Added ``interpolate:true`` state property that **dynamically transitions from the previous state**, without having to manually set ``tr-before``
 - Added group capability validations: During startup, group states are now also validated based on the capabilities of the contained lights
 - Added ability to specify brightness (`bri`) [``1%``-``100%``] and saturation (`sat`) [``0%``-``100%``] as percentage 
 - Added ``h`` shorthand unit for ``tr`` and ``tr-before``
