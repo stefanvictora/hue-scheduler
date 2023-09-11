@@ -25,7 +25,7 @@ Home          00:00        bri:20%   x:0.6024  y:0.3433  interpolate:true
 
 # Garden lights
 Garden        civil_dusk  on:true  bri:100%  tr:1min
-Garden        01:00       on:false tr:5min
+Garden        01:00       on:false tr:5min30s
 
 # Party
 Living room   22:00       bri:100  sat:150  effect:multi_colorloop  days:Fr,Sa
@@ -111,11 +111,13 @@ To distinguish between light and group IDs, group IDs must be prefixed with the 
 Kitchen, Living room, Desk lamp    civil_dusk  ct:2400
 # Is equal to:
 g1, g2, 1                          civil_dusk  ct:2400
+# Is equal to:
+g1                                 civil_dusk  ct:2400
+g2                                 civil_dusk  ct:2400
+1                                  civil_dusk  ct:2400
 ~~~
 
 Note: If you have a group and light with the same name, Hue Scheduler prefers the group. Use IDs instead if you want to change this behavior.
-
-To **improve your Hue system performance**, it might be beneficial to control your lights individually instead of using groups, as groups require broadcast messages that can impact overall Hue performance. You can tell Hue Scheduler to automatically control groups as individual lights by enabling the experimental *--control-group-lights-individually* command line option.
 
 **If you don't want to use light or group names** in your configuration file, you can ****look up their respective IDs**** by sending a GET request to either the `/api/<username>/lights` or `/api/<username>/groups` endpoint of your Philips Hue Bridge. The response will contain a list of all your lights and groups in your system.
 
@@ -171,7 +173,7 @@ Hallway  07:00  bri:254
 Hallway  10:00
   ~~~
 
-In this case, only the interval **07:00–10:00** is created. If you turn your lights on after `10:00` or before `7:00`, Hue Scheduler would not enforce any sate for the light.
+In this case, only the interval **07:00–10:00** is created. If you turn your lights on after `10:00` or before `7:00`, Hue Scheduler would not enforce any state for the light.
 
 ### `[<Property>:<Value>]*`
 
@@ -209,7 +211,7 @@ To control the state of your lights in the given interval, an arbitrary number o
 
 ### Color-Related Properties
 
-Hue Scheduler offers several ways to define the color of support lights.
+Hue Scheduler offers several ways to define the color of support lights:
 
 - ``color``: modifies the color of the light either through **hex** (e.g. ``color:#3CD0E2``) or **rgb** (e.g. ``color:60, 208, 226``). Can't be combined with other color properties. If you don't specify an additional ``bri`` property, Hue Scheduler also calculates an appropriate brightness level for the given color.
 
@@ -228,12 +230,12 @@ Hue Scheduler offers several ways to define the color of support lights.
 Desk  10:00  color:#3CD0E2
 Desk  11:00  color:60, 208, 226
 Desk  12:00  hue:2000  sat:100
-Desk  13:00  effect:colorloop
+Desk  13:00  effect:colorloop  sat:70%  bri:50%
 Desk  14:00  effect:none
 Desk  15:00  x:0.1652  y=0.3103
 ~~~
 
-### Transition Time-Related Properties
+### Transition-Related Properties
 
 > **Warning**: Due to a [firmware bug](https://www.reddit.com/r/tradfri/comments/au903n/firmware_bugs_in_ikea_bulbs/) (see https://github.com/stefanvictora/hue-scheduler/issues/5),
 > Ikea Tradfri light bulbs currently don't support setting multiple properties, e.g., `bri` and `ct`,
@@ -241,14 +243,13 @@ Desk  15:00  x:0.1652  y=0.3103
 > if not specified otherwise, you have to explicitly set `tr:0` if you want to set multiple properties for Ikea Tradfri light bulbs.
 > Another workaround is to only set one property per state and offset the state changes accordingly to the used transition time.
 
-The transition time between two light states, defined as a multiple of 100ms. For example: `tr:1` equals a transition time of 100ms.
-To simplify the definition, you can use the ``s`` (seconds), ``min`` (minutes) and ``h`` (hours) units. For example: ``tr:10s``, ``tr:2min`` or ``tr:1h``. Any combination is also possible, like ``1h20min5s10``, as long as the order is kept from largest to smallest unit. The input itself is case-insensitive.
+Hue Scheduler offers various transition-related properties, which can be combined to create the desired transition and interpolation behavior for your lights:
 
-Hue Scheduler offers two different transition time properties, which can be combined to create the desired transition behavior:
+- ``tr``: defines the transition time used when the defined start time of a state is reached [``0``-``60000``]. Default: `4` (400ms). The Hue System expects the value as a multiple of 100ms. For example: `tr:1` equals a transition time of 100ms. The maximally supported value ``60000`` equals 100 min.
 
-- ``tr``: defines the transition time used at or *after* the defined start time [``0``-``60000``]. The default transition used by the Hue System. Default: `4` (400ms). The maximally supported value ``60000`` equals 100 min. 
+  > To simplify the definition, you can use the ``s`` (seconds), ``min`` (minutes) and ``h`` (hours) units. For example: ``tr:10s``, ``tr:2min`` or ``tr:1h``. Any combination is also possible, like ``1h20min5s10``, as long as the order is kept from largest to smallest unit. The units themselves are case-insensitive.
 
-- ``tr-before``: defines the transition time used *before* the defined start time [``0``-``864000``]. The additional transition provided by Hue Scheduler. The maximally supported value ``864000`` equals 24 hours. In addition to the seconds and minute shorthand from above, ``tr-before`` also supports setting absolute times, including dynamic sun times (see _Start Time Expression_ section):
+- ``tr-before``: defines the transition time used *before* the defined start time. The additional transition type provided by Hue Scheduler. Realistically, the maximally supported value is 24 hours. In addition to the seconds and minute shorthand from above, ``tr-before`` also supports setting absolute times, including dynamic sun times (see _Start Time Expression_ section):
 
   ~~~yacas
   Office  sunrise  on:true  bri:254  tr-before:30min
@@ -260,10 +261,10 @@ Hue Scheduler offers two different transition time properties, which can be comb
   
   > Note: The given start time expression for ``tr-before`` must be before the defined start of the state, otherwise the property is ignored. Setting ``tr-before`` to more than 24 hours is not supported and will lead to unexpected results during scheduling.
 
-  What makes `tr-before` especially useful is that Hue Scheduler automatically adjusts the transition time to the remaining duration if the light is turned on at later point. And most importantly, it also calculates the mid-transition state based on the elapsed time. Consider, for example:
+  What makes `tr-before` especially useful is that Hue Scheduler automatically adjusts the transition time to the remaining duration if the light is turned on at later point. And most importantly, it also calculates the mid-transition state based on the elapsed time, effectively interpolating from the previous state. Consider, for example:
 
   ~~~yacas
-  Office  06:00  ct:400
+  Office  06:00  ct:400  tr:2s
   Office  09:00  ct:200  tr-before:30min  tr:10s
   ~~~
 
@@ -273,12 +274,12 @@ Hue Scheduler offers two different transition time properties, which can be comb
 
   3. If you turn on the lights at any time after `09:00`, Hue Scheduler ignores `tr-before` and instead uses the transition time defined via ``tr`` instead. If no explicit ``tr`` is defined, Hue lights automatically use a transition time of 400ms.
 
-  > Note: Hue Scheduler uses the ``tr`` property of the previous state to determine the transition time for the interpolated call. If you want to disable the transition time for interpolated calls, make sure to set ``tr:0`` for the previous state. If no ``tr`` property is defined for the previous state, Hue Scheduler uses the default value defined via the ``--default-interpolation-transition-time`` (default: `4` = 400ms) global configuration option. 
+  > Note: Hue Scheduler uses the ``tr`` property of the previous state to determine the transition time for the interpolated call. If you want to disable the transition time for interpolated calls, make sure to set ``tr:0`` for the previous state. If no ``tr`` property is defined for the previous state, Hue Scheduler uses the default value defined via the ``--default-interpolation-transition-time`` (default: `4` = 400ms) global command line option. 
 
-  To summarize: `tr-before` allows you to define longer and smoother transitions that always match the desired state, regardless of when they are turned on during the transition. Those interpolations are available for all color modes (CT, XY/RGB, Hue/Sat).
-  The starting point for those interpolations is always the previously defined state. If the color mode differs between the states, then Hue Scheduler automatically performs a conversion between them. This allows us to transition, e.g., from a color temperature to some color value.
+  **To summarize**: `tr-before` allows you to define longer and smoother transitions that always match the desired state, regardless of when they are turned on during the transition. Those interpolations are available for all color modes (CT, XY/RGB, Hue/Sat).
+  The starting point for those interpolations is always the previously defined state. **If the color mode differs** between the states, then **Hue Scheduler automatically performs a conversion** between them. This allows us to perform smooth transition, e.g. from a color temperature to a color value.
  
-- ``interpolate:true``: A convenient extension to ``tr-before`` that dynamically performs a transition from the previous state. See also the ``--interpolate-all`` command line flag, to set ``interpolate:true`` per default to all states.
+- ``interpolate:true``: A convenient extension to ``tr-before`` that automatically starts the transitions from the previous state:
   ~~~yacas
   # Instead of:
   Office  sunrise  bri:100
@@ -289,13 +290,15 @@ Hue Scheduler offers two different transition time properties, which can be comb
   Office  noon     bri:254  interpolate:true
   Office  sunset   bri:50   interpolate:true
   ~~~ 
-  Furthermore, ``interpolate:true`` also enables interpolations crossing over between days:
+  Furthermore, ``interpolate:true`` also allows us to interpolate between states between days:
   ~~~yacas
   Office  sunrise  bri:100  interpolate:true
   Office  noon     bri:254  interpolate:true
   Office  sunset   bri:50   interpolate:true
   ~~~ 
   In this example, Hue Scheduler also interpolates between `sunset` and `sunrise`.
+
+  >  Note: You can enable ``interpolate:true`` per default for all states by using the ``--interpolate-all`` command line flag. This behavior can be customized by either explicitly setting ``interpolate:false`` for single states, or by defining a custom ``tr-before`` which overrides the interpolate property.
 
 ### Advanced Properties
 
@@ -326,7 +329,7 @@ Flag to globally disable tracking of user modifications of lights. Per default H
 
 ### `--default-interpolation-transition-time`
 
-Flag to configure the default transition time as a multiple of 100ms used for the interpolated call when turning a light on during a `tr-before` transition. If the previous state already contains a ``tr`` property, Hue Scheduler reuses the customer value instead.
+Flag to configure the default transition time used for the interpolated call when turning a light on during a `tr-before` transition. Defined either as a multiple of 100ms or with the already mentioned shorthands e.g. `5s`. If the previous state already contains a ``tr`` property, Hue Scheduler reuses the custom value instead.
 
 ~~~yacas
 # Default value used:
@@ -337,19 +340,19 @@ Desk  07:00  bri:100%  tr-before:20min
 Desk  06:00  bri:50%  tr:10s
 Desk  07:00  bri:100%  tr-before:20min
 
-# Disabled interpolation transition:
+# Effectively disabling the interpolation transition:
 Desk  06:00  bri:50%  tr:0
 Desk  07:00  bri:100%  tr-before:20min
 ~~~
-
-Note: This option behaves the same as the other `tr` related state properties, i.e., you can use, e.g., `5s` for convenience.
 
 **Default**: `4` (= 400 ms)
         
 ### `--min-tr-before-gap`
 
 Only relevant and active if user modification tracking is not disabled (see `--disable-user-modification-tracking`). When using transitions, this defines the minimum gap between multiple back-to-back states in minutes. This is needed as otherwise the hue bridge may not yet recognize the target value of the transition and incorrectly marks the light as manually overridden.
-This gap is automatically ensured by shortening transitions between back-to-back states.
+This gap is ensured by automatically shortening transitions between back-to-back states.
+
+If Hue Scheduler detects manual overrides between back-to-back states using transitions, try increasing the default value.
 
 **Default**: `2` minutes
 
@@ -371,9 +374,9 @@ To still benefit from the ease of use of groups, while improving overall system 
 
 *Experimental*
 
-Toggle if Hue Scheduler should control lights found in a group individually instead of using broadcast messages. This might improve performance.
+Toggle if Hue Scheduler should control lights found in a group individually instead of using broadcast messages. This might improve performance but is not recommended any more, as it may impact manual modification tracking.
 
-Note: At the moment, Hue Scheduler does not validate in such cases if all the lights inside the group support the given command. Furthermore, this option might not be suitable for groups with mixed capabilities, i.e. setting color for a group that also contains a color temperature only light. In such cases, the unsupported light is not updated.
+Note: Hue Scheduler does not validate in such cases if all the lights inside the group support the given command. Furthermore, this option might not be suitable for groups with mixed capabilities, i.e. setting color for a group that also contains a color temperature only light. In such cases, the unsupported light is not updated.
 
 **Default**: false
 
@@ -493,7 +496,7 @@ sudo journalctl -u hue-scheduler -e
 # Restart Hue Scheduler, after modifying its configuration file (/etc/hue-scheduler/input.txt)
 sudo systemctl restart hue-scheduler
 
-# Stop Hue Scheduler from running on boo
+# Stop Hue Scheduler from running on boot
 sudo systemctl disable hue-scheduler
 ~~~
 
@@ -520,7 +523,7 @@ This means that if you want to rest manual overrides with dumb wall switches, yo
 
 ### How Does Hue Scheduler Compare to Adaptive Lighting?
 
-Both approaches try to automate your lights' state according to the time of day. However, Adaptive Lighting only updates the color temperature of your lights throughout the day, while Hue Scheduler additionally gives you control over your lights brightness, color, and even on-state. Furthermore, while Adaptive Lighting continuously updates your lights state with no manual control, Hue Scheduler gives you more freedom to configure your own schedule, and even allows you to take over and keep control of lights until you turn them off and on again.
+Both approaches try to automate your lights' state according to the time of day. However, Adaptive Lighting only updates the color temperature and brightness of your lights throughout the day, while Hue Scheduler additionally gives you control over your lights' color, and even on-state. Furthermore, while Adaptive Lighting continuously updates your lights' state with little manual control, Hue Scheduler gives you more freedom to configure your own schedule with multiple custom interpolations all in a single easy to write configuration file.
 
 ### Does Hue Scheduler Access The Internet?
 
