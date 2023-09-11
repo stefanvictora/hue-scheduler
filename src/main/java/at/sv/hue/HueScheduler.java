@@ -46,7 +46,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -209,8 +208,8 @@ public final class HueScheduler implements Runnable {
     }
 
     private StateSchedulerImpl createStateScheduler() {
-        ScheduledExecutorService executorService = Executors.newScheduledThreadPool(Runtime.getRuntime().availableProcessors());
-        return new StateSchedulerImpl(executorService, ZonedDateTime::now);
+        return new StateSchedulerImpl(Executors.newScheduledThreadPool(Runtime.getRuntime().availableProcessors() * 2),
+                ZonedDateTime::now);
     }
 
     private void assertInputIsReadable() {
