@@ -269,11 +269,7 @@ final class ScheduledState {
         if (previousStateDefinedStart == null) {
             return 0;
         }
-        Duration between = Duration.between(previousStateDefinedStart, definedStart);
-        if (between.isNegative()) {
-            between = Duration.ofDays(1).plus(between);
-        }
-        return (int) between.toMillis();
+        return (int) Duration.between(previousStateDefinedStart, definedStart).toMillis();
     }
 
     private int parseTransitionTimeBefore(ZonedDateTime dateTime) {

@@ -297,14 +297,14 @@ public final class HueScheduler implements Runnable {
 
     private ScheduledStateSnapshot getPreviousState(ScheduledState currentState, ZonedDateTime dateTime) {
         ZonedDateTime definedStart = currentState.getDefinedStart(dateTime);
-        List<ScheduledStateSnapshot> previousStates = getPreviousStatesListIgnoringCurrent(currentState, definedStart);
+        List<ScheduledStateSnapshot> previousStates = getPreviousStatesListIgnoringSame(currentState, definedStart);
         return previousStates.stream()
                              .filter(snapshot -> snapshot.getDefinedStart().isBefore(definedStart))
                              .findFirst()
                              .orElse(null);
     }
 
-    private List<ScheduledStateSnapshot> getPreviousStatesListIgnoringCurrent(ScheduledState currentState, ZonedDateTime definedStart) {
+    private List<ScheduledStateSnapshot> getPreviousStatesListIgnoringSame(ScheduledState currentState, ZonedDateTime definedStart) {
         ZonedDateTime theDayBefore = definedStart.minusDays(1).truncatedTo(ChronoUnit.DAYS).withEarlierOffsetAtOverlap();
         return getLightStatesForId(currentState)
                 .stream()
@@ -544,9 +544,6 @@ public final class HueScheduler implements Runnable {
     private PutCall getInterpolatedSplitPutCall(ScheduledState state) {
         ZonedDateTime dateTime = currentTime.get();
         ScheduledStateSnapshot previousState = getPreviousState(state, dateTime);
-        if (previousState == null) {
-            return null;
-        }
         return state.getNextInterpolatedSplitPutCall(currentTime.get(), previousState.getScheduledState());
     }
 
@@ -585,9 +582,6 @@ public final class HueScheduler implements Runnable {
             return putCall;
         }
         ScheduledStateSnapshot nextState = getNextState(getLightStatesForId(state), state.getLastDefinedStart());
-        if (nextState == null) {
-            return putCall;
-        }
         Duration duration = Duration.between(now, nextState.getStart()).abs();
         Duration tr = Duration.ofMillis(putCall.getTransitionTime() * 100);
         long differenceInMinutes = duration.minus(tr).toMinutes();
