@@ -592,13 +592,13 @@ public final class HueScheduler implements Runnable {
         Duration tr = Duration.ofMillis(putCall.getTransitionTime() * 100);
         long differenceInMinutes = duration.minus(tr).toMinutes();
         if (differenceInMinutes < minTrBeforeGapInMinutes) {
-            putCall.setTransitionTime(getAdjustedTransitionTime(duration, nextState.isForced()));
+            putCall.setTransitionTime(getAdjustedTransitionTime(duration, nextState));
         }
         return putCall;
     }
 
-    private Integer getAdjustedTransitionTime(Duration duration, boolean forced) {
-        if (shouldEnsureGap(forced)) {
+    private Integer getAdjustedTransitionTime(Duration duration, ScheduledStateSnapshot nextState) {
+        if (shouldEnsureGap(nextState)) {
             duration = duration.minusMinutes(minTrBeforeGapInMinutes);
         }
         if (duration.isZero() || duration.isNegative()) {
@@ -607,8 +607,8 @@ public final class HueScheduler implements Runnable {
         return (int) (duration.toMillis() / 100);
     }
 
-    private boolean shouldEnsureGap(boolean forced) {
-        return !disableUserModificationTracking && !forced;
+    private boolean shouldEnsureGap(ScheduledStateSnapshot nextState) {
+        return !disableUserModificationTracking && !nextState.isForced() && !nextState.isNullState();
     }
 
     private void retry(ScheduledState state, long delayInMs) {

@@ -253,7 +253,7 @@ final class ScheduledState {
     }
 
     public boolean hasTransitionBefore() {
-        return transitionTimeBeforeString != null || interpolate == Boolean.TRUE;
+        return (transitionTimeBeforeString != null || interpolate == Boolean.TRUE) && !isNullState();
     }
 
     private int getTransitionTimeBefore(ZonedDateTime dateTime, ZonedDateTime definedStart) {

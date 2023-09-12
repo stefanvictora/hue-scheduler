@@ -3620,6 +3620,52 @@ class HueSchedulerTest {
     }
 
     @Test
+    void parse_nullState_interpolateProperty_ignored() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, "00:00", "ct:" + DEFAULT_CT);
+        addState(1, "12:00", "interpolate:true");
+        startScheduler();
+
+        ScheduledRunnable runnable = ensureRunnable(now, now.plusHours(12));
+
+        advanceTimeAndRunAndAssertPutCall(runnable, expectedPutCall(1).ct(DEFAULT_CT).build());
+
+        ensureRunnable(now.plusDays(1), now.plusDays(1).plusHours(12));
+    }
+
+    @Test
+    void parse_nullState_trBefore_ignored() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, "00:00", "ct:" + DEFAULT_CT);
+        addState(1, "12:00", "tr-before:12h");
+        startScheduler();
+
+        ScheduledRunnable runnable = ensureRunnable(now, now.plusHours(12));
+
+        advanceTimeAndRunAndAssertPutCall(runnable, expectedPutCall(1).ct(DEFAULT_CT).build());
+
+        ensureRunnable(now.plusDays(1), now.plusDays(1).plusHours(12));
+    }
+
+    @Test
+    void parse_nullState_backToBack_transition_doesNotAddGap_stillCorrectsTooLongDuration() {
+        enableUserModificationTracking();
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, "00:00", "bri:" + DEFAULT_BRIGHTNESS, "tr:1h20min");
+        addState(1, "01:00");
+        startScheduler();
+
+        ScheduledRunnable runnable = ensureRunnable(now, now.plusHours(1));
+
+        advanceTimeAndRunAndAssertPutCall(runnable, expectedPutCall(1)
+                .bri(DEFAULT_BRIGHTNESS)
+                .transitionTime(tr("1h"))
+                .build());
+
+        ensureRunnable(now.plusDays(1), now.plusDays(1).plusHours(1));
+    }
+
+    @Test
     void parse_useLampNameInsteadOfId_nameIsCorrectlyResolved() {
         String name = "gKitchen Lamp";
         mockLightIdForName(name, 2);

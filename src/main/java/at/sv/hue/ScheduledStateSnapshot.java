@@ -20,4 +20,8 @@ public class ScheduledStateSnapshot {
     public boolean isForced() {
         return scheduledState.isForced();
     }
+
+    public boolean isNullState() {
+        return scheduledState.isNullState();
+    }
 }
