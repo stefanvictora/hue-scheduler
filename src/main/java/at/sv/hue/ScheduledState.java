@@ -74,7 +74,7 @@ final class ScheduledState {
     private ScheduledState originalState;
     private PutCall lastPutCall;
     @Setter
-    private BiFunction<ScheduledState, ZonedDateTime, ZonedDateTime> previousStateDefinedStartLookup;
+    private BiFunction<ScheduledState, ZonedDateTime, ScheduledStateSnapshot> previousStateLookup;
 
     @Builder
     public ScheduledState(String name, int updateId, String startString, Integer brightness, Integer ct, Double x, Double y,
@@ -108,7 +108,7 @@ final class ScheduledState {
         this.temporary = temporary;
         originalState = this;
         retryAfterPowerOnState = false;
-        previousStateDefinedStartLookup = (state, dateTime) -> null;
+        previousStateLookup = (state, dateTime) -> null;
         assertColorCapabilities();
     }
 
@@ -257,18 +257,18 @@ final class ScheduledState {
     }
 
     private int getTransitionTimeBefore(ZonedDateTime dateTime, ZonedDateTime definedStart) {
+        ScheduledStateSnapshot previousState = previousStateLookup.apply(this, dateTime);
+        if (previousState == null || previousState.isNullState()) {
+            return 0;
+        }
         if (transitionTimeBeforeString != null) {
             return parseTransitionTimeBefore(dateTime);
         } else {
-            return getTimeUntilPreviousState(dateTime, definedStart);
+            return getTimeUntilPreviousState(previousState.getDefinedStart(), definedStart);
         }
     }
 
-    private int getTimeUntilPreviousState(ZonedDateTime dateTime, ZonedDateTime definedStart) {
-        ZonedDateTime previousStateDefinedStart = previousStateDefinedStartLookup.apply(this, dateTime);
-        if (previousStateDefinedStart == null) {
-            return 0;
-        }
+    private int getTimeUntilPreviousState(ZonedDateTime previousStateDefinedStart, ZonedDateTime definedStart) {
         return (int) Duration.between(previousStateDefinedStart, definedStart).toMillis();
     }
 

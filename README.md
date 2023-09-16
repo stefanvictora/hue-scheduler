@@ -16,18 +16,18 @@ Office        sunrise     bri:254  ct:6500  tr:10s                    days:Mo-Fr
 Office	      sunrise+90  ct:5000           tr-before:20min           days:Mo-Fr
 Office        sunset      bri:80%  ct:3000  tr-before:golden_hour+10  days:Mo-Fr
 
-# Easy interpolations
+# Easy interpolations with long running transitons
 Home          sunrise      bri:100%  ct:6500             tr-before:civil_dawn
 Home          noon         bri:100%  ct:5000             interpolate:true
 Home          sunset       bri:80%   ct:3000             tr-before:golden_hour
 Home          civil_dusk   bri:40%   ct:2000             interpolate:true
 Home          00:00        bri:20%   x:0.6024  y:0.3433  interpolate:true
 
-# Garden lights
+# Garden lights: turning on & off
 Garden        civil_dusk  on:true  bri:100%  tr:1min
 Garden        01:00       on:false tr:5min30s
 
-# Party
+# Party: controlling effect & color on certain days
 Living room   22:00       bri:100  sat:150  effect:multi_colorloop  days:Fr,Sa
 Kitchen       22:00       color:#00835C     days:Fr,Sa
 ~~~

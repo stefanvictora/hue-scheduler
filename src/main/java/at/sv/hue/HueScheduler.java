@@ -43,7 +43,6 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -282,17 +281,11 @@ public final class HueScheduler implements Runnable {
     private void scheduleInitialStartup(List<ScheduledState> states, ZonedDateTime now) {
         MDC.put("context", "init");
         ZonedDateTime yesterday = now.minusDays(1);
-        states.forEach(state -> state.setPreviousStateDefinedStartLookup(this::getPreviousStateDefinedStart));
+        states.forEach(state -> state.setPreviousStateLookup(this::getPreviousState));
         calculateAndSetEndTimes(states, yesterday);
         states.stream()
               .sorted(Comparator.comparing(state -> state.getDefinedStart(yesterday)))
               .forEach(state -> initialSchedule(state, now));
-    }
-
-    private ZonedDateTime getPreviousStateDefinedStart(ScheduledState currentState, ZonedDateTime dateTime) {
-        return Optional.ofNullable(getPreviousState(currentState, dateTime))
-                       .map(ScheduledStateSnapshot::getDefinedStart)
-                       .orElse(null);
     }
 
     private ScheduledStateSnapshot getPreviousState(ScheduledState currentState, ZonedDateTime dateTime) {
