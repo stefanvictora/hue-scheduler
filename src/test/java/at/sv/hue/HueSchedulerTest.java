@@ -1792,14 +1792,12 @@ class HueSchedulerTest {
 
         setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS + 10));
         advanceTimeAndRunAndAssertPutCalls(secondStateOnWednesday,
-//                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS), // interpolated call from zero length previous state TODO: this is currently not working
+                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS), // interpolated call from zero length previous state
                 expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 10).transitionTime(tr("5min"))
         );
 
         ensureRunnable(initialNow.plusDays(7).plusMinutes(10), initialNow.plusDays(8)); // next monday
     }
-
-    // todo: what if the state crosses over to the previous day. Does it then still work?
 
     @Test
     void parse_transitionTimeBefore_withDaysOfWeek_onlyOnMonday_todayIsMonday_crossesOverToPreviousDay_stillScheduled() {
@@ -1896,9 +1894,15 @@ class HueSchedulerTest {
                 expectedPutCall(1).ct(DEFAULT_CT) // no interpolation, as state is already reached
         );
 
-        ScheduledRunnable nextDay = ensureRunnable(initialNow.plusDays(1).minusMinutes(20), initialNow.plusDays(1).plusHours(12));
+        ScheduledRunnable firstStateNextDay = ensureRunnable(initialNow.plusDays(1).minusMinutes(20), initialNow.plusDays(1).plusHours(12));
 
-        advanceTimeAndRunAndAssertPutCalls(nextDay,
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(1),
+                expectedPutCall(1).ct(DEFAULT_CT + 20)
+        );
+
+        ensureRunnable(initialNow.plusDays(1).plusHours(12), initialNow.plusDays(2).minusMinutes(20));
+
+        advanceTimeAndRunAndAssertPutCalls(firstStateNextDay,
                 expectedPutCall(1).ct(DEFAULT_CT).transitionTime(tr("20min"))
         );
 

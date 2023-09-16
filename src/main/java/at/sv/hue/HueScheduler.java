@@ -90,7 +90,7 @@ public final class HueScheduler implements Runnable {
             description = "The default transition time defined as a multiple of 100ms used for the interpolated call" +
                     " when turning a light on during a tr-before transition. Default: ${DEFAULT-VALUE} (=400 ms)." +
                     " You can also use, e.g., 2s for convenience.")
-    String defaultInterpolationTransitionTimeString; // todo: should we really use this?
+    String defaultInterpolationTransitionTimeString;
     /**
      * The converted transition time as a multiple of 100ms.
      */
@@ -454,7 +454,7 @@ public final class HueScheduler implements Runnable {
         }
         ScheduledState previousState = previousScheduledState.getScheduledState();
         ScheduledState lastSeenState = getLastSeenState(state);
-        if ((lastSeenState == previousState || state.isSameState(lastSeenState))
+        if ((lastSeenState == previousState || state.isSameState(lastSeenState) && state.isSplitState())
                 && !manualOverrideTracker.shouldEnforceSchedule(state.getIdV1())) {
             return; // skip interpolations if the previous or current state was the last state set without any power cycles
         }

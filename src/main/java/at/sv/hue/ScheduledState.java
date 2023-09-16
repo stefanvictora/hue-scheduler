@@ -251,7 +251,7 @@ final class ScheduledState {
     }
 
     public boolean hasTransitionBefore() {
-        return (transitionTimeBeforeString != null || interpolate == Boolean.TRUE) && !isNullState();
+        return (transitionTimeBeforeString != null || interpolate == Boolean.TRUE);
     }
 
     private int getTransitionTimeBefore(ZonedDateTime dateTime, ZonedDateTime definedStart) {
@@ -391,6 +391,10 @@ final class ScheduledState {
                                           boolean keepPreviousPropertiesForNullTargets) {
         return new StateInterpolator(this, previousState, dateTime, keepPreviousPropertiesForNullTargets)
                 .getInterpolatedPutCall();
+    }
+
+    public boolean isSplitState() {
+        return Duration.between(lastStart, lastDefinedStart).compareTo(Duration.ofMillis(MAX_TRANSITION_TIME_MS)) > 0;
     }
 
     public boolean isInsideSplitCallWindow(ZonedDateTime now) {
