@@ -2360,8 +2360,6 @@ class HueSchedulerTest {
         ensureRunnable(initialNow.plusDays(1).plusMinutes(40), initialNow.plusDays(2));
     }
 
-    // todo: what about previous states were no interpolation can be done because of different properties?
-
     @Test
     void parse_transitionTimeBefore_multipleStates_nullState_splitCall_performsNotInterpolation_doesNotAdjustStart() {
         addKnownLightIdsWithDefaultCapabilities(1);
@@ -2412,20 +2410,28 @@ class HueSchedulerTest {
     }
 
     @Test
-    void parse_transitionTimeBefore_multipleStates_previousIsOnStateOnly_notInterpolationAtAll() { // todo: should we adjust tr-before even?
+    void parse_transitionTimeBefore_multipleStates_previousIsOnStateOnly_notInterpolationAtAll_noAdjustmentOfStart() {
         addKnownLightIdsWithDefaultCapabilities(1);
         addStateNow(1, "on:true"); // just a single "on"
         addState(1, now.plusMinutes(40), "bri:" + DEFAULT_BRIGHTNESS, "tr-before:20min");
 
-        List<ScheduledRunnable> scheduledRunnables = startScheduler(2);
-        ScheduledRunnable trBeforeRunnable = scheduledRunnables.get(1);
-
-        advanceTimeAndRunAndAssertPutCalls(trBeforeRunnable,
-                // no additional interpolation call
-                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).transitionTime(tr("20min"))
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(40)),
+                expectedRunnable(now.plusMinutes(40), now.plusDays(1))
         );
 
-        ensureRunnable(initialNow.plusDays(1).plusMinutes(20), initialNow.plusDays(2));
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(0),
+                expectedPutCall(1).on(true)
+        );
+
+        ensureRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(40)); // next day
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(1),
+                // no interpolation call
+                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS) // no transition, as start was not adjusted
+        );
+
+        ensureRunnable(initialNow.plusDays(1).plusMinutes(40), initialNow.plusDays(2));
     }
 
     @Test
@@ -2634,29 +2640,37 @@ class HueSchedulerTest {
     }
 
     @Test
-    void parse_transitionTimeBefore_longDuration_multipleStates_multipleProperty_previousStateHasNoBrightness_noLongTransition() { // todo: the question is if we even should adjust the tr-before here if we can't perfom interpolations
+    void parse_transitionTimeBefore_longDuration_multipleStates_multipleProperty_previousStateHasNoBrightness_noLongTransition_noStartAdjustment() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        addStateNow(1, "ct:166", "x:0.4", "y:0.5", "hue:2000", "tr:1"); // 00:00 zero length
-        addState(1, "12:00", "bri:" + DEFAULT_BRIGHTNESS, "tr-before:00:00"); // 12:00 -> 00:00, back-to-back
+        addStateNow(1, "ct:166", "x:0.4", "y:0.5", "hue:2000", "tr:1"); // 00:00-12:00
+        addState(1, "12:00", "bri:" + DEFAULT_BRIGHTNESS, "tr-before:00:00"); // 12:00 -> no overlapping properties, not start adjustment
 
         List<ScheduledRunnable> scheduledRunnables = startScheduler(
-                expectedRunnable(now, now.plusDays(1)),
-                expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
+                expectedRunnable(now, now.plusHours(12)),
+                expectedRunnable(now.plusHours(12), now.plusDays(1))
         );
-        ScheduledRunnable trBeforeRunnable = scheduledRunnables.get(0);
+        ScheduledRunnable firstState = scheduledRunnables.get(0);
+        ScheduledRunnable secondState = scheduledRunnables.get(1);
 
         advanceCurrentTime(Duration.ofMinutes(30));
 
-        runAndAssertPutCalls(trBeforeRunnable,
+        runAndAssertPutCalls(firstState,
                 expectedPutCall(1).ct(166).x(0.4).y(0.5).hue(2000).transitionTime(1)
         );
-        // no long transition expected, just warning
 
-        ScheduledRunnable nextDay = ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(2));
+        ScheduledRunnable firstStateNextDay = ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusHours(12));
 
-        advanceTimeAndRunAndAssertPutCalls(nextDay); // skips all put calls next day
+        advanceTimeAndRunAndAssertPutCalls(secondState,
+                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS)
+        );
 
-        ensureRunnable(initialNow.plusDays(2), initialNow.plusDays(3));
+        ensureRunnable(initialNow.plusDays(1).plusHours(12), initialNow.plusDays(2));
+
+        advanceTimeAndRunAndAssertPutCalls(firstStateNextDay,
+                expectedPutCall(1).ct(166).x(0.4).y(0.5).hue(2000).transitionTime(1)
+        );
+
+        ensureRunnable(initialNow.plusDays(2), initialNow.plusDays(2).plusHours(12));
     }
 
     @Test

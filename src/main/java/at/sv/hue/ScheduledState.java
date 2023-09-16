@@ -8,8 +8,6 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.ZonedDateTime;
@@ -258,7 +256,7 @@ final class ScheduledState {
 
     private int getTransitionTimeBefore(ZonedDateTime dateTime, ZonedDateTime definedStart) {
         ScheduledStateSnapshot previousState = previousStateLookup.apply(this, dateTime);
-        if (previousState == null || previousState.isNullState()) {
+        if (previousState == null || previousState.isNullState() || hasNoOverlappingProperties(previousState)) {
             return 0;
         }
         if (transitionTimeBeforeString != null) {
@@ -266,6 +264,11 @@ final class ScheduledState {
         } else {
             return getTimeUntilPreviousState(previousState.getDefinedStart(), definedStart);
         }
+    }
+
+    private boolean hasNoOverlappingProperties(ScheduledStateSnapshot previousState) {
+        PutCall previousPutCall = previousState.getScheduledState().getPutCall(null);
+        return StateInterpolator.hasNoOverlappingProperties(previousPutCall, getPutCall(null));
     }
 
     private int getTimeUntilPreviousState(ZonedDateTime previousStateDefinedStart, ZonedDateTime definedStart) {
@@ -384,7 +387,7 @@ final class ScheduledState {
         return (int) between.toMillis() / 100;
     }
 
-    public PutCall getInterpolatedPutCall(ZonedDateTime dateTime, ScheduledState previousState,
+    public PutCall getInterpolatedPutCall(ScheduledState previousState, ZonedDateTime dateTime,
                                           boolean keepPreviousPropertiesForNullTargets) {
         return new StateInterpolator(this, previousState, dateTime, keepPreviousPropertiesForNullTargets)
                 .getInterpolatedPutCall();
@@ -404,7 +407,7 @@ final class ScheduledState {
 
     public PutCall getNextInterpolatedSplitPutCall(ZonedDateTime now, ScheduledState previousState) {
         ZonedDateTime nextSplitStart = getNextTransitionTimeSplitStart(now).minusMinutes(minTrBeforeGapInMinutes); // add buffer
-        PutCall interpolatedSplitPutCall = getInterpolatedPutCall(nextSplitStart, previousState, false);
+        PutCall interpolatedSplitPutCall = getInterpolatedPutCall(previousState, nextSplitStart, false);
         if (interpolatedSplitPutCall == null) {
             return null; // no interpolation possible
         }
@@ -427,16 +430,6 @@ final class ScheduledState {
             splitStart = splitStart.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS);
         }
         return splitStart;
-    }
-
-    /**
-     * t = (current_time - start_time) / (end_time - start_time)
-     */
-    public BigDecimal getInterpolatedTime(ZonedDateTime now) {
-        Duration durationAfterStart = Duration.between(lastStart, now);
-        Duration totalDuration = Duration.between(lastStart, lastDefinedStart);
-        return BigDecimal.valueOf(durationAfterStart.toMillis())
-                         .divide(BigDecimal.valueOf(totalDuration.toMillis()), 7, RoundingMode.HALF_UP);
     }
 
     public boolean endsBefore(ZonedDateTime now) {
@@ -500,7 +493,7 @@ final class ScheduledState {
                       .sat(sat)
                       .on(on)
                       .effect(getEffect())
-                      .transitionTime(getTransitionTime(now))
+                      .transitionTime(now != null ? getTransitionTime(now) : null)
                       .groupState(groupState)
                       .build();
     }

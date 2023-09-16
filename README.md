@@ -274,7 +274,8 @@ Hue Scheduler offers various transition-related properties, which can be combine
 
   3. If you turn on the lights at any time after `09:00`, Hue Scheduler ignores `tr-before` and instead uses the transition time defined via ``tr`` instead. If no explicit ``tr`` is defined, Hue lights automatically use a transition time of 400ms.
 
-  > Note: Hue Scheduler uses the ``tr`` property of the previous state to determine the transition time for the interpolated call. If you want to disable the transition time for interpolated calls, make sure to set ``tr:0`` for the previous state. If no ``tr`` property is defined for the previous state, Hue Scheduler uses the default value defined via the ``--default-interpolation-transition-time`` (default: `4` = 400ms) global command line option. 
+  > Note: Hue Scheduler uses the ``tr`` property of the previous state to determine the transition time for the interpolated call. If you want to disable the transition time for interpolated calls, make sure to set ``tr:0`` for the previous state. If no ``tr`` property is defined for the previous state, Hue Scheduler uses the default value defined via the ``--default-interpolation-transition-time`` (default: `4` = 400ms) global command line option.
+  > Furthermore, if the previous state and the current state don't have any compatible properties to interpolate between, Hue Scheduler will simply ignore the ``tr-before`` and ``interpolate:true`` properties.
 
   **To summarize**: `tr-before` allows you to define longer and smoother transitions that always match the desired state, regardless of when they are turned on during the transition. Those interpolations are available for all color modes (CT, XY/RGB, Hue/Sat).
   The starting point for those interpolations is always the previously defined state. **If the color mode differs** between the states, then **Hue Scheduler automatically performs a conversion** between them. This allows us to perform smooth transition, e.g. from a color temperature to a color value.
@@ -298,7 +299,7 @@ Hue Scheduler offers various transition-related properties, which can be combine
   ~~~ 
   In this example, Hue Scheduler also interpolates between `sunset` and `sunrise`.
 
-  >  Note: You can enable ``interpolate:true`` per default for all states by using the ``--interpolate-all`` command line flag. This behavior can be customized by either explicitly setting ``interpolate:false`` for single states, or by defining a custom ``tr-before`` which overrides the interpolate property.
+  >  Note: You can enable ``interpolate:true`` per default for all states by using the ``--interpolate-all`` command line flag. This behavior can be customized by either explicitly setting ``interpolate:false`` for single states, or by defining a custom ``tr-before`` which takes precedence over the interpolate property.
 
 ### Advanced Properties
 

@@ -458,7 +458,7 @@ public final class HueScheduler implements Runnable {
                 && !manualOverrideTracker.shouldEnforceSchedule(state.getIdV1())) {
             return; // skip interpolations if the previous or current state was the last state set without any power cycles
         }
-        PutCall interpolatedPutCall = state.getInterpolatedPutCall(currentTime.get(), previousState, true);
+        PutCall interpolatedPutCall = state.getInterpolatedPutCall(previousState, currentTime.get(), true);
         if (interpolatedPutCall == null) {
             return;
         }
