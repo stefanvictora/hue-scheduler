@@ -521,7 +521,6 @@ public final class HueScheduler implements Runnable {
         if (state.isInsideSplitCallWindow(now)) {
             PutCall interpolatedSplitPutCall = getInterpolatedSplitPutCall(state);
             if (interpolatedSplitPutCall == null) {
-                logSplitCallSkippedWarning();
                 return true;
             }
             boolean success = performPutApiCall(state, interpolatedSplitPutCall);
@@ -538,10 +537,6 @@ public final class HueScheduler implements Runnable {
         ZonedDateTime dateTime = currentTime.get();
         ScheduledStateSnapshot previousState = getPreviousState(state, dateTime);
         return state.getNextInterpolatedSplitPutCall(currentTime.get(), previousState);
-    }
-
-    private static void logSplitCallSkippedWarning() {
-        LOG.warn("Warning: Skipped extended transition call. No previous state found, missing source properties or required pause.");
     }
 
     private boolean putState(ScheduledState state, PutCall putCall) {
