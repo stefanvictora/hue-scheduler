@@ -1,5 +1,7 @@
 package at.sv.hue;
 
+import at.sv.hue.api.LightCapabilities;
+import at.sv.hue.api.PutCall;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -23,5 +25,13 @@ public class ScheduledStateSnapshot {
 
     public boolean isNullState() {
         return scheduledState.isNullState();
+    }
+
+    public PutCall getPutCall(ZonedDateTime now) {
+        return scheduledState.getPutCall(now, definedStart);
+    }
+
+    public LightCapabilities getCapabilities() {
+        return scheduledState.getCapabilities();
     }
 }

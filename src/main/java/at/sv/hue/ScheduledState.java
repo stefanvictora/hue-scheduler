@@ -267,7 +267,7 @@ final class ScheduledState {
     }
 
     private boolean hasNoOverlappingProperties(ScheduledStateSnapshot previousState) {
-        PutCall previousPutCall = previousState.getScheduledState().getPutCall(null);
+        PutCall previousPutCall = previousState.getPutCall(null);
         return StateInterpolator.hasNoOverlappingProperties(previousPutCall, getPutCall(null));
     }
 
@@ -370,24 +370,24 @@ final class ScheduledState {
         return MULTI_COLOR_LOOP.equals(effect);
     }
 
-    private Integer getTransitionTime(ZonedDateTime now) {
-        int adjustedTrBefore = getAdjustedTransitionTimeBefore(now);
+    private Integer getTransitionTime(ZonedDateTime now, ZonedDateTime definedStart) {
+        int adjustedTrBefore = getAdjustedTransitionTimeBefore(now, definedStart);
         if (adjustedTrBefore == 0) {
             return definedTransitionTime;
         }
         return adjustedTrBefore;
     }
 
-    private int getAdjustedTransitionTimeBefore(ZonedDateTime now) {
+    private int getAdjustedTransitionTimeBefore(ZonedDateTime now, ZonedDateTime definedStart) {
         if (!hasTransitionBefore()) {
             return 0;
         }
-        Duration between = Duration.between(now, lastDefinedStart);
+        Duration between = Duration.between(now, definedStart);
         if (between.isZero() || between.isNegative()) return 0;
         return (int) between.toMillis() / 100;
     }
 
-    public PutCall getInterpolatedPutCall(ScheduledState previousState, ZonedDateTime dateTime,
+    public PutCall getInterpolatedPutCall(ScheduledStateSnapshot previousState, ZonedDateTime dateTime,
                                           boolean keepPreviousPropertiesForNullTargets) {
         return new StateInterpolator(this, previousState, dateTime, keepPreviousPropertiesForNullTargets)
                 .getInterpolatedPutCall();
@@ -409,7 +409,7 @@ final class ScheduledState {
         }
     }
 
-    public PutCall getNextInterpolatedSplitPutCall(ZonedDateTime now, ScheduledState previousState) {
+    public PutCall getNextInterpolatedSplitPutCall(ZonedDateTime now, ScheduledStateSnapshot previousState) {
         ZonedDateTime nextSplitStart = getNextTransitionTimeSplitStart(now).minusMinutes(getRequiredGap()); // add buffer
         PutCall interpolatedSplitPutCall = getInterpolatedPutCall(previousState, nextSplitStart, false);
         if (interpolatedSplitPutCall == null) {
@@ -492,6 +492,10 @@ final class ScheduledState {
     }
 
     public PutCall getPutCall(ZonedDateTime now) {
+        return getPutCall(now, lastDefinedStart);
+    }
+
+    public PutCall getPutCall(ZonedDateTime now, ZonedDateTime definedStart) {
         return PutCall.builder().id(updateId)
                       .bri(brightness)
                       .ct(ct)
@@ -501,7 +505,7 @@ final class ScheduledState {
                       .sat(sat)
                       .on(on)
                       .effect(getEffect())
-                      .transitionTime(now != null ? getTransitionTime(now) : null)
+                      .transitionTime(now != null ? getTransitionTime(now, definedStart) : null)
                       .groupState(groupState)
                       .build();
     }

@@ -14,7 +14,7 @@ import java.time.temporal.ChronoUnit;
 public final class StateInterpolator {
 
     private final ScheduledState state;
-    private final ScheduledState previousState;
+    private final ScheduledStateSnapshot previousState;
     private final ZonedDateTime dateTime;
     private final boolean keepPreviousPropertiesForNullTargets;
 
