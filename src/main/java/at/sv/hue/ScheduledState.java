@@ -410,7 +410,7 @@ final class ScheduledState {
     }
 
     public PutCall getNextInterpolatedSplitPutCall(ZonedDateTime now, ScheduledState previousState) {
-        ZonedDateTime nextSplitStart = getNextTransitionTimeSplitStart(now).minusMinutes(minTrBeforeGapInMinutes); // add buffer
+        ZonedDateTime nextSplitStart = getNextTransitionTimeSplitStart(now).minusMinutes(getRequiredGap()); // add buffer
         PutCall interpolatedSplitPutCall = getInterpolatedPutCall(previousState, nextSplitStart, false);
         if (interpolatedSplitPutCall == null) {
             return null; // no interpolation possible
@@ -421,6 +421,10 @@ final class ScheduledState {
         }
         interpolatedSplitPutCall.setTransitionTime((int) between.toMillis() / 100);
         return interpolatedSplitPutCall;
+    }
+
+    public int getRequiredGap() {
+        return minTrBeforeGapInMinutes;
     }
 
     public long getNextInterpolationSplitDelayInMs(ZonedDateTime now) {

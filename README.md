@@ -355,7 +355,7 @@ This gap is ensured by automatically shortening transitions between back-to-back
 
 If Hue Scheduler detects manual overrides between back-to-back states using transitions, try increasing the default value.
 
-**Default**: `2` minutes
+**Default**: `3` minutes
 
 ### `--max-requests-per-second`
 

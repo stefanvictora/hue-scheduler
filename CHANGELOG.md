@@ -17,12 +17,12 @@
 ### Changed
 - Increased max value for ``tr-before`` to 24 hours by **splitting up long-running transitions into multiple calls** and interpolating between them.
 - Added automatic short gaps for back-to-back states with transitions: Otherwise, the Hue bridge may not yet report the target light state correctly causing incorrect manual modification detections. Only active if manual modification tracking is not disabled.
-- Added ``--min-tr-before-gap`` command line property to configure the minimum gap that Hue Scheduler enforces. Default: ``2`` minutes.
+- Added ``--min-tr-before-gap`` command line property to configure the minimum gap that Hue Scheduler enforces. Default: ``3`` minutes.
 - Improved **manual modification tracking for groups**: Rather than only comparing the state of the first light in a group, Hue Scheduler now compares the state of all contained lights. Special cases for lights with different capabilities are automatically handles, as we can't expect, e.g., color temperature lights to display color.
 - Improved modification tracking for color states: The color gamut of the light is now also used during the comparison
 - Improved **turn-on tracking for groups**: Hue Scheduler now uses group-on events instead of listening for the first contained light being turned on. Additionally, every physically turned-on light inside a group now also triggers a group-on event, in order to still detect physically turned on groups, as the Hue bridge does not create any group events in such cases.
 - Improved support for 'On/Off plug-in unit' type of "lights"
-- The ``force:true`` property now can be used to reschedule ``on:false`` states on power on, effectively forcing lights to be off during a certain time period. 
+- The ``force:true`` property can now be used to reschedule ``on:false`` states on power-on, effectively forcing lights to be off during a certain time period. 
 - Improved ``tr-before`` support for crossovers between days
 - Reduced max value for ``tr`` to ``60000``, i.e., 100min to conform with the max value supported by API v2
 - Improved log messages

@@ -118,7 +118,7 @@ public final class HueScheduler implements Runnable {
     )
     int apiCacheInvalidationIntervalInMinutes;
     @Option(
-            names = "--min-tr-before-gap", paramLabel = "<gap>", defaultValue = "2",
+            names = "--min-tr-before-gap", paramLabel = "<gap>", defaultValue = "3",
             description = "The minimum gap between multiple back-to-back tr-before states in minutes. This is needed as otherwise " +
                     "the hue bridge may not yet recognise the end value of the transition and incorrectly marks " +
                     "the light as manually overridden. This gap is automatically added between back-to-back " +
@@ -578,15 +578,16 @@ public final class HueScheduler implements Runnable {
         Duration duration = Duration.between(now, nextState.getStart()).abs();
         Duration tr = Duration.ofMillis(putCall.getTransitionTime() * 100);
         long differenceInMinutes = duration.minus(tr).toMinutes();
-        if (differenceInMinutes < minTrBeforeGapInMinutes) {
-            putCall.setTransitionTime(getAdjustedTransitionTime(duration, nextState));
+        int requiredGap = state.getRequiredGap();
+        if (differenceInMinutes < requiredGap) {
+            putCall.setTransitionTime(getAdjustedTransitionTime(duration, requiredGap, nextState));
         }
         return putCall;
     }
 
-    private Integer getAdjustedTransitionTime(Duration duration, ScheduledStateSnapshot nextState) {
+    private Integer getAdjustedTransitionTime(Duration duration, int requiredGap, ScheduledStateSnapshot nextState) {
         if (shouldEnsureGap(nextState)) {
-            duration = duration.minusMinutes(minTrBeforeGapInMinutes);
+            duration = duration.minusMinutes(requiredGap);
         }
         if (duration.isZero() || duration.isNegative()) {
             return null;
