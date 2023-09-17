@@ -269,7 +269,7 @@ public final class HueScheduler implements Runnable {
 
     public void start() {
         ZonedDateTime now = currentTime.get();
-        scheduleSunDataInfoLog();
+        scheduleSolarDataInfoLog();
         lightStates.forEach((id, states) -> scheduleInitialStartup(states, now));
         scheduleApiCacheClear();
     }
@@ -655,17 +655,17 @@ public final class HueScheduler implements Runnable {
         hueApi.putState(PutCall.builder().id(light).on(on).effect(effect).build());
     }
 
-    private void scheduleSunDataInfoLog() {
-        logSunDataInfo();
+    private void scheduleSolarDataInfoLog() {
+        logSolarDataInfo();
         ZonedDateTime now = currentTime.get();
         ZonedDateTime midnight = ZonedDateTime.of(now.toLocalDate().plusDays(1), LocalTime.MIDNIGHT, now.getZone());
         long delay = Duration.between(now, midnight).toMinutes();
-        stateScheduler.scheduleAtFixedRate(this::logSunDataInfo, delay + 1, 60 * 24L, TimeUnit.MINUTES);
+        stateScheduler.scheduleAtFixedRate(this::logSolarDataInfo, delay + 1, 60 * 24L, TimeUnit.MINUTES);
     }
 
-    private void logSunDataInfo() {
+    private void logSolarDataInfo() {
         MDC.put("context", "info");
-        LOG.info("Current sun times:\n{}", startTimeProvider.toDebugString(currentTime.get()));
+        LOG.info("Current solar times:\n{}", startTimeProvider.toDebugString(currentTime.get()));
     }
 
     private void scheduleApiCacheClear() {

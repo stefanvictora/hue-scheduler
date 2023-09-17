@@ -123,7 +123,7 @@ Note: If you have a group and light with the same name, Hue Scheduler prefers th
 
 ### `<Start Time Expression>`
 
-For each configured state, either a fixed start time in the 24-hour format ``HH:mm:ss``, or a dynamic sun time expression has to be provided. The following dynamic **sun time constants** are available, sorted in their chronological order:
+For each configured state, either a fixed start time in the 24-hour format ``HH:mm:ss``, or a dynamic solar time expression has to be provided. The following dynamic **solar time constants** are available, sorted in their chronological order:
 
 - ``astronomical_dawn``: e.g. `03:26`
 - ``nautical_dawn``: e.g. `04:17`
@@ -140,15 +140,15 @@ For each configured state, either a fixed start time in the 24-hour format ``HH:
 
 The given examples vary greatly depending on your current location and the current time of year. To get the current times for your location, you can simply start Hue Scheduler with an empty input file.
 
-Additionally, you can **adjust the start time relative to these sun times** by using the following format:
+Additionally, you can **adjust the start time relative to these solar times** by using the following format:
 
 ~~~yacas
 <sun_constant>[+-]<adjustment_in_minutes>
 ~~~
 
-For example: ``sunset-30`` adjusts the start time to 30 minutes before sunset, and ``sunrise+60`` to one hour after sunrise. These expressions are dynamically updated each day to reflect the current sun times at your location.
+For example: ``sunset-30`` adjusts the start time to 30 minutes before sunset, and ``sunrise+60`` to one hour after sunrise. These expressions are dynamically updated each day to reflect the current solar times at your location.
 
-Further details about the different sun times can be found at [Twilight - Wikipedia](https://en.wikipedia.org/wiki/Twilight) and [Twilight - commons-suncalc](https://shredzone.org/maven/commons-suncalc/usage.html#twilight).
+Further details about the different solar times can be found at [Twilight - Wikipedia](https://en.wikipedia.org/wiki/Twilight) and [Twilight - commons-suncalc](https://shredzone.org/maven/commons-suncalc/usage.html#twilight).
 
 **FAQ: How Does Hue Scheduler Determine the End of States?**
 
@@ -161,7 +161,7 @@ Hallway  07:00       bri:254
 Hallway  civil_dusk  bri:150
   ~~~
 
-results in the following **dynamic intervals**, which are adjusted each day based on the sun times:
+results in the following **dynamic intervals**, which are adjusted each day based on the solar times:
 
 - **07:00–civil_dusk**: bri:254
 - **civil_dusk–07:00**: bri:150
@@ -249,7 +249,7 @@ Hue Scheduler offers various transition-related properties, which can be combine
 
   > To simplify the definition, you can use the ``s`` (seconds), ``min`` (minutes) and ``h`` (hours) units. For example: ``tr:10s``, ``tr:2min`` or ``tr:1h``. Any combination is also possible, like ``1h20min5s10``, as long as the order is kept from largest to smallest unit. The units themselves are case-insensitive.
 
-- ``tr-before``: defines the transition time used *before* the defined start time. The additional transition type provided by Hue Scheduler. Realistically, the maximally supported value is 24 hours. In addition to the seconds and minute shorthand from above, ``tr-before`` also supports setting absolute times, including dynamic sun times (see _Start Time Expression_ section):
+- ``tr-before``: defines the transition time used *before* the defined start time. The additional transition type provided by Hue Scheduler. Realistically, the maximally supported value is 24 hours. In addition to the seconds and minute shorthand from above, ``tr-before`` also supports setting absolute times, including dynamic solar times (see _Start Time Expression_ section):
 
   ~~~yacas
   Office  sunrise  on:true  bri:254  tr-before:30min
@@ -411,7 +411,7 @@ A JVM argument to configure the log level of Hue Scheduler. The following values
 
 - `ERROR`: Only logs if the API returned with an error code. This should most likely never occur.
 - `WARN`: Additionally logs if the bridge is not reachable, and Hue Scheduler retries
-- `INFO`: Logs when a light state has been set, a manual override has been detected, as well as the current sun times for each day.
+- `INFO`: Logs when a light state has been set, a manual override has been detected, as well as the current solar times for each day.
 - `DEBUG` (default): Logs every scheduled state; if a state has already ended, and if an on-event for a light has been received.
 - `TRACE`: Maximum logs, including all performed API requests and enforced wait times due to rate limiting.
 
@@ -530,7 +530,7 @@ Both approaches try to automate your lights' state according to the time of day.
 
 No, Hue Scheduler does not access the Internet. It only communicates with your local Philips Hue Bridge. You can see exactly which REST HTTP requests Hue Scheduler sends to your local bridge by setting the `-Dlog.level=TRACE` JVM parameter. See "Advanced Command Line Options".
 
-The dynamic sun times are also calculated locally using the [shred/commons-suncalc](https://github.com/shred/commons-suncalc) library, with no data ever leaving your device.
+The dynamic solar times are also calculated locally using the [shred/commons-suncalc](https://github.com/shred/commons-suncalc) library, with no data ever leaving your device.
 
 ### Does Hue Scheduler Work With Motion Sensors?
 
