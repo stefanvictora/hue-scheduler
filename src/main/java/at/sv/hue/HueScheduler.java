@@ -1,12 +1,29 @@
 package at.sv.hue;
 
-import at.sv.hue.api.*;
+import at.sv.hue.api.BridgeAuthenticationFailure;
+import at.sv.hue.api.BridgeConnectionFailure;
+import at.sv.hue.api.HttpsResourceProviderImpl;
+import at.sv.hue.api.HueApi;
+import at.sv.hue.api.HueApiFailure;
+import at.sv.hue.api.HueApiHttpsClientFactory;
+import at.sv.hue.api.HueApiImpl;
+import at.sv.hue.api.HueEventListener;
+import at.sv.hue.api.HueEventListenerImpl;
+import at.sv.hue.api.HueRawEventHandler;
+import at.sv.hue.api.LightState;
+import at.sv.hue.api.LightStateEventTrackerImpl;
+import at.sv.hue.api.ManualOverrideTracker;
+import at.sv.hue.api.ManualOverrideTrackerImpl;
+import at.sv.hue.api.PutCall;
+import at.sv.hue.api.RateLimiter;
 import at.sv.hue.time.StartTimeProvider;
 import at.sv.hue.time.StartTimeProviderImpl;
 import at.sv.hue.time.SunTimesProviderImpl;
+import lombok.SneakyThrows;
 import okhttp3.OkHttpClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -21,20 +38,25 @@ import java.time.Duration;
 import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-@Command(name = "HueScheduler", version = "0.8.0", mixinStandardHelpOptions = true, sortOptions = false)
+@Command(name = "HueScheduler", version = "0.9.0", mixinStandardHelpOptions = true, sortOptions = false)
 public final class HueScheduler implements Runnable {
 
     private static final Logger LOG = LoggerFactory.getLogger(HueScheduler.class);
 
-    private final Map<Integer, List<ScheduledState>> lightStates;
-    private final ConcurrentHashMap<Integer, List<Runnable>> onStateWaitingList;
+    private final Map<String, List<ScheduledState>> lightStates;
+    private final ConcurrentHashMap<String, List<Runnable>> onStateWaitingList;
     @Parameters(description = "The IP address of your Philips Hue Bridge.")
     String ip;
     @Parameters(description = "The Philips Hue Bridge username created for Hue Scheduler during setup.")
@@ -60,8 +82,22 @@ public final class HueScheduler implements Runnable {
             description = "Globally disable tracking of user modifications which would pause their schedules until they are turned off and on again." +
                     " Default: ${DEFAULT-VALUE}")
     boolean disableUserModificationTracking;
+    @Option(names = "--interpolate-all", defaultValue = "false",
+            description = "Globally sets 'interpolate:true' for all states, unless explicitly set otherwise." +
+                    " Default: ${DEFAULT-VALUE}")
+    private boolean interpolateAll;
+    @Option(names = "--default-interpolation-transition-time", paramLabel = "<tr>", defaultValue = "4",
+            description = "The default transition time defined as a multiple of 100ms used for the interpolated call" +
+                    " when turning a light on during a tr-before transition. Default: ${DEFAULT-VALUE} (=400 ms)." +
+                    " You can also use, e.g., 2s for convenience.")
+    String defaultInterpolationTransitionTimeString;
+    /**
+     * The converted transition time as a multiple of 100ms.
+     */
+    Integer defaultInterpolationTransitionTime = 4;
     @Option(names = "--power-on-reschedule-delay", paramLabel = "<delay>", defaultValue = "150",
-            description = "The delay in ms after the light on-event was received and the current state should be rescheduled again. Default: ${DEFAULT-VALUE} ms.")
+            description = "The delay in ms after the light on-event was received and the current state should be " +
+                    "rescheduled again. Default: ${DEFAULT-VALUE} ms.")
     int powerOnRescheduleDelayInMs;
     @Option(names = "--bridge-failure-retry-delay", paramLabel = "<delay>", defaultValue = "10",
             description = "The delay in seconds for retrying an API call, if the bridge could not be reached due to " +
@@ -75,6 +111,20 @@ public final class HueScheduler implements Runnable {
             description = "The read timeout of the API v2 SSE event stream in minutes. " +
                     "The connection is automatically restored after a timeout. Default: ${DEFAULT-VALUE} minutes.")
     int eventStreamReadTimeoutInMinutes;
+    @Option(
+            names = "--api-cache-invalidation-interval", paramLabel = "<interval>", defaultValue = "15",
+            description = "The interval in which the api cache for groups and lights should be invalidated. " +
+                    "Default: ${DEFAULT-VALUE} minutes."
+    )
+    int apiCacheInvalidationIntervalInMinutes;
+    @Option(
+            names = "--min-tr-before-gap", paramLabel = "<gap>", defaultValue = "3",
+            description = "The minimum gap between multiple back-to-back tr-before states in minutes. This is needed as otherwise " +
+                    "the hue bridge may not yet recognise the end value of the transition and incorrectly marks " +
+                    "the light as manually overridden. This gap is automatically added between back-to-back " +
+                    "tr-before states. Default: ${DEFAULT-VALUE} minutes."
+    )
+    int minTrBeforeGapInMinutes;
     private HueApi hueApi;
     private StateScheduler stateScheduler;
     private final ManualOverrideTracker manualOverrideTracker;
@@ -86,14 +136,15 @@ public final class HueScheduler implements Runnable {
         lightStates = new HashMap<>();
         onStateWaitingList = new ConcurrentHashMap<>();
         manualOverrideTracker = new ManualOverrideTrackerImpl();
-        hueEventListener = new HueEventListenerImpl(manualOverrideTracker, onStateWaitingList::remove);
+        hueEventListener = new HueEventListenerImpl(manualOverrideTracker, onStateWaitingList::remove, this::getAssignedGroups);
     }
 
     public HueScheduler(HueApi hueApi, StateScheduler stateScheduler,
                         StartTimeProvider startTimeProvider, Supplier<ZonedDateTime> currentTime,
                         double requestsPerSecond, boolean controlGroupLightsIndividually,
-                        boolean disableUserModificationTracking, int powerOnRescheduleDelayInMs,
-                        int bridgeFailureRetryDelayInSeconds, int multiColorAdjustmentDelay) {
+                        boolean disableUserModificationTracking, String defaultInterpolationTransitionTimeString,
+                        int powerOnRescheduleDelayInMs, int bridgeFailureRetryDelayInSeconds, int multiColorAdjustmentDelay,
+                        int minTrBeforeGapInMinutes, boolean interpolateAll) {
         this();
         this.hueApi = hueApi;
         this.stateScheduler = stateScheduler;
@@ -102,9 +153,22 @@ public final class HueScheduler implements Runnable {
         this.requestsPerSecond = requestsPerSecond;
         this.controlGroupLightsIndividually = controlGroupLightsIndividually;
         this.disableUserModificationTracking = disableUserModificationTracking;
+        this.defaultInterpolationTransitionTimeString = defaultInterpolationTransitionTimeString;
         this.powerOnRescheduleDelayInMs = powerOnRescheduleDelayInMs;
         this.bridgeFailureRetryDelayInSeconds = bridgeFailureRetryDelayInSeconds;
         this.multiColorAdjustmentDelay = multiColorAdjustmentDelay;
+        this.minTrBeforeGapInMinutes = minTrBeforeGapInMinutes;
+        defaultInterpolationTransitionTime = parseInterpolationTransitionTime(defaultInterpolationTransitionTimeString);
+        this.interpolateAll = interpolateAll;
+        apiCacheInvalidationIntervalInMinutes = 15;
+    }
+
+    private Integer parseInterpolationTransitionTime(String interpolationTransitionTimeString) {
+        if (interpolationTransitionTimeString == null) {
+            return null;
+        }
+        return InputConfigurationParser.parseTransitionTime(
+                "interpolation-transition-time", interpolationTransitionTimeString);
     }
 
     public static void main(String[] args) {
@@ -116,11 +180,13 @@ public final class HueScheduler implements Runnable {
 
     @Override
     public void run() {
+        MDC.put("context", "init");
         OkHttpClient httpsClient = createHttpsClient();
         hueApi = new HueApiImpl(new HttpsResourceProviderImpl(httpsClient), ip, username, RateLimiter.create(requestsPerSecond));
         startTimeProvider = createStartTimeProvider(latitude, longitude, elevation);
         stateScheduler = createStateScheduler();
         currentTime = ZonedDateTime::now;
+        defaultInterpolationTransitionTime = parseInterpolationTransitionTime(defaultInterpolationTransitionTimeString);
         new LightStateEventTrackerImpl(ip, username, httpsClient, new HueRawEventHandler(hueEventListener), eventStreamReadTimeoutInMinutes).start();
         assertInputIsReadable();
         assertConnectionAndStart();
@@ -141,7 +207,8 @@ public final class HueScheduler implements Runnable {
     }
 
     private StateSchedulerImpl createStateScheduler() {
-        return new StateSchedulerImpl(Executors.newScheduledThreadPool(Runtime.getRuntime().availableProcessors()), ZonedDateTime::now);
+        return new StateSchedulerImpl(Executors.newScheduledThreadPool(Runtime.getRuntime().availableProcessors() * 2),
+                ZonedDateTime::now);
     }
 
     private void assertInputIsReadable() {
@@ -165,11 +232,11 @@ public final class HueScheduler implements Runnable {
             hueApi.assertConnection();
             LOG.info("Connected to bridge at {}.", ip);
         } catch (BridgeConnectionFailure e) {
-            LOG.warn("Bridge not reachable: '" + e.getCause().getLocalizedMessage() + "'. Retrying in 5s.");
+            LOG.warn("Bridge not reachable: '{}'. Retrying in 5s.", e.getCause().getLocalizedMessage());
             return false;
         } catch (BridgeAuthenticationFailure e) {
-            System.err.println("Bridge connection rejected: 'Unauthorized user'. Please make sure you use the correct username from the setup process," +
-                    " or try to generate a new one.");
+            System.err.println("Bridge connection rejected: 'Unauthorized user'. Please make sure you use the correct" +
+                    " username from the setup process, or try to generate a new one.");
             System.exit(3);
         }
         return true;
@@ -184,7 +251,8 @@ public final class HueScheduler implements Runnable {
                      try {
                          addState(input);
                      } catch (Exception e) {
-                         System.err.println("Failed to parse configuration line '" + input + "':\n" + e.getClass().getSimpleName() + ": " + e.getLocalizedMessage());
+                         System.err.println("Failed to parse configuration line '" + input + "':\n" +
+                                 e.getClass().getSimpleName() + ": " + e.getLocalizedMessage());
                          System.exit(2);
                      }
                  });
@@ -194,112 +262,127 @@ public final class HueScheduler implements Runnable {
     }
 
     public void addState(String input) {
-        new InputConfigurationParser(startTimeProvider, hueApi).parse(input).forEach(state -> {
-            int updateId;
-            if (state.isGroupState()) {
-                updateId = getGroupId(state.getUpdateId());
-            } else {
-                updateId = state.getUpdateId();
-            }
-            lightStates.computeIfAbsent(updateId, ArrayList::new).add(state);
-        });
-    }
-
-    private int getGroupId(int id) {
-        return id + 1000;
+        new InputConfigurationParser(startTimeProvider, hueApi, minTrBeforeGapInMinutes, interpolateAll)
+                .parse(input)
+                .forEach(state -> lightStates.computeIfAbsent(state.getIdV1(), key -> new ArrayList<>()).add(state));
     }
 
     public void start() {
         ZonedDateTime now = currentTime.get();
+        scheduleSolarDataInfoLog();
         lightStates.forEach((id, states) -> scheduleInitialStartup(states, now));
-        scheduleSunDataInfoLog();
+        scheduleApiCacheClear();
     }
 
+    /**
+     * Schedule the given states. To correctly schedule cross-over states, i.e., states that already started yesterday,
+     * we initially calculate all end times using yesterday, and reschedule them if needed afterward.
+     */
     private void scheduleInitialStartup(List<ScheduledState> states, ZonedDateTime now) {
-        calculateAndSetEndTimes(states, now);
-        scheduleStatesStartingToday(states, now);
-        scheduleStatesNotStartingToday(states, now);
+        MDC.put("context", "init");
+        ZonedDateTime yesterday = now.minusDays(1);
+        states.forEach(state -> state.setPreviousStateLookup(this::getPreviousState));
+        calculateAndSetEndTimes(states, yesterday);
+        states.stream()
+              .sorted(Comparator.comparing(state -> state.getDefinedStart(yesterday)))
+              .forEach(state -> initialSchedule(state, now));
+    }
+
+    private ScheduledStateSnapshot getPreviousState(ScheduledState currentState, ZonedDateTime dateTime) {
+        ZonedDateTime definedStart = currentState.getDefinedStart(dateTime);
+        List<ScheduledStateSnapshot> previousStates = getPreviousStatesListIgnoringSame(currentState, definedStart);
+        return previousStates.stream()
+                             .filter(snapshot -> snapshot.getDefinedStart().isBefore(definedStart))
+                             .findFirst()
+                             .orElse(null);
+    }
+
+    private List<ScheduledStateSnapshot> getPreviousStatesListIgnoringSame(ScheduledState currentState, ZonedDateTime definedStart) {
+        ZonedDateTime theDayBefore = definedStart.minusDays(1).truncatedTo(ChronoUnit.DAYS).withEarlierOffsetAtOverlap();
+        return getLightStatesForId(currentState)
+                .stream()
+                .flatMap(state -> Stream.of(state.getSnapshot(theDayBefore), state.getSnapshot(definedStart)))
+                .sorted(Comparator.comparing(ScheduledStateSnapshot::getDefinedStart, Comparator.reverseOrder())
+                                  .thenComparing(snapshot -> snapshot.getScheduledState().hasTransitionBefore()))
+                .distinct()
+                .filter(snapshot -> currentState.isNotSameState(snapshot.getScheduledState()))
+                .collect(Collectors.toList());
     }
 
     private void calculateAndSetEndTimes(List<ScheduledState> states, ZonedDateTime now) {
-        HashSet<ScheduledState> alreadyProcessedStates = new HashSet<>();
-        for (int i = 0; i < 7; i++) {
-            ZonedDateTime day = now.plusDays(i);
-            List<ScheduledState> statesStartingOnDay = getStatesStartingOnDay(states, day, DayOfWeek.from(day));
-            statesStartingOnDay.stream()
-                               .filter(state -> !alreadyProcessedStates.contains(state))
-                               .forEach(state -> calculateAndSetEndTime(state, states, state.getStart(now)));
-            alreadyProcessedStates.addAll(statesStartingOnDay);
-        }
+        states.forEach(state -> calculateAndSetEndTime(state, states, state.getDefinedStart(now)));
     }
 
-    private List<ScheduledState> getStatesStartingOnDay(List<ScheduledState> states, ZonedDateTime now, DayOfWeek... days) {
+    private void calculateAndSetEndTime(ScheduledState state, List<ScheduledState> states, ZonedDateTime definedStart) {
+        new EndTimeAdjuster(state, getNextState(states, definedStart), definedStart).calculateAndSetEndTime();
+    }
+
+    private ScheduledStateSnapshot getNextState(List<ScheduledState> states, ZonedDateTime definedStart) {
+        List<ScheduledStateSnapshot> nextStates = getNextStatesList(states, definedStart);
+        return nextStates.stream()
+                         .filter(snapshot -> snapshot.getDefinedStart().isAfter(definedStart))
+                         .findFirst()
+                         .orElse(null);
+    }
+
+    private List<ScheduledStateSnapshot> getNextStatesList(List<ScheduledState> states, ZonedDateTime definedStart) {
+        ZonedDateTime theDayAfter = definedStart.plusDays(1).truncatedTo(ChronoUnit.DAYS).withEarlierOffsetAtOverlap();
         return states.stream()
-                     .filter(state -> state.isScheduledOn(days))
-                     .sorted(Comparator.comparing(scheduledState -> scheduledState.getStart(now)))
+                     .flatMap(state -> Stream.of(state.getSnapshot(definedStart), state.getSnapshot(theDayAfter)))
+                     .sorted(Comparator.comparing(ScheduledStateSnapshot::getStart))
+                     .distinct()
                      .collect(Collectors.toList());
     }
 
-    private void calculateAndSetEndTime(ScheduledState state, List<ScheduledState> states, ZonedDateTime start) {
-        new EndTimeAdjuster(state, start, (day, dayOfWeeks) -> getStatesStartingOnDay(states, day, dayOfWeeks)).calculateAndSetEndTime();
+    private void initialSchedule(ScheduledState state, ZonedDateTime now) {
+        ZonedDateTime yesterday = now.minusDays(1);
+        if (state.endsBefore(now)) {
+            state.updateLastStart(yesterday);
+            reschedule(state); // no cross-over state, reschedule normally today
+        } else if (doesNotStartOn(state, yesterday)) {
+            state.updateLastStart(now);
+            schedule(state, state.getDelayUntilStart(now)); // state was already scheduled at a future time, reuse calculated start time
+        } else {
+            state.updateLastStart(yesterday);
+            schedule(state, 0); // schedule cross-over states, i.e., states already starting yesterday immediately
+        }
     }
 
-    private void scheduleStatesStartingToday(List<ScheduledState> states, ZonedDateTime now) {
-        new InitialTodayScheduler(now, (day, dayOfWeeks) -> getStatesStartingOnDay(states, day, dayOfWeeks), this::schedule,
-                this::scheduleNextDay).scheduleStatesStartingToday();
-    }
-
-    private void scheduleStatesNotStartingToday(List<ScheduledState> states, ZonedDateTime now) {
-        states.stream()
-              .filter(state -> doesNotStartToday(state, now))
-              .sorted(Comparator.comparing(state -> state.getStart(now)))
-              .forEach(this::schedule);
-    }
-
-    private boolean doesNotStartToday(ScheduledState state, ZonedDateTime now) {
-        return !DayOfWeek.from(state.getStart(now)).equals(DayOfWeek.from(now));
-    }
-
-    private void schedule(ScheduledState state) {
-        ZonedDateTime now = currentTime.get();
-        state.updateLastStart(now);
-        schedule(state, getMs(state.getDelayInSeconds(now)));
+    private boolean doesNotStartOn(ScheduledState state, ZonedDateTime dateTime) {
+        return !state.isScheduledOn(DayOfWeek.from(dateTime));
     }
 
     private void schedule(ScheduledState state, long delayInMs) {
         if (state.isNullState()) return;
-        if (shouldLogScheduleDebugMessage(delayInMs)) {
-            LOG.debug("Schedule {} in {}", state, Duration.ofMillis(delayInMs));
-        }
+        LOG.debug("Schedule: {} in {}", state, Duration.ofMillis(delayInMs).withNanos(0));
         stateScheduler.schedule(() -> {
-            if (state.endsAfter(currentTime.get())) {
-                LOG.debug("{} already ended", state);
+            MDC.put("context", state.getContextName());
+            if (state.endsBefore(currentTime.get())) {
+                LOG.debug("Already ended: {}", state);
                 reschedule(state);
                 return;
             }
-            if (lightHasBeenManuallyOverriddenBefore(state)) {
-                if (state.isOff()) {
-                    LOG.debug("{} state has been manually overridden before, skip off-state for this day: {}", state.getFormattedName(), state);
-                    reschedule(state, true);
-                } else {
-                    LOG.debug("{} state has been manually overridden before, skip update and retry when back online", state.getFormattedName());
+            LOG.info("Set: {}", state);
+            if (lightHasBeenManuallyOverriddenBefore(state) || lightHasBeenConsideredOffBeforeAndDoesNotTurnOn(state)) {
+                if (shouldRetryOnPowerOn(state)) {
+                    LOG.info("Off or manually overridden: Skip update and retry when back online");
                     retryWhenBackOn(state);
+                } else {
+                    LOG.info("Off or manually overridden: Skip state for this day.");
+                    reschedule(state);
                 }
                 return;
             }
             boolean success;
-            LightState lightState = null;
             try {
                 if (stateIsNotEnforced(state) && stateHasBeenManuallyOverriddenSinceLastSeen(state)) {
-                    LOG.debug("{} state has been manually overridden, pause update until light is turned off and on again", state.getFormattedName());
-                    manualOverrideTracker.onManuallyOverridden(state.getStatusId());
+                    LOG.info("Manually overridden: Pause updates until turned off and on again");
+                    manualOverrideTracker.onManuallyOverridden(state.getIdV1());
                     retryWhenBackOn(state);
                     return;
                 }
+                putAdditionalInterpolatedStateIfNeeded(state);
                 success = putState(state);
-                if (success) {
-                    lightState = hueApi.getLightState(state.getStatusId());
-                }
             } catch (BridgeConnectionFailure e) {
                 LOG.warn("Bridge not reachable, retrying in {}s.", bridgeFailureRetryDelayInSeconds);
                 retry(state, getMs(bridgeFailureRetryDelayInSeconds));
@@ -309,130 +392,124 @@ public final class HueScheduler implements Runnable {
                 retry(state, getMs(bridgeFailureRetryDelayInSeconds));
                 return;
             }
-            if (success && state.isOff() && lightState.isUnreachableOrOff()) {
-                LOG.info("Turned off {}, or was already off", state.getFormattedName());
-                reschedule(state, true);
-                return;
+            if (success) {
+                state.setLastSeen(currentTime.get());
+                manualOverrideTracker.onAutomaticallyAssigned(state.getIdV1());
+            } else {
+                manualOverrideTracker.onLightOff(state.getIdV1());
+                LOG.info("Off: Pause updates until light is turned on again");
             }
-            if (!success || lightState.isUnreachableOrOff()) {
-                LOG.trace("{} not reachable or off, retry when light turns back on", state.getFormattedName());
-                retryWhenBackOn(state);
-                return;
+            if (state.isOff()) {
+                LOG.info("Turned off, or was already off");
             }
-            LOG.info("Set {}", state);
+            if (shouldRetryOnPowerOn(state)) {
+                retryWhenBackOn(createPowerOnCopy(state));
+            }
             if (shouldAdjustMultiColorLoopOffset(state)) {
-                scheduleMultiColorLoopOffsetAdjustments(state.getGroupLights(), 1);
+                scheduleMultiColorLoopOffsetAdjustments(state);
             }
-            state.setLastSeen(currentTime.get());
-            manualOverrideTracker.onAutomaticallyAssigned(state.getStatusId());
-            retryWhenBackOn(ScheduledState.createTemporaryCopy(state, currentTime.get(), state.getEnd()));
-            reschedule(state, shouldEnforceNextDay(state));
+            reschedule(state);
         }, currentTime.get().plus(delayInMs, ChronoUnit.MILLIS), state.getEnd());
     }
 
-    private boolean shouldEnforceNextDay(ScheduledState state) {
-        LocalTime currentTime = this.currentTime.get().toLocalTime().truncatedTo(ChronoUnit.SECONDS).plusSeconds(1);
-        LocalTime stateStartTime = state.getLastStart().toLocalTime().truncatedTo(ChronoUnit.SECONDS);
-        return currentTime.isAfter(stateStartTime) || currentTime.equals(stateStartTime);
+    private boolean lightHasBeenManuallyOverriddenBefore(ScheduledState state) {
+        return manualOverrideTracker.isManuallyOverridden(state.getIdV1());
     }
 
-    private boolean lightHasBeenManuallyOverriddenBefore(ScheduledState state) {
-        return !disableUserModificationTracking && manualOverrideTracker.isManuallyOverridden(state.getStatusId());
+    private boolean lightHasBeenConsideredOffBeforeAndDoesNotTurnOn(ScheduledState state) {
+        return manualOverrideTracker.isOff(state.getIdV1()) && !state.isOn();
     }
 
     private boolean stateIsNotEnforced(ScheduledState state) {
-        return !disableUserModificationTracking && !state.isForced() && !manualOverrideTracker.shouldEnforceSchedule(state.getStatusId());
+        return !disableUserModificationTracking && !state.isForced() && !manualOverrideTracker.shouldEnforceSchedule(state.getIdV1());
     }
 
-    private boolean stateHasBeenManuallyOverriddenSinceLastSeen(ScheduledState currentState) {
-        ScheduledState lastSeenState = getLastSeenState(currentState);
+    private boolean stateHasBeenManuallyOverriddenSinceLastSeen(ScheduledState scheduledState) {
+        ScheduledState lastSeenState = getLastSeenState(scheduledState);
         if (lastSeenState == null) {
             return false;
         }
-        // todo: this does not really work reliably for groups, as it could be that just this light is not reachable because it was manually turned off
-        return lastSeenState.lightStateDiffers(hueApi.getLightState(currentState.getStatusId()));
+        if (scheduledState.isGroupState()) {
+            return hueApi.getGroupStates(scheduledState.getUpdateId()).stream().anyMatch(lastSeenState::lightStateDiffers);
+        } else {
+            return lastSeenState.lightStateDiffers(hueApi.getLightState(scheduledState.getUpdateId()));
+        }
     }
 
     private ScheduledState getLastSeenState(ScheduledState currentState) {
         return getLightStatesForId(currentState).stream()
-                                                .sorted(Comparator.comparing(ScheduledState::getLastSeen, Comparator.nullsFirst(ZonedDateTime::compareTo).reversed()))
                                                 .filter(state -> state.getLastSeen() != null)
-                                                .findFirst()
+                                                .max(Comparator.comparing(ScheduledState::getLastSeen))
                                                 .orElse(null);
     }
 
-    private boolean shouldLogScheduleDebugMessage(long delayInMs) {
-        return delayInMs == 0 || delayInMs > 5000 && delayInMs != getMs(bridgeFailureRetryDelayInSeconds);
+    private void putAdditionalInterpolatedStateIfNeeded(ScheduledState state) {
+        if (!state.hasTransitionBefore()) {
+            return;
+        }
+        ZonedDateTime dateTime = currentTime.get();
+        ScheduledStateSnapshot previousStateSnapshot = getPreviousState(state, dateTime);
+        if (previousStateSnapshot == null) {
+            return;
+        }
+        ScheduledState previousState = previousStateSnapshot.getScheduledState();
+        ScheduledState lastSeenState = getLastSeenState(state);
+        if ((lastSeenState == previousState || state.isSameState(lastSeenState) && state.isSplitState())
+                && !manualOverrideTracker.shouldEnforceSchedule(state.getIdV1())) {
+            return; // skip interpolations if the previous or current state was the last state set without any power cycles
+        }
+        PutCall interpolatedPutCall = state.getInterpolatedPutCall(previousStateSnapshot, currentTime.get(), true);
+        if (interpolatedPutCall == null) {
+            return;
+        }
+        LOG.trace("Perform interpolation from previous state: {}", previousState);
+        Integer interpolationTransitionTime = getInterpolationTransitionTime(previousState);
+        interpolatedPutCall.setTransitionTime(interpolationTransitionTime);
+        putState(previousState, interpolatedPutCall);
+        sleepIfNeeded(interpolationTransitionTime);
+    }
+
+    private Integer getInterpolationTransitionTime(ScheduledState previousState) {
+        Integer definedTransitionTime = previousState.getDefinedTransitionTime();
+        if (definedTransitionTime == null) {
+            return defaultInterpolationTransitionTime;
+        }
+        return definedTransitionTime;
+    }
+
+    @SneakyThrows(InterruptedException.class)
+    private void sleepIfNeeded(Integer sleepTime) {
+        if (sleepTime == null) {
+            return;
+        }
+        Thread.sleep(sleepTime * 100L);
     }
 
     private void reschedule(ScheduledState state) {
-        reschedule(state, false);
-    }
-
-    private void reschedule(ScheduledState state, boolean forceNextDay) {
         if (state.isTemporary()) return;
         ZonedDateTime now = currentTime.get();
-        ZonedDateTime nextStart = getNextStart(state, now, forceNextDay);
-        state.updateLastStart(nextStart); // todo: we should write a test, that his value is now set to the next start instead of now
-        calculateAndSetEndTime(state, getLightStatesForId(state), nextStart);
-        schedule(state, getMs(getDelayInSeconds(now, nextStart)));
+        ZonedDateTime nextDefinedStart = getNextDefinedStart(state, now);
+        state.updateLastStart(nextDefinedStart);
+        calculateAndSetEndTime(state, getLightStatesForId(state), nextDefinedStart);
+        schedule(state, state.getDelayUntilStart(now));
     }
 
-    private ZonedDateTime getNextStart(ScheduledState state, ZonedDateTime now, boolean forceNextDay) {
-        if (forceNextDay || shouldScheduleNextDay(state)) {
-            return state.getStart(now.plusDays(1));
+    private ZonedDateTime getNextDefinedStart(ScheduledState state, ZonedDateTime now) {
+        ZonedDateTime nextDefinedStart = state.getNextDefinedStart(now);
+        if (shouldScheduleNextDay(state, nextDefinedStart, now)) {
+            return state.getNextDefinedStart(now.plusDays(1));
         } else {
-            return state.getStart(now);
+            return nextDefinedStart;
         }
     }
 
-    private boolean shouldScheduleNextDay(ScheduledState state) {
-        List<ScheduledState> todaysStates = getStatesStartingToday(state);
-        if (isLastState(state, todaysStates)) {
-            return false;
-        }
-        return nextStateAlreadyStarted(state, todaysStates);
-    }
-
-    private List<ScheduledState> getStatesStartingToday(ScheduledState state) {
-        ZonedDateTime now = currentTime.get();
-        return getStatesStartingOnDay(getLightStatesForId(state), now, DayOfWeek.from(now))
-                .stream()
-                .sorted(Comparator.comparing(scheduledState -> scheduledState.getStart(now)))
-                .collect(Collectors.toList());
-    }
-
-    private boolean isLastState(ScheduledState state, List<ScheduledState> todaysStates) {
-        return todaysStates.indexOf(state) == todaysStates.size() - 1;
-    }
-
-    private boolean nextStateAlreadyStarted(ScheduledState state, List<ScheduledState> todaysStates) {
-        return todaysStates.get(todaysStates.indexOf(state) + 1).isInThePastOrNow(currentTime.get());
-    }
-
-    private static long getDelayInSeconds(ZonedDateTime now, ZonedDateTime nextStart) {
-        Duration between = Duration.between(now, nextStart);
-        if (between.isNegative()) {
-            return 0;
-        } else {
-            return between.getSeconds();
-        }
-    }
-
-    private void scheduleNextDay(ScheduledState state) {
-        reschedule(state, true);
+    private boolean shouldScheduleNextDay(ScheduledState state, ZonedDateTime nextDefinedStart, ZonedDateTime now) {
+        ScheduledStateSnapshot nextState = getNextState(getLightStatesForId(state), nextDefinedStart);
+        return nextState.getStart().isBefore(now) || nextState.getStart().isEqual(now);
     }
 
     private List<ScheduledState> getLightStatesForId(ScheduledState state) {
-        return lightStates.get(getLightId(state));
-    }
-
-    private int getLightId(ScheduledState state) {
-        if (state.isGroupState()) {
-            return getGroupId(state.getUpdateId());
-        } else {
-            return state.getUpdateId();
-        }
+        return lightStates.get(state.getIdV1());
     }
 
     private long getMs(long seconds) {
@@ -440,42 +517,112 @@ public final class HueScheduler implements Runnable {
     }
 
     private boolean putState(ScheduledState state) {
+        ZonedDateTime now = currentTime.get();
+        if (state.isInsideSplitCallWindow(now)) {
+            PutCall interpolatedSplitPutCall = getInterpolatedSplitPutCall(state);
+            if (interpolatedSplitPutCall == null) {
+                return true;
+            }
+            boolean success = performPutApiCall(state, interpolatedSplitPutCall);
+            if (!state.isRetryAfterPowerOnState()) { // schedule follow-up split
+                schedule(ScheduledState.createTemporaryCopy(state), state.getNextInterpolationSplitDelayInMs(now));
+            }
+            return success;
+        } else {
+            return putState(state, getPutCallWithAdjustedTr(state, now));
+        }
+    }
+
+    private PutCall getInterpolatedSplitPutCall(ScheduledState state) {
+        ZonedDateTime dateTime = currentTime.get();
+        ScheduledStateSnapshot previousState = getPreviousState(state, dateTime);
+        return state.getNextInterpolatedSplitPutCall(currentTime.get(), previousState);
+    }
+
+    private boolean putState(ScheduledState state, PutCall putCall) {
         if (state.isGroupState() && controlGroupLightsIndividually) {
-            for (Integer id : state.getGroupLights()) {
+            for (Integer id : getGroupLights(state)) {
                 try {
-                    if (!putState(id, state, false)) {
-                        LOG.trace("Group light with id {} is off, could not update state", id);
-                    }
+                    performPutApiCall(state, putCall.toBuilder().id(id).groupState(false).build());
                 } catch (HueApiFailure e) {
                     LOG.trace("Unsupported api call for light id {}: {}", id, e.getLocalizedMessage());
                 }
             }
             return true;
         } else {
-            return putState(state.getUpdateId(), state, state.isGroupState());
+            return performPutApiCall(state, putCall);
         }
     }
 
-    private boolean putState(int updateId, ScheduledState state, boolean groupState) {
-        return hueApi.putState(updateId, state.getBrightness(), state.getCt(), state.getX(), state.getY(),
-                state.getHue(), state.getSat(), state.getEffect(), state.getOn(), state.getTransitionTime(currentTime.get()),
-                groupState);
+    private List<Integer> getGroupLights(ScheduledState state) {
+        return hueApi.getGroupLights(state.getUpdateId());
+    }
+
+    private boolean performPutApiCall(ScheduledState state, PutCall putCall) {
+        LOG.trace("{}", putCall);
+        state.setLastPutCall(putCall);
+        return hueApi.putState(putCall);
+    }
+
+    private PutCall getPutCallWithAdjustedTr(ScheduledState state, ZonedDateTime now) {
+        PutCall putCall = state.getPutCall(now);
+        if (putCall.getTransitionTime() == null) {
+            return putCall;
+        }
+        ScheduledStateSnapshot nextState = getNextState(getLightStatesForId(state), state.getLastDefinedStart());
+        Duration duration = Duration.between(now, nextState.getStart()).abs();
+        Duration tr = Duration.ofMillis(putCall.getTransitionTime() * 100);
+        long differenceInMinutes = duration.minus(tr).toMinutes();
+        int requiredGap = state.getRequiredGap();
+        if (differenceInMinutes < requiredGap) {
+            putCall.setTransitionTime(getAdjustedTransitionTime(duration, requiredGap, nextState));
+        }
+        return putCall;
+    }
+
+    private Integer getAdjustedTransitionTime(Duration duration, int requiredGap, ScheduledStateSnapshot nextState) {
+        if (shouldEnsureGap(nextState)) {
+            duration = duration.minusMinutes(requiredGap);
+        }
+        if (duration.isZero() || duration.isNegative()) {
+            return null;
+        }
+        return (int) (duration.toMillis() / 100);
+    }
+
+    private boolean shouldEnsureGap(ScheduledStateSnapshot nextState) {
+        return !disableUserModificationTracking && !nextState.isForced() && !nextState.isNullState();
     }
 
     private void retry(ScheduledState state, long delayInMs) {
         schedule(state, delayInMs);
     }
 
+    private ScheduledState createPowerOnCopy(ScheduledState state) {
+        ScheduledState powerOnCopy = ScheduledState.createTemporaryCopy(state, state.calculateNextPowerOnEnd(currentTime.get()));
+        powerOnCopy.setRetryAfterPowerOnState(true);
+        return powerOnCopy;
+    }
+
+    private static boolean shouldRetryOnPowerOn(ScheduledState state) {
+        return !state.isOff() || state.isForced();
+    }
+
     private void retryWhenBackOn(ScheduledState state) {
-        onStateWaitingList.computeIfAbsent(state.getStatusId(), id -> new ArrayList<>()).add(() -> schedule(state, powerOnRescheduleDelayInMs));
+        onStateWaitingList.computeIfAbsent(state.getIdV1(), id -> new ArrayList<>()).add(() -> schedule(state, powerOnRescheduleDelayInMs));
     }
 
     private boolean shouldAdjustMultiColorLoopOffset(ScheduledState state) {
-        return state.isMultiColorLoop() && state.getGroupLights().size() > 1;
+        return state.isMultiColorLoop() && getGroupLights(state).size() > 1;
+    }
+
+    private void scheduleMultiColorLoopOffsetAdjustments(ScheduledState state) {
+        scheduleMultiColorLoopOffsetAdjustments(getGroupLights(state), 1);
     }
 
     private void scheduleMultiColorLoopOffsetAdjustments(List<Integer> groupLights, int i) {
-        stateScheduler.schedule(() -> offsetMultiColorLoopForLight(groupLights, i), currentTime.get().plusSeconds(multiColorAdjustmentDelay), null);
+        stateScheduler.schedule(() -> offsetMultiColorLoopForLight(groupLights, i),
+                currentTime.get().plusSeconds(multiColorAdjustmentDelay), null);
     }
 
     private void offsetMultiColorLoopForLight(List<Integer> groupLights, int i) {
@@ -500,23 +647,38 @@ public final class HueScheduler implements Runnable {
     }
 
     private void scheduleTurnOn(Integer light) {
-        stateScheduler.schedule(() -> putOnState(light, true, "colorloop"), currentTime.get().plus(300, ChronoUnit.MILLIS), null);
+        stateScheduler.schedule(() -> putOnState(light, true, "colorloop"),
+                currentTime.get().plus(300, ChronoUnit.MILLIS), null);
     }
 
     private void putOnState(int light, boolean on, String effect) {
-        hueApi.putState(light, null, null, null, null, null, null, effect, on, null, false);
+        hueApi.putState(PutCall.builder().id(light).on(on).effect(effect).build());
     }
 
-    private void scheduleSunDataInfoLog() {
-        logSunDataInfo();
+    private void scheduleSolarDataInfoLog() {
+        logSolarDataInfo();
         ZonedDateTime now = currentTime.get();
         ZonedDateTime midnight = ZonedDateTime.of(now.toLocalDate().plusDays(1), LocalTime.MIDNIGHT, now.getZone());
         long delay = Duration.between(now, midnight).toMinutes();
-        stateScheduler.scheduleAtFixedRate(this::logSunDataInfo, delay + 1, 60 * 24, TimeUnit.MINUTES);
+        stateScheduler.scheduleAtFixedRate(this::logSolarDataInfo, delay + 1, 60 * 24L, TimeUnit.MINUTES);
     }
 
-    private void logSunDataInfo() {
-        LOG.info("Current sun times:\n{}", startTimeProvider.toDebugString(currentTime.get()));
+    private void logSolarDataInfo() {
+        MDC.put("context", "info");
+        LOG.info("Current solar times:\n{}", startTimeProvider.toDebugString(currentTime.get()));
+    }
+
+    private void scheduleApiCacheClear() {
+        stateScheduler.scheduleAtFixedRate(
+                hueApi::clearCaches, apiCacheInvalidationIntervalInMinutes, apiCacheInvalidationIntervalInMinutes, TimeUnit.MINUTES);
+    }
+
+    private List<String> getAssignedGroups(String idv1LightId) {
+        int lightId = Integer.parseInt(idv1LightId.substring("/lights/".length()));
+        return hueApi.getAssignedGroups(lightId)
+                     .stream()
+                     .map(id -> "/groups/" + id)
+                     .collect(Collectors.toList());
     }
 
     HueEventListener getHueEventListener() {

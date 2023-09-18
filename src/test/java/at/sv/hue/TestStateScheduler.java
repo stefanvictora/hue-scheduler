@@ -21,7 +21,7 @@ final class TestStateScheduler implements StateScheduler {
 
     @Override
     public void scheduleAtFixedRate(Runnable command, long initialDelay, long period, TimeUnit unit) {
-        
+
     }
 
     public List<ScheduledRunnable> getScheduledStates() {

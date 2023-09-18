@@ -1,61 +1,39 @@
 package at.sv.hue;
 
-import java.time.LocalTime;
+import java.time.Duration;
 import java.time.ZonedDateTime;
-import java.util.List;
+import java.time.temporal.ChronoUnit;
 
 public final class EndTimeAdjuster {
 
-    private final StatesForDayProvider statesForDayProvider;
     private final ScheduledState state;
-    private final ZonedDateTime day;
+    private final ScheduledStateSnapshot nextState;
+    private final ZonedDateTime definedStart;
 
-    public EndTimeAdjuster(ScheduledState state, ZonedDateTime day, StatesForDayProvider statesOnDayProvider) {
+    public EndTimeAdjuster(ScheduledState state, ScheduledStateSnapshot nextState, ZonedDateTime definedStart) {
         this.state = state;
-        this.day = day;
-        this.statesForDayProvider = statesOnDayProvider;
+        this.nextState = nextState;
+        this.definedStart = definedStart;
     }
 
     public void calculateAndSetEndTime() {
-        List<ScheduledState> statesOnDay = getStatesOnDay();
-        int index = statesOnDay.indexOf(state);
-        if (isLastState(statesOnDay, index)) {
-            if (isAlsoScheduledTheDayAfter()) {
-                setEndToStartOfFirstStateTheDayAfter();
-            } else {
-                setEndToEndOfDay();
-            }
+        if (state.isScheduledOn(nextState.getStart()) && isTodayOrNextDay(nextState)) {
+            setEndToStartOfNextState(nextState);
         } else {
-            setEndToStartOfFollowingState(statesOnDay.get(index + 1));
+            setEndToEndOfDay();
         }
     }
 
-    private List<ScheduledState> getStatesOnDay() {
-        return getStatesOnDay(day);
+    private boolean isTodayOrNextDay(ScheduledStateSnapshot nextState) {
+        return Duration.between(definedStart.truncatedTo(ChronoUnit.DAYS),
+                nextState.getStart().truncatedTo(ChronoUnit.DAYS)).toDays() <= 1;
     }
 
-    private List<ScheduledState> getStatesOnDay(ZonedDateTime day) {
-        return statesForDayProvider.getStatesOnDay(day);
-    }
-
-    private boolean isLastState(List<ScheduledState> states, int index) {
-        return index + 1 >= states.size();
-    }
-
-    private boolean isAlsoScheduledTheDayAfter() {
-        return state.isScheduledOn(day.plusDays(1));
-    }
-
-    private void setEndToStartOfFirstStateTheDayAfter() {
-        List<ScheduledState> statesTheDayAfter = getStatesOnDay(day.plusDays(1));
-        state.setEnd(statesTheDayAfter.get(0).getStart(day.plusDays(1)).minusSeconds(1));
+    private void setEndToStartOfNextState(ScheduledStateSnapshot nextState) {
+        state.setEnd(nextState.getStart().minusSeconds(1));
     }
 
     private void setEndToEndOfDay() {
-        state.setEnd(day.with(LocalTime.MIDNIGHT.minusSeconds(1)));
-    }
-
-    private void setEndToStartOfFollowingState(ScheduledState followingState) {
-        state.setEnd(followingState.getStart(day).minusSeconds(1));
+        state.setEnd(definedStart.plusDays(1).truncatedTo(ChronoUnit.DAYS).minusSeconds(1));
     }
 }

@@ -12,15 +12,25 @@ import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class InputConfigurationParser {
 
+    private static final Pattern TR_PATTERN = Pattern.compile("(?:(\\d+)h)?(?:(\\d+)min)?(?:(\\d+)s)?(\\d*)?",
+            Pattern.CASE_INSENSITIVE);
+
     private final StartTimeProvider startTimeProvider;
     private final HueApi hueApi;
+    private final int minTrBeforeGapInMinutes;
+    private final boolean interpolateAll;
 
-    public InputConfigurationParser(StartTimeProvider startTimeProvider, HueApi hueApi) {
+    public InputConfigurationParser(StartTimeProvider startTimeProvider, HueApi hueApi, int minTrBeforeGapInMinutes,
+                                    boolean interpolateAll) {
         this.startTimeProvider = startTimeProvider;
         this.hueApi = hueApi;
+        this.minTrBeforeGapInMinutes = minTrBeforeGapInMinutes;
+        this.interpolateAll = interpolateAll;
     }
 
     public List<ScheduledState> parse(String input) {
@@ -53,35 +63,39 @@ public final class InputConfigurationParser {
                 }
             }
             LightCapabilities capabilities;
-            if (!groupState) {
-                capabilities = hueApi.getLightCapabilities(id);
+            if (groupState) {
+                capabilities = hueApi.getGroupCapabilities(id);
             } else {
-                capabilities = LightCapabilities.NO_CAPABILITIES;
+                capabilities = hueApi.getLightCapabilities(id);
             }
             Integer bri = null;
             Integer ct = null;
             Boolean on = null;
             Boolean force = null;
+            Boolean interpolate = null;
             Double x = null;
             Double y = null;
             Integer hue = null;
             Integer sat = null;
-            Integer transitionTimeBefore = null;
+            String transitionTimeBefore = null;
             Integer transitionTime = null;
             String effect = null;
+            if (interpolateAll) {
+                interpolate = Boolean.TRUE;
+            }
             EnumSet<DayOfWeek> dayOfWeeks = EnumSet.noneOf(DayOfWeek.class);
             for (int i = 2; i < parts.length; i++) {
-                String part = parts[i];
-                String[] typeAndValue = part.split(":");
+                String part = parts[i].trim();
+                String[] typeAndValue = part.split(":", 2);
                 String parameter = typeAndValue[0];
                 String value = typeAndValue[1];
                 switch (parameter) {
                     case "bri":
-                        bri = parseInteger(value, parameter);
+                        bri = parseBrightness(value);
                         break;
                     case "ct":
                         ct = parseInteger(value, parameter);
-                        if (ct >= 1_000) {
+                        if (ct >= 2_000) {
                             ct = convertToMiredCt(ct);
                         }
                         break;
@@ -92,7 +106,7 @@ public final class InputConfigurationParser {
                         transitionTime = parseTransitionTime(parameter, value);
                         break;
                     case "tr-before":
-                        transitionTimeBefore = parseTransitionTime(parameter, value);
+                        transitionTimeBefore = value;
                         break;
                     case "x":
                         x = parseDouble(value, parameter);
@@ -104,7 +118,7 @@ public final class InputConfigurationParser {
                         hue = parseInteger(value, parameter);
                         break;
                     case "sat":
-                        sat = parseInteger(value, parameter);
+                        sat = parseSaturation(value);
                         break;
                     case "color":
                         RGBToXYConverter.XYColor xyColor;
@@ -132,18 +146,64 @@ public final class InputConfigurationParser {
                     case "force":
                         force = parseBoolean(value, parameter);
                         break;
+                    case "interpolate":
+                        interpolate = parseBoolean(value, parameter);
+                        break;
                     default:
                         throw new UnknownStateProperty("Unknown state property '" + parameter + "' with value '" + value + "'");
                 }
             }
             String start = parts[1];
-            states.add(createState(name, id, start, bri, ct, x, y, hue, sat, effect, on, transitionTimeBefore,
-                    transitionTime, dayOfWeeks, capabilities, groupState, force));
+            states.add(new ScheduledState(name, id, start, bri, ct, x, y, hue, sat, effect, on, transitionTimeBefore,
+                    transitionTime, dayOfWeeks, startTimeProvider, capabilities, minTrBeforeGapInMinutes, force,
+                    interpolate, groupState, false));
         }
         return states;
     }
 
-    private Integer parseInteger(String value, String parameter) {
+    private Integer parseBrightness(String value) {
+        if (value.endsWith("%")) {
+            return parseBrightnessPercentValue(value);
+        }
+        return parseInteger(value, "bri");
+    }
+
+    private Integer parseSaturation(String value) {
+        if (value.endsWith("%")) {
+            return parseSaturationPercentValue(value);
+        }
+        return parseInteger(value, "sat");
+    }
+
+    /**
+     * Calculates the brightness value [1-254]. This uses an adapted percentage range of [1%-100%]. Treating 1% as the min value. To make sure, we
+     * also handle the special case of 0% and treat is as 1%.
+     */
+    private int parseBrightnessPercentValue(String value) {
+        String percentString = value.replace("%", "").trim();
+        Double percent = parseDouble(percentString, "bri");
+        if (percent < 1) {
+            return 1;
+        }
+        if (percent > 100) {
+            return 254;
+        }
+        return (int) Math.round((254.0 - 1.0) * (percent - 1) / 99.0 + 1.0);
+    }
+
+    private int parseSaturationPercentValue(String value) {
+        String percentString = value.replace("%", "").trim();
+        Double percent = parseDouble(percentString, "sat");
+        if (percent < 0) {
+            return 0;
+        }
+        if (percent > 100) {
+            return 254;
+        }
+        return (int) Math.round(254.0 * percent / 100.0);
+    }
+
+    private static Integer parseInteger(String value, String parameter) {
         return parseValueWithErrorHandling(value, parameter, "integer", Integer::valueOf);
     }
 
@@ -155,7 +215,7 @@ public final class InputConfigurationParser {
         return parseValueWithErrorHandling(value, parameter, "boolean", Boolean::parseBoolean);
     }
 
-    private <T> T parseValueWithErrorHandling(String value, String parameter, String type, Function<String, T> function) {
+    private static <T> T parseValueWithErrorHandling(String value, String parameter, String type, Function<String, T> function) {
         try {
             return function.apply(value);
         } catch (Exception e) {
@@ -163,37 +223,23 @@ public final class InputConfigurationParser {
         }
     }
 
-    private Integer parseTransitionTime(String parameter, String s) {
-        String value = s;
-        int modifier = 1;
-        if (s.endsWith("s")) {
-            value = s.substring(0, s.length() - 1);
-            modifier = 10;
-        } else if (s.endsWith("min")) {
-            value = s.substring(0, s.length() - 3);
-            modifier = 600;
+    public static int parseTransitionTime(String parameter, String s) {
+        Matcher matcher = TR_PATTERN.matcher(s);
+        if (!matcher.matches()) {
+            throw new InvalidPropertyValue("Invalid transition time '" + s + "' for property '" + parameter + "'.");
         }
-        return parseInteger(value.trim(), parameter) * modifier;
+        int hours = getIntFromGroup(matcher.group(1), parameter);
+        int minutes = getIntFromGroup(matcher.group(2), parameter);
+        int seconds = getIntFromGroup(matcher.group(3), parameter);
+        int milliseconds = getIntFromGroup(matcher.group(4), parameter);
+        return hours * 36000 + minutes * 600 + seconds * 10 + milliseconds;
+    }
+
+    private static int getIntFromGroup(String group, String parameter) {
+        return (group == null || group.isEmpty()) ? 0 : parseInteger(group, parameter);
     }
 
     private Integer convertToMiredCt(Integer kelvin) {
         return 1_000_000 / kelvin;
-    }
-
-    private ScheduledState createState(String name, int id, String start, Integer brightness, Integer ct, Double x, Double y,
-                                       Integer hue, Integer sat, String effect, Boolean on, Integer transitionTimeBefore, Integer transitionTime,
-                                       EnumSet<DayOfWeek> dayOfWeeks, LightCapabilities capabilities, boolean groupState, Boolean force) {
-        List<Integer> groupLights;
-        if (groupState) {
-            groupLights = getGroupLights(id);
-        } else {
-            groupLights = null;
-        }
-        return new ScheduledState(name, id, start, brightness, ct, x, y, hue, sat, effect, on, transitionTimeBefore,
-                transitionTime, dayOfWeeks, startTimeProvider, groupState, groupLights, capabilities, force);
-    }
-
-    private List<Integer> getGroupLights(int groupId) {
-        return hueApi.getGroupLights(groupId);
     }
 }

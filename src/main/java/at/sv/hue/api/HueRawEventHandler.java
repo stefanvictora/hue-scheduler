@@ -8,13 +8,14 @@ import com.launchdarkly.eventsource.MessageEvent;
 import com.launchdarkly.eventsource.background.BackgroundEventHandler;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 
 import java.util.ArrayList;
 import java.util.List;
 
 @Slf4j
 public final class HueRawEventHandler implements BackgroundEventHandler {
-    private final static TypeReference<List<HueEventContainer>> typeRef = new TypeReference<List<HueEventContainer>>() {
+    private static final TypeReference<List<HueEventContainer>> typeRef = new TypeReference<List<HueEventContainer>>() {
     };
     private final HueEventListener hueEventListener;
     private final ObjectMapper objectMapper;
@@ -27,12 +28,14 @@ public final class HueRawEventHandler implements BackgroundEventHandler {
 
     @Override
     public void onOpen() {
-        log.info("Hue event stream handler opened");
+        MDC.put("context", "events");
+        log.trace("Hue event stream handler opened");
     }
 
     @Override
     public void onClosed() {
-        log.debug("Hue event stream handler closed");
+        MDC.put("context", "events");
+        log.trace("Hue event stream handler closed");
     }
 
     @Override
@@ -41,10 +44,10 @@ public final class HueRawEventHandler implements BackgroundEventHandler {
         hueEventContainers.stream()
                           .flatMap(container -> container.getData().stream())
                           .forEach(hueEvent -> {
-                              if (hueEvent.isLight() && hueEvent.isOffEvent()) {
-                                  hueEventListener.onLightOff(hueEvent.getLightId(), hueEvent.getId());
-                              } else if (hueEvent.isLight() && hueEvent.isOnEvent()) {
-                                  hueEventListener.onLightOn(hueEvent.getLightId(), hueEvent.getId());
+                              if (hueEvent.isLightOrGroup() && hueEvent.isOffEvent()) {
+                                  hueEventListener.onLightOff(hueEvent.getId_v1(), hueEvent.getId());
+                              } else if (hueEvent.isLightOrGroup() && hueEvent.isOnEvent()) {
+                                  hueEventListener.onLightOn(hueEvent.getId_v1(), hueEvent.getId(), hueEvent.isPhysical());
                               }
                           });
     }
@@ -55,6 +58,7 @@ public final class HueRawEventHandler implements BackgroundEventHandler {
 
     @Override
     public void onError(Throwable t) {
+        MDC.put("context", "events");
         log.error("An error occurred during event stream processing: {}", t.getLocalizedMessage());
     }
 
@@ -75,7 +79,7 @@ public final class HueRawEventHandler implements BackgroundEventHandler {
         private String type;
 
         private String getStatus() {
-            if (status.isTextual()) {
+            if (status != null && status.isTextual()) {
                 return status.asText();
             }
             return null;
@@ -90,12 +94,16 @@ public final class HueRawEventHandler implements BackgroundEventHandler {
             return on != null && on.isOn() || "zigbee_connectivity".equals(type) && "connected".equals(getStatus());
         }
 
-        public boolean isLight() {
-            return "light".equals(type) || id_v1 != null && id_v1.startsWith("/lights/");
+        public boolean isPhysical() {
+            return "zigbee_connectivity".equals(type);
         }
 
-        public int getLightId() {
-            return Integer.parseInt(id_v1.substring("/lights/".length()));
+        public boolean isLightOrGroup() {
+            return isLight() || isGroup();
+        }
+
+        public boolean isLight() {
+            return "light".equals(type) || id_v1 != null && id_v1.startsWith("/lights/");
         }
 
         public boolean isGroup() {

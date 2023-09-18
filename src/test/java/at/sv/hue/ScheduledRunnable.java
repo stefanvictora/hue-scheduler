@@ -16,4 +16,12 @@ final class ScheduledRunnable implements Runnable {
     public void run() {
         runnable.run();
     }
+
+    @Override
+    public String toString() {
+        return "ScheduledRunnable{" +
+                "start=" + start +
+                ", end=" + end +
+                '}';
+    }
 }

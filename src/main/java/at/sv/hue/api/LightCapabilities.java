@@ -1,29 +1,34 @@
 package at.sv.hue.api;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Getter;
+import lombok.Data;
 
-@Getter
+import java.util.EnumSet;
+
+@Data
+@AllArgsConstructor
 @Builder
 public final class LightCapabilities {
 
-    public static final LightCapabilities NO_CAPABILITIES = new LightCapabilities(null, null, null);
+    public static final LightCapabilities NO_CAPABILITIES = LightCapabilities.builder().build();
 
+    private final String colorGamutType;
     private final Double[][] colorGamut;
     private final Integer ctMin;
     private final Integer ctMax;
-
-    public LightCapabilities(Double[][] colorGamut, Integer ctMin, Integer ctMax) {
-        this.colorGamut = colorGamut;
-        this.ctMin = ctMin;
-        this.ctMax = ctMax;
-    }
+    @Builder.Default
+    private final EnumSet<Capability> capabilities = EnumSet.noneOf(Capability.class);
 
     public boolean isColorSupported() {
-        return colorGamut != null;
+        return capabilities.contains(Capability.COLOR);
     }
 
     public boolean isCtSupported() {
-        return ctMin != null && ctMax != null;
+        return capabilities.contains(Capability.COLOR_TEMPERATURE);
+    }
+
+    public boolean isBrightnessSupported() {
+        return capabilities.contains(Capability.BRIGHTNESS);
     }
 }

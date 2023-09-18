@@ -119,6 +119,11 @@ class StartTimeProviderTest {
             public ZonedDateTime getAstronomicalStart(ZonedDateTime dateTime) {
                 return astronomicalStart;
             }
+
+            @Override
+            public String toDebugString(ZonedDateTime dateTime) {
+                return null;
+            }
         });
     }
 

@@ -3,30 +3,14 @@ package at.sv.hue.color;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.text.DecimalFormat;
-
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.core.Is.is;
+import static org.assertj.core.api.Assertions.assertThat;
 
 public class RGBToXYConverterTest {
 
-    private DecimalFormat df;
     private Double[][] gamutA;
-
-    private void assertColor(int r, int g, int b, double x, double y, int brightness) {
-        assertColor(r, g, b, x, y, brightness, null);
-    }
-
-    private void assertColor(int r, int g, int b, double x, double y, int brightness, Double[][] gamut) {
-        RGBToXYConverter.XYColor color = RGBToXYConverter.convert(r, g, b, gamut);
-        assertThat("X differs", df.format(color.getX()), is(df.format(x)));
-        assertThat("Y differs", df.format(color.getY()), is(df.format(y)));
-        assertThat("Brightness differs", color.getBrightness(), is(brightness));
-    }
 
     @BeforeEach
     void setUp() {
-        df = new DecimalFormat("#0.000");
         gamutA = new Double[][]{{0.704, 0.296}, {0.2151, 0.7106}, {0.138, 0.08}};
     }
 
@@ -36,14 +20,42 @@ public class RGBToXYConverterTest {
      */
     @Test
     void convert_convertsRGBToXYAndBrightness_handlesGamut() {
-        assertColor(0, 0, 0, 0.0, 0.0, 0);
-        assertColor(255, 255, 255, 0.323, 0.329, 254);
-        assertColor(0, 0, 255, 0.136, 0.04, 12);
-        assertColor(0, 0, 255, 0.138, 0.08, 12, gamutA);
-        assertColor(0, 255, 0, 0.172, 0.747, 170);
-        assertColor(0, 255, 0, 0.215, 0.711, 170, gamutA);
-        assertColor(255, 0, 0, 0.701, 0.299, 72);
-        assertColor(255, 0, 0, 0.7, 0.299, 72, gamutA);
-        assertColor(128, 0, 0, 0.701, 0.299, 15);
+        assertRGBToXY(0, 0, 0, null, 0.0, 0.0, 0);
+        assertRGBToXY(255, 255, 255, null, 0.3227, 0.329, 254);
+        assertRGBToXY(0, 0, 255, null, 0.1355, 0.0399, 12);
+        assertRGBToXY(0, 255, 0, null, 0.1724, 0.7468, 170);
+        assertRGBToXY(255, 0, 0, null, 0.7006, 0.2993, 72);
+        assertRGBToXY(128, 0, 0, null, 0.7006, 0.2993, 15);
+        assertRGBToXY(0, 0, 255, gamutA, 0.138, 0.08, 12);
+        assertRGBToXY(0, 255, 0, gamutA, 0.2151, 0.7106, 170);
+        assertRGBToXY(255, 0, 0, gamutA, 0.7004, 0.2991, 72);
+    }
+
+    /**
+     * Adapted from <a href="https://github.com/home-assistant/core/blob/dev/tests/util/test_color.py">Home Assistant test_color.py</a>
+     * License: Apache-2.0 License
+     */
+    @Test
+    void convert_convertsXYToRGB_handlesGamut() {
+        assertXYToRGB(1, 0, 255, null, 255, 0, 60);
+        assertXYToRGB(0, 1, 255, null, 0, 255, 0);
+        assertXYToRGB(0, 0, 255, null, 0, 63, 255);
+        assertXYToRGB(1, 0, 255, gamutA, 255, 0, 3);
+        assertXYToRGB(0, 1, 255, gamutA, 82, 255, 0);
+        assertXYToRGB(0, 0, 255, gamutA, 9, 85, 255);
+    }
+
+    private void assertRGBToXY(int r, int g, int b, Double[][] gamut, double x, double y, int brightness) {
+        RGBToXYConverter.XYColor color = RGBToXYConverter.convert(r, g, b, gamut);
+        assertThat(color.getX()).isEqualByComparingTo(x);
+        assertThat(color.getY()).isEqualByComparingTo(y);
+        assertThat(color.getBrightness()).isEqualTo(brightness);
+    }
+
+    private void assertXYToRGB(double x, double y, int brightness, Double[][] gamut, int r, int g, int b) {
+        int[] rgb = RGBToXYConverter.convert(x, y, brightness, gamut);
+        assertThat(rgb[0]).isEqualTo(r);
+        assertThat(rgb[1]).isEqualTo(g);
+        assertThat(rgb[2]).isEqualTo(b);
     }
 }

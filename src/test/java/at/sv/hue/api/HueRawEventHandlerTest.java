@@ -56,7 +56,7 @@ class HueRawEventHandlerTest {
                 "  }\n" +
                 "]"));
 
-        verify(hueEventListener).onLightOff(40, "69b2c6bd-48ff-4bab-9f06-37ccd9399f69");
+        verify(hueEventListener).onLightOff("/lights/40", "69b2c6bd-48ff-4bab-9f06-37ccd9399f69");
     }
 
     @Test
@@ -81,11 +81,11 @@ class HueRawEventHandlerTest {
                 "  }\n" +
                 "]"));
 
-        verify(hueEventListener).onLightOff(40, "69b2c6bd-48ff-4bab-9f06-37ccd9399f69");
+        verify(hueEventListener).onLightOff("/lights/40", "69b2c6bd-48ff-4bab-9f06-37ccd9399f69");
     }
 
     @Test
-    void onMessage_zigbeeConnectionEstablishedEvent_triggersLightOn() throws Exception {
+    void onMessage_zigbeeConnectionEstablishedEvent_triggersLightOn_setsPhysicalFlag() throws Exception {
         handler.onMessage("", new MessageEvent("[\n" +
                 "  {\n" +
                 "    \"creationtime\": \"2023-07-22T15:12:39Z\",\n" +
@@ -106,7 +106,7 @@ class HueRawEventHandlerTest {
                 "  }\n" +
                 "]"));
 
-        verify(hueEventListener).onLightOn(39, "60b2bafa-53f4-4062-9f58-253be813b349");
+        verify(hueEventListener).onLightOn("/lights/39", "60b2bafa-53f4-4062-9f58-253be813b349", true);
     }
 
     @Test
@@ -164,7 +164,7 @@ class HueRawEventHandlerTest {
                 "  }\n" +
                 "]"));
 
-        verify(hueEventListener).onLightOn(36, "d37eb9c4-d7eb-42ee-9a13-fa9148f8d403");
+        verify(hueEventListener).onLightOn("/lights/36", "d37eb9c4-d7eb-42ee-9a13-fa9148f8d403", false);
     }
 
     @Test
@@ -191,7 +191,91 @@ class HueRawEventHandlerTest {
                 "  }\n" +
                 "]"));
 
-        verify(hueEventListener).onLightOff(36, "d37eb9c4-d7eb-42ee-9a13-fa9148f8d403");
+        verify(hueEventListener).onLightOff("/lights/36", "d37eb9c4-d7eb-42ee-9a13-fa9148f8d403");
+    }
+
+    @Test
+    void onMessage_onEvent_forGroup_triggersGroupOn() throws Exception {
+        handler.onMessage("", new MessageEvent("[\n"
+                + "  {\n"
+                + "    \"creationtime\": \"2023-08-15T19:30:41Z\",\n"
+                + "    \"data\": [\n"
+                + "      {\n"
+                + "        \"dimming\": {\n"
+                + "          \"brightness\": 52.178\n"
+                + "        },\n"
+                + "        \"id\": \"14871193-d3a9-4f09-9e7b-9ffacd616799\",\n"
+                + "        \"id_v1\": \"/groups/0\",\n"
+                + "        \"owner\": {\n"
+                + "          \"rid\": \"88d6c1ef-bed4-4b3f-aa36-8081a4367b6c\",\n"
+                + "          \"rtype\": \"bridge_home\"\n"
+                + "        },\n"
+                + "        \"type\": \"grouped_light\"\n"
+                + "      },\n"
+                + "      {\n"
+                + "        \"dimming\": {\n"
+                + "          \"brightness\": 100.0\n"
+                + "        },\n"
+                + "        \"id\": \"560cd8f7-c498-4358-8dba-19734b4173f7\",\n"
+                + "        \"id_v1\": \"/groups/13\",\n"
+                + "        \"on\": {\n"
+                + "          \"on\": true\n"
+                + "        },\n"
+                + "        \"owner\": {\n"
+                + "          \"rid\": \"233f8334-a727-4c5f-a10b-368a5d60f310\",\n"
+                + "          \"rtype\": \"room\"\n"
+                + "        },\n"
+                + "        \"type\": \"grouped_light\"\n"
+                + "      }\n"
+                + "    ],\n"
+                + "    \"id\": \"66e393a8-26e8-459b-9631-0e761db02396\",\n"
+                + "    \"type\": \"update\"\n"
+                + "  }\n"
+                + "]"));
+
+        verify(hueEventListener).onLightOn("/groups/13", "560cd8f7-c498-4358-8dba-19734b4173f7", false);
+    }
+
+    @Test
+    void onMessage_offEvent_forGroup_triggersGroupOff() throws Exception {
+        handler.onMessage("", new MessageEvent("[\n"
+                + "  {\n"
+                + "    \"creationtime\": \"2023-08-15T19:39:48Z\",\n"
+                + "    \"data\": [\n"
+                + "      {\n"
+                + "        \"dimming\": {\n"
+                + "          \"brightness\": 48.762142857142855\n"
+                + "        },\n"
+                + "        \"id\": \"14871193-d3a9-4f09-9e7b-9ffacd616799\",\n"
+                + "        \"id_v1\": \"/groups/0\",\n"
+                + "        \"owner\": {\n"
+                + "          \"rid\": \"88d6c1ef-bed4-4b3f-aa36-8081a4367b6c\",\n"
+                + "          \"rtype\": \"bridge_home\"\n"
+                + "        },\n"
+                + "        \"type\": \"grouped_light\"\n"
+                + "      },\n"
+                + "      {\n"
+                + "        \"dimming\": {\n"
+                + "          \"brightness\": 0.0\n"
+                + "        },\n"
+                + "        \"id\": \"560cd8f7-c498-4358-8dba-19734b4173f7\",\n"
+                + "        \"id_v1\": \"/groups/13\",\n"
+                + "        \"on\": {\n"
+                + "          \"on\": false\n"
+                + "        },\n"
+                + "        \"owner\": {\n"
+                + "          \"rid\": \"233f8334-a727-4c5f-a10b-368a5d60f310\",\n"
+                + "          \"rtype\": \"room\"\n"
+                + "        },\n"
+                + "        \"type\": \"grouped_light\"\n"
+                + "      }\n"
+                + "    ],\n"
+                + "    \"id\": \"99ea7091-a1ce-466a-871d-2d300113f34b\",\n"
+                + "    \"type\": \"update\"\n"
+                + "  }\n"
+                + "]"));
+
+        verify(hueEventListener).onLightOff("/groups/13", "560cd8f7-c498-4358-8dba-19734b4173f7");
     }
 
     @Test
@@ -262,8 +346,8 @@ class HueRawEventHandlerTest {
                 "  }\n" +
                 "]"));
 
-        verify(hueEventListener).onLightOff(36, "d37eb9c4-d7eb-42ee-9a13-fa9148f8d403");
-        verify(hueEventListener).onLightOn(38, "db1d8ea4-d55d-47bd-b741-aa9d6ac0f0e7");
+        verify(hueEventListener).onLightOff("/lights/36", "d37eb9c4-d7eb-42ee-9a13-fa9148f8d403");
+        verify(hueEventListener).onLightOn("/lights/38", "db1d8ea4-d55d-47bd-b741-aa9d6ac0f0e7", false);
         verifyNoMoreInteractions(hueEventListener);
     }
 }

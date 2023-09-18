@@ -1,6 +1,7 @@
 package at.sv.hue.api;
 
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.util.HashMap;
 
@@ -8,52 +9,65 @@ public class ManualOverrideTrackerImpl implements ManualOverrideTracker {
 
     private static final TrackedState DEFAULT_STATE = new TrackedState();
 
-    private final HashMap<Long, TrackedState> trackedStatesPerLight;
+    private final HashMap<String, TrackedState> trackedStatesPerId;
 
     public ManualOverrideTrackerImpl() {
-        trackedStatesPerLight = new HashMap<>();
+        trackedStatesPerId = new HashMap<>();
     }
 
     @Override
-    public void onManuallyOverridden(long lightId) {
-        getOrCreateTrackedState(lightId).setManuallyOverridden(true);
+    public void onManuallyOverridden(String id) {
+        getOrCreateTrackedState(id).setManuallyOverridden(true);
     }
 
     @Override
-    public boolean isManuallyOverridden(long lightId) {
-        return getOrDefaultState(lightId).isManuallyOverridden();
+    public boolean isManuallyOverridden(String id) {
+        return getOrDefaultState(id).isManuallyOverridden();
     }
 
     @Override
-    public void onLightTurnedOn(long lightId) {
-        TrackedState trackedState = getOrCreateTrackedState(lightId);
+    public void onLightTurnedOn(String id) {
+        TrackedState trackedState = getOrCreateTrackedState(id);
         trackedState.setManuallyOverridden(false);
+        trackedState.setLightIsOff(false);
         trackedState.setEnforceSchedule(true);
     }
 
     @Override
-    public boolean shouldEnforceSchedule(long lightId) {
-        return getOrDefaultState(lightId).isEnforceSchedule();
+    public void onLightOff(String id) {
+        getOrCreateTrackedState(id).setLightIsOff(true);
     }
 
     @Override
-    public void onAutomaticallyAssigned(long lightId) {
-        TrackedState trackedState = getOrCreateTrackedState(lightId);
+    public boolean isOff(String id) {
+        return getOrDefaultState(id).isLightIsOff();
+    }
+
+    @Override
+    public boolean shouldEnforceSchedule(String id) {
+        return getOrDefaultState(id).isEnforceSchedule();
+    }
+
+    @Override
+    public void onAutomaticallyAssigned(String id) {
+        TrackedState trackedState = getOrCreateTrackedState(id);
         trackedState.setManuallyOverridden(false);  // maybe not needed, as this flag is overridden also on light-on events
         trackedState.setEnforceSchedule(false);
     }
 
-    private TrackedState getOrCreateTrackedState(long lightId) {
-        return trackedStatesPerLight.computeIfAbsent(lightId, id -> new TrackedState());
+    private TrackedState getOrCreateTrackedState(String id) {
+        return trackedStatesPerId.computeIfAbsent(id, i -> new TrackedState());
     }
 
-    private TrackedState getOrDefaultState(long lightId) {
-        return trackedStatesPerLight.getOrDefault(lightId, DEFAULT_STATE);
+    private TrackedState getOrDefaultState(String id) {
+        return trackedStatesPerId.getOrDefault(id, DEFAULT_STATE);
     }
 
-    @Data
+    @Getter
+    @Setter
     private static final class TrackedState {
         private boolean manuallyOverridden;
         private boolean enforceSchedule;
+        private boolean lightIsOff;
     }
 }

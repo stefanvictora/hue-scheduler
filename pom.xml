@@ -6,7 +6,7 @@
 
     <groupId>at.sv.hue</groupId>
     <artifactId>hue-scheduler</artifactId>
-    <version>0.8.0.1</version>
+    <version>0.9.0-SNAPSHOT</version>
 
     <scm>
         <connection>scm:git:git@github.com:stefanvictora/hue-scheduler.git</connection>
@@ -136,10 +136,6 @@
                 <version>3.0.0-M5</version>
             </plugin>
             <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>appassembler-maven-plugin</artifactId>
-            </plugin>
-            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-assembly-plugin</artifactId>
             </plugin>
@@ -155,6 +151,18 @@
                         </goals>
                     </execution>
                 </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.pitest</groupId>
+                <artifactId>pitest-maven</artifactId>
+                <version>1.14.3</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.pitest</groupId>
+                        <artifactId>pitest-junit5-plugin</artifactId>
+                        <version>1.2.0</version>
+                    </dependency>
+                </dependencies>
             </plugin>
         </plugins>
     </build>

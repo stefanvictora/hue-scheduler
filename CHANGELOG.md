@@ -2,10 +2,37 @@
 
 ## [Unreleased]
 
+## [0.9.0] - 2023-09-17
+
+### Added
+- **Added interpolations for tr-before states (#4)**: For states using `tr-before`, if the light is turned on mid-transition, Hue Scheduler now calculates the mid-transition point based on the previous state and time elapsed, then continues the transition from there. Additionally, Hue Scheduler now supports transitioning between all color modes by converting values among CT, XY, and Hue/Sat.
+- Added ``interpolate:true`` state property that enables **dynamic transitions from the previous state**, without having to manually set ``tr-before``
+- Added ``--interpolate-all`` command line flag to globally set ``interpolate:true`` for all states, unless a state is explicitly marked otherwise
+- ``tr-before`` transition times can now utilize both absolute and solar time references, such as ``tr-before:12:00`` or ``tr-before:sunset+10``
+- Added `--interpolation-transition-time` command line option: Allows configuration of the default transition time for interpolated calls in 100ms increments. Used when the previous state does not have an explicit transition time set via the ``tr`` property. Default: `4` (= 400 ms).
+- Added capability validations to groups: On startup, group states are now validated against the capabilities of the contained lights.
+- Added ability to specify brightness (`bri`) [``1%``-``100%``] and saturation (`sat`) [``0%``-``100%``] values in percentages 
+- Added a ``h`` shorthand for ``tr`` and ``tr-before`` properties. Additionally, combinations like ``1h20min5s3`` are now possible for more fine-grained control.
+- Added automatic gaps for consecutive states with transitions: To prevent the Hue bridge from potentially misreporting target light states, which would result in false manual modification detections, short gaps are automatically added. This feature is active unless manual modification tracking is disabled. Added ``--min-tr-before-gap`` command line property to configure the minimal gap enforced by Hue Scheduler. Default: ``3`` minutes.
+
+### Changed
+- Extended ``tr-before`` max value to 24 hours by **splitting up long-running transitions into multiple calls** and interpolating between them.
+- **Enhanced manual modification tracking for groups**: Hue Scheduler now compares the state of every light in a group, instead of just the first one. Special cases for groups with different light capabilities are automatically handled, as, e.g., we can't expect color temperature lights to display color.
+- Enhanced modification tracking for color states: Comparisons now factor in the light's color gamut.
+- **Optimized turn-on tracking for groups**: Hue Scheduler now leverages group-on events rather than monitoring the first light inside a group. Moreover, every physically turned-on group light now triggers a group-on event, as the Hue bridge does not create any events in such cases.
+- Extended the functionality of the ``force:true`` property: It can now reschedule ``on:false`` states upon power-on, ensuring lights remain off during a specified time periods.
+- Reduced max value for ``tr`` to ``60000``, equivalent to 100min, to conform with the max value supported by the API v2.
+- Improved support for ``tr-before`` transitions that span between two days
+- Improved support for 'On/Off plug-in unit' type lights
+- Improved log messages
+
+### Removed
+- Removed obsolete reachable checks post-state update: Those became redundant following the transition to the Hue API v2 event stream and optimizations introduced in v0.9.0.
+
 ## [0.8.0.1] - 2023-08-06
 
 ### Added
-- Added new `noon` dynamic sun time constant
+- Added new `noon` dynamic solar time constant
 
 ### Fixed
 - Fixed incorrect manual change detection for brightness only states

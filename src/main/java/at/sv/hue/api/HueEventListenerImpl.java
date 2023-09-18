@@ -2,6 +2,7 @@ package at.sv.hue.api;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 
 import java.util.List;
 import java.util.function.Function;
@@ -11,19 +12,27 @@ import java.util.function.Function;
 public class HueEventListenerImpl implements HueEventListener {
 
     private final ManualOverrideTracker manualOverrideTracker;
-    private final Function<Integer, List<Runnable>> waitingListProvider;
+    private final Function<String, List<Runnable>> waitingListProvider;
+    private final Function<String, List<String>> lightToGroupAssignmentLookup;
 
     @Override
-    public void onLightOff(int lightId, String uuid) {
+    public void onLightOff(String idv1, String uuid) {
         // currently not needed
     }
 
     @Override
-    public void onLightOn(int lightId, String uuid) {
-        manualOverrideTracker.onLightTurnedOn(lightId);
-        List<Runnable> waitingList = waitingListProvider.apply(lightId);
+    public void onLightOn(String idv1, String uuid, boolean physical) {
+        if (physical) { // only lights can be turned on physically
+            MDC.put("context", "on-event " + idv1);
+            // if light has been physically turned on, we additionally signal to each group the light is assigned
+            lightToGroupAssignmentLookup.apply(idv1)
+                                        .forEach(groupId -> onLightOn(groupId, null, false));
+        }
+        MDC.put("context", "on-event " + idv1);
+        manualOverrideTracker.onLightTurnedOn(idv1);
+        List<Runnable> waitingList = waitingListProvider.apply(idv1);
         if (waitingList != null) {
-            log.debug("Received on-event for light {}. Reschedule {} waiting states.", lightId, waitingList.size());
+            log.debug("Reschedule {} waiting states.", waitingList.size());
             waitingList.forEach(Runnable::run);
         }
     }
