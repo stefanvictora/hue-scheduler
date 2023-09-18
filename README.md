@@ -4,37 +4,35 @@
 
 [![build](https://github.com/stefanvictora/hue-scheduler/actions/workflows/maven.yml/badge.svg)](https://github.com/stefanvictora/hue-scheduler)
 
-> With Hue Scheduler, you can improve your alertness during the day and relax in the evening by automatically adjusting your Philips Hue lights according to the time of day, the position of the sun and the day of the week.
+> Boost your daytime focus and unwind at night with Hue Scheduler. Fine-tune your  Philips Hue lights based on the time, sun's position, and the day of the week.
 
-Compared to other approaches, such as Apple's Adaptive Lighting, Hue Scheduler lets you additionally control the brightness, color, and even the on-state of your lights. Furthermore, it was designed to work well with dumb wall switches that physically turn off your lights, as it reschedules each state until they become reachable again. Since version 0.8.0 Hue Scheduler uses the Hue API v2 event stream for detecting when lights have been turned on, further increasing its response time.
+While approaches such as Adaptive Lighting already offer a level of automation for your smart lights, Hue Scheduler takes it a step further. Not only can you control brightness and color temperature, but you also have full control and flexibility over color, power state and custom interpolations between solar and absolute times. Designed with dumb wall switches in mind, Hue Scheduler automatically reschedules light states until they're reachable, ensuring consistent results even when lights are physically turned off. Starting from version 0.8.0, Hue Scheduler uses the Hue API v2 event stream, delivering even faster response times when lights are turned on.
 
 ## Demo
 
 ~~~yacas
-# Energize > Concentrate > Wind down
-Office        sunrise     bri:254  ct:6500  tr:10s                    days:Mo-Fr
-Office	      sunrise+90  ct:5000           tr-before:20min           days:Mo-Fr
-Office        sunset      bri:80%  ct:3000  tr-before:golden_hour+10  days:Mo-Fr
+# Daily Routines: Sun-based brightness & termperature
+Office        sunrise     bri:100%  ct:6500  tr:5s                     days:Mo-Fr
+Office	      sunrise+90  ct:5000            tr-before:20min           days:Mo-Fr
+Office        sunset      bri:80%   ct:3000  tr-before:golden_hour+10  days:Mo-Fr
 
-# Easy interpolations with long running transitons
+# Dynamic Lighting: Smooth transitions & interpolations
 Home          sunrise      bri:100%  ct:6500             tr-before:civil_dawn
 Home          noon         bri:100%  ct:5000             interpolate:true
 Home          sunset       bri:80%   ct:3000             tr-before:golden_hour
 Home          civil_dusk   bri:40%   ct:2000             interpolate:true
 Home          00:00        bri:20%   x:0.6024  y:0.3433  interpolate:true
 
-# Garden lights: turning on & off
-Garden        civil_dusk  on:true  bri:100%  tr:1min
-Garden        01:00       on:false tr:5min30s
+# Power Management: Scheduled on/off control
+Garden        civil_dusk  on:true   bri:100%  tr:1min
+Garden        01:00       on:false  tr:5min30s
 
-# Party: controlling effect & color on certain days
+# Mood and Ambiance: Effects & color
 Living room   22:00       bri:100  sat:150  effect:multi_colorloop  days:Fr,Sa
-Kitchen       22:00       color:#00835C     days:Fr,Sa
+Kitchen       22:00       color:#00835C     days:Sa
 ~~~
 
-In the first example, the lights in your (home) office are set to a bright and blue white at sunrise for an energetic start to your day. Ninety minutes after sunrise, the color temperature is set to a more neutral white for prolonged concentrated work. Finally, the light is dimmed slightly to a warmer temperature as the sun sets. Each time with a smooth 20-minute transition. Should the lights be turned on in the middle of those transitions, Hue Scheduler automatically calculates the mid-transition state and continues the transition from this point on. With this simple configuration, you can create fine-grained schedules that are enforced by Hue Scheduler.
-
-Since version 0.8.0 Hue Scheduler also **keeps track of any manual adjustments** to your lights and automatically disables the schedule for the affected lights, until they have been turned off and on again. This gives you the convenience of automatic schedules while still retaining manual control of certain lights when needed. After the manually adjusted lights have been turned off and on, Hue Scheduler automatically reschedules the expected state again.
+In the first example, the lights in your (home) office dynamically adjust based on the sun's position. At sunrise, they shift to a bright, blue white, setting the stage for an energetic start to your day. Ninety minutes after sunrise, the temperature transitions to a more neutral white, ideal for extended focus and concentration. As the sun sets, the lights gradually adopt a warmer tone, each time with a smooth 20-minute transition. If you happen to turn on the lights midway through any of these transitions, Hue Scheduler smartly computes the mid-transition state, picking up and continuing the shift from there. Furthermore, Hue Scheduler detects any manual changes to your lights and temporarily suspends their schedule until they are turned off and on again. This simple configuration lets you design detailed lighting schedules, seamlessly managed by Hue Scheduler, while still retaining manual control when needed.
 
 *Note: Hue Scheduler does not automatically turn on your lights (unless explicitly told with ``on:true``), so you retain control over the state of your lights, while Hue Scheduler does all the heavy lifting of adjusting them to your defined schedule.*
 
@@ -56,7 +54,7 @@ If you do not yet know your bridge's IP address, you can discover it by navigati
 [{"id":"<id>","internalipaddress":"192.168.0.59"}]
 ~~~
 
-Next, to authenticate a new user on your bridge, navigate to `http://<BRIDGE_IP_ADDRESS>/debug/clip.html` in your browser and enter the following in the corresponding fields, replacing ``<name>`` with any value of 26 characters or less:
+Next, to authenticate a new user on your bridge, navigate to `http://<BRIDGE_IP_ADDRESS>/debug/clip.html` in your browser and enter the following in the corresponding fields, replacing ``<name>`` with any value of 26 characters or fewer:
 
 ~~~
 URL:	/api
@@ -238,7 +236,7 @@ Desk  15:00  x:0.1652  y=0.3103
 ### Transition-Related Properties
 
 > **Warning**: Due to a [firmware bug](https://www.reddit.com/r/tradfri/comments/au903n/firmware_bugs_in_ikea_bulbs/) (see https://github.com/stefanvictora/hue-scheduler/issues/5),
-> Ikea Tradfri light bulbs currently don't support setting multiple properties, e.g., `bri` and `ct`,
+> Ikea Tradfri light bulbs may currently not support setting multiple properties, e.g., `bri` and `ct`,
 > in combination with a transition time > 0. Since the Hue bridge applies a default transition time of 400ms (`tr:4`)
 > if not specified otherwise, you have to explicitly set `tr:0` if you want to set multiple properties for Ikea Tradfri light bulbs.
 > Another workaround is to only set one property per state and offset the state changes accordingly to the used transition time.
@@ -299,7 +297,7 @@ Hue Scheduler offers various transition-related properties, which can be combine
   ~~~ 
   In this example, Hue Scheduler also interpolates between `sunset` and `sunrise`.
 
-  >  Note: You can enable ``interpolate:true`` per default for all states by using the ``--interpolate-all`` command line flag. This behavior can be customized by either explicitly setting ``interpolate:false`` for single states, or by defining a custom ``tr-before`` which takes precedence over the interpolate property.
+  >  Note: You can enable ``interpolate:true`` per default for all states by using the ``--interpolate-all`` command line flag. This behavior can be customized by either explicitly setting ``interpolate:false`` for single states, or by defining a custom ``tr-before`` which takes precedence over the ``interpolate`` property.
 
 ### Advanced Properties
 
@@ -350,10 +348,10 @@ Desk  07:00  bri:100%  tr-before:20min
         
 ### `--min-tr-before-gap`
 
-Only relevant and active if user modification tracking is not disabled (see `--disable-user-modification-tracking`). When using transitions, this defines the minimum gap between multiple back-to-back states in minutes. This is needed as otherwise the hue bridge may not yet recognize the target value of the transition and incorrectly marks the light as manually overridden.
+Only relevant and active if user modification tracking is not disabled (see `--disable-user-modification-tracking`). When using transitions, this defines the minimum gap between multiple back-to-back states in minutes. This is needed as otherwise the hue bridge may not yet recognize the target value of the transition and may incorrectly mark the light as manually overridden.
 This gap is ensured by automatically shortening transitions between back-to-back states.
 
-If Hue Scheduler detects manual overrides between back-to-back states using transitions, try increasing the default value.
+If Hue Scheduler still detects manual overrides between back-to-back states using transitions, try increasing the default value.
 
 **Default**: `3` minutes
 
@@ -361,13 +359,13 @@ If Hue Scheduler detects manual overrides between back-to-back states using tran
 
 The maximum number of PUT API requests Hue Scheduler is allowed to perform per second. The official Hue API Documentation recommends keeping this at 10 requests per second, or else the bridge might drop some requests.
 
-Note: The bridge controls groups by using more computationally expensive broadcast messages, which is why the official recommendation is to limit group updates to one per second. Hue Scheduler automatically rate limits lights and groups updates accordingly.
+Note: The bridge controls groups by using more computationally expensive broadcast messages, which is why the official recommendation is to limit group updates to one per second. Hue Scheduler automatically rate-limits lights and groups updates accordingly.
 
 > As a general guideline we always recommend to our developers to stay at roughly 10 commands per second to the /lights resource with a 100ms gap between each API call. For /groups commands you should keep to a maximum of 1 per second.
 >
-> > -- [Hue System Performance - Philips Hue Developer Program (meethue.com)](https://developers.meethue.com/develop/application-design-guidance/hue-system-performance/) (requires login)
+> > -- [Hue System Performance — Philips Hue Developer Program (meethue.com)](https://developers.meethue.com/develop/application-design-guidance/hue-system-performance/) (requires login)
 
-To still benefit from the ease of use of groups, while improving overall system performance, you can use the experimental *--control-group-lights-individually* Option, as described below.
+To still benefit from the ease-of-use of groups, while improving overall system performance, you can use the experimental *--control-group-lights-individually* Option, as described below.
 
 **Default and recommended**: `10` requests per second
 
@@ -464,7 +462,7 @@ The main steps are:
    sudo systemctl edit --force hue-scheduler
     ~~~
 
-   This will create the file in the right place and at the same time open an editor where you can paste your service configuration. Make sure to save the changes with `Strg+O` + `Enter`, and exit the editor again with `Strg+X`.
+   This will create the file in the right place and at the same time open an editor where you can paste your service configuration. Make sure to save the changes with `Ctrl+O` + `Enter`, and exit the editor again with `Ctrl+X`.
 
 4. Configure the new service:
 
@@ -524,7 +522,11 @@ This means that if you want to rest manual overrides with dumb wall switches, yo
 
 ### How Does Hue Scheduler Compare to Adaptive Lighting?
 
-Both approaches try to automate your lights' state according to the time of day. However, Adaptive Lighting only updates the color temperature and brightness of your lights throughout the day, while Hue Scheduler additionally gives you control over your lights' color, and even on-state. Furthermore, while Adaptive Lighting continuously updates your lights' state with little manual control, Hue Scheduler gives you more freedom to configure your own schedule with multiple custom interpolations all in a single easy to write configuration file.
+Both Adaptive Lighting and Hue Scheduler aim to automate the state of your lights based on the time of day. However, there are key differences:
+
+- **Control Over Light Properties**: Adaptive Lighting primarily adjusts the color temperature and brightness of your lights. In contrast, Hue Scheduler offers extended control, allowing you to also set specific colors and manage the on-state of your lights.
+
+- **Flexibility and Customization**: Adaptive Lighting operates with a continuous adjustment mechanism, offering limited manual intervention. Hue Scheduler, on the other hand, provides a more hands-on approach, empowering you with the flexibility to define your own schedule. You can even introduce multiple custom interpolations, all through a single, user-friendly configuration file.
 
 ### Does Hue Scheduler Access The Internet?
 
