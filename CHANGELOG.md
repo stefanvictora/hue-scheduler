@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-## [0.9.0] - 2023-09-17
+## [0.9.0] - 2023-09-18
 
 ### Added
 - **Added interpolations for tr-before states (#4)**: For states using `tr-before`, if the light is turned on mid-transition, Hue Scheduler now calculates the mid-transition point based on the previous state and time elapsed, then continues the transition from there. Additionally, Hue Scheduler now supports transitioning between all color modes by converting values among CT, XY, and Hue/Sat.
