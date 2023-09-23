@@ -11,7 +11,7 @@ While approaches such as Adaptive Lighting already offer a level of automation f
 ## Demo
 
 ~~~yacas
-# Daily Routines: Sun-based brightness & termperature
+# Daily Routines: Sun-based brightness & temperature
 Office        sunrise     bri:100%  ct:6500  tr:5s                     days:Mo-Fr
 Office	      sunrise+90  ct:5000            tr-before:20min           days:Mo-Fr
 Office        sunset      bri:80%   ct:3000  tr-before:golden_hour+10  days:Mo-Fr
