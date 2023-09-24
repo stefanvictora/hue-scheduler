@@ -28,13 +28,13 @@ public final class HueApiImpl implements HueApi {
     private final Object lightMapLock = new Object();
     private final Object groupMapLock = new Object();
     private final RateLimiter rateLimiter;
-    private Map<Integer, Light> availableLights;
+    private Map<String, Light> availableLights;
     private boolean availableLightsInvalidated;
-    private Map<Integer, Group> availableGroups;
+    private Map<String, Group> availableGroups;
     private boolean availableGroupsInvalidated;
-    private Map<String, Integer> lightNameToIdMap;
+    private Map<String, String> lightNameToIdMap;
     private boolean lightNameToIdMapInvalidated;
-    private Map<String, Integer> groupNameToIdMap;
+    private Map<String, String> groupNameToIdMap;
     private boolean groupNameToIdMapInvalidated;
 
     public HueApiImpl(HttpResourceProvider resourceProvider, String ip, String username, RateLimiter rateLimiter) {
@@ -47,13 +47,13 @@ public final class HueApiImpl implements HueApi {
     }
 
     @Override
-    public LightState getLightState(int id) {
+    public LightState getLightState(String id) {
         String response = getResourceAndAssertNoErrors(getLightStateUrl(id));
         try {
             Light light = mapper.readValue(response, Light.class);
             return createLightState(light);
         } catch (JsonProcessingException | NullPointerException e) {
-            throw new HueApiFailure("Failed to parse light state response '" + response + "' for id " + id + ": " + e.getLocalizedMessage());
+            throw new ApiFailure("Failed to parse light state response '" + response + "' for id " + id + ": " + e.getLocalizedMessage());
         }
     }
 
@@ -65,9 +65,9 @@ public final class HueApiImpl implements HueApi {
     }
 
     @Override
-    public List<LightState> getGroupStates(int id) {
-        List<Integer> groupLights = getGroupLights(id);
-        Map<Integer, Light> currentLights = lookupLights();
+    public List<LightState> getGroupStates(String id) {
+        List<String> groupLights = getGroupLights(id);
+        Map<String, Light> currentLights = lookupLights();
         return groupLights.stream()
                           .map(currentLights::get)
                           .filter(Objects::nonNull)
@@ -107,9 +107,10 @@ public final class HueApiImpl implements HueApi {
                 case 1:
                     throw new BridgeAuthenticationFailure();
                 case 201:
-                    throw new LightIsOff();
+                    // ignore
+                    break;
                 default:
-                    throw new HueApiFailure(description);
+                    throw new ApiFailure(description);
             }
         }
     }
@@ -129,7 +130,7 @@ public final class HueApiImpl implements HueApi {
         return null;
     }
 
-    private URL getLightStateUrl(int id) {
+    private URL getLightStateUrl(String id) {
         return createUrl("/lights/" + id);
     }
 
@@ -142,24 +143,39 @@ public final class HueApiImpl implements HueApi {
     }
 
     @Override
-    public boolean putState(PutCall putCall) {
+    public boolean isLightOff(String id) {
+        return getLightState(id).isOff();
+    }
+
+    @Override
+    public boolean isGroupOff(String id) {
+        String response = getResourceAndAssertNoErrors(getGroupUrl(id));
+        try {
+            Group group = mapper.readValue(response, Group.class);
+            return Boolean.FALSE == group.state.any_on;
+        } catch (JsonProcessingException | NullPointerException e) {
+            throw new ApiFailure("Failed to parse group state response '" + response + "' for id " + id + ": " + e.getLocalizedMessage());
+        }
+    }
+
+    private URL getGroupUrl(String id) {
+        return createUrl("/groups/" + id);
+    }
+
+    @Override
+    public void putState(PutCall putCall) {
         if (putCall.isGroupState()) {
             rateLimiter.acquire(10);
         } else {
             rateLimiter.acquire(1);
         }
-        return assertNoPutErrors(resourceProvider.putResource(getUpdateUrl(putCall.id, putCall.groupState),
+        assertNoPutErrors(resourceProvider.putResource(getUpdateUrl(putCall.id, putCall.groupState),
                 getBody(new State(putCall.bri, putCall.ct, putCall.x, putCall.y, putCall.hue, putCall.sat, putCall.effect,
                         putCall.on, putCall.transitionTime))));
     }
 
-    private boolean assertNoPutErrors(String putResource) {
-        try {
-            assertNoErrors(putResource);
-            return true;
-        } catch (LightIsOff e) {
-            return false;
-        }
+    private void assertNoPutErrors(String putResource) {
+        assertNoErrors(putResource);
     }
 
     private String getBody(State state) {
@@ -171,9 +187,9 @@ public final class HueApiImpl implements HueApi {
     }
 
     @Override
-    public List<Integer> getGroupLights(int groupId) {
+    public List<String> getGroupLights(String groupId) {
         Group group = getAndAssertGroupExists(groupId);
-        Integer[] lights = group.lights;
+        String[] lights = group.lights;
         if (lights.length == 0) {
             throw new EmptyGroupException("Group with id '" + groupId + "' has no lights to control!");
         }
@@ -181,7 +197,7 @@ public final class HueApiImpl implements HueApi {
     }
 
     @Override
-    public List<Integer> getAssignedGroups(int lightId) {
+    public List<String> getAssignedGroups(String lightId) {
         return getOrLookupGroups().entrySet()
                                   .stream()
                                   .filter(entry -> Arrays.asList(entry.getValue().getLights()).contains(lightId))
@@ -189,7 +205,7 @@ public final class HueApiImpl implements HueApi {
                                   .collect(Collectors.toList());
     }
 
-    private Map<Integer, Group> getOrLookupGroups() {
+    private Map<String, Group> getOrLookupGroups() {
         synchronized (groupMapLock) {
             if (availableGroups == null || availableGroupsInvalidated) {
                 availableGroups = lookupGroups();
@@ -199,13 +215,13 @@ public final class HueApiImpl implements HueApi {
         return availableGroups;
     }
 
-    private Map<Integer, Group> lookupGroups() {
+    private Map<String, Group> lookupGroups() {
         String response = getResourceAndAssertNoErrors(getGroupsUrl());
         try {
-            return mapper.readValue(response, new TypeReference<Map<Integer, Group>>() {
+            return mapper.readValue(response, new TypeReference<Map<String, Group>>() {
             });
         } catch (JsonProcessingException e) {
-            throw new HueApiFailure("Failed to parse groups response '" + response + "': " + e.getLocalizedMessage());
+            throw new ApiFailure("Failed to parse groups response '" + response + "': " + e.getLocalizedMessage());
         }
     }
 
@@ -214,15 +230,15 @@ public final class HueApiImpl implements HueApi {
     }
 
     @Override
-    public int getGroupId(String name) {
-        Integer groupId = getOrLookupGroupNameToIdMap().get(name);
+    public String getGroupId(String name) {
+        String groupId = getOrLookupGroupNameToIdMap().get(name);
         if (groupId == null) {
             throw new GroupNotFoundException("Group with name '" + name + "' was not found!");
         }
         return groupId;
     }
 
-    private Map<String, Integer> getOrLookupGroupNameToIdMap() {
+    private Map<String, String> getOrLookupGroupNameToIdMap() {
         synchronized (groupMapLock) {
             if (groupNameToIdMap == null || groupNameToIdMapInvalidated) {
                 groupNameToIdMap = new HashMap<>();
@@ -234,11 +250,11 @@ public final class HueApiImpl implements HueApi {
     }
 
     @Override
-    public String getGroupName(int groupId) {
+    public String getGroupName(String groupId) {
         return getAndAssertGroupExists(groupId).name;
     }
 
-    private Group getAndAssertGroupExists(int groupId) {
+    private Group getAndAssertGroupExists(String groupId) {
         Group group = getOrLookupGroups().get(groupId);
         if (group == null) {
             throw new GroupNotFoundException("Group with id '" + groupId + "' not found!");
@@ -247,15 +263,15 @@ public final class HueApiImpl implements HueApi {
     }
 
     @Override
-    public int getLightId(String name) {
-        Integer lightId = getOrLookupLightNameToIdMap().get(name);
+    public String getLightId(String name) {
+        String lightId = getOrLookupLightNameToIdMap().get(name);
         if (lightId == null) {
             throw new LightNotFoundException("Light with name '" + name + "' was not found!");
         }
         return lightId;
     }
 
-    private Map<String, Integer> getOrLookupLightNameToIdMap() {
+    private Map<String, String> getOrLookupLightNameToIdMap() {
         synchronized (lightMapLock) {
             if (lightNameToIdMap == null || lightNameToIdMapInvalidated) {
                 lightNameToIdMap = new HashMap<>();
@@ -266,7 +282,7 @@ public final class HueApiImpl implements HueApi {
         return lightNameToIdMap;
     }
 
-    private Map<Integer, Light> getOrLookupLights() {
+    private Map<String, Light> getOrLookupLights() {
         synchronized (lightMapLock) {
             if (availableLights == null || availableLightsInvalidated) {
                 availableLights = lookupLights();
@@ -276,23 +292,23 @@ public final class HueApiImpl implements HueApi {
         return availableLights;
     }
 
-    private Map<Integer, Light> lookupLights() {
+    private Map<String, Light> lookupLights() {
         String response = getResourceAndAssertNoErrors(getLightsUrl());
         try {
-            return mapper.readValue(response, new TypeReference<Map<Integer, Light>>() {
+            return mapper.readValue(response, new TypeReference<Map<String, Light>>() {
             });
         } catch (JsonProcessingException e) {
-            throw new HueApiFailure("Failed to parse lights response '" + response + "': " + e.getLocalizedMessage());
+            throw new ApiFailure("Failed to parse lights response '" + response + "': " + e.getLocalizedMessage());
         }
     }
 
     @Override
-    public String getLightName(int id) {
+    public String getLightName(String id) {
         Light light = getAndAssertLightExists(id);
         return light.name;
     }
 
-    private Light getAndAssertLightExists(int id) {
+    private Light getAndAssertLightExists(String id) {
         Light light = getOrLookupLights().get(id);
         if (light == null) {
             throw new LightNotFoundException("Light with id '" + id + "' not found!");
@@ -301,7 +317,7 @@ public final class HueApiImpl implements HueApi {
     }
 
     @Override
-    public LightCapabilities getLightCapabilities(int id) {
+    public LightCapabilities getLightCapabilities(String id) {
         Light light = getAndAssertLightExists(id);
         return createLightCapabilities(light);
     }
@@ -333,7 +349,7 @@ public final class HueApiImpl implements HueApi {
     }
 
     @Override
-    public LightCapabilities getGroupCapabilities(int id) {
+    public LightCapabilities getGroupCapabilities(String id) {
         List<LightCapabilities> lightCapabilities = getGroupLights(id)
                 .stream()
                 .map(this::getLightCapabilities)
@@ -420,7 +436,7 @@ public final class HueApiImpl implements HueApi {
         return createUrl("/lights");
     }
 
-    private URL getUpdateUrl(int id, boolean groupState) {
+    private URL getUpdateUrl(String id, boolean groupState) {
         if (groupState) {
             return createUrl("/groups/" + id + "/action");
         } else {
@@ -493,7 +509,13 @@ public final class HueApiImpl implements HueApi {
     @Data
     private static final class Group {
         String name;
-        Integer[] lights = new Integer[0];
+        String[] lights = new String[0];
+        GroupState state;
+    }
+
+    @Data
+    private static final class GroupState {
+        Boolean any_on;
     }
 
     @Data
@@ -506,10 +528,5 @@ public final class HueApiImpl implements HueApi {
         int type;
         String address;
         String description;
-    }
-
-    private static final class LightIsOff extends RuntimeException {
-        private LightIsOff() {
-        }
     }
 }

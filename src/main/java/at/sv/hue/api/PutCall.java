@@ -11,7 +11,7 @@ import java.util.stream.Stream;
 @Data
 @Builder(toBuilder = true)
 public final class PutCall {
-    int id;
+    String id;
     Integer bri;
     Integer ct;
     Double x;

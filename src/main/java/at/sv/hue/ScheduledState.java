@@ -33,7 +33,7 @@ final class ScheduledState {
 
     private final String name;
     @Getter
-    private final int updateId;
+    private final String id; // todo: we should get rid of multiple IDs. I probably makes sense to always use IDv1 or something generic
     private final String startString;
     private final Integer brightness;
     private final Integer ct;
@@ -75,12 +75,12 @@ final class ScheduledState {
     private BiFunction<ScheduledState, ZonedDateTime, ScheduledStateSnapshot> previousStateLookup;
 
     @Builder
-    public ScheduledState(String name, int updateId, String startString, Integer brightness, Integer ct, Double x, Double y,
+    public ScheduledState(String name, String id, String startString, Integer brightness, Integer ct, Double x, Double y,
                           Integer hue, Integer sat, String effect, Boolean on, String transitionTimeBeforeString, Integer definedTransitionTime,
                           Set<DayOfWeek> daysOfWeek, StartTimeProvider startTimeProvider, LightCapabilities capabilities,
                           int minTrBeforeGapInMinutes, Boolean force, Boolean interpolate, boolean groupState, boolean temporary) {
         this.name = name;
-        this.updateId = updateId;
+        this.id = id;
         this.startString = startString;
         this.interpolate = interpolate;
         if (daysOfWeek == null || daysOfWeek.isEmpty()) {
@@ -119,7 +119,7 @@ final class ScheduledState {
     }
 
     private static ScheduledState createTemporaryCopy(ScheduledState state, String start, ZonedDateTime end) {
-        ScheduledState copy = new ScheduledState(state.name, state.updateId, start,
+        ScheduledState copy = new ScheduledState(state.name, state.id, start,
                 state.brightness, state.ct, state.x, state.y, state.hue, state.sat, state.effect, state.on,
                 state.transitionTimeBeforeString, state.definedTransitionTime, state.daysOfWeek, state.startTimeProvider,
                 state.capabilities, state.minTrBeforeGapInMinutes, state.force, state.interpolate, state.groupState, true);
@@ -352,11 +352,11 @@ final class ScheduledState {
         return daysOfWeek.containsAll(Arrays.asList(day));
     }
 
-    public String getIdV1() {
+    public String getIdV1() { // todo: this does not work well with other APIs, as this is very specific to Hue Bridges
         if (groupState) {
-            return "/groups/" + updateId;
+            return "/groups/" + id;
         }
-        return "/lights/" + updateId;
+        return "/lights/" + id;
     }
 
     private String getEffect() {
@@ -496,7 +496,7 @@ final class ScheduledState {
     }
 
     public PutCall getPutCall(ZonedDateTime now, ZonedDateTime definedStart) {
-        return PutCall.builder().id(updateId)
+        return PutCall.builder().id(id)
                       .bri(brightness)
                       .ct(ct)
                       .x(x)
@@ -513,7 +513,7 @@ final class ScheduledState {
     @Override
     public String toString() {
         return getFormattedName() + " {" +
-                "id=" + updateId +
+                "id=" + id +
                 (temporary && !retryAfterPowerOnState ? ", temporary" : "") +
                 (retryAfterPowerOnState ? ", power-on-event" : "") +
                 ", start=" + getFormattedStart() +

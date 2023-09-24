@@ -21,14 +21,14 @@ public final class InputConfigurationParser {
             Pattern.CASE_INSENSITIVE);
 
     private final StartTimeProvider startTimeProvider;
-    private final HueApi hueApi;
+    private final HueApi api;
     private final int minTrBeforeGapInMinutes;
     private final boolean interpolateAll;
 
-    public InputConfigurationParser(StartTimeProvider startTimeProvider, HueApi hueApi, int minTrBeforeGapInMinutes,
+    public InputConfigurationParser(StartTimeProvider startTimeProvider, HueApi api, int minTrBeforeGapInMinutes,
                                     boolean interpolateAll) {
         this.startTimeProvider = startTimeProvider;
-        this.hueApi = hueApi;
+        this.api = api;
         this.minTrBeforeGapInMinutes = minTrBeforeGapInMinutes;
         this.interpolateAll = interpolateAll;
     }
@@ -41,32 +41,32 @@ public final class InputConfigurationParser {
         ArrayList<ScheduledState> states = new ArrayList<>();
         for (String idPart : parts[0].split(",")) {
             idPart = idPart.trim();
-            int id;
+            String id;
             boolean groupState;
             String name = "";
             if (idPart.matches("g\\d+")) {
-                id = Integer.parseInt(idPart.substring(1));
-                name = hueApi.getGroupName(id);
+                id = idPart.substring(1);
+                name = api.getGroupName(id);
                 groupState = true;
             } else if (idPart.matches("\\d+")) {
-                id = Integer.parseInt(idPart);
-                name = hueApi.getLightName(id);
+                id = idPart;
+                name = api.getLightName(id);
                 groupState = false;
             } else {
                 name = idPart;
                 try {
-                    id = hueApi.getGroupId(idPart);
+                    id = api.getGroupId(idPart);
                     groupState = true;
                 } catch (GroupNotFoundException e) {
-                    id = hueApi.getLightId(idPart);
+                    id = api.getLightId(idPart);
                     groupState = false;
                 }
             }
             LightCapabilities capabilities;
             if (groupState) {
-                capabilities = hueApi.getGroupCapabilities(id);
+                capabilities = api.getGroupCapabilities(id);
             } else {
-                capabilities = hueApi.getLightCapabilities(id);
+                capabilities = api.getLightCapabilities(id);
             }
             Integer bri = null;
             Integer ct = null;

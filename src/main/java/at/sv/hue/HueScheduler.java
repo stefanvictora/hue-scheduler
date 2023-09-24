@@ -1,10 +1,10 @@
 package at.sv.hue;
 
+import at.sv.hue.api.ApiFailure;
 import at.sv.hue.api.BridgeAuthenticationFailure;
 import at.sv.hue.api.BridgeConnectionFailure;
-import at.sv.hue.api.HttpsResourceProviderImpl;
+import at.sv.hue.api.HttpResourceProviderImpl;
 import at.sv.hue.api.HueApi;
-import at.sv.hue.api.HueApiFailure;
 import at.sv.hue.api.HueApiHttpsClientFactory;
 import at.sv.hue.api.HueApiImpl;
 import at.sv.hue.api.HueEventListener;
@@ -16,11 +16,12 @@ import at.sv.hue.api.ManualOverrideTracker;
 import at.sv.hue.api.ManualOverrideTrackerImpl;
 import at.sv.hue.api.PutCall;
 import at.sv.hue.api.RateLimiter;
+import at.sv.hue.api.hass.HassApiImpl;
 import at.sv.hue.time.StartTimeProvider;
 import at.sv.hue.time.StartTimeProviderImpl;
 import at.sv.hue.time.SunTimesProviderImpl;
-import lombok.SneakyThrows;
 import okhttp3.OkHttpClient;
+import okhttp3.Request;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -50,17 +51,17 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-@Command(name = "HueScheduler", version = "0.9.0", mixinStandardHelpOptions = true, sortOptions = false)
+@Command(name = "HueScheduler", version = "0.10.0", mixinStandardHelpOptions = true, sortOptions = false)
 public final class HueScheduler implements Runnable {
 
     private static final Logger LOG = LoggerFactory.getLogger(HueScheduler.class);
 
     private final Map<String, List<ScheduledState>> lightStates;
     private final ConcurrentHashMap<String, List<Runnable>> onStateWaitingList;
-    @Parameters(description = "The IP address of your Philips Hue Bridge.")
+    @Parameters(description = "The IP address of your Philips Hue Bridge or HASS instance.")
     String ip;
-    @Parameters(description = "The Philips Hue Bridge username created for Hue Scheduler during setup.")
-    String username;
+    @Parameters(description = "The Philips Hue Bridge username or HASS Bearer token used for authentication.")
+    String key;
     @Parameters(paramLabel = "FILE", description = "The configuration file containing your schedules.")
     Path inputFile;
     @Option(names = "--lat", required = true, description = "The latitude of your location.")
@@ -125,7 +126,7 @@ public final class HueScheduler implements Runnable {
                     "tr-before states. Default: ${DEFAULT-VALUE} minutes."
     )
     int minTrBeforeGapInMinutes;
-    private HueApi hueApi;
+    private HueApi api;
     private StateScheduler stateScheduler;
     private final ManualOverrideTracker manualOverrideTracker;
     private final HueEventListener hueEventListener;
@@ -139,14 +140,14 @@ public final class HueScheduler implements Runnable {
         hueEventListener = new HueEventListenerImpl(manualOverrideTracker, onStateWaitingList::remove, this::getAssignedGroups);
     }
 
-    public HueScheduler(HueApi hueApi, StateScheduler stateScheduler,
+    public HueScheduler(HueApi api, StateScheduler stateScheduler,
                         StartTimeProvider startTimeProvider, Supplier<ZonedDateTime> currentTime,
                         double requestsPerSecond, boolean controlGroupLightsIndividually,
                         boolean disableUserModificationTracking, String defaultInterpolationTransitionTimeString,
                         int powerOnRescheduleDelayInMs, int bridgeFailureRetryDelayInSeconds, int multiColorAdjustmentDelay,
                         int minTrBeforeGapInMinutes, boolean interpolateAll) {
         this();
-        this.hueApi = hueApi;
+        this.api = api;
         this.stateScheduler = stateScheduler;
         this.startTimeProvider = startTimeProvider;
         this.currentTime = currentTime;
@@ -178,16 +179,35 @@ public final class HueScheduler implements Runnable {
         }
     }
 
+    @Command(name = "hass")
+    public void hass(@Option(names = "--port", description = "The port of your HASS instance", defaultValue = "8123") String port) {
+        MDC.put("context", "init");
+        OkHttpClient httpClient = new OkHttpClient.Builder()
+                .addInterceptor(chain -> {
+                    Request request = chain.request().newBuilder()
+                                           .header("Authorization", "Bearer " + key)
+                                           .build();
+                    return chain.proceed(request);
+                })
+                .build();
+        api = new HassApiImpl(new HttpResourceProviderImpl(httpClient), ip, port, RateLimiter.create(requestsPerSecond));
+        createAndStart();
+    }
+
     @Override
     public void run() {
         MDC.put("context", "init");
         OkHttpClient httpsClient = createHttpsClient();
-        hueApi = new HueApiImpl(new HttpsResourceProviderImpl(httpsClient), ip, username, RateLimiter.create(requestsPerSecond));
+        api = new HueApiImpl(new HttpResourceProviderImpl(httpsClient), ip, key, RateLimiter.create(requestsPerSecond));
+        new LightStateEventTrackerImpl(ip, key, httpsClient, new HueRawEventHandler(hueEventListener), eventStreamReadTimeoutInMinutes).start();
+        createAndStart();
+    }
+
+    private void createAndStart() {
         startTimeProvider = createStartTimeProvider(latitude, longitude, elevation);
         stateScheduler = createStateScheduler();
         currentTime = ZonedDateTime::now;
         defaultInterpolationTransitionTime = parseInterpolationTransitionTime(defaultInterpolationTransitionTimeString);
-        new LightStateEventTrackerImpl(ip, username, httpsClient, new HueRawEventHandler(hueEventListener), eventStreamReadTimeoutInMinutes).start();
         assertInputIsReadable();
         assertConnectionAndStart();
     }
@@ -229,7 +249,7 @@ public final class HueScheduler implements Runnable {
 
     private boolean assertConnection() {
         try {
-            hueApi.assertConnection();
+            api.assertConnection();
             LOG.info("Connected to bridge at {}.", ip);
         } catch (BridgeConnectionFailure e) {
             LOG.warn("Bridge not reachable: '{}'. Retrying in 5s.", e.getCause().getLocalizedMessage());
@@ -262,7 +282,7 @@ public final class HueScheduler implements Runnable {
     }
 
     public void addState(String input) {
-        new InputConfigurationParser(startTimeProvider, hueApi, minTrBeforeGapInMinutes, interpolateAll)
+        new InputConfigurationParser(startTimeProvider, api, minTrBeforeGapInMinutes, interpolateAll)
                 .parse(input)
                 .forEach(state -> lightStates.computeIfAbsent(state.getIdV1(), key -> new ArrayList<>()).add(state));
     }
@@ -363,7 +383,7 @@ public final class HueScheduler implements Runnable {
                 return;
             }
             LOG.info("Set: {}", state);
-            if (lightHasBeenManuallyOverriddenBefore(state) || lightHasBeenConsideredOffBeforeAndDoesNotTurnOn(state)) {
+            if (lightHasBeenManuallyOverriddenBefore(state) || lightIsOffAndDoesNotTurnOn(state)) {
                 if (shouldRetryOnPowerOn(state)) {
                     LOG.info("Off or manually overridden: Skip update and retry when back online");
                     retryWhenBackOn(state);
@@ -373,7 +393,6 @@ public final class HueScheduler implements Runnable {
                 }
                 return;
             }
-            boolean success;
             try {
                 if (stateIsNotEnforced(state) && stateHasBeenManuallyOverriddenSinceLastSeen(state)) {
                     LOG.info("Manually overridden: Pause updates until turned off and on again");
@@ -382,25 +401,20 @@ public final class HueScheduler implements Runnable {
                     return;
                 }
                 putAdditionalInterpolatedStateIfNeeded(state);
-                success = putState(state);
+                putState(state);
             } catch (BridgeConnectionFailure e) {
                 LOG.warn("Bridge not reachable, retrying in {}s.", bridgeFailureRetryDelayInSeconds);
                 retry(state, getMs(bridgeFailureRetryDelayInSeconds));
                 return;
-            } catch (HueApiFailure e) {
+            } catch (ApiFailure e) {
                 LOG.error("Hue api call failed: '{}'. Retrying in {}s.", e.getLocalizedMessage(), bridgeFailureRetryDelayInSeconds);
                 retry(state, getMs(bridgeFailureRetryDelayInSeconds));
                 return;
             }
-            if (success) {
-                state.setLastSeen(currentTime.get());
-                manualOverrideTracker.onAutomaticallyAssigned(state.getIdV1());
-            } else {
-                manualOverrideTracker.onLightOff(state.getIdV1());
-                LOG.info("Off: Pause updates until light is turned on again");
-            }
+            state.setLastSeen(currentTime.get());
+            manualOverrideTracker.onAutomaticallyAssigned(state.getIdV1());
             if (state.isOff()) {
-                LOG.info("Turned off, or was already off");
+                LOG.info("Turned off");
             }
             if (shouldRetryOnPowerOn(state)) {
                 retryWhenBackOn(createPowerOnCopy(state));
@@ -416,8 +430,30 @@ public final class HueScheduler implements Runnable {
         return manualOverrideTracker.isManuallyOverridden(state.getIdV1());
     }
 
-    private boolean lightHasBeenConsideredOffBeforeAndDoesNotTurnOn(ScheduledState state) {
-        return manualOverrideTracker.isOff(state.getIdV1()) && !state.isOn();
+    private boolean lightIsOffAndDoesNotTurnOn(ScheduledState state) {
+        return !state.isOn() && (lastSeenAsOff(state) || isCurrentlyOff(state));
+    }
+
+    private boolean lastSeenAsOff(ScheduledState state) {
+        return manualOverrideTracker.isOff(state.getIdV1());
+    }
+
+    private boolean isCurrentlyOff(ScheduledState state) {
+        boolean off = isGroupOrLightOff(state);
+        if (off) {
+            manualOverrideTracker.onLightOff(state.getIdV1());
+        }
+        return off;
+    }
+
+    private boolean isGroupOrLightOff(ScheduledState state) {
+        boolean off;
+        if (state.isGroupState()) {
+            off = api.isGroupOff(state.getId());
+        } else {
+            off = api.isLightOff(state.getId());
+        }
+        return off;
     }
 
     private boolean stateIsNotEnforced(ScheduledState state) {
@@ -430,9 +466,9 @@ public final class HueScheduler implements Runnable {
             return false;
         }
         if (scheduledState.isGroupState()) {
-            return hueApi.getGroupStates(scheduledState.getUpdateId()).stream().anyMatch(lastSeenState::lightStateDiffers);
+            return api.getGroupStates(scheduledState.getId()).stream().anyMatch(lastSeenState::lightStateDiffers);
         } else {
-            return lastSeenState.lightStateDiffers(hueApi.getLightState(scheduledState.getUpdateId()));
+            return lastSeenState.lightStateDiffers(api.getLightState(scheduledState.getId()));
         }
     }
 
@@ -477,12 +513,15 @@ public final class HueScheduler implements Runnable {
         return definedTransitionTime;
     }
 
-    @SneakyThrows(InterruptedException.class)
     private void sleepIfNeeded(Integer sleepTime) {
         if (sleepTime == null) {
             return;
         }
-        Thread.sleep(sleepTime * 100L);
+        try {
+            Thread.sleep(sleepTime * 100L);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private void reschedule(ScheduledState state) {
@@ -516,20 +555,19 @@ public final class HueScheduler implements Runnable {
         return seconds * 1000L;
     }
 
-    private boolean putState(ScheduledState state) {
+    private void putState(ScheduledState state) {
         ZonedDateTime now = currentTime.get();
         if (state.isInsideSplitCallWindow(now)) {
             PutCall interpolatedSplitPutCall = getInterpolatedSplitPutCall(state);
             if (interpolatedSplitPutCall == null) {
-                return true;
+                return;
             }
-            boolean success = performPutApiCall(state, interpolatedSplitPutCall);
+            performPutApiCall(state, interpolatedSplitPutCall);
             if (!state.isRetryAfterPowerOnState()) { // schedule follow-up split
                 schedule(ScheduledState.createTemporaryCopy(state), state.getNextInterpolationSplitDelayInMs(now));
             }
-            return success;
         } else {
-            return putState(state, getPutCallWithAdjustedTr(state, now));
+            putState(state, getPutCallWithAdjustedTr(state, now));
         }
     }
 
@@ -539,29 +577,28 @@ public final class HueScheduler implements Runnable {
         return state.getNextInterpolatedSplitPutCall(currentTime.get(), previousState);
     }
 
-    private boolean putState(ScheduledState state, PutCall putCall) {
+    private void putState(ScheduledState state, PutCall putCall) {
         if (state.isGroupState() && controlGroupLightsIndividually) {
-            for (Integer id : getGroupLights(state)) {
+            for (String id : getGroupLights(state)) {
                 try {
                     performPutApiCall(state, putCall.toBuilder().id(id).groupState(false).build());
-                } catch (HueApiFailure e) {
+                } catch (ApiFailure e) {
                     LOG.trace("Unsupported api call for light id {}: {}", id, e.getLocalizedMessage());
                 }
             }
-            return true;
         } else {
-            return performPutApiCall(state, putCall);
+            performPutApiCall(state, putCall);
         }
     }
 
-    private List<Integer> getGroupLights(ScheduledState state) {
-        return hueApi.getGroupLights(state.getUpdateId());
+    private List<String> getGroupLights(ScheduledState state) {
+        return api.getGroupLights(state.getId());
     }
 
-    private boolean performPutApiCall(ScheduledState state, PutCall putCall) {
+    private void performPutApiCall(ScheduledState state, PutCall putCall) {
         LOG.trace("{}", putCall);
         state.setLastPutCall(putCall);
-        return hueApi.putState(putCall);
+        api.putState(putCall);
     }
 
     private PutCall getPutCallWithAdjustedTr(ScheduledState state, ZonedDateTime now) {
@@ -620,14 +657,14 @@ public final class HueScheduler implements Runnable {
         scheduleMultiColorLoopOffsetAdjustments(getGroupLights(state), 1);
     }
 
-    private void scheduleMultiColorLoopOffsetAdjustments(List<Integer> groupLights, int i) {
+    private void scheduleMultiColorLoopOffsetAdjustments(List<String> groupLights, int i) {
         stateScheduler.schedule(() -> offsetMultiColorLoopForLight(groupLights, i),
                 currentTime.get().plusSeconds(multiColorAdjustmentDelay), null);
     }
 
-    private void offsetMultiColorLoopForLight(List<Integer> groupLights, int i) {
-        Integer light = groupLights.get(i);
-        LightState lightState = hueApi.getLightState(light);
+    private void offsetMultiColorLoopForLight(List<String> groupLights, int i) {
+        String light = groupLights.get(i);
+        LightState lightState = api.getLightState(light);
         boolean delayNext = false;
         if (lightState.isOn() && lightState.isColorLoopEffect()) {
             turnOff(light);
@@ -642,17 +679,17 @@ public final class HueScheduler implements Runnable {
         }
     }
 
-    private void turnOff(Integer light) {
+    private void turnOff(String light) {
         putOnState(light, false, null);
     }
 
-    private void scheduleTurnOn(Integer light) {
+    private void scheduleTurnOn(String light) {
         stateScheduler.schedule(() -> putOnState(light, true, "colorloop"),
                 currentTime.get().plus(300, ChronoUnit.MILLIS), null);
     }
 
-    private void putOnState(int light, boolean on, String effect) {
-        hueApi.putState(PutCall.builder().id(light).on(on).effect(effect).build());
+    private void putOnState(String light, boolean on, String effect) {
+        api.putState(PutCall.builder().id(light).on(on).effect(effect).build());
     }
 
     private void scheduleSolarDataInfoLog() {
@@ -670,15 +707,15 @@ public final class HueScheduler implements Runnable {
 
     private void scheduleApiCacheClear() {
         stateScheduler.scheduleAtFixedRate(
-                hueApi::clearCaches, apiCacheInvalidationIntervalInMinutes, apiCacheInvalidationIntervalInMinutes, TimeUnit.MINUTES);
+                api::clearCaches, apiCacheInvalidationIntervalInMinutes, apiCacheInvalidationIntervalInMinutes, TimeUnit.MINUTES);
     }
 
     private List<String> getAssignedGroups(String idv1LightId) {
-        int lightId = Integer.parseInt(idv1LightId.substring("/lights/".length()));
-        return hueApi.getAssignedGroups(lightId)
-                     .stream()
-                     .map(id -> "/groups/" + id)
-                     .collect(Collectors.toList());
+        String lightId = idv1LightId.substring("/lights/".length());
+        return api.getAssignedGroups(lightId)
+                  .stream()
+                  .map(id -> "/groups/" + id)
+                  .collect(Collectors.toList());
     }
 
     HueEventListener getHueEventListener() {
