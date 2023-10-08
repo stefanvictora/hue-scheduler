@@ -19,6 +19,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Data;
 
 import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -125,7 +127,7 @@ public class HassApiImpl implements HueApi {
         if (isHueGroup(state)) {
             groupLights.addAll(state.attributes.lights.stream()
                                                       .map(this::getNonGroupLightId)
-                                                      .collect(Collectors.toList()));
+                                                      .toList());
         } else if (isHassGroup(state)) {
             groupLights.addAll(state.attributes.entity_id);
         }
@@ -163,7 +165,7 @@ public class HassApiImpl implements HueApi {
         List<State> states = getOrLookupStatesByName(name);
         if (states.size() > 1) {
             throw new NonUniqueNameException("There are " + states.size() + " states with the given name '" + name + "'." +
-                    " Please use a unique ID instead.");
+                                             " Please use a unique ID instead.");
         }
         return states.get(0).entity_id;
     }
@@ -227,7 +229,7 @@ public class HassApiImpl implements HueApi {
     private Map<String, State> lookupStates() {
         String response = httpResourceProvider.getResource(createUrl("/states"));
         try {
-            List<State> states = mapper.readValue(response, new TypeReference<List<State>>() {
+            List<State> states = mapper.readValue(response, new TypeReference<>() {
             });
             return states.stream()
                          .filter(HassApiImpl::isSupportedStateType)
@@ -240,8 +242,8 @@ public class HassApiImpl implements HueApi {
 
     private URL createUrl(String url) {
         try {
-            return new URL(baseApi + url);
-        } catch (MalformedURLException e) {
+            return new URI(baseApi + url).toURL();
+        } catch (MalformedURLException | URISyntaxException e) {
             throw new IllegalArgumentException("Failed to construct API url", e);
         }
     }

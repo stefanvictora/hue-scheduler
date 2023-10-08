@@ -6,14 +6,14 @@ import com.launchdarkly.eventsource.EventSource;
 import com.launchdarkly.eventsource.background.BackgroundEventSource;
 import okhttp3.OkHttpClient;
 
-import java.net.MalformedURLException;
-import java.net.URL;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.time.Duration;
 
 public class LightStateEventTrackerImpl {
 
     private final String apiKey;
-    private final URL eventUrl;
+    private final URI eventUrl;
     private final HueRawEventHandler hueRawEventHandler;
     private final OkHttpClient httpsClient;
 
@@ -28,10 +28,10 @@ public class LightStateEventTrackerImpl {
         eventUrl = createUrl("https://" + ip + "/eventstream/clip/v2");
     }
 
-    private static URL createUrl(String url) {
+    private static URI createUrl(String url) {
         try {
-            return new URL(url);
-        } catch (MalformedURLException e) {
+            return new URI(url);
+        } catch (URISyntaxException e) {
             throw new IllegalArgumentException("Failed to construct API url", e);
         }
     }

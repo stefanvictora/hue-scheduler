@@ -155,7 +155,7 @@ final class ScheduledState {
     private void assertBrightnessSupported() {
         if (!capabilities.isBrightnessSupported()) {
             throw new BrightnessNotSupported(getFormattedName() + "' does not support setting brightness! "
-                    + "Capabilities: " + capabilities.getCapabilities());
+                                             + "Capabilities: " + capabilities.getCapabilities());
         }
     }
 
@@ -169,7 +169,7 @@ final class ScheduledState {
         }
         if (ct > capabilities.getCtMax() || ct < capabilities.getCtMin()) {
             throw new InvalidColorTemperatureValue("Invalid ct value '" + ct + "'. Support integer range for " + getFormattedName() + ": "
-                    + capabilities.getCtMin() + "-" + capabilities.getCtMax());
+                                                   + capabilities.getCtMin() + "-" + capabilities.getCtMax());
         }
         return ct;
     }
@@ -177,7 +177,7 @@ final class ScheduledState {
     private void assertCtSupported() {
         if (!capabilities.isCtSupported()) {
             throw new ColorTemperatureNotSupported(getFormattedName() + "' does not support setting color temperature! "
-                    + "Capabilities: " + capabilities.getCapabilities());
+                                                   + "Capabilities: " + capabilities.getCapabilities());
         }
     }
 
@@ -212,7 +212,7 @@ final class ScheduledState {
     private void assertColorCapabilities() {
         if (isColorState() && !capabilities.isColorSupported()) {
             throw new ColorNotSupported(getFormattedName() + "' does not support setting color! "
-                    + "Capabilities: " + capabilities.getCapabilities());
+                                        + "Capabilities: " + capabilities.getCapabilities());
         }
     }
 
@@ -513,26 +513,26 @@ final class ScheduledState {
     @Override
     public String toString() {
         return getFormattedName() + " {" +
-                "id=" + id +
-                (temporary && !retryAfterPowerOnState ? ", temporary" : "") +
-                (retryAfterPowerOnState ? ", power-on-event" : "") +
-                ", start=" + getFormattedStart() +
-                ", end=" + getFormattedEnd() +
-                getFormattedPropertyIfSet("on", on) +
-                getFormattedPropertyIfSet("bri", brightness) +
-                getFormattedPropertyIfSet("ct", ct) +
-                getFormattedPropertyIfSet("x", x) +
-                getFormattedPropertyIfSet("y", y) +
-                getFormattedPropertyIfSet("hue", hue) +
-                getFormattedPropertyIfSet("sat", sat) +
-                getFormattedPropertyIfSet("effect", effect) +
-                getFormattedDaysOfWeek() +
-                getFormattedTransitionTimeBefore() +
-                getFormattedTransitionTimeIfSet("tr", definedTransitionTime) +
-                getFormattedPropertyIfSet("lastSeen", getFormattedTime(lastSeen)) +
-                getFormattedPropertyIfSet("force", force) +
-                getFormattedPropertyIfSet("interpolate", interpolate) +
-                '}';
+               "id=" + id +
+               (temporary && !retryAfterPowerOnState ? ", temporary" : "") +
+               (retryAfterPowerOnState ? ", power-on-event" : "") +
+               ", start=" + getFormattedStart() +
+               ", end=" + getFormattedEnd() +
+               getFormattedPropertyIfSet("on", on) +
+               getFormattedPropertyIfSet("bri", brightness) +
+               getFormattedPropertyIfSet("ct", ct) +
+               getFormattedPropertyIfSet("x", x) +
+               getFormattedPropertyIfSet("y", y) +
+               getFormattedPropertyIfSet("hue", hue) +
+               getFormattedPropertyIfSet("sat", sat) +
+               getFormattedPropertyIfSet("effect", effect) +
+               getFormattedDaysOfWeek() +
+               getFormattedTransitionTimeBefore() +
+               getFormattedTransitionTimeIfSet("tr", definedTransitionTime) +
+               getFormattedPropertyIfSet("lastSeen", getFormattedTime(lastSeen)) +
+               getFormattedPropertyIfSet("force", force) +
+               getFormattedPropertyIfSet("interpolate", interpolate) +
+               '}';
     }
 
     public String getFormattedName() {
@@ -577,7 +577,7 @@ final class ScheduledState {
         }
         if (lastStart != null) {
             return formatPropertyName("tr-before") + transitionTimeBeforeString +
-                    " (" + formatTransitionTimeBefore(parseTransitionTimeBefore(lastStart)) + ")";
+                   " (" + formatTransitionTimeBefore(parseTransitionTimeBefore(lastStart)) + ")";
         }
         return formatPropertyName("tr-before") + transitionTimeBeforeString;
     }

@@ -15,7 +15,7 @@ import java.util.List;
 
 @Slf4j
 public final class HueRawEventHandler implements BackgroundEventHandler {
-    private static final TypeReference<List<HueEventContainer>> typeRef = new TypeReference<List<HueEventContainer>>() {
+    private static final TypeReference<List<HueEventContainer>> typeRef = new TypeReference<>() {
     };
     private final HueEventListener hueEventListener;
     private final ObjectMapper objectMapper;
@@ -87,7 +87,7 @@ public final class HueRawEventHandler implements BackgroundEventHandler {
 
         public boolean isOffEvent() {
             return on != null && !on.isOn() || "zigbee_connectivity".equals(type) &&
-                    ("connectivity_issue".equals(getStatus()) || "disconnected".equals(getStatus()));
+                                               ("connectivity_issue".equals(getStatus()) || "disconnected".equals(getStatus()));
         }
 
         public boolean isOnEvent() {

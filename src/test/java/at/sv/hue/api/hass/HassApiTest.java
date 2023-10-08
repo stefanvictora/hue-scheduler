@@ -8,11 +8,14 @@ import at.sv.hue.api.LightCapabilities;
 import at.sv.hue.api.LightNotFoundException;
 import at.sv.hue.api.LightState;
 import at.sv.hue.api.PutCall;
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.EnumSet;
 import java.util.List;
@@ -48,166 +51,168 @@ public class HassApiTest {
 
     @Test
     void getLightOrGroupNameAndId_found() {
-        setGetResponse("/states", "[\n" +
-                "  {\n" +
-                "    \"entity_id\": \"person.stefans_home\",\n" +
-                "    \"state\": \"unknown\",\n" +
-                "    \"attributes\": {\n" +
-                "      \"editable\": true,\n" +
-                "      \"id\": \"stefans_home\",\n" +
-                "      \"user_id\": \"123456\",\n" +
-                "      \"device_trackers\": [],\n" +
-                "      \"friendly_name\": \"Stefans Home\"\n" +
-                "    },\n" +
-                "    \"last_changed\": \"2023-09-21T17:35:56.486268+00:00\",\n" +
-                "    \"last_updated\": \"2023-09-21T17:36:01.279407+00:00\",\n" +
-                "    \"context\": {\n" +
-                "      \"id\": \"123456789\",\n" +
-                "      \"parent_id\": null,\n" +
-                "      \"user_id\": null\n" +
-                "    }\n" +
-                "  },\n" +
-                "  {\n" +
-                "    \"entity_id\": \"zone.home\",\n" +
-                "    \"state\": \"0\",\n" +
-                "    \"attributes\": {\n" +
-                "      \"latitude\": 1.0,\n" +
-                "      \"longitude\": 1.0,\n" +
-                "      \"radius\": 100,\n" +
-                "      \"passive\": false,\n" +
-                "      \"persons\": [],\n" +
-                "      \"editable\": true,\n" +
-                "      \"icon\": \"mdi:home\",\n" +
-                "      \"friendly_name\": \"Home\"\n" +
-                "    },\n" +
-                "    \"last_changed\": \"2023-09-21T17:35:58.872380+00:00\",\n" +
-                "    \"last_updated\": \"2023-09-21T17:35:58.872380+00:00\",\n" +
-                "    \"context\": {\n" +
-                "      \"id\": \"123456789\",\n" +
-                "      \"parent_id\": null,\n" +
-                "      \"user_id\": null\n" +
-                "    }\n" +
-                "  },\n" +
-                "  {\n" +
-                "    \"entity_id\": \"light.schreibtisch_r\",\n" +
-                "    \"state\": \"unavailable\",\n" +
-                "    \"attributes\": {\n" +
-                "      \"min_color_temp_kelvin\": 2000,\n" +
-                "      \"max_color_temp_kelvin\": 6535,\n" +
-                "      \"min_mireds\": 153,\n" +
-                "      \"max_mireds\": 500,\n" +
-                "      \"effect_list\": [\n" +
-                "        \"None\",\n" +
-                "        \"candle\",\n" +
-                "        \"fire\",\n" +
-                "        \"unknown\"\n" +
-                "      ],\n" +
-                "      \"supported_color_modes\": [\n" +
-                "        \"color_temp\",\n" +
-                "        \"xy\"\n" +
-                "      ],\n" +
-                "      \"friendly_name\": \"Schreibtisch R\",\n" +
-                "      \"supported_features\": 44\n" +
-                "    },\n" +
-                "    \"last_changed\": \"2023-09-24T08:09:56.861254+00:00\",\n" +
-                "    \"last_updated\": \"2023-09-24T08:09:56.861254+00:00\",\n" +
-                "    \"context\": {\n" +
-                "      \"id\": \"123456789\",\n" +
-                "      \"parent_id\": null,\n" +
-                "      \"user_id\": null\n" +
-                "    }\n" +
-                "  },\n" +
-                "  {\n" +
-                "    \"entity_id\": \"light.flur\",\n" +
-                "    \"state\": \"on\",\n" +
-                "    \"attributes\": {\n" +
-                "      \"min_color_temp_kelvin\": 2202,\n" +
-                "      \"max_color_temp_kelvin\": 6535,\n" +
-                "      \"min_mireds\": 153,\n" +
-                "      \"max_mireds\": 454,\n" +
-                "      \"supported_color_modes\": [\n" +
-                "        \"color_temp\",\n" +
-                "        \"xy\"\n" +
-                "      ],\n" +
-                "      \"color_mode\": \"xy\",\n" +
-                "      \"brightness\": 90,\n" +
-                "      \"hs_color\": [\n" +
-                "        15.638,\n" +
-                "        73.725\n" +
-                "      ],\n" +
-                "      \"rgb_color\": [\n" +
-                "        255,\n" +
-                "        116,\n" +
-                "        67\n" +
-                "      ],\n" +
-                "      \"xy_color\": [\n" +
-                "        0.6024,\n" +
-                "        0.3433\n" +
-                "      ],\n" +
-                "      \"is_hue_group\": true,\n" +
-                "      \"hue_scenes\": [],\n" +
-                "      \"hue_type\": \"room\",\n" +
-                "      \"lights\": [\n" +
-                "        \"Eingang S Tür\",\n" +
-                "        \"Eingang S Klo\",\n" +
-                "        \"Eingang S Kleider\",\n" +
-                "        \"Flur S Mitte\",\n" +
-                "        \"Flur S Tür\",\n" +
-                "        \"Flur S Stiege\",\n" +
-                "        \"Eingang\"\n" +
-                "      ],\n" +
-                "      \"dynamics\": false,\n" +
-                "      \"icon\": \"mdi:lightbulb-group\",\n" +
-                "      \"friendly_name\": \"Flur\",\n" +
-                "      \"supported_features\": 40\n" +
-                "    },\n" +
-                "    \"last_changed\": \"2023-09-21T17:59:29.726678+00:00\",\n" +
-                "    \"last_updated\": \"2023-09-24T08:04:31.393954+00:00\",\n" +
-                "    \"context\": {\n" +
-                "      \"id\": \"01HB33FY115WJHS4DRSP1V83AV\",\n" +
-                "      \"parent_id\": null,\n" +
-                "      \"user_id\": null\n" +
-                "    }\n" +
-                "  },\n" +
-                "  {\n" +
-                "    \"entity_id\": \"light.on_off_1\",\n" +
-                "    \"state\": \"on\",\n" +
-                "    \"attributes\": {\n" +
-                "      \"supported_color_modes\": [],\n" +
-                "      \"color_mode\": \"onoff\",\n" +
-                "      \"mode\": \"normal\",\n" +
-                "      \"dynamics\": \"none\",\n" +
-                "      \"friendly_name\": \"On Off\",\n" +
-                "      \"supported_features\": 0\n" +
-                "    },\n" +
-                "    \"last_changed\": \"2023-09-24T07:55:01.698292+00:00\",\n" +
-                "    \"last_updated\": \"2023-09-24T07:55:01.698292+00:00\",\n" +
-                "    \"context\": {\n" +
-                "      \"id\": \"123456789\",\n" +
-                "      \"parent_id\": null,\n" +
-                "      \"user_id\": null\n" +
-                "    }\n" +
-                "  },\n" +
-                "  {\n" +
-                "    \"entity_id\": \"light.on_off_2\",\n" +
-                "    \"state\": \"on\",\n" +
-                "    \"attributes\": {\n" +
-                "      \"supported_color_modes\": [],\n" +
-                "      \"color_mode\": \"onoff\",\n" +
-                "      \"mode\": \"normal\",\n" +
-                "      \"dynamics\": \"none\",\n" +
-                "      \"friendly_name\": \"On Off\",\n" +
-                "      \"supported_features\": 0\n" +
-                "    },\n" +
-                "    \"last_changed\": \"2023-09-24T07:55:01.698292+00:00\",\n" +
-                "    \"last_updated\": \"2023-09-24T07:55:01.698292+00:00\",\n" +
-                "    \"context\": {\n" +
-                "      \"id\": \"123456789\",\n" +
-                "      \"parent_id\": null,\n" +
-                "      \"user_id\": null\n" +
-                "    }\n" +
-                "  }\n" +
-                "]\n");
+        setGetResponse("/states", """
+                [
+                  {
+                    "entity_id": "person.stefans_home",
+                    "state": "unknown",
+                    "attributes": {
+                      "editable": true,
+                      "id": "stefans_home",
+                      "user_id": "123456",
+                      "device_trackers": [],
+                      "friendly_name": "Stefans Home"
+                    },
+                    "last_changed": "2023-09-21T17:35:56.486268+00:00",
+                    "last_updated": "2023-09-21T17:36:01.279407+00:00",
+                    "context": {
+                      "id": "123456789",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  },
+                  {
+                    "entity_id": "zone.home",
+                    "state": "0",
+                    "attributes": {
+                      "latitude": 1.0,
+                      "longitude": 1.0,
+                      "radius": 100,
+                      "passive": false,
+                      "persons": [],
+                      "editable": true,
+                      "icon": "mdi:home",
+                      "friendly_name": "Home"
+                    },
+                    "last_changed": "2023-09-21T17:35:58.872380+00:00",
+                    "last_updated": "2023-09-21T17:35:58.872380+00:00",
+                    "context": {
+                      "id": "123456789",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  },
+                  {
+                    "entity_id": "light.schreibtisch_r",
+                    "state": "unavailable",
+                    "attributes": {
+                      "min_color_temp_kelvin": 2000,
+                      "max_color_temp_kelvin": 6535,
+                      "min_mireds": 153,
+                      "max_mireds": 500,
+                      "effect_list": [
+                        "None",
+                        "candle",
+                        "fire",
+                        "unknown"
+                      ],
+                      "supported_color_modes": [
+                        "color_temp",
+                        "xy"
+                      ],
+                      "friendly_name": "Schreibtisch R",
+                      "supported_features": 44
+                    },
+                    "last_changed": "2023-09-24T08:09:56.861254+00:00",
+                    "last_updated": "2023-09-24T08:09:56.861254+00:00",
+                    "context": {
+                      "id": "123456789",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  },
+                  {
+                    "entity_id": "light.flur",
+                    "state": "on",
+                    "attributes": {
+                      "min_color_temp_kelvin": 2202,
+                      "max_color_temp_kelvin": 6535,
+                      "min_mireds": 153,
+                      "max_mireds": 454,
+                      "supported_color_modes": [
+                        "color_temp",
+                        "xy"
+                      ],
+                      "color_mode": "xy",
+                      "brightness": 90,
+                      "hs_color": [
+                        15.638,
+                        73.725
+                      ],
+                      "rgb_color": [
+                        255,
+                        116,
+                        67
+                      ],
+                      "xy_color": [
+                        0.6024,
+                        0.3433
+                      ],
+                      "is_hue_group": true,
+                      "hue_scenes": [],
+                      "hue_type": "room",
+                      "lights": [
+                        "Eingang S Tür",
+                        "Eingang S Klo",
+                        "Eingang S Kleider",
+                        "Flur S Mitte",
+                        "Flur S Tür",
+                        "Flur S Stiege",
+                        "Eingang"
+                      ],
+                      "dynamics": false,
+                      "icon": "mdi:lightbulb-group",
+                      "friendly_name": "Flur",
+                      "supported_features": 40
+                    },
+                    "last_changed": "2023-09-21T17:59:29.726678+00:00",
+                    "last_updated": "2023-09-24T08:04:31.393954+00:00",
+                    "context": {
+                      "id": "01HB33FY115WJHS4DRSP1V83AV",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  },
+                  {
+                    "entity_id": "light.on_off_1",
+                    "state": "on",
+                    "attributes": {
+                      "supported_color_modes": [],
+                      "color_mode": "onoff",
+                      "mode": "normal",
+                      "dynamics": "none",
+                      "friendly_name": "On Off",
+                      "supported_features": 0
+                    },
+                    "last_changed": "2023-09-24T07:55:01.698292+00:00",
+                    "last_updated": "2023-09-24T07:55:01.698292+00:00",
+                    "context": {
+                      "id": "123456789",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  },
+                  {
+                    "entity_id": "light.on_off_2",
+                    "state": "on",
+                    "attributes": {
+                      "supported_color_modes": [],
+                      "color_mode": "onoff",
+                      "mode": "normal",
+                      "dynamics": "none",
+                      "friendly_name": "On Off",
+                      "supported_features": 0
+                    },
+                    "last_changed": "2023-09-24T07:55:01.698292+00:00",
+                    "last_updated": "2023-09-24T07:55:01.698292+00:00",
+                    "context": {
+                      "id": "123456789",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  }
+                ]
+                """);
 
         assertThat(api.getLightName("light.schreibtisch_r")).isEqualTo("Schreibtisch R");
         assertThat(api.getLightName("light.flur")).isEqualTo("Flur");
@@ -245,53 +250,54 @@ public class HassApiTest {
 
     @Test
     void getLightState_colorAndCT_xyColorMode_returnsState() {
-        setGetResponse("/states/light.schreibtisch_r", "{\n" +
-                "  \"entity_id\": \"light.schreibtisch_r\",\n" +
-                "  \"state\": \"on\",\n" +
-                "  \"attributes\": {\n" +
-                "    \"min_color_temp_kelvin\": 2000,\n" +
-                "    \"max_color_temp_kelvin\": 6535,\n" +
-                "    \"min_mireds\": 153,\n" +
-                "    \"max_mireds\": 500,\n" +
-                "    \"effect_list\": [\n" +
-                "      \"None\",\n" +
-                "      \"candle\",\n" +
-                "      \"fire\",\n" +
-                "      \"unknown\"\n" +
-                "    ],\n" +
-                "    \"supported_color_modes\": [\n" +
-                "      \"color_temp\",\n" +
-                "      \"xy\"\n" +
-                "    ],\n" +
-                "    \"color_mode\": \"xy\",\n" +
-                "    \"brightness\": 127,\n" +
-                "    \"hs_color\": [\n" +
-                "      15.638,\n" +
-                "      73.725\n" +
-                "    ],\n" +
-                "    \"rgb_color\": [\n" +
-                "      255,\n" +
-                "      116,\n" +
-                "      67\n" +
-                "    ],\n" +
-                "    \"xy_color\": [\n" +
-                "      0.6024,\n" +
-                "      0.3433\n" +
-                "    ],\n" +
-                "    \"effect\": \"None\",\n" +
-                "    \"mode\": \"normal\",\n" +
-                "    \"dynamics\": \"none\",\n" +
-                "    \"friendly_name\": \"Schreibtisch R\",\n" +
-                "    \"supported_features\": 44\n" +
-                "  },\n" +
-                "  \"last_changed\": \"2023-09-21T17:59:28.462902+00:00\",\n" +
-                "  \"last_updated\": \"2023-09-23T20:05:44.786943+00:00\",\n" +
-                "  \"context\": {\n" +
-                "    \"id\": \"123456789\",\n" +
-                "    \"parent_id\": null,\n" +
-                "    \"user_id\": null\n" +
-                "  }\n" +
-                "}");
+        setGetResponse("/states/light.schreibtisch_r", """
+                {
+                  "entity_id": "light.schreibtisch_r",
+                  "state": "on",
+                  "attributes": {
+                    "min_color_temp_kelvin": 2000,
+                    "max_color_temp_kelvin": 6535,
+                    "min_mireds": 153,
+                    "max_mireds": 500,
+                    "effect_list": [
+                      "None",
+                      "candle",
+                      "fire",
+                      "unknown"
+                    ],
+                    "supported_color_modes": [
+                      "color_temp",
+                      "xy"
+                    ],
+                    "color_mode": "xy",
+                    "brightness": 127,
+                    "hs_color": [
+                      15.638,
+                      73.725
+                    ],
+                    "rgb_color": [
+                      255,
+                      116,
+                      67
+                    ],
+                    "xy_color": [
+                      0.6024,
+                      0.3433
+                    ],
+                    "effect": "None",
+                    "mode": "normal",
+                    "dynamics": "none",
+                    "friendly_name": "Schreibtisch R",
+                    "supported_features": 44
+                  },
+                  "last_changed": "2023-09-21T17:59:28.462902+00:00",
+                  "last_updated": "2023-09-23T20:05:44.786943+00:00",
+                  "context": {
+                    "id": "123456789",
+                    "parent_id": null,
+                    "user_id": null
+                  }
+                }""");
 
         LightState lightState = getLightState("light.schreibtisch_r");
 
@@ -316,55 +322,56 @@ public class HassApiTest {
 
     @Test
     void getLightState_colorAndCT_colorTempMode_returnsState() {
-        setGetResponse("/states/light.schreibtisch_r", "{\n" +
-                "    \"entity_id\": \"light.schreibtisch_r\",\n" +
-                "    \"state\": \"on\",\n" +
-                "    \"attributes\": {\n" +
-                "        \"min_color_temp_kelvin\": 2000,\n" +
-                "        \"max_color_temp_kelvin\": 6535,\n" +
-                "        \"min_mireds\": 153,\n" +
-                "        \"max_mireds\": 500,\n" +
-                "        \"effect_list\": [\n" +
-                "            \"None\",\n" +
-                "            \"candle\",\n" +
-                "            \"fire\",\n" +
-                "            \"unknown\"\n" +
-                "        ],\n" +
-                "        \"supported_color_modes\": [\n" +
-                "            \"color_temp\",\n" +
-                "            \"xy\"\n" +
-                "        ],\n" +
-                "        \"color_mode\": \"color_temp\",\n" +
-                "        \"brightness\": 37,\n" +
-                "        \"color_temp_kelvin\": 6211,\n" +
-                "        \"color_temp\": 161,\n" +
-                "        \"hs_color\": [\n" +
-                "            33.877,\n" +
-                "            4.876\n" +
-                "        ],\n" +
-                "        \"rgb_color\": [\n" +
-                "            255,\n" +
-                "            249,\n" +
-                "            242\n" +
-                "        ],\n" +
-                "        \"xy_color\": [\n" +
-                "            0.334,\n" +
-                "            0.336\n" +
-                "        ],\n" +
-                "        \"effect\": \"None\",\n" +
-                "        \"mode\": \"normal\",\n" +
-                "        \"dynamics\": \"none\",\n" +
-                "        \"friendly_name\": \"Schreibtisch R\",\n" +
-                "        \"supported_features\": 44\n" +
-                "    },\n" +
-                "    \"last_changed\": \"2023-09-21T17:59:28.462902+00:00\",\n" +
-                "    \"last_updated\": \"2023-09-24T07:29:18.919176+00:00\",\n" +
-                "    \"context\": {\n" +
-                "        \"id\": \"123456789\",\n" +
-                "        \"parent_id\": null,\n" +
-                "        \"user_id\": \"abc\"\n" +
-                "    }\n" +
-                "}");
+        setGetResponse("/states/light.schreibtisch_r", """
+                {
+                    "entity_id": "light.schreibtisch_r",
+                    "state": "on",
+                    "attributes": {
+                        "min_color_temp_kelvin": 2000,
+                        "max_color_temp_kelvin": 6535,
+                        "min_mireds": 153,
+                        "max_mireds": 500,
+                        "effect_list": [
+                            "None",
+                            "candle",
+                            "fire",
+                            "unknown"
+                        ],
+                        "supported_color_modes": [
+                            "color_temp",
+                            "xy"
+                        ],
+                        "color_mode": "color_temp",
+                        "brightness": 37,
+                        "color_temp_kelvin": 6211,
+                        "color_temp": 161,
+                        "hs_color": [
+                            33.877,
+                            4.876
+                        ],
+                        "rgb_color": [
+                            255,
+                            249,
+                            242
+                        ],
+                        "xy_color": [
+                            0.334,
+                            0.336
+                        ],
+                        "effect": "None",
+                        "mode": "normal",
+                        "dynamics": "none",
+                        "friendly_name": "Schreibtisch R",
+                        "supported_features": 44
+                    },
+                    "last_changed": "2023-09-21T17:59:28.462902+00:00",
+                    "last_updated": "2023-09-24T07:29:18.919176+00:00",
+                    "context": {
+                        "id": "123456789",
+                        "parent_id": null,
+                        "user_id": "abc"
+                    }
+                }""");
 
         LightState lightState = getLightState("light.schreibtisch_r");
 
@@ -389,52 +396,53 @@ public class HassApiTest {
 
     @Test
     void getLightsState_CTOnly() {
-        setGetResponse("/states/light.ct_only", "{\n" +
-                "        \"entity_id\": \"light.ct_only\",\n" +
-                "        \"state\": \"on\",\n" +
-                "        \"attributes\": {\n" +
-                "            \"min_color_temp_kelvin\": 2202,\n" +
-                "            \"max_color_temp_kelvin\": 6535,\n" +
-                "            \"min_mireds\": 153,\n" +
-                "            \"max_mireds\": 454,\n" +
-                "            \"effect_list\": [\n" +
-                "                \"None\",\n" +
-                "                \"candle\"\n" +
-                "            ],\n" +
-                "            \"supported_color_modes\": [\n" +
-                "                \"color_temp\"\n" +
-                "            ],\n" +
-                "            \"color_mode\": \"color_temp\",\n" +
-                "            \"brightness\": 234,\n" +
-                "            \"color_temp_kelvin\": 2732,\n" +
-                "            \"color_temp\": 366,\n" +
-                "            \"hs_color\": [\n" +
-                "                28.327,\n" +
-                "                64.71\n" +
-                "            ],\n" +
-                "            \"rgb_color\": [\n" +
-                "                255,\n" +
-                "                167,\n" +
-                "                89\n" +
-                "            ],\n" +
-                "            \"xy_color\": [\n" +
-                "                0.524,\n" +
-                "                0.387\n" +
-                "            ],\n" +
-                "            \"effect\": \"None\",\n" +
-                "            \"mode\": \"normal\",\n" +
-                "            \"dynamics\": \"none\",\n" +
-                "            \"friendly_name\": \"CT Only\",\n" +
-                "            \"supported_features\": 44\n" +
-                "        },\n" +
-                "        \"last_changed\": \"2023-09-24T08:02:02.025445+00:00\",\n" +
-                "        \"last_updated\": \"2023-09-24T08:02:03.037742+00:00\",\n" +
-                "        \"context\": {\n" +
-                "            \"id\": \"12345689\",\n" +
-                "            \"parent_id\": null,\n" +
-                "            \"user_id\": \"93aa9186c4944cb182e08a61f7d201ca\"\n" +
-                "        }\n" +
-                "    }");
+        setGetResponse("/states/light.ct_only", """
+                {
+                        "entity_id": "light.ct_only",
+                        "state": "on",
+                        "attributes": {
+                            "min_color_temp_kelvin": 2202,
+                            "max_color_temp_kelvin": 6535,
+                            "min_mireds": 153,
+                            "max_mireds": 454,
+                            "effect_list": [
+                                "None",
+                                "candle"
+                            ],
+                            "supported_color_modes": [
+                                "color_temp"
+                            ],
+                            "color_mode": "color_temp",
+                            "brightness": 234,
+                            "color_temp_kelvin": 2732,
+                            "color_temp": 366,
+                            "hs_color": [
+                                28.327,
+                                64.71
+                            ],
+                            "rgb_color": [
+                                255,
+                                167,
+                                89
+                            ],
+                            "xy_color": [
+                                0.524,
+                                0.387
+                            ],
+                            "effect": "None",
+                            "mode": "normal",
+                            "dynamics": "none",
+                            "friendly_name": "CT Only",
+                            "supported_features": 44
+                        },
+                        "last_changed": "2023-09-24T08:02:02.025445+00:00",
+                        "last_updated": "2023-09-24T08:02:03.037742+00:00",
+                        "context": {
+                            "id": "12345689",
+                            "parent_id": null,
+                            "user_id": "93aa9186c4944cb182e08a61f7d201ca"
+                        }
+                    }""");
 
         LightState lightState = getLightState("light.ct_only");
 
@@ -459,41 +467,42 @@ public class HassApiTest {
 
     @Test
     void getLightsState_XYOnly_doesNotSupportEffects() {
-        setGetResponse("/states/light.xy_only", "{\n" +
-                "        \"entity_id\": \"light.xy_only\",\n" +
-                "        \"state\": \"on\",\n" +
-                "        \"attributes\": {\n" +
-                "            \"supported_color_modes\": [\n" +
-                "                \"xy\"\n" +
-                "            ],\n" +
-                "            \"color_mode\": \"xy\",\n" +
-                "            \"brightness\": 136,\n" +
-                "            \"hs_color\": [\n" +
-                "                13.366,\n" +
-                "                79.216\n" +
-                "            ],\n" +
-                "            \"rgb_color\": [\n" +
-                "                255,\n" +
-                "                98,\n" +
-                "                53\n" +
-                "            ],\n" +
-                "            \"xy_color\": [\n" +
-                "                0.6311,\n" +
-                "                0.3325\n" +
-                "            ],\n" +
-                "            \"mode\": \"normal\",\n" +
-                "            \"dynamics\": \"none\",\n" +
-                "            \"friendly_name\": \"XY Only\",\n" +
-                "            \"supported_features\": 40\n" +
-                "        },\n" +
-                "        \"last_changed\": \"2023-09-23T15:32:38.271511+00:00\",\n" +
-                "        \"last_updated\": \"2023-09-23T17:10:00.578272+00:00\",\n" +
-                "        \"context\": {\n" +
-                "            \"id\": \"123456789\",\n" +
-                "            \"parent_id\": null,\n" +
-                "            \"user_id\": null\n" +
-                "        }\n" +
-                "    },");
+        setGetResponse("/states/light.xy_only", """
+                {
+                        "entity_id": "light.xy_only",
+                        "state": "on",
+                        "attributes": {
+                            "supported_color_modes": [
+                                "xy"
+                            ],
+                            "color_mode": "xy",
+                            "brightness": 136,
+                            "hs_color": [
+                                13.366,
+                                79.216
+                            ],
+                            "rgb_color": [
+                                255,
+                                98,
+                                53
+                            ],
+                            "xy_color": [
+                                0.6311,
+                                0.3325
+                            ],
+                            "mode": "normal",
+                            "dynamics": "none",
+                            "friendly_name": "XY Only",
+                            "supported_features": 40
+                        },
+                        "last_changed": "2023-09-23T15:32:38.271511+00:00",
+                        "last_updated": "2023-09-23T17:10:00.578272+00:00",
+                        "context": {
+                            "id": "123456789",
+                            "parent_id": null,
+                            "user_id": null
+                        }
+                    }""");
 
         LightState lightState = getLightState("light.xy_only");
 
@@ -514,35 +523,36 @@ public class HassApiTest {
 
     @Test
     void getLightState_unavailable_treatedAsOffAndUnreachable() {
-        setGetResponse("/states/light.ceiling", "{\n" +
-                "    \"entity_id\": \"light.ceiling\",\n" +
-                "    \"state\": \"unavailable\",\n" +
-                "    \"attributes\": {\n" +
-                "        \"min_color_temp_kelvin\": 2000,\n" +
-                "        \"max_color_temp_kelvin\": 6535,\n" +
-                "        \"min_mireds\": 153,\n" +
-                "        \"max_mireds\": 500,\n" +
-                "        \"effect_list\": [\n" +
-                "            \"None\",\n" +
-                "            \"candle\",\n" +
-                "            \"fire\",\n" +
-                "            \"unknown\"\n" +
-                "        ],\n" +
-                "        \"supported_color_modes\": [\n" +
-                "            \"color_temp\",\n" +
-                "            \"xy\"\n" +
-                "        ],\n" +
-                "        \"friendly_name\": \"Ceiling\",\n" +
-                "        \"supported_features\": 44\n" +
-                "    },\n" +
-                "    \"last_changed\": \"2023-09-21T18:10:21.423610+00:00\",\n" +
-                "    \"last_updated\": \"2023-09-21T18:10:21.423610+00:00\",\n" +
-                "    \"context\": {\n" +
-                "        \"id\": \"123456789\",\n" +
-                "        \"parent_id\": null,\n" +
-                "        \"user_id\": null\n" +
-                "    }\n" +
-                "}");
+        setGetResponse("/states/light.ceiling", """
+                {
+                    "entity_id": "light.ceiling",
+                    "state": "unavailable",
+                    "attributes": {
+                        "min_color_temp_kelvin": 2000,
+                        "max_color_temp_kelvin": 6535,
+                        "min_mireds": 153,
+                        "max_mireds": 500,
+                        "effect_list": [
+                            "None",
+                            "candle",
+                            "fire",
+                            "unknown"
+                        ],
+                        "supported_color_modes": [
+                            "color_temp",
+                            "xy"
+                        ],
+                        "friendly_name": "Ceiling",
+                        "supported_features": 44
+                    },
+                    "last_changed": "2023-09-21T18:10:21.423610+00:00",
+                    "last_updated": "2023-09-21T18:10:21.423610+00:00",
+                    "context": {
+                        "id": "123456789",
+                        "parent_id": null,
+                        "user_id": null
+                    }
+                }""");
 
         LightState lightState = getLightState("light.ceiling");
 
@@ -561,34 +571,35 @@ public class HassApiTest {
 
     @Test
     void getLightState_isOff() {
-        setGetResponse("/states/light.off", "{\n" +
-                "        \"entity_id\": \"light.off\",\n" +
-                "        \"state\": \"off\",\n" +
-                "        \"attributes\": {\n" +
-                "            \"min_color_temp_kelvin\": 2202,\n" +
-                "            \"max_color_temp_kelvin\": 6535,\n" +
-                "            \"min_mireds\": 153,\n" +
-                "            \"max_mireds\": 454,\n" +
-                "            \"effect_list\": [\n" +
-                "                \"None\",\n" +
-                "                \"candle\"\n" +
-                "            ],\n" +
-                "            \"supported_color_modes\": [\n" +
-                "                \"color_temp\"\n" +
-                "            ],\n" +
-                "            \"mode\": \"normal\",\n" +
-                "            \"dynamics\": \"none\",\n" +
-                "            \"friendly_name\": \"Off Light\",\n" +
-                "            \"supported_features\": 44\n" +
-                "        },\n" +
-                "        \"last_changed\": \"2023-09-21T17:36:01.004020+00:00\",\n" +
-                "        \"last_updated\": \"2023-09-21T17:36:01.004020+00:00\",\n" +
-                "        \"context\": {\n" +
-                "            \"id\": \"123456789\",\n" +
-                "            \"parent_id\": null,\n" +
-                "            \"user_id\": null\n" +
-                "        }\n" +
-                "    },");
+        setGetResponse("/states/light.off", """
+                {
+                        "entity_id": "light.off",
+                        "state": "off",
+                        "attributes": {
+                            "min_color_temp_kelvin": 2202,
+                            "max_color_temp_kelvin": 6535,
+                            "min_mireds": 153,
+                            "max_mireds": 454,
+                            "effect_list": [
+                                "None",
+                                "candle"
+                            ],
+                            "supported_color_modes": [
+                                "color_temp"
+                            ],
+                            "mode": "normal",
+                            "dynamics": "none",
+                            "friendly_name": "Off Light",
+                            "supported_features": 44
+                        },
+                        "last_changed": "2023-09-21T17:36:01.004020+00:00",
+                        "last_updated": "2023-09-21T17:36:01.004020+00:00",
+                        "context": {
+                            "id": "123456789",
+                            "parent_id": null,
+                            "user_id": null
+                        }
+                    }""");
 
         LightState lightState = getLightState("light.off");
 
@@ -607,25 +618,27 @@ public class HassApiTest {
 
     @Test
     void getLightsState_onOffOnly_light() {
-        setGetResponse("/states/light.on_off", "    {\n" +
-                "        \"entity_id\": \"light.on_off\",\n" +
-                "        \"state\": \"on\",\n" +
-                "        \"attributes\": {\n" +
-                "            \"supported_color_modes\": [],\n" +
-                "            \"color_mode\": \"onoff\",\n" +
-                "            \"mode\": \"normal\",\n" +
-                "            \"dynamics\": \"none\",\n" +
-                "            \"friendly_name\": \"On Off\",\n" +
-                "            \"supported_features\": 0\n" +
-                "        },\n" +
-                "        \"last_changed\": \"2023-09-24T07:55:01.698292+00:00\",\n" +
-                "        \"last_updated\": \"2023-09-24T07:55:01.698292+00:00\",\n" +
-                "        \"context\": {\n" +
-                "            \"id\": \"123456789\",\n" +
-                "            \"parent_id\": null,\n" +
-                "            \"user_id\": null\n" +
-                "        }\n" +
-                "    }");
+        setGetResponse("/states/light.on_off", """
+                    {
+                        "entity_id": "light.on_off",
+                        "state": "on",
+                        "attributes": {
+                            "supported_color_modes": [],
+                            "color_mode": "onoff",
+                            "mode": "normal",
+                            "dynamics": "none",
+                            "friendly_name": "On Off",
+                            "supported_features": 0
+                        },
+                        "last_changed": "2023-09-24T07:55:01.698292+00:00",
+                        "last_updated": "2023-09-24T07:55:01.698292+00:00",
+                        "context": {
+                            "id": "123456789",
+                            "parent_id": null,
+                            "user_id": null
+                        }
+                    }
+                """);
 
         LightState lightState = getLightState("light.on_off");
 
@@ -640,22 +653,24 @@ public class HassApiTest {
 
     @Test
     void getLightsState_onOffOnly_switch() {
-        setGetResponse("/states/switch.switch_demo", "    {\n" +
-                "        \"entity_id\": \"switch.switch_demo\",\n" +
-                "        \"state\": \"on\",\n" +
-                "        \"attributes\": {\n" +
-                "            \"configuration\": {},\n" +
-                "            \"icon\": \"mdi:theme-light-dark\",\n" +
-                "            \"friendly_name\": \"Switch Demo\"\n" +
-                "        },\n" +
-                "        \"last_changed\": \"2023-09-24T10:36:25.264439+00:00\",\n" +
-                "        \"last_updated\": \"2023-09-24T10:36:25.264439+00:00\",\n" +
-                "        \"context\": {\n" +
-                "            \"id\": \"123456789\",\n" +
-                "            \"parent_id\": null,\n" +
-                "            \"user_id\": null\n" +
-                "        }\n" +
-                "    }");
+        setGetResponse("/states/switch.switch_demo", """
+                    {
+                        "entity_id": "switch.switch_demo",
+                        "state": "on",
+                        "attributes": {
+                            "configuration": {},
+                            "icon": "mdi:theme-light-dark",
+                            "friendly_name": "Switch Demo"
+                        },
+                        "last_changed": "2023-09-24T10:36:25.264439+00:00",
+                        "last_updated": "2023-09-24T10:36:25.264439+00:00",
+                        "context": {
+                            "id": "123456789",
+                            "parent_id": null,
+                            "user_id": null
+                        }
+                    }
+                """);
 
         LightState lightState = getLightState("switch.switch_demo");
 
@@ -670,22 +685,24 @@ public class HassApiTest {
 
     @Test
     void getLightsState_onOffOnly_inputBoolean() {
-        setGetResponse("/states/input_boolean.test_toggle", "    {\n" +
-                "        \"entity_id\": \"input_boolean.test_toggle\",\n" +
-                "        \"state\": \"on\",\n" +
-                "        \"attributes\": {\n" +
-                "            \"editable\": true,\n" +
-                "            \"icon\": \"mdi:alarm-panel\",\n" +
-                "            \"friendly_name\": \"Test Toggle\"\n" +
-                "        },\n" +
-                "        \"last_changed\": \"2023-09-24T14:06:32.744839+00:00\",\n" +
-                "        \"last_updated\": \"2023-09-24T14:06:32.744839+00:00\",\n" +
-                "        \"context\": {\n" +
-                "            \"id\": \"01HB3R6T9820DA0PE9VCFJRE14\",\n" +
-                "            \"parent_id\": null,\n" +
-                "            \"user_id\": null\n" +
-                "        }\n" +
-                "    },");
+        setGetResponse("/states/input_boolean.test_toggle", """
+                    {
+                        "entity_id": "input_boolean.test_toggle",
+                        "state": "on",
+                        "attributes": {
+                            "editable": true,
+                            "icon": "mdi:alarm-panel",
+                            "friendly_name": "Test Toggle"
+                        },
+                        "last_changed": "2023-09-24T14:06:32.744839+00:00",
+                        "last_updated": "2023-09-24T14:06:32.744839+00:00",
+                        "context": {
+                            "id": "01HB3R6T9820DA0PE9VCFJRE14",
+                            "parent_id": null,
+                            "user_id": null
+                        }
+                    }
+                """);
 
         LightState lightState = getLightState("input_boolean.test_toggle");
 
@@ -700,22 +717,23 @@ public class HassApiTest {
 
     @Test
     void getLightsState_onOffOnly_unavailable() {
-        setGetResponse("/states/light.on_off", "{\n" +
-                "        \"entity_id\": \"light.on_off\",\n" +
-                "        \"state\": \"unavailable\",\n" +
-                "        \"attributes\": {\n" +
-                "            \"supported_color_modes\": [],\n" +
-                "            \"friendly_name\": \"On Off\",\n" +
-                "            \"supported_features\": 0\n" +
-                "        },\n" +
-                "        \"last_changed\": \"2023-09-21T17:36:01.003533+00:00\",\n" +
-                "        \"last_updated\": \"2023-09-21T17:36:01.003533+00:00\",\n" +
-                "        \"context\": {\n" +
-                "            \"id\": \"123456789\",\n" +
-                "            \"parent_id\": null,\n" +
-                "            \"user_id\": null\n" +
-                "        }\n" +
-                "    }");
+        setGetResponse("/states/light.on_off", """
+                {
+                        "entity_id": "light.on_off",
+                        "state": "unavailable",
+                        "attributes": {
+                            "supported_color_modes": [],
+                            "friendly_name": "On Off",
+                            "supported_features": 0
+                        },
+                        "last_changed": "2023-09-21T17:36:01.003533+00:00",
+                        "last_updated": "2023-09-21T17:36:01.003533+00:00",
+                        "context": {
+                            "id": "123456789",
+                            "parent_id": null,
+                            "user_id": null
+                        }
+                    }""");
 
         LightState lightState = getLightState("light.on_off");
 
@@ -730,33 +748,34 @@ public class HassApiTest {
 
     @Test
     void getLightState_brightnessOnly_maxBrightness() {
-        setGetResponse("/states/light.brightness", "{\n" +
-                "        \"entity_id\": \"light.brightness\",\n" +
-                "        \"state\": \"on\",\n" +
-                "        \"attributes\": {\n" +
-                "            \"effect_list\": [\n" +
-                "                \"None\",\n" +
-                "                \"candle\"\n" +
-                "            ],\n" +
-                "            \"supported_color_modes\": [\n" +
-                "                \"brightness\"\n" +
-                "            ],\n" +
-                "            \"color_mode\": \"brightness\",\n" +
-                "            \"brightness\": 255,\n" +
-                "            \"effect\": \"None\",\n" +
-                "            \"mode\": \"normal\",\n" +
-                "            \"dynamics\": \"none\",\n" +
-                "            \"friendly_name\": \"Brightness only lamp\",\n" +
-                "            \"supported_features\": 44\n" +
-                "        },\n" +
-                "        \"last_changed\": \"2023-09-24T08:09:32.431546+00:00\",\n" +
-                "        \"last_updated\": \"2023-09-24T08:09:32.431546+00:00\",\n" +
-                "        \"context\": {\n" +
-                "            \"id\": \"123456789\",\n" +
-                "            \"parent_id\": null,\n" +
-                "            \"user_id\": null\n" +
-                "        }\n" +
-                "    },");
+        setGetResponse("/states/light.brightness", """
+                {
+                        "entity_id": "light.brightness",
+                        "state": "on",
+                        "attributes": {
+                            "effect_list": [
+                                "None",
+                                "candle"
+                            ],
+                            "supported_color_modes": [
+                                "brightness"
+                            ],
+                            "color_mode": "brightness",
+                            "brightness": 255,
+                            "effect": "None",
+                            "mode": "normal",
+                            "dynamics": "none",
+                            "friendly_name": "Brightness only lamp",
+                            "supported_features": 44
+                        },
+                        "last_changed": "2023-09-24T08:09:32.431546+00:00",
+                        "last_updated": "2023-09-24T08:09:32.431546+00:00",
+                        "context": {
+                            "id": "123456789",
+                            "parent_id": null,
+                            "user_id": null
+                        }
+                    }""");
 
         LightState lightState = getLightState("light.brightness");
 
@@ -774,33 +793,34 @@ public class HassApiTest {
 
     @Test
     void getLightState_brightnessOnly_minBrightness() {
-        setGetResponse("/states/light.brightness", "{\n" +
-                "        \"entity_id\": \"light.brightness\",\n" +
-                "        \"state\": \"on\",\n" +
-                "        \"attributes\": {\n" +
-                "            \"effect_list\": [\n" +
-                "                \"None\",\n" +
-                "                \"candle\"\n" +
-                "            ],\n" +
-                "            \"supported_color_modes\": [\n" +
-                "                \"brightness\"\n" +
-                "            ],\n" +
-                "            \"color_mode\": \"brightness\",\n" +
-                "            \"brightness\": 0,\n" +
-                "            \"effect\": \"None\",\n" +
-                "            \"mode\": \"normal\",\n" +
-                "            \"dynamics\": \"none\",\n" +
-                "            \"friendly_name\": \"Brightness only lamp\",\n" +
-                "            \"supported_features\": 44\n" +
-                "        },\n" +
-                "        \"last_changed\": \"2023-09-24T08:09:32.431546+00:00\",\n" +
-                "        \"last_updated\": \"2023-09-24T08:09:32.431546+00:00\",\n" +
-                "        \"context\": {\n" +
-                "            \"id\": \"123456789\",\n" +
-                "            \"parent_id\": null,\n" +
-                "            \"user_id\": null\n" +
-                "        }\n" +
-                "    },");
+        setGetResponse("/states/light.brightness", """
+                {
+                        "entity_id": "light.brightness",
+                        "state": "on",
+                        "attributes": {
+                            "effect_list": [
+                                "None",
+                                "candle"
+                            ],
+                            "supported_color_modes": [
+                                "brightness"
+                            ],
+                            "color_mode": "brightness",
+                            "brightness": 0,
+                            "effect": "None",
+                            "mode": "normal",
+                            "dynamics": "none",
+                            "friendly_name": "Brightness only lamp",
+                            "supported_features": 44
+                        },
+                        "last_changed": "2023-09-24T08:09:32.431546+00:00",
+                        "last_updated": "2023-09-24T08:09:32.431546+00:00",
+                        "context": {
+                            "id": "123456789",
+                            "parent_id": null,
+                            "user_id": null
+                        }
+                    }""");
 
         LightState lightState = getLightState("light.brightness");
 
@@ -818,33 +838,34 @@ public class HassApiTest {
 
     @Test
     void getLightState_brightnessOnly_brightnessInTheUpperRange() {
-        setGetResponse("/states/light.brightness", "{\n" +
-                "        \"entity_id\": \"light.brightness\",\n" +
-                "        \"state\": \"on\",\n" +
-                "        \"attributes\": {\n" +
-                "            \"effect_list\": [\n" +
-                "                \"None\",\n" +
-                "                \"candle\"\n" +
-                "            ],\n" +
-                "            \"supported_color_modes\": [\n" +
-                "                \"brightness\"\n" +
-                "            ],\n" +
-                "            \"color_mode\": \"brightness\",\n" +
-                "            \"brightness\": 200,\n" +
-                "            \"effect\": \"None\",\n" +
-                "            \"mode\": \"normal\",\n" +
-                "            \"dynamics\": \"none\",\n" +
-                "            \"friendly_name\": \"Brightness only lamp\",\n" +
-                "            \"supported_features\": 44\n" +
-                "        },\n" +
-                "        \"last_changed\": \"2023-09-24T08:09:32.431546+00:00\",\n" +
-                "        \"last_updated\": \"2023-09-24T08:09:32.431546+00:00\",\n" +
-                "        \"context\": {\n" +
-                "            \"id\": \"123456789\",\n" +
-                "            \"parent_id\": null,\n" +
-                "            \"user_id\": null\n" +
-                "        }\n" +
-                "    },");
+        setGetResponse("/states/light.brightness", """
+                {
+                        "entity_id": "light.brightness",
+                        "state": "on",
+                        "attributes": {
+                            "effect_list": [
+                                "None",
+                                "candle"
+                            ],
+                            "supported_color_modes": [
+                                "brightness"
+                            ],
+                            "color_mode": "brightness",
+                            "brightness": 200,
+                            "effect": "None",
+                            "mode": "normal",
+                            "dynamics": "none",
+                            "friendly_name": "Brightness only lamp",
+                            "supported_features": 44
+                        },
+                        "last_changed": "2023-09-24T08:09:32.431546+00:00",
+                        "last_updated": "2023-09-24T08:09:32.431546+00:00",
+                        "context": {
+                            "id": "123456789",
+                            "parent_id": null,
+                            "user_id": null
+                        }
+                    }""");
 
         LightState lightState = getLightState("light.brightness");
 
@@ -862,128 +883,130 @@ public class HassApiTest {
 
     @Test
     void getGroupLights_hueGroup_fetchesContainedLightsByName_ignoresGroupStates() {
-        setGetResponse("/states", "[\n" +
-                "  {\n" +
-                "    \"entity_id\": \"light.couch_group\",\n" +
-                "    \"state\": \"on\",\n" +
-                "    \"attributes\": {\n" +
-                "      \"supported_color_modes\": [\n" +
-                "        \"xy\"\n" +
-                "      ],\n" +
-                "      \"color_mode\": \"xy\",\n" +
-                "      \"brightness\": 255,\n" +
-                "      \"hs_color\": [\n" +
-                "        12.464,\n" +
-                "        81.176\n" +
-                "      ],\n" +
-                "      \"rgb_color\": [\n" +
-                "        255,\n" +
-                "        91,\n" +
-                "        48\n" +
-                "      ],\n" +
-                "      \"xy_color\": [\n" +
-                "        0.6408,\n" +
-                "        0.3284\n" +
-                "      ],\n" +
-                "      \"is_hue_group\": true,\n" +
-                "      \"hue_scenes\": [\n" +
-                "        \"Gedimmt\",\n" +
-                "        \"Nachtlicht\",\n" +
-                "        \"Hell\",\n" +
-                "        \"Frühlingsblüten\",\n" +
-                "        \"Sonnenuntergang Savanne\",\n" +
-                "        \"Tropendämmerung\",\n" +
-                "        \"Nordlichter\"\n" +
-                "      ],\n" +
-                "      \"hue_type\": \"zone\",\n" +
-                "      \"lights\": [\n" +
-                "        \"Couch\",\n" +
-                "        \"Couch unten\"\n" +
-                "      ],\n" +
-                "      \"dynamics\": false,\n" +
-                "      \"icon\": \"mdi:lightbulb-group\",\n" +
-                "      \"friendly_name\": \"Couch\",\n" +
-                "      \"supported_features\": 40\n" +
-                "    },\n" +
-                "    \"last_changed\": \"2023-09-24T14:06:34.783862+00:00\",\n" +
-                "    \"last_updated\": \"2023-09-24T14:06:34.783862+00:00\",\n" +
-                "    \"context\": {\n" +
-                "      \"id\": \"123456789\",\n" +
-                "      \"parent_id\": null,\n" +
-                "      \"user_id\": null\n" +
-                "    }\n" +
-                "  },\n" +
-                "  {\n" +
-                "    \"entity_id\": \"light.couch_unten\",\n" +
-                "    \"state\": \"on\",\n" +
-                "    \"attributes\": {\n" +
-                "      \"supported_color_modes\": [\n" +
-                "        \"xy\"\n" +
-                "      ],\n" +
-                "      \"color_mode\": \"xy\",\n" +
-                "      \"brightness\": 255,\n" +
-                "      \"hs_color\": [\n" +
-                "        12.464,\n" +
-                "        81.176\n" +
-                "      ],\n" +
-                "      \"rgb_color\": [\n" +
-                "        255,\n" +
-                "        91,\n" +
-                "        48\n" +
-                "      ],\n" +
-                "      \"xy_color\": [\n" +
-                "        0.6408,\n" +
-                "        0.3284\n" +
-                "      ],\n" +
-                "      \"mode\": \"normal\",\n" +
-                "      \"dynamics\": \"none\",\n" +
-                "      \"friendly_name\": \"Couch unten\",\n" +
-                "      \"supported_features\": 40\n" +
-                "    },\n" +
-                "    \"last_changed\": \"2023-09-24T14:06:34.772408+00:00\",\n" +
-                "    \"last_updated\": \"2023-09-24T14:06:34.772408+00:00\",\n" +
-                "    \"context\": {\n" +
-                "      \"id\": \"123456789\",\n" +
-                "      \"parent_id\": null,\n" +
-                "      \"user_id\": null\n" +
-                "    }\n" +
-                "  },\n" +
-                "  {\n" +
-                "    \"entity_id\": \"light.couch\",\n" +
-                "    \"state\": \"on\",\n" +
-                "    \"attributes\": {\n" +
-                "      \"supported_color_modes\": [\n" +
-                "        \"xy\"\n" +
-                "      ],\n" +
-                "      \"color_mode\": \"xy\",\n" +
-                "      \"brightness\": 255,\n" +
-                "      \"hs_color\": [\n" +
-                "        12.464,\n" +
-                "        81.176\n" +
-                "      ],\n" +
-                "      \"rgb_color\": [\n" +
-                "        255,\n" +
-                "        91,\n" +
-                "        48\n" +
-                "      ],\n" +
-                "      \"xy_color\": [\n" +
-                "        0.6408,\n" +
-                "        0.3284\n" +
-                "      ],\n" +
-                "      \"mode\": \"normal\",\n" +
-                "      \"dynamics\": \"none\",\n" +
-                "      \"friendly_name\": \"Couch\",\n" +
-                "      \"supported_features\": 40\n" +
-                "    },\n" +
-                "    \"last_changed\": \"2023-09-24T14:06:34.774658+00:00\",\n" +
-                "    \"last_updated\": \"2023-09-24T14:06:34.774658+00:00\",\n" +
-                "    \"context\": {\n" +
-                "      \"id\": \"123456789\",\n" +
-                "      \"parent_id\": null,\n" +
-                "      \"user_id\": null\n" +
-                "    }\n" +
-                "  }\n" +
-                "]\n");
+        setGetResponse("/states", """
+                [
+                  {
+                    "entity_id": "light.couch_group",
+                    "state": "on",
+                    "attributes": {
+                      "supported_color_modes": [
+                        "xy"
+                      ],
+                      "color_mode": "xy",
+                      "brightness": 255,
+                      "hs_color": [
+                        12.464,
+                        81.176
+                      ],
+                      "rgb_color": [
+                        255,
+                        91,
+                        48
+                      ],
+                      "xy_color": [
+                        0.6408,
+                        0.3284
+                      ],
+                      "is_hue_group": true,
+                      "hue_scenes": [
+                        "Gedimmt",
+                        "Nachtlicht",
+                        "Hell",
+                        "Frühlingsblüten",
+                        "Sonnenuntergang Savanne",
+                        "Tropendämmerung",
+                        "Nordlichter"
+                      ],
+                      "hue_type": "zone",
+                      "lights": [
+                        "Couch",
+                        "Couch unten"
+                      ],
+                      "dynamics": false,
+                      "icon": "mdi:lightbulb-group",
+                      "friendly_name": "Couch",
+                      "supported_features": 40
+                    },
+                    "last_changed": "2023-09-24T14:06:34.783862+00:00",
+                    "last_updated": "2023-09-24T14:06:34.783862+00:00",
+                    "context": {
+                      "id": "123456789",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  },
+                  {
+                    "entity_id": "light.couch_unten",
+                    "state": "on",
+                    "attributes": {
+                      "supported_color_modes": [
+                        "xy"
+                      ],
+                      "color_mode": "xy",
+                      "brightness": 255,
+                      "hs_color": [
+                        12.464,
+                        81.176
+                      ],
+                      "rgb_color": [
+                        255,
+                        91,
+                        48
+                      ],
+                      "xy_color": [
+                        0.6408,
+                        0.3284
+                      ],
+                      "mode": "normal",
+                      "dynamics": "none",
+                      "friendly_name": "Couch unten",
+                      "supported_features": 40
+                    },
+                    "last_changed": "2023-09-24T14:06:34.772408+00:00",
+                    "last_updated": "2023-09-24T14:06:34.772408+00:00",
+                    "context": {
+                      "id": "123456789",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  },
+                  {
+                    "entity_id": "light.couch",
+                    "state": "on",
+                    "attributes": {
+                      "supported_color_modes": [
+                        "xy"
+                      ],
+                      "color_mode": "xy",
+                      "brightness": 255,
+                      "hs_color": [
+                        12.464,
+                        81.176
+                      ],
+                      "rgb_color": [
+                        255,
+                        91,
+                        48
+                      ],
+                      "xy_color": [
+                        0.6408,
+                        0.3284
+                      ],
+                      "mode": "normal",
+                      "dynamics": "none",
+                      "friendly_name": "Couch",
+                      "supported_features": 40
+                    },
+                    "last_changed": "2023-09-24T14:06:34.774658+00:00",
+                    "last_updated": "2023-09-24T14:06:34.774658+00:00",
+                    "context": {
+                      "id": "123456789",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  }
+                ]
+                """);
 
         assertThat(api.getGroupLights("light.couch_group")).containsExactlyInAnyOrder("light.couch",
                 "light.couch_unten"
@@ -992,198 +1015,204 @@ public class HassApiTest {
 
     @Test
     void getGroupLights_hueGroup_containsUnknownLight_exception() {
-        setGetResponse("/states", "[\n" +
-                "  {\n" +
-                "    \"entity_id\": \"light.couch_group\",\n" +
-                "    \"state\": \"on\",\n" +
-                "    \"attributes\": {\n" +
-                "      \"supported_color_modes\": [\n" +
-                "        \"xy\"\n" +
-                "      ],\n" +
-                "      \"color_mode\": \"xy\",\n" +
-                "      \"brightness\": 255,\n" +
-                "      \"hs_color\": [\n" +
-                "        12.464,\n" +
-                "        81.176\n" +
-                "      ],\n" +
-                "      \"rgb_color\": [\n" +
-                "        255,\n" +
-                "        91,\n" +
-                "        48\n" +
-                "      ],\n" +
-                "      \"xy_color\": [\n" +
-                "        0.6408,\n" +
-                "        0.3284\n" +
-                "      ],\n" +
-                "      \"is_hue_group\": true,\n" +
-                "      \"hue_scenes\": [\n" +
-                "        \"Gedimmt\",\n" +
-                "        \"Nachtlicht\",\n" +
-                "        \"Hell\",\n" +
-                "        \"Frühlingsblüten\",\n" +
-                "        \"Sonnenuntergang Savanne\",\n" +
-                "        \"Tropendämmerung\",\n" +
-                "        \"Nordlichter\"\n" +
-                "      ],\n" +
-                "      \"hue_type\": \"zone\",\n" +
-                "      \"lights\": [\n" +
-                "        \"Couch\",\n" +
-                "        \"Couch unten\"\n" +
-                "      ],\n" +
-                "      \"dynamics\": false,\n" +
-                "      \"icon\": \"mdi:lightbulb-group\",\n" +
-                "      \"friendly_name\": \"Couch\",\n" +
-                "      \"supported_features\": 40\n" +
-                "    },\n" +
-                "    \"last_changed\": \"2023-09-24T14:06:34.783862+00:00\",\n" +
-                "    \"last_updated\": \"2023-09-24T14:06:34.783862+00:00\",\n" +
-                "    \"context\": {\n" +
-                "      \"id\": \"123456789\",\n" +
-                "      \"parent_id\": null,\n" +
-                "      \"user_id\": null\n" +
-                "    }\n" +
-                "  }\n" +
-                "]\n");
+        setGetResponse("/states", """
+                [
+                  {
+                    "entity_id": "light.couch_group",
+                    "state": "on",
+                    "attributes": {
+                      "supported_color_modes": [
+                        "xy"
+                      ],
+                      "color_mode": "xy",
+                      "brightness": 255,
+                      "hs_color": [
+                        12.464,
+                        81.176
+                      ],
+                      "rgb_color": [
+                        255,
+                        91,
+                        48
+                      ],
+                      "xy_color": [
+                        0.6408,
+                        0.3284
+                      ],
+                      "is_hue_group": true,
+                      "hue_scenes": [
+                        "Gedimmt",
+                        "Nachtlicht",
+                        "Hell",
+                        "Frühlingsblüten",
+                        "Sonnenuntergang Savanne",
+                        "Tropendämmerung",
+                        "Nordlichter"
+                      ],
+                      "hue_type": "zone",
+                      "lights": [
+                        "Couch",
+                        "Couch unten"
+                      ],
+                      "dynamics": false,
+                      "icon": "mdi:lightbulb-group",
+                      "friendly_name": "Couch",
+                      "supported_features": 40
+                    },
+                    "last_changed": "2023-09-24T14:06:34.783862+00:00",
+                    "last_updated": "2023-09-24T14:06:34.783862+00:00",
+                    "context": {
+                      "id": "123456789",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  }
+                ]
+                """);
 
         assertThatThrownBy(() -> api.getGroupLights("light.couch_group")).isInstanceOf(LightNotFoundException.class);
     }
 
     @Test
     void getGroupLights_hueGroup_ignoresHassGroup_exception() {
-        setGetResponse("/states", "[\n" +
-                "  {\n" +
-                "    \"entity_id\": \"light.couch_group\",\n" +
-                "    \"state\": \"on\",\n" +
-                "    \"attributes\": {\n" +
-                "      \"supported_color_modes\": [\n" +
-                "        \"xy\"\n" +
-                "      ],\n" +
-                "      \"color_mode\": \"xy\",\n" +
-                "      \"brightness\": 255,\n" +
-                "      \"hs_color\": [\n" +
-                "        12.464,\n" +
-                "        81.176\n" +
-                "      ],\n" +
-                "      \"rgb_color\": [\n" +
-                "        255,\n" +
-                "        91,\n" +
-                "        48\n" +
-                "      ],\n" +
-                "      \"xy_color\": [\n" +
-                "        0.6408,\n" +
-                "        0.3284\n" +
-                "      ],\n" +
-                "      \"is_hue_group\": true,\n" +
-                "      \"hue_scenes\": [\n" +
-                "        \"Gedimmt\",\n" +
-                "        \"Nachtlicht\",\n" +
-                "        \"Hell\",\n" +
-                "        \"Frühlingsblüten\",\n" +
-                "        \"Sonnenuntergang Savanne\",\n" +
-                "        \"Tropendämmerung\",\n" +
-                "        \"Nordlichter\"\n" +
-                "      ],\n" +
-                "      \"hue_type\": \"zone\",\n" +
-                "      \"lights\": [\n" +
-                "        \"Couch\"\n" +
-                "      ],\n" +
-                "      \"dynamics\": false,\n" +
-                "      \"icon\": \"mdi:lightbulb-group\",\n" +
-                "      \"friendly_name\": \"Couch\",\n" +
-                "      \"supported_features\": 40\n" +
-                "    },\n" +
-                "    \"last_changed\": \"2023-09-24T14:06:34.783862+00:00\",\n" +
-                "    \"last_updated\": \"2023-09-24T14:06:34.783862+00:00\",\n" +
-                "    \"context\": {\n" +
-                "      \"id\": \"123456789\",\n" +
-                "      \"parent_id\": null,\n" +
-                "      \"user_id\": null\n" +
-                "    }\n" +
-                "  },\n" +
-                "  {\n" +
-                "    \"entity_id\": \"light.couch_group2\",\n" +
-                "    \"state\": \"on\",\n" +
-                "    \"attributes\": {\n" +
-                "      \"min_color_temp_kelvin\": 2000,\n" +
-                "      \"max_color_temp_kelvin\": 6535,\n" +
-                "      \"min_mireds\": 153,\n" +
-                "      \"max_mireds\": 500,\n" +
-                "      \"effect_list\": [\n" +
-                "        \"None\",\n" +
-                "        \"candle\",\n" +
-                "        \"fire\",\n" +
-                "        \"unknown\"\n" +
-                "      ],\n" +
-                "      \"supported_color_modes\": [\n" +
-                "        \"brightness\",\n" +
-                "        \"color_temp\",\n" +
-                "        \"xy\"\n" +
-                "      ],\n" +
-                "      \"color_mode\": \"brightness\",\n" +
-                "      \"brightness\": 255,\n" +
-                "      \"effect\": \"None\",\n" +
-                "      \"entity_id\": [\n" +
-                "        \"light.couch\"\n" +
-                "      ],\n" +
-                "      \"icon\": \"mdi:lightbulb-group\",\n" +
-                "      \"friendly_name\": \"Couch\",\n" +
-                "      \"supported_features\": 44\n" +
-                "    },\n" +
-                "    \"last_changed\": \"2023-09-24T14:06:35.260070+00:00\",\n" +
-                "    \"last_updated\": \"2023-09-24T14:20:00.208887+00:00\",\n" +
-                "    \"context\": {\n" +
-                "      \"id\": \"123456789\",\n" +
-                "      \"parent_id\": null,\n" +
-                "      \"user_id\": null\n" +
-                "    }\n" +
-                "  }\n" +
-                "]\n");
+        setGetResponse("/states", """
+                [
+                  {
+                    "entity_id": "light.couch_group",
+                    "state": "on",
+                    "attributes": {
+                      "supported_color_modes": [
+                        "xy"
+                      ],
+                      "color_mode": "xy",
+                      "brightness": 255,
+                      "hs_color": [
+                        12.464,
+                        81.176
+                      ],
+                      "rgb_color": [
+                        255,
+                        91,
+                        48
+                      ],
+                      "xy_color": [
+                        0.6408,
+                        0.3284
+                      ],
+                      "is_hue_group": true,
+                      "hue_scenes": [
+                        "Gedimmt",
+                        "Nachtlicht",
+                        "Hell",
+                        "Frühlingsblüten",
+                        "Sonnenuntergang Savanne",
+                        "Tropendämmerung",
+                        "Nordlichter"
+                      ],
+                      "hue_type": "zone",
+                      "lights": [
+                        "Couch"
+                      ],
+                      "dynamics": false,
+                      "icon": "mdi:lightbulb-group",
+                      "friendly_name": "Couch",
+                      "supported_features": 40
+                    },
+                    "last_changed": "2023-09-24T14:06:34.783862+00:00",
+                    "last_updated": "2023-09-24T14:06:34.783862+00:00",
+                    "context": {
+                      "id": "123456789",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  },
+                  {
+                    "entity_id": "light.couch_group2",
+                    "state": "on",
+                    "attributes": {
+                      "min_color_temp_kelvin": 2000,
+                      "max_color_temp_kelvin": 6535,
+                      "min_mireds": 153,
+                      "max_mireds": 500,
+                      "effect_list": [
+                        "None",
+                        "candle",
+                        "fire",
+                        "unknown"
+                      ],
+                      "supported_color_modes": [
+                        "brightness",
+                        "color_temp",
+                        "xy"
+                      ],
+                      "color_mode": "brightness",
+                      "brightness": 255,
+                      "effect": "None",
+                      "entity_id": [
+                        "light.couch"
+                      ],
+                      "icon": "mdi:lightbulb-group",
+                      "friendly_name": "Couch",
+                      "supported_features": 44
+                    },
+                    "last_changed": "2023-09-24T14:06:35.260070+00:00",
+                    "last_updated": "2023-09-24T14:20:00.208887+00:00",
+                    "context": {
+                      "id": "123456789",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  }
+                ]
+                """);
 
         assertThatThrownBy(() -> api.getGroupLights("light.couch_group")).isInstanceOf(LightNotFoundException.class);
     }
 
     @Test
     void getGroupLights_hassGroup_returnsContainedLightIds() {
-        setGetResponse("/states", "[\n" +
-                "  {\n" +
-                "    \"entity_id\": \"light.test_group\",\n" +
-                "    \"state\": \"on\",\n" +
-                "    \"attributes\": {\n" +
-                "      \"min_color_temp_kelvin\": 2000,\n" +
-                "      \"max_color_temp_kelvin\": 6535,\n" +
-                "      \"min_mireds\": 153,\n" +
-                "      \"max_mireds\": 500,\n" +
-                "      \"effect_list\": [\n" +
-                "        \"None\",\n" +
-                "        \"candle\",\n" +
-                "        \"fire\",\n" +
-                "        \"unknown\"\n" +
-                "      ],\n" +
-                "      \"supported_color_modes\": [\n" +
-                "        \"brightness\",\n" +
-                "        \"color_temp\",\n" +
-                "        \"xy\"\n" +
-                "      ],\n" +
-                "      \"color_mode\": \"brightness\",\n" +
-                "      \"brightness\": 255,\n" +
-                "      \"effect\": \"None\",\n" +
-                "      \"entity_id\": [\n" +
-                "        \"light.schreibtisch_r\",\n" +
-                "        \"light.schreibtisch_l\"\n" +
-                "      ],\n" +
-                "      \"icon\": \"mdi:lightbulb-group\",\n" +
-                "      \"friendly_name\": \"Test Group\",\n" +
-                "      \"supported_features\": 44\n" +
-                "    },\n" +
-                "    \"last_changed\": \"2023-09-24T14:06:35.260070+00:00\",\n" +
-                "    \"last_updated\": \"2023-09-24T14:20:00.208887+00:00\",\n" +
-                "    \"context\": {\n" +
-                "      \"id\": \"123456789\",\n" +
-                "      \"parent_id\": null,\n" +
-                "      \"user_id\": null\n" +
-                "    }\n" +
-                "  }\n" +
-                "]\n");
+        setGetResponse("/states", """
+                [
+                  {
+                    "entity_id": "light.test_group",
+                    "state": "on",
+                    "attributes": {
+                      "min_color_temp_kelvin": 2000,
+                      "max_color_temp_kelvin": 6535,
+                      "min_mireds": 153,
+                      "max_mireds": 500,
+                      "effect_list": [
+                        "None",
+                        "candle",
+                        "fire",
+                        "unknown"
+                      ],
+                      "supported_color_modes": [
+                        "brightness",
+                        "color_temp",
+                        "xy"
+                      ],
+                      "color_mode": "brightness",
+                      "brightness": 255,
+                      "effect": "None",
+                      "entity_id": [
+                        "light.schreibtisch_r",
+                        "light.schreibtisch_l"
+                      ],
+                      "icon": "mdi:lightbulb-group",
+                      "friendly_name": "Test Group",
+                      "supported_features": 44
+                    },
+                    "last_changed": "2023-09-24T14:06:35.260070+00:00",
+                    "last_updated": "2023-09-24T14:20:00.208887+00:00",
+                    "context": {
+                      "id": "123456789",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  }
+                ]
+                """);
 
         assertThat(api.getGroupLights("light.test_group")).containsExactlyInAnyOrder("light.schreibtisch_r",
                 "light.schreibtisch_l"
@@ -1192,119 +1221,123 @@ public class HassApiTest {
 
     @Test
     void getGroupLights_notAGroup_exception() {
-        setGetResponse("/states", "[\n" +
-                "  {\n" +
-                "    \"entity_id\": \"light.on_off\",\n" +
-                "    \"state\": \"on\",\n" +
-                "    \"attributes\": {\n" +
-                "      \"supported_color_modes\": [],\n" +
-                "      \"color_mode\": \"onoff\",\n" +
-                "      \"mode\": \"normal\",\n" +
-                "      \"dynamics\": \"none\",\n" +
-                "      \"friendly_name\": \"On Off\",\n" +
-                "      \"supported_features\": 0\n" +
-                "    },\n" +
-                "    \"last_changed\": \"2023-09-24T07:55:01.698292+00:00\",\n" +
-                "    \"last_updated\": \"2023-09-24T07:55:01.698292+00:00\",\n" +
-                "    \"context\": {\n" +
-                "      \"id\": \"123456789\",\n" +
-                "      \"parent_id\": null,\n" +
-                "      \"user_id\": null\n" +
-                "    }\n" +
-                "  }\n" +
-                "]\n");
+        setGetResponse("/states", """
+                [
+                  {
+                    "entity_id": "light.on_off",
+                    "state": "on",
+                    "attributes": {
+                      "supported_color_modes": [],
+                      "color_mode": "onoff",
+                      "mode": "normal",
+                      "dynamics": "none",
+                      "friendly_name": "On Off",
+                      "supported_features": 0
+                    },
+                    "last_changed": "2023-09-24T07:55:01.698292+00:00",
+                    "last_updated": "2023-09-24T07:55:01.698292+00:00",
+                    "context": {
+                      "id": "123456789",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  }
+                ]
+                """);
 
         assertThatThrownBy(() -> api.getGroupLights("light.on_off")).isInstanceOf(GroupNotFoundException.class);
     }
 
     @Test
     void getGroupLights_emptyGroup_exception() {
-        setGetResponse("/states", "[\n" +
-                "  {\n" +
-                "    \"entity_id\": \"light.couch_group\",\n" +
-                "    \"state\": \"on\",\n" +
-                "    \"attributes\": {\n" +
-                "      \"supported_color_modes\": [\n" +
-                "        \"xy\"\n" +
-                "      ],\n" +
-                "      \"color_mode\": \"xy\",\n" +
-                "      \"brightness\": 255,\n" +
-                "      \"hs_color\": [\n" +
-                "        12.464,\n" +
-                "        81.176\n" +
-                "      ],\n" +
-                "      \"rgb_color\": [\n" +
-                "        255,\n" +
-                "        91,\n" +
-                "        48\n" +
-                "      ],\n" +
-                "      \"xy_color\": [\n" +
-                "        0.6408,\n" +
-                "        0.3284\n" +
-                "      ],\n" +
-                "      \"is_hue_group\": true,\n" +
-                "      \"hue_scenes\": [\n" +
-                "        \"Gedimmt\",\n" +
-                "        \"Nachtlicht\",\n" +
-                "        \"Hell\",\n" +
-                "        \"Frühlingsblüten\",\n" +
-                "        \"Sonnenuntergang Savanne\",\n" +
-                "        \"Tropendämmerung\",\n" +
-                "        \"Nordlichter\"\n" +
-                "      ],\n" +
-                "      \"hue_type\": \"zone\",\n" +
-                "      \"lights\": [\n" +
-                "      ],\n" +
-                "      \"dynamics\": false,\n" +
-                "      \"icon\": \"mdi:lightbulb-group\",\n" +
-                "      \"friendly_name\": \"Couch\",\n" +
-                "      \"supported_features\": 40\n" +
-                "    },\n" +
-                "    \"last_changed\": \"2023-09-24T14:06:34.783862+00:00\",\n" +
-                "    \"last_updated\": \"2023-09-24T14:06:34.783862+00:00\",\n" +
-                "    \"context\": {\n" +
-                "      \"id\": \"123456789\",\n" +
-                "      \"parent_id\": null,\n" +
-                "      \"user_id\": null\n" +
-                "    }\n" +
-                "  },\n" +
-                "  {\n" +
-                "    \"entity_id\": \"light.couch_group2\",\n" +
-                "    \"state\": \"on\",\n" +
-                "    \"attributes\": {\n" +
-                "      \"min_color_temp_kelvin\": 2000,\n" +
-                "      \"max_color_temp_kelvin\": 6535,\n" +
-                "      \"min_mireds\": 153,\n" +
-                "      \"max_mireds\": 500,\n" +
-                "      \"effect_list\": [\n" +
-                "        \"None\",\n" +
-                "        \"candle\",\n" +
-                "        \"fire\",\n" +
-                "        \"unknown\"\n" +
-                "      ],\n" +
-                "      \"supported_color_modes\": [\n" +
-                "        \"brightness\",\n" +
-                "        \"color_temp\",\n" +
-                "        \"xy\"\n" +
-                "      ],\n" +
-                "      \"color_mode\": \"brightness\",\n" +
-                "      \"brightness\": 255,\n" +
-                "      \"effect\": \"None\",\n" +
-                "      \"entity_id\": [\n" +
-                "      ],\n" +
-                "      \"icon\": \"mdi:lightbulb-group\",\n" +
-                "      \"friendly_name\": \"Couch\",\n" +
-                "      \"supported_features\": 44\n" +
-                "    },\n" +
-                "    \"last_changed\": \"2023-09-24T14:06:35.260070+00:00\",\n" +
-                "    \"last_updated\": \"2023-09-24T14:20:00.208887+00:00\",\n" +
-                "    \"context\": {\n" +
-                "      \"id\": \"123456789\",\n" +
-                "      \"parent_id\": null,\n" +
-                "      \"user_id\": null\n" +
-                "    }\n" +
-                "  }\n" +
-                "]\n");
+        setGetResponse("/states", """
+                [
+                  {
+                    "entity_id": "light.couch_group",
+                    "state": "on",
+                    "attributes": {
+                      "supported_color_modes": [
+                        "xy"
+                      ],
+                      "color_mode": "xy",
+                      "brightness": 255,
+                      "hs_color": [
+                        12.464,
+                        81.176
+                      ],
+                      "rgb_color": [
+                        255,
+                        91,
+                        48
+                      ],
+                      "xy_color": [
+                        0.6408,
+                        0.3284
+                      ],
+                      "is_hue_group": true,
+                      "hue_scenes": [
+                        "Gedimmt",
+                        "Nachtlicht",
+                        "Hell",
+                        "Frühlingsblüten",
+                        "Sonnenuntergang Savanne",
+                        "Tropendämmerung",
+                        "Nordlichter"
+                      ],
+                      "hue_type": "zone",
+                      "lights": [
+                      ],
+                      "dynamics": false,
+                      "icon": "mdi:lightbulb-group",
+                      "friendly_name": "Couch",
+                      "supported_features": 40
+                    },
+                    "last_changed": "2023-09-24T14:06:34.783862+00:00",
+                    "last_updated": "2023-09-24T14:06:34.783862+00:00",
+                    "context": {
+                      "id": "123456789",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  },
+                  {
+                    "entity_id": "light.couch_group2",
+                    "state": "on",
+                    "attributes": {
+                      "min_color_temp_kelvin": 2000,
+                      "max_color_temp_kelvin": 6535,
+                      "min_mireds": 153,
+                      "max_mireds": 500,
+                      "effect_list": [
+                        "None",
+                        "candle",
+                        "fire",
+                        "unknown"
+                      ],
+                      "supported_color_modes": [
+                        "brightness",
+                        "color_temp",
+                        "xy"
+                      ],
+                      "color_mode": "brightness",
+                      "brightness": 255,
+                      "effect": "None",
+                      "entity_id": [
+                      ],
+                      "icon": "mdi:lightbulb-group",
+                      "friendly_name": "Couch",
+                      "supported_features": 44
+                    },
+                    "last_changed": "2023-09-24T14:06:35.260070+00:00",
+                    "last_updated": "2023-09-24T14:20:00.208887+00:00",
+                    "context": {
+                      "id": "123456789",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  }
+                ]
+                """);
 
         assertThatThrownBy(() -> api.getGroupLights("light.couch_group")).isInstanceOf(EmptyGroupException.class);
         assertThatThrownBy(() -> api.getGroupLights("light.couch_group2")).isInstanceOf(EmptyGroupException.class);
@@ -1312,56 +1345,57 @@ public class HassApiTest {
 
     @Test
     void getGroupCapabilities_directlyReturnsCapabilitiesOfState() {
-        setGetResponse("/states", "[\n" +
-                "  {\n" +
-                "    \"entity_id\": \"light.couch_group\",\n" +
-                "    \"state\": \"on\",\n" +
-                "    \"attributes\": {\n" +
-                "      \"supported_color_modes\": [\n" +
-                "        \"xy\"\n" +
-                "      ],\n" +
-                "      \"color_mode\": \"xy\",\n" +
-                "      \"brightness\": 255,\n" +
-                "      \"hs_color\": [\n" +
-                "        12.464,\n" +
-                "        81.176\n" +
-                "      ],\n" +
-                "      \"rgb_color\": [\n" +
-                "        255,\n" +
-                "        91,\n" +
-                "        48\n" +
-                "      ],\n" +
-                "      \"xy_color\": [\n" +
-                "        0.6408,\n" +
-                "        0.3284\n" +
-                "      ],\n" +
-                "      \"is_hue_group\": true,\n" +
-                "      \"hue_scenes\": [\n" +
-                "        \"Gedimmt\",\n" +
-                "        \"Nachtlicht\",\n" +
-                "        \"Hell\",\n" +
-                "        \"Frühlingsblüten\",\n" +
-                "        \"Sonnenuntergang Savanne\",\n" +
-                "        \"Tropendämmerung\",\n" +
-                "        \"Nordlichter\"\n" +
-                "      ],\n" +
-                "      \"hue_type\": \"zone\",\n" +
-                "      \"lights\": [\n" +
-                "      ],\n" +
-                "      \"dynamics\": false,\n" +
-                "      \"icon\": \"mdi:lightbulb-group\",\n" +
-                "      \"friendly_name\": \"Couch\",\n" +
-                "      \"supported_features\": 40\n" +
-                "    },\n" +
-                "    \"last_changed\": \"2023-09-24T14:06:34.783862+00:00\",\n" +
-                "    \"last_updated\": \"2023-09-24T14:06:34.783862+00:00\",\n" +
-                "    \"context\": {\n" +
-                "      \"id\": \"123456789\",\n" +
-                "      \"parent_id\": null,\n" +
-                "      \"user_id\": null\n" +
-                "    }\n" +
-                "  }\n" +
-                "]");
+        setGetResponse("/states", """
+                [
+                  {
+                    "entity_id": "light.couch_group",
+                    "state": "on",
+                    "attributes": {
+                      "supported_color_modes": [
+                        "xy"
+                      ],
+                      "color_mode": "xy",
+                      "brightness": 255,
+                      "hs_color": [
+                        12.464,
+                        81.176
+                      ],
+                      "rgb_color": [
+                        255,
+                        91,
+                        48
+                      ],
+                      "xy_color": [
+                        0.6408,
+                        0.3284
+                      ],
+                      "is_hue_group": true,
+                      "hue_scenes": [
+                        "Gedimmt",
+                        "Nachtlicht",
+                        "Hell",
+                        "Frühlingsblüten",
+                        "Sonnenuntergang Savanne",
+                        "Tropendämmerung",
+                        "Nordlichter"
+                      ],
+                      "hue_type": "zone",
+                      "lights": [
+                      ],
+                      "dynamics": false,
+                      "icon": "mdi:lightbulb-group",
+                      "friendly_name": "Couch",
+                      "supported_features": 40
+                    },
+                    "last_changed": "2023-09-24T14:06:34.783862+00:00",
+                    "last_updated": "2023-09-24T14:06:34.783862+00:00",
+                    "context": {
+                      "id": "123456789",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  }
+                ]""");
 
         assertThat(api.getGroupCapabilities("light.couch_group")).isEqualTo(LightCapabilities.builder()
                                                                                              .capabilities(EnumSet.of(Capability.COLOR,
@@ -1372,159 +1406,161 @@ public class HassApiTest {
 
     @Test
     void getGroupStates_returnsStatesForContainedLights_doesNotUseCache() {
-        setGetResponse("/states", "[\n" +
-                "  {\n" +
-                "    \"entity_id\": \"light.test_group\",\n" +
-                "    \"state\": \"on\",\n" +
-                "    \"attributes\": {\n" +
-                "      \"min_color_temp_kelvin\": 2000,\n" +
-                "      \"max_color_temp_kelvin\": 6535,\n" +
-                "      \"min_mireds\": 153,\n" +
-                "      \"max_mireds\": 500,\n" +
-                "      \"effect_list\": [\n" +
-                "        \"None\",\n" +
-                "        \"candle\",\n" +
-                "        \"fire\",\n" +
-                "        \"unknown\"\n" +
-                "      ],\n" +
-                "      \"supported_color_modes\": [\n" +
-                "        \"color_temp\",\n" +
-                "        \"xy\"\n" +
-                "      ],\n" +
-                "      \"color_mode\": \"color_temp\",\n" +
-                "      \"brightness\": 244,\n" +
-                "      \"color_temp_kelvin\": 2971,\n" +
-                "      \"color_temp\": 336,\n" +
-                "      \"hs_color\": [\n" +
-                "        27.874,\n" +
-                "        57.689\n" +
-                "      ],\n" +
-                "      \"rgb_color\": [\n" +
-                "        255,\n" +
-                "        176,\n" +
-                "        107\n" +
-                "      ],\n" +
-                "      \"xy_color\": [\n" +
-                "        0.499,\n" +
-                "        0.384\n" +
-                "      ],\n" +
-                "      \"effect\": \"None\",\n" +
-                "      \"entity_id\": [\n" +
-                "        \"light.schreibtisch_l\",\n" +
-                "        \"light.schreibtisch_r\",\n" +
-                "        \"light.ignored\"\n" +
-                "      ],\n" +
-                "      \"icon\": \"mdi:lightbulb-group\",\n" +
-                "      \"friendly_name\": \"Test Group\",\n" +
-                "      \"supported_features\": 44\n" +
-                "    },\n" +
-                "    \"last_changed\": \"2023-09-24T16:13:59.022491+00:00\",\n" +
-                "    \"last_updated\": \"2023-09-24T16:13:59.194048+00:00\",\n" +
-                "    \"context\": {\n" +
-                "      \"id\": \"123456789\",\n" +
-                "      \"parent_id\": null,\n" +
-                "      \"user_id\": null\n" +
-                "    }\n" +
-                "  },\n" +
-                "  {\n" +
-                "    \"entity_id\": \"light.schreibtisch_l\",\n" +
-                "    \"state\": \"on\",\n" +
-                "    \"attributes\": {\n" +
-                "      \"min_color_temp_kelvin\": 2000,\n" +
-                "      \"max_color_temp_kelvin\": 6535,\n" +
-                "      \"min_mireds\": 153,\n" +
-                "      \"max_mireds\": 500,\n" +
-                "      \"effect_list\": [\n" +
-                "        \"None\",\n" +
-                "        \"candle\",\n" +
-                "        \"fire\",\n" +
-                "        \"unknown\"\n" +
-                "      ],\n" +
-                "      \"supported_color_modes\": [\n" +
-                "        \"color_temp\",\n" +
-                "        \"xy\"\n" +
-                "      ],\n" +
-                "      \"color_mode\": \"color_temp\",\n" +
-                "      \"brightness\": 127,\n" +
-                "      \"color_temp_kelvin\": 2994,\n" +
-                "      \"color_temp\": 334,\n" +
-                "      \"hs_color\": [\n" +
-                "        27.835,\n" +
-                "        57.058\n" +
-                "      ],\n" +
-                "      \"rgb_color\": [\n" +
-                "        255,\n" +
-                "        177,\n" +
-                "        109\n" +
-                "      ],\n" +
-                "      \"xy_color\": [\n" +
-                "        0.497,\n" +
-                "        0.384\n" +
-                "      ],\n" +
-                "      \"effect\": \"None\",\n" +
-                "      \"mode\": \"normal\",\n" +
-                "      \"dynamics\": \"none\",\n" +
-                "      \"friendly_name\": \"Schreibtisch L\",\n" +
-                "      \"supported_features\": 44\n" +
-                "    },\n" +
-                "    \"last_changed\": \"2023-09-24T14:50:55.062582+00:00\",\n" +
-                "    \"last_updated\": \"2023-09-24T16:10:21.374478+00:00\",\n" +
-                "    \"context\": {\n" +
-                "      \"id\": \"123456789\",\n" +
-                "      \"parent_id\": null,\n" +
-                "      \"user_id\": null\n" +
-                "    }\n" +
-                "  },\n" +
-                "  {\n" +
-                "    \"entity_id\": \"light.schreibtisch_r\",\n" +
-                "    \"state\": \"on\",\n" +
-                "    \"attributes\": {\n" +
-                "      \"min_color_temp_kelvin\": 2000,\n" +
-                "      \"max_color_temp_kelvin\": 6535,\n" +
-                "      \"min_mireds\": 153,\n" +
-                "      \"max_mireds\": 500,\n" +
-                "      \"effect_list\": [\n" +
-                "        \"None\",\n" +
-                "        \"candle\",\n" +
-                "        \"fire\",\n" +
-                "        \"unknown\"\n" +
-                "      ],\n" +
-                "      \"supported_color_modes\": [\n" +
-                "        \"color_temp\",\n" +
-                "        \"xy\"\n" +
-                "      ],\n" +
-                "      \"color_mode\": \"color_temp\",\n" +
-                "      \"brightness\": 246,\n" +
-                "      \"color_temp_kelvin\": 2976,\n" +
-                "      \"color_temp\": 336,\n" +
-                "      \"hs_color\": [\n" +
-                "        27.865,\n" +
-                "        57.551\n" +
-                "      ],\n" +
-                "      \"rgb_color\": [\n" +
-                "        255,\n" +
-                "        176,\n" +
-                "        108\n" +
-                "      ],\n" +
-                "      \"xy_color\": [\n" +
-                "        0.498,\n" +
-                "        0.383\n" +
-                "      ],\n" +
-                "      \"effect\": \"None\",\n" +
-                "      \"mode\": \"normal\",\n" +
-                "      \"dynamics\": \"none\",\n" +
-                "      \"friendly_name\": \"Schreibtisch R\",\n" +
-                "      \"supported_features\": 44\n" +
-                "    },\n" +
-                "    \"last_changed\": \"2023-09-24T16:04:27.160634+00:00\",\n" +
-                "    \"last_updated\": \"2023-09-24T16:12:22.081189+00:00\",\n" +
-                "    \"context\": {\n" +
-                "      \"id\": \"123456789\",\n" +
-                "      \"parent_id\": null,\n" +
-                "      \"user_id\": null\n" +
-                "    }\n" +
-                "  }\n" +
-                "]\n");
+        setGetResponse("/states", """
+                [
+                  {
+                    "entity_id": "light.test_group",
+                    "state": "on",
+                    "attributes": {
+                      "min_color_temp_kelvin": 2000,
+                      "max_color_temp_kelvin": 6535,
+                      "min_mireds": 153,
+                      "max_mireds": 500,
+                      "effect_list": [
+                        "None",
+                        "candle",
+                        "fire",
+                        "unknown"
+                      ],
+                      "supported_color_modes": [
+                        "color_temp",
+                        "xy"
+                      ],
+                      "color_mode": "color_temp",
+                      "brightness": 244,
+                      "color_temp_kelvin": 2971,
+                      "color_temp": 336,
+                      "hs_color": [
+                        27.874,
+                        57.689
+                      ],
+                      "rgb_color": [
+                        255,
+                        176,
+                        107
+                      ],
+                      "xy_color": [
+                        0.499,
+                        0.384
+                      ],
+                      "effect": "None",
+                      "entity_id": [
+                        "light.schreibtisch_l",
+                        "light.schreibtisch_r",
+                        "light.ignored"
+                      ],
+                      "icon": "mdi:lightbulb-group",
+                      "friendly_name": "Test Group",
+                      "supported_features": 44
+                    },
+                    "last_changed": "2023-09-24T16:13:59.022491+00:00",
+                    "last_updated": "2023-09-24T16:13:59.194048+00:00",
+                    "context": {
+                      "id": "123456789",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  },
+                  {
+                    "entity_id": "light.schreibtisch_l",
+                    "state": "on",
+                    "attributes": {
+                      "min_color_temp_kelvin": 2000,
+                      "max_color_temp_kelvin": 6535,
+                      "min_mireds": 153,
+                      "max_mireds": 500,
+                      "effect_list": [
+                        "None",
+                        "candle",
+                        "fire",
+                        "unknown"
+                      ],
+                      "supported_color_modes": [
+                        "color_temp",
+                        "xy"
+                      ],
+                      "color_mode": "color_temp",
+                      "brightness": 127,
+                      "color_temp_kelvin": 2994,
+                      "color_temp": 334,
+                      "hs_color": [
+                        27.835,
+                        57.058
+                      ],
+                      "rgb_color": [
+                        255,
+                        177,
+                        109
+                      ],
+                      "xy_color": [
+                        0.497,
+                        0.384
+                      ],
+                      "effect": "None",
+                      "mode": "normal",
+                      "dynamics": "none",
+                      "friendly_name": "Schreibtisch L",
+                      "supported_features": 44
+                    },
+                    "last_changed": "2023-09-24T14:50:55.062582+00:00",
+                    "last_updated": "2023-09-24T16:10:21.374478+00:00",
+                    "context": {
+                      "id": "123456789",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  },
+                  {
+                    "entity_id": "light.schreibtisch_r",
+                    "state": "on",
+                    "attributes": {
+                      "min_color_temp_kelvin": 2000,
+                      "max_color_temp_kelvin": 6535,
+                      "min_mireds": 153,
+                      "max_mireds": 500,
+                      "effect_list": [
+                        "None",
+                        "candle",
+                        "fire",
+                        "unknown"
+                      ],
+                      "supported_color_modes": [
+                        "color_temp",
+                        "xy"
+                      ],
+                      "color_mode": "color_temp",
+                      "brightness": 246,
+                      "color_temp_kelvin": 2976,
+                      "color_temp": 336,
+                      "hs_color": [
+                        27.865,
+                        57.551
+                      ],
+                      "rgb_color": [
+                        255,
+                        176,
+                        108
+                      ],
+                      "xy_color": [
+                        0.498,
+                        0.383
+                      ],
+                      "effect": "None",
+                      "mode": "normal",
+                      "dynamics": "none",
+                      "friendly_name": "Schreibtisch R",
+                      "supported_features": 44
+                    },
+                    "last_changed": "2023-09-24T16:04:27.160634+00:00",
+                    "last_updated": "2023-09-24T16:12:22.081189+00:00",
+                    "context": {
+                      "id": "123456789",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  }
+                ]
+                """);
 
         List<LightState> groupStates = api.getGroupStates("light.test_group");
 
@@ -1564,129 +1600,131 @@ public class HassApiTest {
 
     @Test
     void getAssignedGroups_returnsGroupIdsTheGivenLightIdIsContained() {
-        setGetResponse("/states", "[\n" +
-                "  {\n" +
-                "    \"entity_id\": \"light.couch_group\",\n" +
-                "    \"state\": \"on\",\n" +
-                "    \"attributes\": {\n" +
-                "      \"supported_color_modes\": [\n" +
-                "        \"xy\"\n" +
-                "      ],\n" +
-                "      \"color_mode\": \"xy\",\n" +
-                "      \"brightness\": 255,\n" +
-                "      \"hs_color\": [\n" +
-                "        12.464,\n" +
-                "        81.176\n" +
-                "      ],\n" +
-                "      \"rgb_color\": [\n" +
-                "        255,\n" +
-                "        91,\n" +
-                "        48\n" +
-                "      ],\n" +
-                "      \"xy_color\": [\n" +
-                "        0.6408,\n" +
-                "        0.3284\n" +
-                "      ],\n" +
-                "      \"is_hue_group\": true,\n" +
-                "      \"hue_scenes\": [\n" +
-                "        \"Gedimmt\",\n" +
-                "        \"Nachtlicht\",\n" +
-                "        \"Hell\",\n" +
-                "        \"Frühlingsblüten\",\n" +
-                "        \"Sonnenuntergang Savanne\",\n" +
-                "        \"Tropendämmerung\",\n" +
-                "        \"Nordlichter\"\n" +
-                "      ],\n" +
-                "      \"hue_type\": \"zone\",\n" +
-                "      \"lights\": [\n" +
-                "        \"Couch Light\"\n" +
-                "      ],\n" +
-                "      \"dynamics\": false,\n" +
-                "      \"icon\": \"mdi:lightbulb-group\",\n" +
-                "      \"friendly_name\": \"Couch\",\n" +
-                "      \"supported_features\": 40\n" +
-                "    },\n" +
-                "    \"last_changed\": \"2023-09-24T14:06:34.783862+00:00\",\n" +
-                "    \"last_updated\": \"2023-09-24T14:06:34.783862+00:00\",\n" +
-                "    \"context\": {\n" +
-                "      \"id\": \"123456789\",\n" +
-                "      \"parent_id\": null,\n" +
-                "      \"user_id\": null\n" +
-                "    }\n" +
-                "  },\n" +
-                "  {\n" +
-                "    \"entity_id\": \"light.couch_group2\",\n" +
-                "    \"state\": \"on\",\n" +
-                "    \"attributes\": {\n" +
-                "      \"min_color_temp_kelvin\": 2000,\n" +
-                "      \"max_color_temp_kelvin\": 6535,\n" +
-                "      \"min_mireds\": 153,\n" +
-                "      \"max_mireds\": 500,\n" +
-                "      \"effect_list\": [\n" +
-                "        \"None\",\n" +
-                "        \"candle\",\n" +
-                "        \"fire\",\n" +
-                "        \"unknown\"\n" +
-                "      ],\n" +
-                "      \"supported_color_modes\": [\n" +
-                "        \"brightness\",\n" +
-                "        \"color_temp\",\n" +
-                "        \"xy\"\n" +
-                "      ],\n" +
-                "      \"color_mode\": \"brightness\",\n" +
-                "      \"brightness\": 255,\n" +
-                "      \"effect\": \"None\",\n" +
-                "      \"entity_id\": [\n" +
-                "        \"light.couch_light\"\n" +
-                "      ],\n" +
-                "      \"icon\": \"mdi:lightbulb-group\",\n" +
-                "      \"friendly_name\": \"Couch\",\n" +
-                "      \"supported_features\": 44\n" +
-                "    },\n" +
-                "    \"last_changed\": \"2023-09-24T14:06:35.260070+00:00\",\n" +
-                "    \"last_updated\": \"2023-09-24T14:20:00.208887+00:00\",\n" +
-                "    \"context\": {\n" +
-                "      \"id\": \"123456789\",\n" +
-                "      \"parent_id\": null,\n" +
-                "      \"user_id\": null\n" +
-                "    }\n" +
-                "  },\n" +
-                "  {\n" +
-                "    \"entity_id\": \"light.couch_light\",\n" +
-                "    \"state\": \"on\",\n" +
-                "    \"attributes\": {\n" +
-                "      \"supported_color_modes\": [\n" +
-                "        \"xy\"\n" +
-                "      ],\n" +
-                "      \"color_mode\": \"xy\",\n" +
-                "      \"brightness\": 245,\n" +
-                "      \"hs_color\": [\n" +
-                "        12.464,\n" +
-                "        81.176\n" +
-                "      ],\n" +
-                "      \"rgb_color\": [\n" +
-                "        255,\n" +
-                "        91,\n" +
-                "        48\n" +
-                "      ],\n" +
-                "      \"xy_color\": [\n" +
-                "        0.6408,\n" +
-                "        0.3284\n" +
-                "      ],\n" +
-                "      \"mode\": \"normal\",\n" +
-                "      \"dynamics\": \"none\",\n" +
-                "      \"friendly_name\": \"Couch Light\",\n" +
-                "      \"supported_features\": 40\n" +
-                "    },\n" +
-                "    \"last_changed\": \"2023-09-24T14:50:55.040229+00:00\",\n" +
-                "    \"last_updated\": \"2023-09-24T16:13:00.757488+00:00\",\n" +
-                "    \"context\": {\n" +
-                "      \"id\": \"01HB3ZECEN2DN594VKX5RFRQ5P\",\n" +
-                "      \"parent_id\": null,\n" +
-                "      \"user_id\": null\n" +
-                "    }\n" +
-                "  }\n" +
-                "]\n");
+        setGetResponse("/states", """
+                [
+                  {
+                    "entity_id": "light.couch_group",
+                    "state": "on",
+                    "attributes": {
+                      "supported_color_modes": [
+                        "xy"
+                      ],
+                      "color_mode": "xy",
+                      "brightness": 255,
+                      "hs_color": [
+                        12.464,
+                        81.176
+                      ],
+                      "rgb_color": [
+                        255,
+                        91,
+                        48
+                      ],
+                      "xy_color": [
+                        0.6408,
+                        0.3284
+                      ],
+                      "is_hue_group": true,
+                      "hue_scenes": [
+                        "Gedimmt",
+                        "Nachtlicht",
+                        "Hell",
+                        "Frühlingsblüten",
+                        "Sonnenuntergang Savanne",
+                        "Tropendämmerung",
+                        "Nordlichter"
+                      ],
+                      "hue_type": "zone",
+                      "lights": [
+                        "Couch Light"
+                      ],
+                      "dynamics": false,
+                      "icon": "mdi:lightbulb-group",
+                      "friendly_name": "Couch",
+                      "supported_features": 40
+                    },
+                    "last_changed": "2023-09-24T14:06:34.783862+00:00",
+                    "last_updated": "2023-09-24T14:06:34.783862+00:00",
+                    "context": {
+                      "id": "123456789",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  },
+                  {
+                    "entity_id": "light.couch_group2",
+                    "state": "on",
+                    "attributes": {
+                      "min_color_temp_kelvin": 2000,
+                      "max_color_temp_kelvin": 6535,
+                      "min_mireds": 153,
+                      "max_mireds": 500,
+                      "effect_list": [
+                        "None",
+                        "candle",
+                        "fire",
+                        "unknown"
+                      ],
+                      "supported_color_modes": [
+                        "brightness",
+                        "color_temp",
+                        "xy"
+                      ],
+                      "color_mode": "brightness",
+                      "brightness": 255,
+                      "effect": "None",
+                      "entity_id": [
+                        "light.couch_light"
+                      ],
+                      "icon": "mdi:lightbulb-group",
+                      "friendly_name": "Couch",
+                      "supported_features": 44
+                    },
+                    "last_changed": "2023-09-24T14:06:35.260070+00:00",
+                    "last_updated": "2023-09-24T14:20:00.208887+00:00",
+                    "context": {
+                      "id": "123456789",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  },
+                  {
+                    "entity_id": "light.couch_light",
+                    "state": "on",
+                    "attributes": {
+                      "supported_color_modes": [
+                        "xy"
+                      ],
+                      "color_mode": "xy",
+                      "brightness": 245,
+                      "hs_color": [
+                        12.464,
+                        81.176
+                      ],
+                      "rgb_color": [
+                        255,
+                        91,
+                        48
+                      ],
+                      "xy_color": [
+                        0.6408,
+                        0.3284
+                      ],
+                      "mode": "normal",
+                      "dynamics": "none",
+                      "friendly_name": "Couch Light",
+                      "supported_features": 40
+                    },
+                    "last_changed": "2023-09-24T14:50:55.040229+00:00",
+                    "last_updated": "2023-09-24T16:13:00.757488+00:00",
+                    "context": {
+                      "id": "01HB3ZECEN2DN594VKX5RFRQ5P",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  }
+                ]
+                """);
 
         assertThat(api.getAssignedGroups("light.couch_light")).containsExactlyInAnyOrder("light.couch_group",
                 "light.couch_group2");
@@ -1770,25 +1808,26 @@ public class HassApiTest {
 
     @Test
     void isLightOff_isOn_false() {
-        setGetResponse("/states/light.on_off", "{\n" +
-                "  \"entity_id\": \"light.on_off\",\n" +
-                "  \"state\": \"on\",\n" +
-                "  \"attributes\": {\n" +
-                "    \"supported_color_modes\": [],\n" +
-                "    \"color_mode\": \"onoff\",\n" +
-                "    \"mode\": \"normal\",\n" +
-                "    \"dynamics\": \"none\",\n" +
-                "    \"friendly_name\": \"On Off\",\n" +
-                "    \"supported_features\": 0\n" +
-                "  },\n" +
-                "  \"last_changed\": \"2023-09-24T07:55:01.698292+00:00\",\n" +
-                "  \"last_updated\": \"2023-09-24T07:55:01.698292+00:00\",\n" +
-                "  \"context\": {\n" +
-                "    \"id\": \"123456789\",\n" +
-                "    \"parent_id\": null,\n" +
-                "    \"user_id\": null\n" +
-                "  }\n" +
-                "}");
+        setGetResponse("/states/light.on_off", """
+                {
+                  "entity_id": "light.on_off",
+                  "state": "on",
+                  "attributes": {
+                    "supported_color_modes": [],
+                    "color_mode": "onoff",
+                    "mode": "normal",
+                    "dynamics": "none",
+                    "friendly_name": "On Off",
+                    "supported_features": 0
+                  },
+                  "last_changed": "2023-09-24T07:55:01.698292+00:00",
+                  "last_updated": "2023-09-24T07:55:01.698292+00:00",
+                  "context": {
+                    "id": "123456789",
+                    "parent_id": null,
+                    "user_id": null
+                  }
+                }""");
 
 
         assertThat(api.isLightOff("light.on_off")).isFalse();
@@ -1797,25 +1836,26 @@ public class HassApiTest {
 
     @Test
     void isLightOff_off_true() {
-        setGetResponse("/states/light.on_off", "{\n" +
-                "  \"entity_id\": \"light.on_off\",\n" +
-                "  \"state\": \"off\",\n" +
-                "  \"attributes\": {\n" +
-                "    \"supported_color_modes\": [],\n" +
-                "    \"color_mode\": \"onoff\",\n" +
-                "    \"mode\": \"normal\",\n" +
-                "    \"dynamics\": \"none\",\n" +
-                "    \"friendly_name\": \"On Off\",\n" +
-                "    \"supported_features\": 0\n" +
-                "  },\n" +
-                "  \"last_changed\": \"2023-09-24T07:55:01.698292+00:00\",\n" +
-                "  \"last_updated\": \"2023-09-24T07:55:01.698292+00:00\",\n" +
-                "  \"context\": {\n" +
-                "    \"id\": \"123456789\",\n" +
-                "    \"parent_id\": null,\n" +
-                "    \"user_id\": null\n" +
-                "  }\n" +
-                "}");
+        setGetResponse("/states/light.on_off", """
+                {
+                  "entity_id": "light.on_off",
+                  "state": "off",
+                  "attributes": {
+                    "supported_color_modes": [],
+                    "color_mode": "onoff",
+                    "mode": "normal",
+                    "dynamics": "none",
+                    "friendly_name": "On Off",
+                    "supported_features": 0
+                  },
+                  "last_changed": "2023-09-24T07:55:01.698292+00:00",
+                  "last_updated": "2023-09-24T07:55:01.698292+00:00",
+                  "context": {
+                    "id": "123456789",
+                    "parent_id": null,
+                    "user_id": null
+                  }
+                }""");
 
 
         assertThat(api.isLightOff("light.on_off")).isTrue();
@@ -1824,39 +1864,40 @@ public class HassApiTest {
 
     @Test
     void isLightOff_unavailable_true() {
-        setGetResponse("/states/light.on_off", "{\n" +
-                "  \"entity_id\": \"light.on_off\",\n" +
-                "  \"state\": \"unavailable\",\n" +
-                "  \"attributes\": {\n" +
-                "    \"supported_color_modes\": [],\n" +
-                "    \"color_mode\": \"onoff\",\n" +
-                "    \"mode\": \"normal\",\n" +
-                "    \"dynamics\": \"none\",\n" +
-                "    \"friendly_name\": \"On Off\",\n" +
-                "    \"supported_features\": 0\n" +
-                "  },\n" +
-                "  \"last_changed\": \"2023-09-24T07:55:01.698292+00:00\",\n" +
-                "  \"last_updated\": \"2023-09-24T07:55:01.698292+00:00\",\n" +
-                "  \"context\": {\n" +
-                "    \"id\": \"123456789\",\n" +
-                "    \"parent_id\": null,\n" +
-                "    \"user_id\": null\n" +
-                "  }\n" +
-                "}");
+        setGetResponse("/states/light.on_off", """
+                {
+                  "entity_id": "light.on_off",
+                  "state": "unavailable",
+                  "attributes": {
+                    "supported_color_modes": [],
+                    "color_mode": "onoff",
+                    "mode": "normal",
+                    "dynamics": "none",
+                    "friendly_name": "On Off",
+                    "supported_features": 0
+                  },
+                  "last_changed": "2023-09-24T07:55:01.698292+00:00",
+                  "last_updated": "2023-09-24T07:55:01.698292+00:00",
+                  "context": {
+                    "id": "123456789",
+                    "parent_id": null,
+                    "user_id": null
+                  }
+                }""");
 
 
         assertThat(api.isLightOff("light.on_off")).isTrue();
         assertThat(api.isGroupOff("light.on_off")).isTrue();
     }
 
-    private void setGetResponse(String expectedUrl, String response) {
+    private void setGetResponse(String expectedUrl, @Language("JSON") String response) {
         when(http.getResource(getUrl(expectedUrl))).thenReturn(response);
     }
 
     private URL getUrl(String expectedUrl) {
         try {
-            return new URL(baseUrl + expectedUrl);
-        } catch (MalformedURLException e) {
+            return new URI(baseUrl + expectedUrl).toURL();
+        } catch (MalformedURLException | URISyntaxException e) {
             throw new IllegalArgumentException("Could not create URL", e);
         }
     }

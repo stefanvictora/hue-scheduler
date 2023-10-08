@@ -8,6 +8,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Data;
 
 import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.Arrays;
 import java.util.Collection;
@@ -136,8 +138,8 @@ public final class HueApiImpl implements HueApi {
 
     private URL createUrl(String url) {
         try {
-            return new URL(baseApi + url);
-        } catch (MalformedURLException e) {
+            return new URI(baseApi + url).toURL();
+        } catch (MalformedURLException | URISyntaxException e) {
             throw new IllegalArgumentException("Failed to construct API url", e);
         }
     }
@@ -218,7 +220,7 @@ public final class HueApiImpl implements HueApi {
     private Map<String, Group> lookupGroups() {
         String response = getResourceAndAssertNoErrors(getGroupsUrl());
         try {
-            return mapper.readValue(response, new TypeReference<Map<String, Group>>() {
+            return mapper.readValue(response, new TypeReference<>() {
             });
         } catch (JsonProcessingException e) {
             throw new ApiFailure("Failed to parse groups response '" + response + "': " + e.getLocalizedMessage());
@@ -295,7 +297,7 @@ public final class HueApiImpl implements HueApi {
     private Map<String, Light> lookupLights() {
         String response = getResourceAndAssertNoErrors(getLightsUrl());
         try {
-            return mapper.readValue(response, new TypeReference<Map<String, Light>>() {
+            return mapper.readValue(response, new TypeReference<>() {
             });
         } catch (JsonProcessingException e) {
             throw new ApiFailure("Failed to parse lights response '" + response + "': " + e.getLocalizedMessage());
@@ -411,20 +413,15 @@ public final class HueApiImpl implements HueApi {
         if (type == null) {
             return EnumSet.noneOf(Capability.class);
         }
-        switch (type.toLowerCase(Locale.ENGLISH)) {
-            case "extended color light":
-                return EnumSet.allOf(Capability.class);
-            case "color light":
-                return EnumSet.of(Capability.COLOR, Capability.BRIGHTNESS, Capability.ON_OFF);
-            case "color temperature light":
-                return EnumSet.of(Capability.COLOR_TEMPERATURE, Capability.BRIGHTNESS, Capability.ON_OFF);
-            case "dimmable light":
-                return EnumSet.of(Capability.BRIGHTNESS, Capability.ON_OFF);
-            case "on/off plug-in unit":
-                return EnumSet.of(Capability.ON_OFF);
-            default:
-                return EnumSet.noneOf(Capability.class);
-        }
+        return switch (type.toLowerCase(Locale.ENGLISH)) {
+            case "extended color light" -> EnumSet.allOf(Capability.class);
+            case "color light" -> EnumSet.of(Capability.COLOR, Capability.BRIGHTNESS, Capability.ON_OFF);
+            case "color temperature light" ->
+                    EnumSet.of(Capability.COLOR_TEMPERATURE, Capability.BRIGHTNESS, Capability.ON_OFF);
+            case "dimmable light" -> EnumSet.of(Capability.BRIGHTNESS, Capability.ON_OFF);
+            case "on/off plug-in unit" -> EnumSet.of(Capability.ON_OFF);
+            default -> EnumSet.noneOf(Capability.class);
+        };
     }
 
     @Override

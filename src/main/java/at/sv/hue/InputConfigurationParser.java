@@ -37,7 +37,7 @@ public final class InputConfigurationParser {
         String[] parts = input.split("\\t|\\s{2,}");
         if (parts.length < 2)
             throw new InvalidConfigurationLine("Invalid configuration line format '" + Arrays.toString(parts) + "': at least id and start time have to be set." +
-                    " Make sure to use either tabs or at least two spaces to separate the different configuration parts.");
+                                               " Make sure to use either tabs or at least two spaces to separate the different configuration parts.");
         ArrayList<ScheduledState> states = new ArrayList<>();
         for (String idPart : parts[0].split(",")) {
             idPart = idPart.trim();
