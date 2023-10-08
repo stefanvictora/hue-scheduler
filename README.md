@@ -40,9 +40,11 @@ In the first example, the lights in your (home) office dynamically adjust based 
 
 You need at least:
 
-- Java 8
-- An up-to-date Philips Hue Bridge
+- Java 21
+- An up-to-date Philips Hue Bridge or Home Assistant instance
 - A computer or device (e.g. a Raspberry Pi) running continuously on your network
+
+Alternatively you can run Hue Scheduler via Docker. See _Using Hue Scheduler_ below.
 
 ## Setup
 
@@ -74,6 +76,8 @@ Copy and save that username for further use with Hue Scheduler. You only need to
 If you get the error message ``"link button not pressed"``, try to repeat the process of pressing the button on your bridge and the ``POST`` button in the web interface within 30 seconds.
 
 ## Using Hue Scheduler
+ 
+### Manually
 
 You can download the latest release of Hue Scheduler from GitHub [here](https://github.com/stefanvictora/hue-scheduler/releases/latest).
 
@@ -88,6 +92,59 @@ java -jar hue-scheduler.jar <ip> <username> --lat=<latitude> --long=<longitude> 
 - **Latitude, Longitude & Elevation**: Your approximate location and optional elevation, so Hue Scheduler can calculate your local sunrise and sunset using the [shred/commons-suncalc](https://github.com/shred/commons-suncalc) library. The calculation is performed locally and no data is sent to the Internet.
 
 - **FILE**: The file path to your configured light schedules. The format is described in detail below.
+         
+### Via Docker
+
+The following `docker-compose.yml` example shows how to use Hue Scheduler with Docker:
+
+~~~yaml
+version: '3.8'
+services:
+  hue-scheduler:
+    container_name: hue-scheduler
+    image: stefanvictora/hue-scheduler:0.10.0-SNAPSHOT
+    command: ["<IP>", "<USERNAME>", "--lat=<latitude>", "--long=<longitude>", "--elevation=<elevation>", "/config/input.txt"]
+    environment:
+      - log.level=DEBUG
+    volumes:
+      - type: bind
+        source: ./input.txt
+        target: /config/input.txt
+        read_only: true
+~~~
+    
+Docker compose usage:
+
+~~~shell
+# Create and Run:
+docker compose up -d
+
+# Stop and Remove:
+docker compose down
+
+# Just Stop / Start:
+docker compose stop
+docker compose start
+~~~
+
+Alternatively, you can use ``docker run`` to create the docker container:
+
+~~~shell
+# Powershell:
+docker run -d --name hue-scheduler -v ${PWD}/input.txt:/config/input.txt:ro stefanvictora/hue-scheduler:0.10.0-SNAPSHOT <IP> <USERNAME> --lat <latitude> --long <longitude> --elevation <elevation> /config/input.txt
+# Bash:
+docker run -d --name hue-scheduler -v $(pwd)/input.txt:/config/input.txt:ro stefanvictora/hue-scheduler:0.10.0-SNAPSHOT <IP> <USERNAME> --lat <latitude> --long <longitude> --elevation <elevation> /config/input.txt
+
+# Stop / Start:
+docker stop hue-scheduler
+docker start hue-scheduler
+# Remove
+docker rm hue-scheduler
+~~~
+
+Notes:
+* This mounts the ``input.txt`` file from the current working directory (see ``PWD`` variable) to be used as input for Hue Scheduler. Feel free to change the input file and location to your usage.
+* You can configure the log level via ``-e "log.level=TRACE"``.
 
 ## Configuration
 
@@ -510,6 +567,25 @@ mvnw clean install
 ~~~
 
 This creates the runnable jar `target\hue-scheduler.jar` containing all dependencies.
+      
+### Docker
+
+Alternatively you can use the provided Dockerfile for building and running Hue Scheduler.
+Replace ``<VERSION>`` with the current version of Hue Scheduler.
+
+~~~shell
+docker build -t stefanvictora/hue-scheduler:<VERSION> -f Dockerfile .
+~~~
+                     
+The usage of the image is shown above in _Using Hue Scheduler_. Other useful commands:
+
+~~~shell
+# Rebuild and Run:
+docker-compose up -d --build
+
+# Remove container on exit:
+docker run --rm -e "log.level=TRACE" --name hue-scheduler ...
+~~~
 
 ## FAQ
 
@@ -551,6 +627,9 @@ Yes, but you should probably use a third-party app like iConnectHue to configure
 - [x] **Enforce states** -- ensure that a state is always set; allow no manual override
 - [x] **Interpolate between states** -- support more advanced interpolations between states when using `tr-before`
 - [x] **Advanced state interpolations** -- easily create full day state interpolations without explicitly using `tr-before`
+- [ ] **Docker support** -- provide a prebuilt docker images for easier setup
+- [ ] **Home Assistant API support** -- allow controlling lights via the HASS API
+- [ ] **Home Assistant Addon support** -- package Hue Scheduler as an easy to install HASS addon
 - [ ] **Date-based scheduling** -- schedule state only during a specific date range
 - [ ] **Support for gradients** -- support setting gradients to supported lights
 - [ ] **Support for scenes** -- support scheduling scenes for groups
