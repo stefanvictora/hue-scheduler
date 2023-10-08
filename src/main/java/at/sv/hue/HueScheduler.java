@@ -210,6 +210,7 @@ public final class HueScheduler implements Runnable {
         defaultInterpolationTransitionTime = parseInterpolationTransitionTime(defaultInterpolationTransitionTimeString);
         assertInputIsReadable();
         assertConnectionAndStart();
+        keepMainThreadAlive();
     }
 
     private OkHttpClient createHttpsClient() {
@@ -227,7 +228,7 @@ public final class HueScheduler implements Runnable {
     }
 
     private StateSchedulerImpl createStateScheduler() {
-        return new StateSchedulerImpl(Executors.newScheduledThreadPool(Runtime.getRuntime().availableProcessors() * 2),
+        return new StateSchedulerImpl(Executors.newScheduledThreadPool(0, Thread.ofVirtual().factory()),
                 ZonedDateTime::now);
     }
 
@@ -716,6 +717,14 @@ public final class HueScheduler implements Runnable {
                   .stream()
                   .map(id -> "/groups/" + id)
                   .collect(Collectors.toList());
+    }
+
+    private static void keepMainThreadAlive() {
+        try {
+            Thread.currentThread().join();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     HueEventListener getHueEventListener() {
