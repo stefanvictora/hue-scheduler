@@ -1,5 +1,6 @@
-package at.sv.hue.api;
+package at.sv.hue.api.hue;
 
+import at.sv.hue.api.LightEventListener;
 import com.launchdarkly.eventsource.MessageEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,15 +11,15 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class HueRawEventHandlerTest {
+class HueEventHandlerTest {
 
     @Mock
-    private HueEventListener hueEventListener;
-    private HueRawEventHandler handler;
+    private LightEventListener lightEventListener;
+    private HueEventHandler handler;
 
     @BeforeEach
     void setUp() {
-        handler = new HueRawEventHandler(hueEventListener);
+        handler = new HueEventHandler(lightEventListener);
     }
 
     @Test
@@ -32,7 +33,7 @@ class HueRawEventHandlerTest {
                   }
                 ]"""));
 
-        verifyNoInteractions(hueEventListener);
+        verifyNoInteractions(lightEventListener);
     }
 
     @Test
@@ -58,7 +59,7 @@ class HueRawEventHandlerTest {
                   }
                 ]"""));
 
-        verify(hueEventListener).onLightOff("/lights/40", "69b2c6bd-48ff-4bab-9f06-37ccd9399f69");
+        verify(lightEventListener).onLightOff("/lights/40", "69b2c6bd-48ff-4bab-9f06-37ccd9399f69");
     }
 
     @Test
@@ -84,7 +85,7 @@ class HueRawEventHandlerTest {
                   }
                 ]"""));
 
-        verify(hueEventListener).onLightOff("/lights/40", "69b2c6bd-48ff-4bab-9f06-37ccd9399f69");
+        verify(lightEventListener).onLightOff("/lights/40", "69b2c6bd-48ff-4bab-9f06-37ccd9399f69");
     }
 
     @Test
@@ -110,7 +111,7 @@ class HueRawEventHandlerTest {
                   }
                 ]"""));
 
-        verify(hueEventListener).onLightOn("/lights/39", "60b2bafa-53f4-4062-9f58-253be813b349", true);
+        verify(lightEventListener).onLightOn("/lights/39", "60b2bafa-53f4-4062-9f58-253be813b349", true);
     }
 
     @Test
@@ -143,7 +144,7 @@ class HueRawEventHandlerTest {
                 ]
                 """));
 
-        verifyNoInteractions(hueEventListener);
+        verifyNoInteractions(lightEventListener);
     }
 
     @Test
@@ -171,7 +172,7 @@ class HueRawEventHandlerTest {
                   }
                 ]"""));
 
-        verify(hueEventListener).onLightOn("/lights/36", "d37eb9c4-d7eb-42ee-9a13-fa9148f8d403", false);
+        verify(lightEventListener).onLightOn("/lights/36", "d37eb9c4-d7eb-42ee-9a13-fa9148f8d403", false);
     }
 
     @Test
@@ -199,7 +200,7 @@ class HueRawEventHandlerTest {
                   }
                 ]"""));
 
-        verify(hueEventListener).onLightOff("/lights/36", "d37eb9c4-d7eb-42ee-9a13-fa9148f8d403");
+        verify(lightEventListener).onLightOff("/lights/36", "d37eb9c4-d7eb-42ee-9a13-fa9148f8d403");
     }
 
     @Test
@@ -242,7 +243,7 @@ class HueRawEventHandlerTest {
                   }
                 ]"""));
 
-        verify(hueEventListener).onLightOn("/groups/13", "560cd8f7-c498-4358-8dba-19734b4173f7", false);
+        verify(lightEventListener).onLightOn("/groups/13", "560cd8f7-c498-4358-8dba-19734b4173f7", false);
     }
 
     @Test
@@ -285,7 +286,7 @@ class HueRawEventHandlerTest {
                   }
                 ]"""));
 
-        verify(hueEventListener).onLightOff("/groups/13", "560cd8f7-c498-4358-8dba-19734b4173f7");
+        verify(lightEventListener).onLightOff("/groups/13", "560cd8f7-c498-4358-8dba-19734b4173f7");
     }
 
     @Test
@@ -357,8 +358,8 @@ class HueRawEventHandlerTest {
                   }
                 ]"""));
 
-        verify(hueEventListener).onLightOff("/lights/36", "d37eb9c4-d7eb-42ee-9a13-fa9148f8d403");
-        verify(hueEventListener).onLightOn("/lights/38", "db1d8ea4-d55d-47bd-b741-aa9d6ac0f0e7", false);
-        verifyNoMoreInteractions(hueEventListener);
+        verify(lightEventListener).onLightOff("/lights/36", "d37eb9c4-d7eb-42ee-9a13-fa9148f8d403");
+        verify(lightEventListener).onLightOn("/lights/38", "db1d8ea4-d55d-47bd-b741-aa9d6ac0f0e7", false);
+        verifyNoMoreInteractions(lightEventListener);
     }
 }

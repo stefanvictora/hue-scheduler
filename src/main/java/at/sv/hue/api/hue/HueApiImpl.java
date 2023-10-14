@@ -1,5 +1,17 @@
-package at.sv.hue.api;
+package at.sv.hue.api.hue;
 
+import at.sv.hue.api.ApiFailure;
+import at.sv.hue.api.BridgeAuthenticationFailure;
+import at.sv.hue.api.Capability;
+import at.sv.hue.api.EmptyGroupException;
+import at.sv.hue.api.GroupNotFoundException;
+import at.sv.hue.api.HttpResourceProvider;
+import at.sv.hue.api.HueApi;
+import at.sv.hue.api.LightCapabilities;
+import at.sv.hue.api.LightNotFoundException;
+import at.sv.hue.api.LightState;
+import at.sv.hue.api.PutCall;
+import at.sv.hue.api.RateLimiter;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -171,9 +183,9 @@ public final class HueApiImpl implements HueApi {
         } else {
             rateLimiter.acquire(1);
         }
-        assertNoPutErrors(resourceProvider.putResource(getUpdateUrl(putCall.id, putCall.groupState),
-                getBody(new State(putCall.bri, putCall.ct, putCall.x, putCall.y, putCall.hue, putCall.sat, putCall.effect,
-                        putCall.on, putCall.transitionTime))));
+        assertNoPutErrors(resourceProvider.putResource(getUpdateUrl(putCall.getId(), putCall.isGroupState()),
+                getBody(new State(putCall.getBri(), putCall.getCt(), putCall.getX(), putCall.getY(), putCall.getHue(),
+                        putCall.getSat(), putCall.getEffect(), putCall.getOn(), putCall.getTransitionTime()))));
     }
 
     private void assertNoPutErrors(String putResource) {

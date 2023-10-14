@@ -1,5 +1,17 @@
-package at.sv.hue.api;
+package at.sv.hue.api.hue;
 
+import at.sv.hue.api.ApiFailure;
+import at.sv.hue.api.BridgeAuthenticationFailure;
+import at.sv.hue.api.BridgeConnectionFailure;
+import at.sv.hue.api.Capability;
+import at.sv.hue.api.EmptyGroupException;
+import at.sv.hue.api.GroupNotFoundException;
+import at.sv.hue.api.HttpResourceProvider;
+import at.sv.hue.api.HueApi;
+import at.sv.hue.api.LightCapabilities;
+import at.sv.hue.api.LightNotFoundException;
+import at.sv.hue.api.LightState;
+import at.sv.hue.api.PutCall;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

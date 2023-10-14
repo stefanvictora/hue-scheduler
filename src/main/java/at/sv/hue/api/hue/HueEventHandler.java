@@ -1,5 +1,6 @@
-package at.sv.hue.api;
+package at.sv.hue.api.hue;
 
+import at.sv.hue.api.LightEventListener;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -14,14 +15,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Slf4j
-public final class HueRawEventHandler implements BackgroundEventHandler {
+public final class HueEventHandler implements BackgroundEventHandler {
     private static final TypeReference<List<HueEventContainer>> typeRef = new TypeReference<>() {
     };
-    private final HueEventListener hueEventListener;
+    private final LightEventListener lightEventListener;
     private final ObjectMapper objectMapper;
 
-    public HueRawEventHandler(HueEventListener hueEventListener) {
-        this.hueEventListener = hueEventListener;
+    public HueEventHandler(LightEventListener lightEventListener) {
+        this.lightEventListener = lightEventListener;
         objectMapper = new ObjectMapper();
         objectMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
     }
@@ -45,9 +46,9 @@ public final class HueRawEventHandler implements BackgroundEventHandler {
                           .flatMap(container -> container.getData().stream())
                           .forEach(hueEvent -> {
                               if (hueEvent.isLightOrGroup() && hueEvent.isOffEvent()) {
-                                  hueEventListener.onLightOff(hueEvent.getId_v1(), hueEvent.getId());
+                                  lightEventListener.onLightOff(hueEvent.getId_v1(), hueEvent.getId());
                               } else if (hueEvent.isLightOrGroup() && hueEvent.isOnEvent()) {
-                                  hueEventListener.onLightOn(hueEvent.getId_v1(), hueEvent.getId(), hueEvent.isPhysical());
+                                  lightEventListener.onLightOn(hueEvent.getId_v1(), hueEvent.getId(), hueEvent.isPhysical());
                               }
                           });
     }

@@ -5,18 +5,18 @@ import at.sv.hue.api.BridgeAuthenticationFailure;
 import at.sv.hue.api.BridgeConnectionFailure;
 import at.sv.hue.api.HttpResourceProviderImpl;
 import at.sv.hue.api.HueApi;
-import at.sv.hue.api.HueApiHttpsClientFactory;
-import at.sv.hue.api.HueApiImpl;
-import at.sv.hue.api.HueEventListener;
-import at.sv.hue.api.HueEventListenerImpl;
-import at.sv.hue.api.HueRawEventHandler;
+import at.sv.hue.api.LightEventListener;
+import at.sv.hue.api.LightEventListenerImpl;
 import at.sv.hue.api.LightState;
-import at.sv.hue.api.LightStateEventTrackerImpl;
 import at.sv.hue.api.ManualOverrideTracker;
 import at.sv.hue.api.ManualOverrideTrackerImpl;
 import at.sv.hue.api.PutCall;
 import at.sv.hue.api.RateLimiter;
 import at.sv.hue.api.hass.HassApiImpl;
+import at.sv.hue.api.hue.HueApiImpl;
+import at.sv.hue.api.hue.HueEventHandler;
+import at.sv.hue.api.hue.HueEventStreamReader;
+import at.sv.hue.api.hue.HueHttpsClientFactory;
 import at.sv.hue.time.StartTimeProvider;
 import at.sv.hue.time.StartTimeProviderImpl;
 import at.sv.hue.time.SunTimesProviderImpl;
@@ -44,7 +44,6 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
@@ -57,7 +56,6 @@ public final class HueScheduler implements Runnable {
     private static final Logger LOG = LoggerFactory.getLogger(HueScheduler.class);
 
     private final Map<String, List<ScheduledState>> lightStates;
-    private final ConcurrentHashMap<String, List<Runnable>> onStateWaitingList;
     @Parameters(description = "The IP address of your Philips Hue Bridge or HASS instance.")
     String ip;
     @Parameters(description = "The Philips Hue Bridge username or HASS Bearer token used for authentication.")
@@ -129,15 +127,14 @@ public final class HueScheduler implements Runnable {
     private HueApi api;
     private StateScheduler stateScheduler;
     private final ManualOverrideTracker manualOverrideTracker;
-    private final HueEventListener hueEventListener;
+    private final LightEventListener lightEventListener;
     private StartTimeProvider startTimeProvider;
     private Supplier<ZonedDateTime> currentTime;
 
     public HueScheduler() {
         lightStates = new HashMap<>();
-        onStateWaitingList = new ConcurrentHashMap<>();
         manualOverrideTracker = new ManualOverrideTrackerImpl();
-        hueEventListener = new HueEventListenerImpl(manualOverrideTracker, onStateWaitingList::remove, this::getAssignedGroups);
+        lightEventListener = new LightEventListenerImpl(manualOverrideTracker, this::getAssignedGroups);
     }
 
     public HueScheduler(HueApi api, StateScheduler stateScheduler,
@@ -199,7 +196,7 @@ public final class HueScheduler implements Runnable {
         MDC.put("context", "init");
         OkHttpClient httpsClient = createHttpsClient();
         api = new HueApiImpl(new HttpResourceProviderImpl(httpsClient), ip, key, RateLimiter.create(requestsPerSecond));
-        new LightStateEventTrackerImpl(ip, key, httpsClient, new HueRawEventHandler(hueEventListener), eventStreamReadTimeoutInMinutes).start();
+        new HueEventStreamReader(ip, key, httpsClient, new HueEventHandler(lightEventListener), eventStreamReadTimeoutInMinutes).start();
         createAndStart();
     }
 
@@ -215,7 +212,7 @@ public final class HueScheduler implements Runnable {
 
     private OkHttpClient createHttpsClient() {
         try {
-            return HueApiHttpsClientFactory.createHttpsClient(ip);
+            return HueHttpsClientFactory.createHttpsClient(ip);
         } catch (Exception e) {
             System.err.println("Failed to create https client: " + e.getLocalizedMessage());
             System.exit(1);
@@ -647,7 +644,7 @@ public final class HueScheduler implements Runnable {
     }
 
     private void retryWhenBackOn(ScheduledState state) {
-        onStateWaitingList.computeIfAbsent(state.getIdV1(), id -> new ArrayList<>()).add(() -> schedule(state, powerOnRescheduleDelayInMs));
+        lightEventListener.runWhenTurnedOn(state.getIdV1(), () -> schedule(state, powerOnRescheduleDelayInMs));
     }
 
     private boolean shouldAdjustMultiColorLoopOffset(ScheduledState state) {
@@ -727,8 +724,8 @@ public final class HueScheduler implements Runnable {
         }
     }
 
-    HueEventListener getHueEventListener() {
-        return hueEventListener;
+    LightEventListener getHueEventListener() {
+        return lightEventListener;
     }
 
     ManualOverrideTracker getManualOverrideTracker() {
