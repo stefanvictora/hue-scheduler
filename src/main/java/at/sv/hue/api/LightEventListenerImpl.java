@@ -23,21 +23,21 @@ public class LightEventListenerImpl implements LightEventListener {
     }
 
     @Override
-    public void onLightOff(String idv1, String uuid) {
+    public void onLightOff(String id, String uuid) {
         // currently not needed
     }
 
     @Override
-    public void onLightOn(String idv1, String uuid, boolean physical) {
+    public void onLightOn(String id, String uuid, boolean physical) {
         if (physical) { // only lights can be turned on physically
-            MDC.put("context", "on-event " + idv1);
+            MDC.put("context", "on-event " + id);
             // if light has been physically turned on, we additionally signal to each group the light is assigned
-            lightToGroupAssignmentLookup.apply(idv1)
+            lightToGroupAssignmentLookup.apply(id)
                                         .forEach(groupId -> onLightOn(groupId, null, false));
         }
-        MDC.put("context", "on-event " + idv1);
-        manualOverrideTracker.onLightTurnedOn(idv1);
-        List<Runnable> waitingList = onStateWaitingList.remove(idv1);
+        MDC.put("context", "on-event " + id);
+        manualOverrideTracker.onLightTurnedOn(id);
+        List<Runnable> waitingList = onStateWaitingList.remove(id);
         if (waitingList != null) {
             log.debug("Reschedule {} waiting states.", waitingList.size());
             waitingList.forEach(Runnable::run);
@@ -45,7 +45,7 @@ public class LightEventListenerImpl implements LightEventListener {
     }
 
     @Override
-    public void runWhenTurnedOn(String idV1, Runnable runnable) {
-        onStateWaitingList.computeIfAbsent(idV1, id -> new ArrayList<>()).add(runnable);
+    public void runWhenTurnedOn(String id, Runnable runnable) {
+        onStateWaitingList.computeIfAbsent(id, i -> new ArrayList<>()).add(runnable);
     }
 }

@@ -45,13 +45,13 @@ public class HassApiImpl implements HueApi {
     private Map<String, List<State>> nameToStatesMap;
     private boolean nameToStatesMapInvalidated;
 
-    public HassApiImpl(HttpResourceProvider httpResourceProvider, String ip, String port, RateLimiter rateLimiter) {
+    public HassApiImpl(HttpResourceProvider httpResourceProvider, String hostname, String port, RateLimiter rateLimiter) {
         this.httpResourceProvider = httpResourceProvider;
         this.rateLimiter = rateLimiter;
         mapper = new ObjectMapper();
         mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
-        baseApi = "http://" + ip + ":" + port + "/api";
+        baseApi = "http://" + hostname + ":" + port + "/api"; // todo: allow other schemas
     }
 
     @Override
@@ -410,29 +410,6 @@ public class HassApiImpl implements HueApi {
         } catch (JsonProcessingException e) {
             throw new IllegalArgumentException("Failed to create state body", e);
         }
-    }
-
-    @Data
-    private static final class State {
-        String entity_id;
-        String state;
-        StateAttributes attributes;
-    }
-
-    @Data
-    private static final class StateAttributes {
-        String friendly_name;
-        String color_mode;
-        Integer brightness;
-        Integer color_temp;
-        Double[] xy_color;
-        String effect;
-        List<String> supported_color_modes;
-        Integer min_mireds;
-        Integer max_mireds;
-        Boolean is_hue_group;
-        List<String> lights;
-        List<String> entity_id;
     }
 
     @Data

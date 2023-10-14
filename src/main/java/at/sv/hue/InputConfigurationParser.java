@@ -3,6 +3,7 @@ package at.sv.hue;
 import at.sv.hue.api.GroupNotFoundException;
 import at.sv.hue.api.HueApi;
 import at.sv.hue.api.LightCapabilities;
+import at.sv.hue.api.hass.HassSupportedEntityTypes;
 import at.sv.hue.color.RGBToXYConverter;
 import at.sv.hue.time.StartTimeProvider;
 
@@ -45,20 +46,24 @@ public final class InputConfigurationParser {
             boolean groupState;
             String name = "";
             if (idPart.matches("g\\d+")) {
-                id = idPart.substring(1);
+                id = "/groups/" + idPart.substring(1);
                 name = api.getGroupName(id);
                 groupState = true;
             } else if (idPart.matches("\\d+")) {
+                id = "/lights/" + idPart;
+                name = api.getLightName(id);
+                groupState = false;
+            } else if (HassSupportedEntityTypes.isSupportedEntityType(idPart)) {
                 id = idPart;
                 name = api.getLightName(id);
                 groupState = false;
             } else {
                 name = idPart;
                 try {
-                    id = api.getGroupId(idPart);
+                    id = api.getGroupId(name);
                     groupState = true;
                 } catch (GroupNotFoundException e) {
-                    id = api.getLightId(idPart);
+                    id = api.getLightId(name);
                     groupState = false;
                 }
             }

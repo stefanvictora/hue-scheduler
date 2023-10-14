@@ -23,7 +23,7 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -62,7 +62,7 @@ public final class HueApiImpl implements HueApi {
 
     @Override
     public LightState getLightState(String id) {
-        String response = getResourceAndAssertNoErrors(getLightStateUrl(id));
+        String response = getResourceAndAssertNoErrors(createUrl(id));
         try {
             Light light = mapper.readValue(response, Light.class);
             return createLightState(light);
@@ -144,10 +144,6 @@ public final class HueApiImpl implements HueApi {
         return null;
     }
 
-    private URL getLightStateUrl(String id) {
-        return createUrl("/lights/" + id);
-    }
-
     private URL createUrl(String url) {
         try {
             return new URI(baseApi + url).toURL();
@@ -163,17 +159,13 @@ public final class HueApiImpl implements HueApi {
 
     @Override
     public boolean isGroupOff(String id) {
-        String response = getResourceAndAssertNoErrors(getGroupUrl(id));
+        String response = getResourceAndAssertNoErrors(createUrl(id));
         try {
             Group group = mapper.readValue(response, Group.class);
             return Boolean.FALSE == group.state.any_on;
         } catch (JsonProcessingException | NullPointerException e) {
             throw new ApiFailure("Failed to parse group state response '" + response + "' for id " + id + ": " + e.getLocalizedMessage());
         }
-    }
-
-    private URL getGroupUrl(String id) {
-        return createUrl("/groups/" + id);
     }
 
     @Override
@@ -203,18 +195,18 @@ public final class HueApiImpl implements HueApi {
     @Override
     public List<String> getGroupLights(String groupId) {
         Group group = getAndAssertGroupExists(groupId);
-        String[] lights = group.lights;
-        if (lights.length == 0) {
+        List<String> lights = group.getLights();
+        if (lights.isEmpty()) {
             throw new EmptyGroupException("Group with id '" + groupId + "' has no lights to control!");
         }
-        return Arrays.asList(lights);
+        return lights;
     }
 
     @Override
     public List<String> getAssignedGroups(String lightId) {
         return getOrLookupGroups().entrySet()
                                   .stream()
-                                  .filter(entry -> Arrays.asList(entry.getValue().getLights()).contains(lightId))
+                                  .filter(entry -> entry.getValue().getLights().contains(lightId))
                                   .map(Map.Entry::getKey)
                                   .collect(Collectors.toList());
     }
@@ -232,11 +224,17 @@ public final class HueApiImpl implements HueApi {
     private Map<String, Group> lookupGroups() {
         String response = getResourceAndAssertNoErrors(getGroupsUrl());
         try {
-            return mapper.readValue(response, new TypeReference<>() {
-            });
+            return addKeyPrefix(mapper.readValue(response, new TypeReference<>() {
+            }), "/groups/");
         } catch (JsonProcessingException e) {
             throw new ApiFailure("Failed to parse groups response '" + response + "': " + e.getLocalizedMessage());
         }
+    }
+
+    private static <V> Map<String, V> addKeyPrefix(Map<String, V> map, String prefix) {
+        return map.entrySet()
+                  .stream()
+                  .collect(Collectors.toMap(entry -> prefix + entry.getKey(), Map.Entry::getValue));
     }
 
     private URL getGroupsUrl() {
@@ -309,8 +307,8 @@ public final class HueApiImpl implements HueApi {
     private Map<String, Light> lookupLights() {
         String response = getResourceAndAssertNoErrors(getLightsUrl());
         try {
-            return mapper.readValue(response, new TypeReference<>() {
-            });
+            return addKeyPrefix(mapper.readValue(response, new TypeReference<>() {
+            }), "/lights/");
         } catch (JsonProcessingException e) {
             throw new ApiFailure("Failed to parse lights response '" + response + "': " + e.getLocalizedMessage());
         }
@@ -447,9 +445,9 @@ public final class HueApiImpl implements HueApi {
 
     private URL getUpdateUrl(String id, boolean groupState) {
         if (groupState) {
-            return createUrl("/groups/" + id + "/action");
+            return createUrl(id + "/action");
         } else {
-            return createUrl("/lights/" + id + "/state");
+            return createUrl(id + "/state");
         }
     }
 
@@ -518,8 +516,14 @@ public final class HueApiImpl implements HueApi {
     @Data
     private static final class Group {
         String name;
-        String[] lights = new String[0];
+        private List<String> lights = new ArrayList<>();
         GroupState state;
+
+        List<String> getLights() {
+            return lights.stream()
+                         .map(id -> "/lights/" + id)
+                         .collect(Collectors.toList());
+        }
     }
 
     @Data

@@ -67,7 +67,7 @@ class HueApiTest {
     void getState_networkFailure_exception() {
         when(resourceProviderMock.getResource(any())).thenThrow(new BridgeConnectionFailure("Failed"));
 
-        assertThrows(BridgeConnectionFailure.class, () -> getLightState(1));
+        assertThrows(BridgeConnectionFailure.class, () -> getLightState("/lights/1"));
     }
 
     @Test
@@ -83,7 +83,7 @@ class HueApiTest {
                   }
                 ]""");
 
-        assertThrows(ApiFailure.class, () -> getLightState(1), "resource, /lights/1/state, not available");
+        assertThrows(ApiFailure.class, () -> getLightState("/lights/1"), "resource, /lights/1/state, not available");
     }
 
     @Test
@@ -99,21 +99,21 @@ class HueApiTest {
                   }
                 ]""");
 
-        assertThrows(ApiFailure.class, () -> getLightState(1), "any other error");
+        assertThrows(ApiFailure.class, () -> getLightState("/lights/1"), "any other error");
     }
 
     @Test
     void getState_emptyResponse_exception() {
         setGetResponse("/lights/1", "");
 
-        assertThrows(ApiFailure.class, () -> getLightState(1));
+        assertThrows(ApiFailure.class, () -> getLightState("/lights/1"));
     }
 
     @Test
     void getState_emptyJSON_exception() {
         setGetResponse("/lights/1", "{}");
 
-        assertThrows(ApiFailure.class, () -> getLightState(1));
+        assertThrows(ApiFailure.class, () -> getLightState("/lights/1"));
     }
 
     @Test
@@ -139,7 +139,7 @@ class HueApiTest {
                 }
                 """);
 
-        LightState lightState = getLightState(lightId);
+        LightState lightState = getLightState("/lights/" + lightId);
 
         assertLightState(
                 lightState, LightState
@@ -183,7 +183,7 @@ class HueApiTest {
                 }
                 """);
 
-        LightState lightState = getLightState(lightId);
+        LightState lightState = getLightState("/lights/" + lightId);
 
         assertLightState(lightState, LightState
                 .builder()
@@ -217,7 +217,7 @@ class HueApiTest {
                   "type": "Dimmable light"
                 }""");
 
-        LightState lightState = getLightState(lightId);
+        LightState lightState = getLightState("/lights/" + lightId);
 
         assertLightState(lightState, LightState
                 .builder()
@@ -243,7 +243,7 @@ class HueApiTest {
                   "type": "On/Off plug-in unit"
                 }""");
 
-        LightState lightState = getLightState(lightId);
+        LightState lightState = getLightState("/lights/" + lightId);
 
         assertLightState(lightState, LightState
                 .builder()
@@ -377,7 +377,7 @@ class HueApiTest {
                   }
                 }""");
 
-        assertThat(getGroupStates(17)).containsExactly(
+        assertThat(getGroupStates("/groups/17")).containsExactly(
                 LightState.builder()
                           .on(true)
                           .brightness(43)
@@ -420,7 +420,7 @@ class HueApiTest {
                           .build()
         );
 
-        assertThat(getGroupStates(18)).containsExactly(
+        assertThat(getGroupStates("/groups/18")).containsExactly(
                 LightState.builder()
                           .on(false)
                           .reachable(true)
@@ -451,8 +451,8 @@ class HueApiTest {
                     ]
                   }}""");
 
-        assertThat(getGroupLights(2)).containsExactly("4", "5");
-        assertThat(getGroupName(2)).isEqualTo("Group 2");
+        assertThat(getGroupLights("/groups/2")).containsExactly("/lights/4", "/lights/5");
+        assertThat(getGroupName("/groups/2")).isEqualTo("Group 2");
     }
 
     @Test
@@ -476,12 +476,12 @@ class HueApiTest {
                     ]
                   }}""");
 
-        assertThat(getAssignedGroups(2)).containsExactly("1");
-        assertThat(getAssignedGroups(3)).containsExactly("1", "2");
-        assertThat(getAssignedGroups(777)).isEmpty();
+        assertThat(getAssignedGroups("/lights/2")).containsExactly("/groups/1");
+        assertThat(getAssignedGroups("/lights/3")).containsExactlyInAnyOrder("/groups/1", "/groups/2");
+        assertThat(getAssignedGroups("/lights/777")).isEmpty();
         api.clearCaches();
-        assertThat(getAssignedGroups(2)).containsExactly("1");
-        assertThat(getAssignedGroups(2)).containsExactly("1");
+        assertThat(getAssignedGroups("/lights/2")).containsExactly("/groups/1");
+        assertThat(getAssignedGroups("/lights/2")).containsExactly("/groups/1");
         verify(resourceProviderMock, times(2)).getResource(any());
     }
 
@@ -496,21 +496,21 @@ class HueApiTest {
                   }
                 }""");
 
-        assertThrows(EmptyGroupException.class, () -> getGroupLights(1));
+        assertThrows(EmptyGroupException.class, () -> getGroupLights("/groups/1"));
     }
 
     @Test
     void getGroupLights_unknownId_exception() {
         setGetResponse("/groups", "{}");
 
-        assertThrows(GroupNotFoundException.class, () -> getGroupLights(1234));
+        assertThrows(GroupNotFoundException.class, () -> getGroupLights("/groups/1234"));
     }
 
     @Test
     void getGroupLights_emptyResponse_exception() {
         setGetResponse("/groups", "");
 
-        assertThrows(ApiFailure.class, () -> getGroupLights(1));
+        assertThrows(ApiFailure.class, () -> getGroupLights("/groups/1"));
     }
 
     @Test
@@ -533,8 +533,8 @@ class HueApiTest {
                     ]
                   }}""");
 
-        String name1 = getGroupName(1);
-        String name2 = getGroupName(2);
+        String name1 = getGroupName("/groups/1");
+        String name2 = getGroupName("/groups/2");
 
         assertThat(name1).isEqualTo("Group 1");
         assertThat(name2).isEqualTo("Group 2");
@@ -544,14 +544,14 @@ class HueApiTest {
     void getGroupName_unknownId_exception() {
         setGetResponse("/groups", "{}");
 
-        assertThrows(GroupNotFoundException.class, () -> getGroupName(1234));
+        assertThrows(GroupNotFoundException.class, () -> getGroupName("/groups/1234"));
     }
 
     @Test
     void getGroupName_emptyResponse_exception() {
         setGetResponse("/groups", "");
 
-        assertThrows(ApiFailure.class, () -> getGroupName(1));
+        assertThrows(ApiFailure.class, () -> getGroupName("/groups/1"));
     }
 
     @Test
@@ -566,12 +566,12 @@ class HueApiTest {
                   }
                 }""");
 
-        assertThat(api.getLightId("Lamp 1")).isEqualTo("7");
-        assertThat(api.getLightId("Lamp 2")).isEqualTo("1234");
+        assertThat(api.getLightId("Lamp 1")).isEqualTo("/lights/7");
+        assertThat(api.getLightId("Lamp 2")).isEqualTo("/lights/1234");
         verify(resourceProviderMock).getResource(any());
         api.clearCaches();
-        assertThat(api.getLightId("Lamp 1")).isEqualTo("7");
-        assertThat(api.getLightId("Lamp 1")).isEqualTo("7");
+        assertThat(api.getLightId("Lamp 1")).isEqualTo("/lights/7");
+        assertThat(api.getLightId("Lamp 1")).isEqualTo("/lights/7");
         verify(resourceProviderMock, times(2)).getResource(any());
     }
 
@@ -609,12 +609,12 @@ class HueApiTest {
                   }
                 }""");
 
-        assertThat(api.getGroupId("Group 1")).isEqualTo("11");
-        assertThat(api.getGroupId("Group 2")).isEqualTo("789");
+        assertThat(api.getGroupId("Group 1")).isEqualTo("/groups/11");
+        assertThat(api.getGroupId("Group 2")).isEqualTo("/groups/789");
         verify(resourceProviderMock).getResource(any());
         api.clearCaches();
-        assertThat(api.getGroupId("Group 1")).isEqualTo("11");
-        assertThat(api.getGroupId("Group 1")).isEqualTo("11");
+        assertThat(api.getGroupId("Group 1")).isEqualTo("/groups/11");
+        assertThat(api.getGroupId("Group 1")).isEqualTo("/groups/11");
         verify(resourceProviderMock, times(2)).getResource(any());
     }
 
@@ -644,12 +644,12 @@ class HueApiTest {
                   }
                 }""");
 
-        assertThat(getLightName(7)).isEqualTo("Lamp 1");
-        assertThat(getLightName(1234)).isEqualTo("Lamp 2");
+        assertThat(getLightName("/lights/7")).isEqualTo("Lamp 1");
+        assertThat(getLightName("/lights/1234")).isEqualTo("Lamp 2");
         verify(resourceProviderMock).getResource(any());
         api.clearCaches();
-        assertThat(getLightName(7)).isEqualTo("Lamp 1");
-        assertThat(getLightName(7)).isEqualTo("Lamp 1");
+        assertThat(getLightName("/lights/7")).isEqualTo("Lamp 1");
+        assertThat(getLightName("/lights/7")).isEqualTo("Lamp 1");
         verify(resourceProviderMock, times(2)).getResource(any());
     }
 
@@ -657,14 +657,14 @@ class HueApiTest {
     void getLightName_unknownId_exception() {
         setGetResponse("/lights", "{}");
 
-        assertThrows(LightNotFoundException.class, () -> getLightName(1234));
+        assertThrows(LightNotFoundException.class, () -> getLightName("/lights/1234"));
     }
 
     @Test
     void getLightName_emptyResponse_exception() {
         setGetResponse("/lights", "");
 
-        assertThrows(ApiFailure.class, () -> getLightName(2));
+        assertThrows(ApiFailure.class, () -> getLightName("/lights/2"));
     }
 
     @Test
@@ -701,7 +701,7 @@ class HueApiTest {
                   }
                 }""");
 
-        LightCapabilities capabilities = getLightCapabilities(22);
+        LightCapabilities capabilities = getLightCapabilities("/lights/22");
 
         assertCapabilities(
                 capabilities,
@@ -748,7 +748,7 @@ class HueApiTest {
                   }
                 }""");
 
-        LightCapabilities capabilities = getLightCapabilities(22);
+        LightCapabilities capabilities = getLightCapabilities("/lights/22");
 
         assertCapabilities(
                 capabilities,
@@ -778,7 +778,7 @@ class HueApiTest {
                   }
                 }""");
 
-        LightCapabilities capabilities = getLightCapabilities(7);
+        LightCapabilities capabilities = getLightCapabilities("/lights/7");
 
         assertCapabilities(capabilities, LightCapabilities.builder().capabilities(EnumSet.of(Capability.BRIGHTNESS, Capability.ON_OFF)).build());
         assertThat(capabilities.isColorSupported()).isFalse();
@@ -823,7 +823,7 @@ class HueApiTest {
                   }
                 }""");
 
-        LightCapabilities capabilities = getLightCapabilities(42);
+        LightCapabilities capabilities = getLightCapabilities("/lights/42");
 
         assertCapabilities(
                 capabilities,
@@ -864,7 +864,7 @@ class HueApiTest {
                   }
                 }""");
 
-        LightCapabilities capabilities = getLightCapabilities(24);
+        LightCapabilities capabilities = getLightCapabilities("/lights/24");
 
         assertCapabilities(capabilities, LightCapabilities.builder().capabilities(EnumSet.of(Capability.ON_OFF)).build());
         assertThat(capabilities.isColorSupported()).isFalse();
@@ -876,7 +876,7 @@ class HueApiTest {
     void getCapabilities_unknownId_exception() {
         setGetResponse("/lights", "{}");
 
-        assertThrows(LightNotFoundException.class, () -> getLightCapabilities(1234));
+        assertThrows(LightNotFoundException.class, () -> getLightCapabilities("/lights/1234"));
     }
 
     @Test
@@ -1057,7 +1057,7 @@ class HueApiTest {
                 }""");
 
         assertCapabilities(
-                getGroupCapabilities(1),
+                getGroupCapabilities("/groups/1"),
                 LightCapabilities.builder()
                                  .colorGamut(GAMUT_C)
                                  .ctMin(100)
@@ -1066,13 +1066,13 @@ class HueApiTest {
                                  .build()
         );
         assertCapabilities(
-                getGroupCapabilities(2),
+                getGroupCapabilities("/groups/2"),
                 LightCapabilities.builder()
                                  .colorGamut(GAMUT_C)
                                  .capabilities(EnumSet.of(Capability.COLOR, Capability.BRIGHTNESS, Capability.ON_OFF))
                                  .build());
         assertCapabilities(
-                getGroupCapabilities(3),
+                getGroupCapabilities("/groups/3"),
                 LightCapabilities.builder()
                                  .ctMin(100)
                                  .ctMax(454)
@@ -1080,25 +1080,25 @@ class HueApiTest {
                                  .build()
         );
         assertCapabilities(
-                getGroupCapabilities(4),
+                getGroupCapabilities("/groups/4"),
                 LightCapabilities.builder()
                                  .capabilities(EnumSet.of(Capability.ON_OFF))
                                  .build()
         );
         assertCapabilities(
-                getGroupCapabilities(5),
+                getGroupCapabilities("/groups/5"),
                 LightCapabilities.builder()
                                  .colorGamut(GAMUT_A)
                                  .capabilities(EnumSet.of(Capability.COLOR, Capability.BRIGHTNESS, Capability.ON_OFF))
                                  .build());
         assertCapabilities(
-                getGroupCapabilities(6),
+                getGroupCapabilities("/groups/6"),
                 LightCapabilities.builder()
                                  .colorGamut(GAMUT_C)
                                  .capabilities(EnumSet.of(Capability.COLOR, Capability.BRIGHTNESS, Capability.ON_OFF))
                                  .build());
         assertCapabilities(
-                getGroupCapabilities(7),
+                getGroupCapabilities("/groups/7"),
                 LightCapabilities.builder()
                                  .colorGamut(GAMUT_B)
                                  .capabilities(EnumSet.of(Capability.COLOR, Capability.BRIGHTNESS, Capability.ON_OFF))
@@ -1117,7 +1117,7 @@ class HueApiTest {
                           }
                         ]""");
 
-        performPutCall(PutCall.builder().id("15").bri(200).build());
+        performPutCall(PutCall.builder().id("/lights/15").bri(200).build());
     }
 
     @Test
@@ -1132,14 +1132,14 @@ class HueApiTest {
                           }
                         ]""");
 
-        performPutCall(PutCall.builder().id("9").bri(200).groupState(true).build());
+        performPutCall(PutCall.builder().id("/groups/9").bri(200).groupState(true).build());
     }
 
     @Test
     void putState_ct_correctBody() {
         setPutResponse("/lights/" + 16 + "/state", "{\"ct\":100}", "[success]");
 
-        performPutCall(PutCall.builder().id("16").ct(100).build());
+        performPutCall(PutCall.builder().id("/lights/16").ct(100).build());
     }
 
     @Test
@@ -1148,7 +1148,7 @@ class HueApiTest {
         double y = 0.3525;
         setPutResponse("/lights/" + 16 + "/state", "{\"xy\":[" + x + "," + y + "]}", "[success]");
 
-        performPutCall(PutCall.builder().id("16").x(x).y(y).build());
+        performPutCall(PutCall.builder().id("/lights/16").x(x).y(y).build());
     }
 
     @Test
@@ -1157,35 +1157,35 @@ class HueApiTest {
         int sat = 254;
         setPutResponse("/lights/" + 16 + "/state", "{\"hue\":" + hue + ",\"sat\":" + sat + "}", "[success]");
 
-        performPutCall(PutCall.builder().id("16").hue(hue).sat(sat).build());
+        performPutCall(PutCall.builder().id("/lights/16").hue(hue).sat(sat).build());
     }
 
     @Test
     void putState_on_setsFlagCorrectly() {
         setPutResponse("/lights/" + 16 + "/state", "{\"on\":true}", "[success]");
 
-        performPutCall(PutCall.builder().id("16").on(true).build());
+        performPutCall(PutCall.builder().id("/lights/16").on(true).build());
     }
 
     @Test
     void putState_transitionTime_setsTimeCorrectly() {
         setPutResponse("/lights/" + 16 + "/state", "{\"transitiontime\":2}", "[success]");
 
-        performPutCall(PutCall.builder().id("16").transitionTime(2).build());
+        performPutCall(PutCall.builder().id("/lights/16").transitionTime(2).build());
     }
 
     @Test
     void putState_transitionTime_defaultValueOfFour_isIgnored() {
         setPutResponse("/lights/" + 16 + "/state", "{}", "[success]");
 
-        performPutCall(PutCall.builder().id("16").transitionTime(4).build());
+        performPutCall(PutCall.builder().id("/lights/16").transitionTime(4).build());
     }
 
     @Test
     void putState_effect_correctlySet() {
         setPutResponse("/lights/" + 1 + "/state", "{\"effect\":\"colorloop\"}", "[success]");
 
-        performPutCall(PutCall.builder().id("1").effect("colorloop").build());
+        performPutCall(PutCall.builder().id("/lights/1").effect("colorloop").build());
 
     }
 
@@ -1202,7 +1202,7 @@ class HueApiTest {
                   }
                 ]""");
 
-        assertThrows(BridgeAuthenticationFailure.class, () -> performPutCall(PutCall.builder().id("10").bri(100).build()));
+        assertThrows(BridgeAuthenticationFailure.class, () -> performPutCall(PutCall.builder().id("/lights/10").bri(100).build()));
     }
 
     @Test
@@ -1218,7 +1218,7 @@ class HueApiTest {
                   }
                 ]""");
 
-        ApiFailure apiFailure = assertThrows(ApiFailure.class, () -> performPutCall(PutCall.builder().id("1").bri(100).build()));
+        ApiFailure apiFailure = assertThrows(ApiFailure.class, () -> performPutCall(PutCall.builder().id("/lights/1").bri(100).build()));
         assertThat(apiFailure.getMessage()).isEqualTo("resource, /lights/1/state, not available");
     }
 
@@ -1235,7 +1235,7 @@ class HueApiTest {
                   }
                 ]""");
 
-        ApiFailure apiFailure = assertThrows(ApiFailure.class, () -> performPutCall(PutCall.builder().id("1").bri(100).groupState(true).build()));
+        ApiFailure apiFailure = assertThrows(ApiFailure.class, () -> performPutCall(PutCall.builder().id("/groups/1").bri(100).groupState(true).build()));
         assertThat(apiFailure.getMessage()).isEqualTo("resource, /groups/11/action, not available");
     }
 
@@ -1243,7 +1243,7 @@ class HueApiTest {
     void putState_connectionFailure_exception() {
         when(resourceProviderMock.putResource(any(), any())).thenThrow(new BridgeConnectionFailure("Failed"));
 
-        assertThrows(BridgeConnectionFailure.class, () -> performPutCall(PutCall.builder().id("123").bri(100).build()));
+        assertThrows(BridgeConnectionFailure.class, () -> performPutCall(PutCall.builder().id("/lights/123").bri(100).build()));
     }
 
     @Test
@@ -1252,7 +1252,7 @@ class HueApiTest {
                 "[\n" +
                 "]");
 
-        performPutCall(PutCall.builder().id("123").bri(100).build());
+        performPutCall(PutCall.builder().id("/lights/123").bri(100).build());
     }
 
     @Test
@@ -1274,7 +1274,7 @@ class HueApiTest {
                           }
                         ]""");
 
-        ApiFailure apiFailure = assertThrows(ApiFailure.class, () -> performPutCall(PutCall.builder().id("777").bri(300).build()));
+        ApiFailure apiFailure = assertThrows(ApiFailure.class, () -> performPutCall(PutCall.builder().id("/lights/777").bri(300).build()));
         assertThat(apiFailure.getMessage()).isEqualTo("invalid value, 300}, for parameter, bri");
     }
 
@@ -1291,7 +1291,7 @@ class HueApiTest {
                   }
                 ]""");
 
-        performPutCall(PutCall.builder().id("777").bri(200).build());
+        performPutCall(PutCall.builder().id("/lights/777").bri(200).build());
     }
 
     @Test
@@ -1307,7 +1307,7 @@ class HueApiTest {
                   "type": "On/Off plug-in unit"
                 }""");
 
-        assertThat(isLightOff(lightId)).isFalse();
+        assertThat(isLightOff("/lights/" + lightId)).isFalse();
     }
 
     @Test
@@ -1323,7 +1323,7 @@ class HueApiTest {
                   "type": "On/Off plug-in unit"
                 }""");
 
-        assertThat(isLightOff(lightId)).isFalse();
+        assertThat(isLightOff("/lights/" + lightId)).isFalse();
     }
 
     @Test
@@ -1339,7 +1339,7 @@ class HueApiTest {
                   "type": "On/Off plug-in unit"
                 }""");
 
-        assertThat(isLightOff(lightId)).isTrue();
+        assertThat(isLightOff("/lights/" + lightId)).isTrue();
     }
 
     @Test
@@ -1362,7 +1362,7 @@ class HueApiTest {
                   "class": "Living room"
                 }""");
 
-        assertThat(api.isGroupOff(groupId)).isFalse();
+        assertThat(api.isGroupOff("/groups/" + groupId)).isFalse();
     }
 
     @Test
@@ -1385,7 +1385,7 @@ class HueApiTest {
                   "class": "Living room"
                 }""");
 
-        assertThat(api.isGroupOff(groupId)).isFalse();
+        assertThat(api.isGroupOff("/groups/" + groupId)).isFalse();
     }
 
     @Test
@@ -1408,7 +1408,7 @@ class HueApiTest {
                   "class": "Living room"
                 }""");
 
-        assertThat(api.isGroupOff(groupId)).isTrue();
+        assertThat(api.isGroupOff("/groups/" + groupId)).isTrue();
     }
 
     private boolean isLightOff(String lightId) {
@@ -1431,28 +1431,28 @@ class HueApiTest {
         when(resourceProviderMock.putResource(getUrl(expectedUrl), expectedBody)).thenReturn(response);
     }
 
-    private LightCapabilities getLightCapabilities(int id) {
-        return api.getLightCapabilities(String.valueOf(id));
+    private LightCapabilities getLightCapabilities(String id) {
+        return api.getLightCapabilities(id);
     }
 
-    private LightCapabilities getGroupCapabilities(int id) {
-        return api.getGroupCapabilities(String.valueOf(id));
+    private LightCapabilities getGroupCapabilities(String id) {
+        return api.getGroupCapabilities(id);
     }
 
-    private LightState getLightState(int lightId) {
-        return api.getLightState(String.valueOf(lightId));
+    private LightState getLightState(String lightId) {
+        return api.getLightState(lightId);
     }
 
-    private List<LightState> getGroupStates(int id) {
-        return api.getGroupStates(String.valueOf(id));
+    private List<LightState> getGroupStates(String id) {
+        return api.getGroupStates(id);
     }
 
-    private String getLightName(int id) {
-        return api.getLightName(String.valueOf(id));
+    private String getLightName(String id) {
+        return api.getLightName(id);
     }
 
-    private String getGroupName(int groupId) {
-        return api.getGroupName(String.valueOf(groupId));
+    private String getGroupName(String groupId) {
+        return api.getGroupName(groupId);
     }
 
     private void assertLightState(LightState lightState, LightState expected) {
@@ -1463,12 +1463,12 @@ class HueApiTest {
         api.putState(putCall);
     }
 
-    private List<String> getGroupLights(int groupId) {
-        return api.getGroupLights(String.valueOf(groupId));
+    private List<String> getGroupLights(String groupId) {
+        return api.getGroupLights(groupId);
     }
 
-    private List<String> getAssignedGroups(int lightId) {
-        return api.getAssignedGroups(String.valueOf(lightId));
+    private List<String> getAssignedGroups(String lightId) {
+        return api.getAssignedGroups(lightId);
     }
 
     private void assertCapabilities(LightCapabilities capabilities, LightCapabilities expected) {

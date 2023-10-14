@@ -33,7 +33,7 @@ final class ScheduledState {
 
     private final String name;
     @Getter
-    private final String id; // todo: we should get rid of multiple IDs. I probably makes sense to always use IDv1 or something generic
+    private final String id;
     private final String startString;
     private final Integer brightness;
     private final Integer ct;
@@ -350,13 +350,6 @@ final class ScheduledState {
 
     public boolean isScheduledOn(DayOfWeek... day) {
         return daysOfWeek.containsAll(Arrays.asList(day));
-    }
-
-    public String getIdV1() { // todo: this does not work well with other APIs, as this is very specific to Hue Bridges
-        if (groupState) {
-            return "/groups/" + id;
-        }
-        return "/lights/" + id;
     }
 
     private String getEffect() {
