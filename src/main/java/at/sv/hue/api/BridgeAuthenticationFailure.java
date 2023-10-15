@@ -1,7 +1,7 @@
 package at.sv.hue.api;
 
-public final class BridgeAuthenticationFailure extends HueApiFailure {
+public final class BridgeAuthenticationFailure extends ApiFailure {
     public BridgeAuthenticationFailure() {
-        super("Username was rejected by bridge");
+        super("Username / token was rejected by bridge");
     }
 }

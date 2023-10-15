@@ -21,14 +21,14 @@ public class LightStateComparator {
             return false; // don't compare state if light is off, unless it's an on state
         }
         return isOnAndStateDiffers() ||
-                brightnessDiffers() ||
-                colorModeOrValuesDiffer() ||
-                effectDiffers();
+               brightnessDiffers() ||
+               colorModeOrValuesDiffer() ||
+               effectDiffers();
     }
 
     private boolean brightnessDiffers() {
         return lastPutCall.getBri() != null && currentState.isBrightnessSupported() &&
-                !lastPutCall.getBri().equals(currentState.getBrightness());
+               !lastPutCall.getBri().equals(currentState.getBrightness());
     }
 
     private boolean colorModeOrValuesDiffer() {
@@ -42,23 +42,19 @@ public class LightStateComparator {
         if (colorModeDiffers(colorMode)) {
             return true;
         }
-        switch (colorMode) {
-            case CT:
-                return ctDiffers();
-            case HS:
-                return lastPutCall.getHue() != null && !lastPutCall.getHue().equals(currentState.getHue()) ||
-                        lastPutCall.getSat() != null && !lastPutCall.getSat().equals(currentState.getSat());
-            case XY:
-                return xyDiffers();
-            default:
-                return false; // should not happen, but as a fallback we just ignore unknown color modes
-        }
+        return switch (colorMode) {
+            case CT -> ctDiffers();
+            case HS -> lastPutCall.getHue() != null && !lastPutCall.getHue().equals(currentState.getHue()) ||
+                       lastPutCall.getSat() != null && !lastPutCall.getSat().equals(currentState.getSat());
+            case XY -> xyDiffers();
+            default -> false; // should not happen, but as a fallback we just ignore unknown color modes
+        };
     }
 
     private boolean colorModeNotSupportedByState(ColorMode colorMode) {
         return colorMode == ColorMode.CT && !currentState.isCtSupported()
-                || colorMode == ColorMode.HS && !currentState.isColorSupported()
-                || colorMode == ColorMode.XY && !currentState.isColorSupported();
+               || colorMode == ColorMode.HS && !currentState.isColorSupported()
+               || colorMode == ColorMode.XY && !currentState.isColorSupported();
     }
 
     private boolean colorModeDiffers(ColorMode colorMode) {

@@ -37,36 +37,18 @@ public final class DayOfWeeksParser {
     }
 
     private static DayOfWeek parseDay(String day) {
-        switch (day.trim().toLowerCase(Locale.ENGLISH)) {
-            case "mo":
-            case "mon":
-                return DayOfWeek.MONDAY;
-            case "tu":
-            case "tue":
-            case "di":
-                return DayOfWeek.TUESDAY;
-            case "we":
-            case "wen":
-            case "mi":
-                return DayOfWeek.WEDNESDAY;
-            case "th":
-            case "thu":
-            case "do":
-                return DayOfWeek.THURSDAY;
-            case "fr":
-            case "fri":
-                return DayOfWeek.FRIDAY;
-            case "sa":
-            case "sat":
-                return DayOfWeek.SATURDAY;
-            case "su":
-            case "sun":
-            case "so":
-                return DayOfWeek.SUNDAY;
-            default:
-                throw new InvalidPropertyValue("Unknown day parameter '" + day + "'. Please check your spelling. " +
-                        "Supported values (case insensitive): [Mo|Mon, Tu|Di|Tue, We|Mi|Wen, Th|Do|Thu, Fr|Fri, Sa|Sat Su|So|Sun]");
-        }
+        return switch (day.trim().toLowerCase(Locale.ENGLISH)) {
+            case "mo", "mon" -> DayOfWeek.MONDAY;
+            case "tu", "tue", "di" -> DayOfWeek.TUESDAY;
+            case "we", "wen", "mi" -> DayOfWeek.WEDNESDAY;
+            case "th", "thu", "do" -> DayOfWeek.THURSDAY;
+            case "fr", "fri" -> DayOfWeek.FRIDAY;
+            case "sa", "sat" -> DayOfWeek.SATURDAY;
+            case "su", "sun", "so" -> DayOfWeek.SUNDAY;
+            default ->
+                    throw new InvalidPropertyValue("Unknown day parameter '" + day + "'. Please check your spelling. " +
+                                                   "Supported values (case insensitive): [Mo|Mon, Tu|Di|Tue, We|Mi|Wen, Th|Do|Thu, Fr|Fri, Sa|Sat Su|So|Sun]");
+        };
     }
 
     private static boolean overFlowsEndOfWeek(DayOfWeek rangeStart, DayOfWeek rangeEnd) {

@@ -1,4 +1,4 @@
-package at.sv.hue.api;
+package at.sv.hue.api.hue;
 
 import okhttp3.OkHttpClient;
 
@@ -11,7 +11,7 @@ import java.security.KeyStore;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 
-public class HueApiHttpsClientFactory {
+public class HueHttpsClientFactory {
 
     private static final String HUE_BRIDGE_CERTIFICATE = "/hue-bridge-certificate.pem";
 
@@ -33,7 +33,7 @@ public class HueApiHttpsClientFactory {
     }
 
     private static Certificate loadCertificate() throws Exception {
-        try (InputStream certInputStream = LightStateEventTrackerImpl.class.getResourceAsStream(HUE_BRIDGE_CERTIFICATE)) {
+        try (InputStream certInputStream = HueEventStreamReader.class.getResourceAsStream(HUE_BRIDGE_CERTIFICATE)) {
             return CertificateFactory.getInstance("X.509").generateCertificate(certInputStream);
         }
     }

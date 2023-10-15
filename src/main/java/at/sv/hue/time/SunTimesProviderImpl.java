@@ -95,18 +95,18 @@ public final class SunTimesProviderImpl implements SunTimesProvider {
     @Override
     public String toDebugString(ZonedDateTime dateTime) {
         return "astronomical_dawn: " + format(getAstronomicalStart(dateTime)) +
-                "\nnautical_dawn: " + format(getNauticalStart(dateTime)) +
-                "\ncivil_dawn: " + format(getCivilStart(dateTime)) +
-                "\nsunrise: " + format(getSunrise(dateTime)) +
-                "\nnoon: " + format(getNoon(dateTime)) +
-                "\ngolden_hour: " + format(getGoldenHour(dateTime)) +
-                "\nsunset: " + format(getSunset(dateTime)) +
-                "\nblue_hour: " + format(getBlueHour(dateTime)) +
-                "\ncivil_dusk: " + format(getCivilEnd(dateTime)) +
-                "\nnight_hour: " + format(getNightHour(dateTime)) +
-                "\nnautical_dusk: " + format(getNauticalEnd(dateTime)) +
-                "\nastronomical_dusk: " + format(getAstronomicalEnd(dateTime)) +
-                "";
+               "\nnautical_dawn: " + format(getNauticalStart(dateTime)) +
+               "\ncivil_dawn: " + format(getCivilStart(dateTime)) +
+               "\nsunrise: " + format(getSunrise(dateTime)) +
+               "\nnoon: " + format(getNoon(dateTime)) +
+               "\ngolden_hour: " + format(getGoldenHour(dateTime)) +
+               "\nsunset: " + format(getSunset(dateTime)) +
+               "\nblue_hour: " + format(getBlueHour(dateTime)) +
+               "\ncivil_dusk: " + format(getCivilEnd(dateTime)) +
+               "\nnight_hour: " + format(getNightHour(dateTime)) +
+               "\nnautical_dusk: " + format(getNauticalEnd(dateTime)) +
+               "\nastronomical_dusk: " + format(getAstronomicalEnd(dateTime)) +
+               "";
     }
 
     private String format(ZonedDateTime time) {
