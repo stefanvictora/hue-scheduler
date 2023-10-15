@@ -609,12 +609,12 @@ class HueApiTest {
                   }
                 }""");
 
-        assertThat(api.getGroupId("Group 1")).isEqualTo("/groups/11");
-        assertThat(api.getGroupId("Group 2")).isEqualTo("/groups/789");
+        assertThat(getGroupId("Group 1")).isEqualTo("/groups/11");
+        assertThat(getGroupId("Group 2")).isEqualTo("/groups/789");
         verify(resourceProviderMock).getResource(any());
         api.clearCaches();
-        assertThat(api.getGroupId("Group 1")).isEqualTo("/groups/11");
-        assertThat(api.getGroupId("Group 1")).isEqualTo("/groups/11");
+        assertThat(getGroupId("Group 1")).isEqualTo("/groups/11");
+        assertThat(getGroupId("Group 1")).isEqualTo("/groups/11");
         verify(resourceProviderMock, times(2)).getResource(any());
     }
 
@@ -622,14 +622,14 @@ class HueApiTest {
     void getGroupId_unknownName_exception() {
         setGetResponse("/groups", "{}");
 
-        assertThrows(GroupNotFoundException.class, () -> api.getGroupId("Unknown Group"));
+        assertThrows(GroupNotFoundException.class, () -> getGroupId("Unknown Group"));
     }
 
     @Test
     void getGroupId_emptyResponse_exception() {
         setGetResponse("/groups", "");
 
-        assertThrows(ApiFailure.class, () -> api.getGroupId("Group"));
+        assertThrows(ApiFailure.class, () -> getGroupId("Group"));
     }
 
     @Test
@@ -1453,6 +1453,10 @@ class HueApiTest {
 
     private String getGroupName(String groupId) {
         return api.getGroupName(groupId);
+    }
+
+    private String getGroupId(String name) {
+        return api.getGroupId(name);
     }
 
     private void assertLightState(LightState lightState, LightState expected) {

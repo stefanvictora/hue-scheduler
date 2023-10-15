@@ -42,7 +42,7 @@ public final class HassEventStreamReader {
                 MDC.put("context", "events");
                 authenticate(webSocket);
                 subscribeToEvents(webSocket);
-                log.trace("HASS event stream handler opened");
+                log.trace("HASS event stream handler opened.");
             }
 
             @Override

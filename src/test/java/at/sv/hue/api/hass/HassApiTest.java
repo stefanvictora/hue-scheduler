@@ -246,6 +246,9 @@ public class HassApiTest {
 
         // Non unique names
         assertThatThrownBy(() -> api.getLightId("On Off")).isInstanceOf(NonUniqueNameException.class);
+
+        // Not a group
+        assertThatThrownBy(() -> api.getGroupId("Schreibtisch R")).isInstanceOf(GroupNotFoundException.class);
     }
 
     @Test

@@ -30,13 +30,13 @@ public final class HueEventHandler implements BackgroundEventHandler {
     @Override
     public void onOpen() {
         MDC.put("context", "events");
-        log.trace("Hue event stream handler opened");
+        log.trace("Hue event stream handler opened.");
     }
 
     @Override
     public void onClosed() {
         MDC.put("context", "events");
-        log.trace("Hue event stream handler closed");
+        log.trace("Hue event stream handler closed.");
     }
 
     @Override

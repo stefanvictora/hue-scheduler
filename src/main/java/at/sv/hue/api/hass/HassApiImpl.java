@@ -152,7 +152,11 @@ public class HassApiImpl implements HueApi {
 
     @Override
     public String getGroupId(String name) {
-        return getLightId(name);
+        State state = lookupStateByName(name);
+        if (isNoGroupState(state)) {
+            throw new GroupNotFoundException("No group with name '" + name + "' found");
+        }
+        return state.entity_id;
     }
 
     @Override
@@ -162,12 +166,16 @@ public class HassApiImpl implements HueApi {
 
     @Override
     public String getLightId(String name) {
+        return lookupStateByName(name).entity_id;
+    }
+
+    private State lookupStateByName(String name) {
         List<State> states = getOrLookupStatesByName(name);
         if (states.size() > 1) {
             throw new NonUniqueNameException("There are " + states.size() + " states with the given name '" + name + "'." +
                                              " Please use a unique ID instead.");
         }
-        return states.get(0).entity_id;
+        return states.get(0);
     }
 
     @Override
