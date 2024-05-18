@@ -73,7 +73,6 @@ public class HassApiImpl implements HueApi {
 
     @Override
     public List<LightState> getGroupStates(String id) {
-        assertSupportedStateType(id);
         List<String> groupLights = getGroupLights(id);
         Map<String, State> currentStates = lookupStates();
         return groupLights.stream()
@@ -128,7 +127,7 @@ public class HassApiImpl implements HueApi {
             groupLights.addAll(state.attributes.lights.stream()
                                                       .map(this::getNonGroupLightId)
                                                       .toList());
-        } else if (isHassGroup(state)) {
+        } else {
             groupLights.addAll(state.attributes.entity_id);
         }
 
@@ -140,7 +139,6 @@ public class HassApiImpl implements HueApi {
 
     @Override
     public List<String> getAssignedGroups(String lightId) {
-        assertSupportedStateType(lightId);
         String lightName = getLightName(lightId);
         return getOrLookupStates().values()
                                   .stream()
@@ -175,7 +173,7 @@ public class HassApiImpl implements HueApi {
             throw new NonUniqueNameException("There are " + states.size() + " states with the given name '" + name + "'." +
                                              " Please use a unique ID instead.");
         }
-        return states.get(0);
+        return states.getFirst();
     }
 
     @Override

@@ -1252,7 +1252,7 @@ public class HassApiTest {
     }
 
     @Test
-    void getGroupLights_emptyGroup_exception() {
+    void getGroupLights_hueGroup_emptyGroup_exception() {
         setGetResponse("/states", """
                 [
                   {
@@ -1408,7 +1408,7 @@ public class HassApiTest {
     }
 
     @Test
-    void getGroupStates_returnsStatesForContainedLights_doesNotUseCache() {
+    void getGroupStates_returnsStatesForContainedLights_doesNotUseCache_ignoresUnknownStates() {
         setGetResponse("/states", """
                 [
                   {
@@ -1450,7 +1450,8 @@ public class HassApiTest {
                       "entity_id": [
                         "light.schreibtisch_l",
                         "light.schreibtisch_r",
-                        "light.ignored"
+                        "light.ignored",
+                        "sensor.sun_next_setting"
                       ],
                       "icon": "mdi:lightbulb-group",
                       "friendly_name": "Test Group",
@@ -1561,7 +1562,23 @@ public class HassApiTest {
                       "parent_id": null,
                       "user_id": null
                     }
-                  }
+                  },
+                  {
+                     "entity_id": "sensor.sun_next_setting",
+                     "state": "2024-05-19T18:32:39+00:00",
+                     "attributes": {
+                         "device_class": "timestamp",
+                         "friendly_name": "Sun Next setting"
+                     },
+                     "last_changed": "2024-05-18T19:27:33.729389+00:00",
+                     "last_reported": "2024-05-18T19:27:33.729389+00:00",
+                     "last_updated": "2024-05-18T19:27:33.729389+00:00",
+                     "context": {
+                         "id": "123456789",
+                         "parent_id": null,
+                         "user_id": null
+                     }
+                   }
                 ]
                 """);
 
@@ -1605,132 +1622,205 @@ public class HassApiTest {
     void getAssignedGroups_returnsGroupIdsTheGivenLightIdIsContained() {
         setGetResponse("/states", """
                 [
-                  {
-                    "entity_id": "light.couch_group",
-                    "state": "on",
-                    "attributes": {
-                      "supported_color_modes": [
-                        "xy"
-                      ],
-                      "color_mode": "xy",
-                      "brightness": 255,
-                      "hs_color": [
-                        12.464,
-                        81.176
-                      ],
-                      "rgb_color": [
-                        255,
-                        91,
-                        48
-                      ],
-                      "xy_color": [
-                        0.6408,
-                        0.3284
-                      ],
-                      "is_hue_group": true,
-                      "hue_scenes": [
-                        "Gedimmt",
-                        "Nachtlicht",
-                        "Hell",
-                        "Frühlingsblüten",
-                        "Sonnenuntergang Savanne",
-                        "Tropendämmerung",
-                        "Nordlichter"
-                      ],
-                      "hue_type": "zone",
-                      "lights": [
-                        "Couch Light"
-                      ],
-                      "dynamics": false,
-                      "icon": "mdi:lightbulb-group",
-                      "friendly_name": "Couch",
-                      "supported_features": 40
+                    {
+                      "entity_id": "light.couch_group",
+                      "state": "on",
+                      "attributes": {
+                        "supported_color_modes": [
+                          "xy"
+                        ],
+                        "color_mode": "xy",
+                        "brightness": 255,
+                        "hs_color": [
+                          12.464,
+                          81.176
+                        ],
+                        "rgb_color": [
+                          255,
+                          91,
+                          48
+                        ],
+                        "xy_color": [
+                          0.6408,
+                          0.3284
+                        ],
+                        "is_hue_group": true,
+                        "hue_scenes": [
+                          "Gedimmt",
+                          "Nachtlicht",
+                          "Hell",
+                          "Frühlingsblüten",
+                          "Sonnenuntergang Savanne",
+                          "Tropendämmerung",
+                          "Nordlichter"
+                        ],
+                        "hue_type": "zone",
+                        "lights": [
+                          "Couch Light"
+                        ],
+                        "dynamics": false,
+                        "icon": "mdi:lightbulb-group",
+                        "friendly_name": "Couch",
+                        "supported_features": 40
+                      },
+                      "last_changed": "2023-09-24T14:06:34.783862+00:00",
+                      "last_updated": "2023-09-24T14:06:34.783862+00:00",
+                      "context": {
+                        "id": "123456789",
+                        "parent_id": null,
+                        "user_id": null
+                      }
                     },
-                    "last_changed": "2023-09-24T14:06:34.783862+00:00",
-                    "last_updated": "2023-09-24T14:06:34.783862+00:00",
-                    "context": {
-                      "id": "123456789",
-                      "parent_id": null,
-                      "user_id": null
-                    }
-                  },
-                  {
-                    "entity_id": "light.couch_group2",
-                    "state": "on",
-                    "attributes": {
-                      "min_color_temp_kelvin": 2000,
-                      "max_color_temp_kelvin": 6535,
-                      "min_mireds": 153,
-                      "max_mireds": 500,
-                      "effect_list": [
-                        "None",
-                        "candle",
-                        "fire",
-                        "unknown"
-                      ],
-                      "supported_color_modes": [
-                        "brightness",
-                        "color_temp",
-                        "xy"
-                      ],
-                      "color_mode": "brightness",
-                      "brightness": 255,
-                      "effect": "None",
-                      "entity_id": [
-                        "light.couch_light"
-                      ],
-                      "icon": "mdi:lightbulb-group",
-                      "friendly_name": "Couch",
-                      "supported_features": 44
+                    {
+                      "entity_id": "light.couch_group2",
+                      "state": "on",
+                      "attributes": {
+                        "min_color_temp_kelvin": 2000,
+                        "max_color_temp_kelvin": 6535,
+                        "min_mireds": 153,
+                        "max_mireds": 500,
+                        "effect_list": [
+                          "None",
+                          "candle",
+                          "fire",
+                          "unknown"
+                        ],
+                        "supported_color_modes": [
+                          "brightness",
+                          "color_temp",
+                          "xy"
+                        ],
+                        "color_mode": "brightness",
+                        "brightness": 255,
+                        "effect": "None",
+                        "entity_id": [
+                          "light.couch_light"
+                        ],
+                        "icon": "mdi:lightbulb-group",
+                        "friendly_name": "Couch",
+                        "supported_features": 44
+                      },
+                      "last_changed": "2023-09-24T14:06:35.260070+00:00",
+                      "last_updated": "2023-09-24T14:20:00.208887+00:00",
+                      "context": {
+                        "id": "123456789",
+                        "parent_id": null,
+                        "user_id": null
+                      }
                     },
-                    "last_changed": "2023-09-24T14:06:35.260070+00:00",
-                    "last_updated": "2023-09-24T14:20:00.208887+00:00",
-                    "context": {
-                      "id": "123456789",
-                      "parent_id": null,
-                      "user_id": null
-                    }
-                  },
-                  {
-                    "entity_id": "light.couch_light",
-                    "state": "on",
-                    "attributes": {
-                      "supported_color_modes": [
-                        "xy"
-                      ],
-                      "color_mode": "xy",
-                      "brightness": 245,
-                      "hs_color": [
-                        12.464,
-                        81.176
-                      ],
-                      "rgb_color": [
-                        255,
-                        91,
-                        48
-                      ],
-                      "xy_color": [
-                        0.6408,
-                        0.3284
-                      ],
-                      "mode": "normal",
-                      "dynamics": "none",
-                      "friendly_name": "Couch Light",
-                      "supported_features": 40
+                    {
+                      "entity_id": "light.another_group",
+                      "state": "on",
+                      "attributes": {
+                        "min_color_temp_kelvin": 2000,
+                        "max_color_temp_kelvin": 6535,
+                        "min_mireds": 153,
+                        "max_mireds": 500,
+                        "effect_list": [
+                          "None",
+                          "candle",
+                          "fire",
+                          "unknown"
+                        ],
+                        "supported_color_modes": [
+                          "brightness",
+                          "color_temp",
+                          "xy"
+                        ],
+                        "color_mode": "brightness",
+                        "brightness": 255,
+                        "effect": "None",
+                        "entity_id": [
+                          "light.another_light"
+                        ],
+                        "icon": "mdi:lightbulb-group",
+                        "friendly_name": "Another Group",
+                        "supported_features": 44
+                      },
+                      "last_changed": "2023-09-24T14:06:35.260070+00:00",
+                      "last_updated": "2023-09-24T14:20:00.208887+00:00",
+                      "context": {
+                        "id": "123456789",
+                        "parent_id": null,
+                        "user_id": null
+                      }
                     },
-                    "last_changed": "2023-09-24T14:50:55.040229+00:00",
-                    "last_updated": "2023-09-24T16:13:00.757488+00:00",
-                    "context": {
-                      "id": "01HB3ZECEN2DN594VKX5RFRQ5P",
-                      "parent_id": null,
-                      "user_id": null
+                    {
+                      "entity_id": "light.another_light",
+                      "state": "on",
+                      "attributes": {
+                        "supported_color_modes": [
+                          "xy"
+                        ],
+                        "color_mode": "xy",
+                        "brightness": 245,
+                        "hs_color": [
+                          12.464,
+                          81.176
+                        ],
+                        "rgb_color": [
+                          255,
+                          91,
+                          48
+                        ],
+                        "xy_color": [
+                          0.6408,
+                          0.3284
+                        ],
+                        "mode": "normal",
+                        "dynamics": "none",
+                        "friendly_name": "Another Light",
+                        "supported_features": 40
+                      },
+                      "last_changed": "2023-09-24T14:50:55.040229+00:00",
+                      "last_updated": "2023-09-24T16:13:00.757488+00:00",
+                      "context": {
+                        "id": "01HB3ZECEN2DN594VKX5RFRQ5P",
+                        "parent_id": null,
+                        "user_id": null
+                      }
+                    },
+                    {
+                      "entity_id": "light.couch_light",
+                      "state": "on",
+                      "attributes": {
+                        "supported_color_modes": [
+                          "xy"
+                        ],
+                        "color_mode": "xy",
+                        "brightness": 245,
+                        "hs_color": [
+                          12.464,
+                          81.176
+                        ],
+                        "rgb_color": [
+                          255,
+                          91,
+                          48
+                        ],
+                        "xy_color": [
+                          0.6408,
+                          0.3284
+                        ],
+                        "mode": "normal",
+                        "dynamics": "none",
+                        "friendly_name": "Couch Light",
+                        "supported_features": 40
+                      },
+                      "last_changed": "2023-09-24T14:50:55.040229+00:00",
+                      "last_updated": "2023-09-24T16:13:00.757488+00:00",
+                      "context": {
+                        "id": "01HB3ZECEN2DN594VKX5RFRQ5P",
+                        "parent_id": null,
+                        "user_id": null
+                      }
                     }
-                  }
-                ]
+                  ]
                 """);
 
         assertThat(api.getAssignedGroups("light.couch_light")).containsExactlyInAnyOrder("light.couch_group",
                 "light.couch_group2");
+        assertThat(api.getAssignedGroups("light.another_light")).containsExactlyInAnyOrder("light.another_group");
     }
 
     @Test
@@ -1756,6 +1846,28 @@ public class HassApiTest {
 
         verify(http).postResource(getUrl("/services/light/turn_on"),
                 "{\"entity_id\":\"light.id\",\"brightness\":255,\"xy_color\":[0.354,0.546]}");
+    }
+
+    @Test
+    void putState_turnOn_xy_missingY_ignoresColor() {
+        putState(PutCall.builder()
+                        .id("light.id")
+                        .bri(254)
+                        .x(0.354)); // y missing
+
+        verify(http).postResource(getUrl("/services/light/turn_on"),
+                "{\"entity_id\":\"light.id\",\"brightness\":255}");
+    }
+
+    @Test
+    void putState_turnOn_xy_missingX_ignoresColor() {
+        putState(PutCall.builder()
+                        .id("light.id")
+                        .bri(254)
+                        .y(0.546)); // x missing
+
+        verify(http).postResource(getUrl("/services/light/turn_on"),
+                "{\"entity_id\":\"light.id\",\"brightness\":255}");
     }
 
     @Test
