@@ -12,12 +12,12 @@ public final class SunTimesProviderImpl implements SunTimesProvider {
 
     private final double lat;
     private final double lng;
-    private final double height;
+    private final double elevation;
 
-    public SunTimesProviderImpl(double lat, double lng, double height) {
+    public SunTimesProviderImpl(double lat, double lng, double elevation) {
         this.lat = lat;
         this.lng = lng;
-        this.height = height;
+        this.elevation = elevation;
     }
 
     @Override
@@ -89,7 +89,7 @@ public final class SunTimesProviderImpl implements SunTimesProvider {
     }
 
     private SunTimes.Parameters getProviderFor(ZonedDateTime dateTime) {
-        return SunTimes.compute().at(lat, lng).height(height).on(dateTime.with(LocalTime.MIDNIGHT));
+        return SunTimes.compute().at(lat, lng).elevation(elevation).on(dateTime.with(LocalTime.MIDNIGHT));
     }
 
     @Override
