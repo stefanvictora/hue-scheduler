@@ -8,6 +8,9 @@ import com.launchdarkly.eventsource.background.BackgroundEventHandler;
 import okhttp3.OkHttpClient;
 import org.junit.jupiter.api.Test;
 
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -21,8 +24,9 @@ class HueEventStreamReaderIT {
                 .withHeader("hue-application-key", equalTo(apiKey))
                 .willReturn(aResponse()
                         .withHeader("Content-Type", "text/event-stream")
-                        .withBody("event:Test\ndata:Hello\n\n")));
+                        .withBody("id: 1716111309:0\ndata: Hello\n\n")));
 
+        CountDownLatch latch = new CountDownLatch(1);
         final boolean[] messageReceived = {false};
         String testHost = "localhost:" + info.getHttpsPort();
         OkHttpClient httpsClient = TestHttpsClientFactory.createTrustAllHttpsClient();
@@ -37,8 +41,9 @@ class HueEventStreamReaderIT {
 
             @Override
             public void onMessage(String event, MessageEvent messageEvent) {
-                if (event.equals("Test") && messageEvent.getData().equals("Hello")) {
+                if (messageEvent.getData().equals("Hello")) {
                     messageReceived[0] = true;
+                    latch.countDown();
                 }
             }
 
@@ -53,7 +58,8 @@ class HueEventStreamReaderIT {
 
         reader.start();
 
-        Thread.sleep(2000);
+        latch.await(3, TimeUnit.SECONDS);
+
         assertThat(messageReceived[0]).isTrue();
     }
 }
