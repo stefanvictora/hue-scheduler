@@ -59,7 +59,7 @@ class HueEventHandlerTest {
                   }
                 ]"""));
 
-        verify(lightEventListener).onLightOff("/lights/40", "69b2c6bd-48ff-4bab-9f06-37ccd9399f69");
+        verify(lightEventListener).onLightOff("/lights/40");
     }
 
     @Test
@@ -85,7 +85,7 @@ class HueEventHandlerTest {
                   }
                 ]"""));
 
-        verify(lightEventListener).onLightOff("/lights/40", "69b2c6bd-48ff-4bab-9f06-37ccd9399f69");
+        verify(lightEventListener).onLightOff("/lights/40");
     }
 
     @Test
@@ -111,7 +111,7 @@ class HueEventHandlerTest {
                   }
                 ]"""));
 
-        verify(lightEventListener).onLightOn("/lights/39", "60b2bafa-53f4-4062-9f58-253be813b349", true);
+        verify(lightEventListener).onLightOn("/lights/39", true);
     }
 
     @Test
@@ -172,7 +172,7 @@ class HueEventHandlerTest {
                   }
                 ]"""));
 
-        verify(lightEventListener).onLightOn("/lights/36", "d37eb9c4-d7eb-42ee-9a13-fa9148f8d403", false);
+        verify(lightEventListener).onLightOn("/lights/36", false);
     }
 
     @Test
@@ -200,7 +200,7 @@ class HueEventHandlerTest {
                   }
                 ]"""));
 
-        verify(lightEventListener).onLightOff("/lights/36", "d37eb9c4-d7eb-42ee-9a13-fa9148f8d403");
+        verify(lightEventListener).onLightOff("/lights/36");
     }
 
     @Test
@@ -243,7 +243,7 @@ class HueEventHandlerTest {
                   }
                 ]"""));
 
-        verify(lightEventListener).onLightOn("/groups/13", "560cd8f7-c498-4358-8dba-19734b4173f7", false);
+        verify(lightEventListener).onLightOn("/groups/13", false);
     }
 
     @Test
@@ -286,7 +286,7 @@ class HueEventHandlerTest {
                   }
                 ]"""));
 
-        verify(lightEventListener).onLightOff("/groups/13", "560cd8f7-c498-4358-8dba-19734b4173f7");
+        verify(lightEventListener).onLightOff("/groups/13");
     }
 
     @Test
@@ -358,8 +358,8 @@ class HueEventHandlerTest {
                   }
                 ]"""));
 
-        verify(lightEventListener).onLightOff("/lights/36", "d37eb9c4-d7eb-42ee-9a13-fa9148f8d403");
-        verify(lightEventListener).onLightOn("/lights/38", "db1d8ea4-d55d-47bd-b741-aa9d6ac0f0e7", false);
+        verify(lightEventListener).onLightOff("/lights/36");
+        verify(lightEventListener).onLightOn("/lights/38", false);
         verifyNoMoreInteractions(lightEventListener);
     }
 }

@@ -133,7 +133,7 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verify(eventListener).onLightOn("light.schreibtisch_r", null, false);
+        verify(eventListener).onLightOn("light.schreibtisch_r", false);
     }
 
     @Test
@@ -234,7 +234,7 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verify(eventListener).onLightOn("light.schreibtisch_r", null, true);
+        verify(eventListener).onLightOn("light.schreibtisch_r", true);
     }
 
     @Test
@@ -694,7 +694,7 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verify(eventListener).onLightOff("light.schreibtisch_l", null);
+        verify(eventListener).onLightOff("light.schreibtisch_l");
     }
 
     @Test
@@ -795,7 +795,7 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verify(eventListener).onLightOff("light.schreibtisch_l", null);
+        verify(eventListener).onLightOff("light.schreibtisch_l");
     }
 
     @Test

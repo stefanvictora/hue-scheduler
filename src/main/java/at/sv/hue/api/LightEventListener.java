@@ -1,9 +1,9 @@
 package at.sv.hue.api;
 
 public interface LightEventListener {
-    void onLightOff(String id, String uuid);
+    void onLightOff(String id);
 
-    void onLightOn(String id, String uuid, boolean physical);
+    void onLightOn(String id, boolean physical);
 
     void runWhenTurnedOn(String id, Runnable runnable);
 }

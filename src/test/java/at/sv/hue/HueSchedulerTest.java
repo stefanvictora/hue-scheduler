@@ -385,7 +385,7 @@ class HueSchedulerTest {
     }
 
     private void simulateLightOnEvent(String id) {
-        scheduler.getHueEventListener().onLightOn(id, null, false);
+        scheduler.getHueEventListener().onLightOn(id, false);
     }
 
     private ScheduledRunnable simulateLightOnEventExpectingSingleScheduledState() {
@@ -4573,7 +4573,7 @@ class HueSchedulerTest {
 
         ensureScheduledStates(0);
 
-        scheduler.getHueEventListener().onLightOn("/lights/" + lightId, null, true);
+        scheduler.getHueEventListener().onLightOn("/lights/" + lightId, true);
 
         ensureScheduledStates(3); // individual light, as well as contained groups are rescheduled
     }

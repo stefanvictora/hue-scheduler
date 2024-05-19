@@ -46,9 +46,9 @@ public final class HueEventHandler implements BackgroundEventHandler {
                           .flatMap(container -> container.getData().stream())
                           .forEach(hueEvent -> {
                               if (hueEvent.isLightOrGroup() && hueEvent.isOffEvent()) {
-                                  lightEventListener.onLightOff(hueEvent.getId_v1(), hueEvent.getId());
+                                  lightEventListener.onLightOff(hueEvent.getId_v1());
                               } else if (hueEvent.isLightOrGroup() && hueEvent.isOnEvent()) {
-                                  lightEventListener.onLightOn(hueEvent.getId_v1(), hueEvent.getId(), hueEvent.isPhysical());
+                                  lightEventListener.onLightOn(hueEvent.getId_v1(), hueEvent.isPhysical());
                               }
                           });
     }

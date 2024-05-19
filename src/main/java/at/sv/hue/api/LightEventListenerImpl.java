@@ -23,17 +23,17 @@ public class LightEventListenerImpl implements LightEventListener {
     }
 
     @Override
-    public void onLightOff(String id, String uuid) {
+    public void onLightOff(String id) {
         // currently not needed
     }
 
     @Override
-    public void onLightOn(String id, String uuid, boolean physical) {
+    public void onLightOn(String id, boolean physical) {
         if (physical) { // only lights can be turned on physically
             MDC.put("context", "on-event " + id);
             // if light has been physically turned on, we additionally signal to each group the light is assigned
             lightToGroupAssignmentLookup.apply(id)
-                                        .forEach(groupId -> onLightOn(groupId, null, false));
+                                        .forEach(groupId -> onLightOn(groupId, false));
         }
         MDC.put("context", "on-event " + id);
         manualOverrideTracker.onLightTurnedOn(id);
