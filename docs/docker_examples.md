@@ -10,7 +10,7 @@ services:
     container_name: hue-scheduler
     image: stefanvictora/hue-scheduler:0.10.0-SNAPSHOT
     environment:
-      - HOST=192.168.0.157
+      - API_HOST=192.168.0.157
       - ACCESS_TOKEN=1028d66426293e821ecfd9ef1a0731df
       - LAT=48.208731
       - LONG=16.372599
@@ -39,7 +39,7 @@ docker run -d `
   -v ${PWD}/input.txt:/config/input.txt:ro `
   -e log.level=DEBUG `
   stefanvictora/hue-scheduler:0.10.0 `
-  <HOST> <ACCESS_TOKEN> `
+  <API_HOST> <ACCESS_TOKEN> `
   --lat <LATITUDE> `
   --long <LONGITUDE> `
   --elevation <ELEVATION> `
@@ -54,7 +54,7 @@ docker run -d \
   -v $(pwd)/input.txt:/config/input.txt:ro \
   -e log.level=DEBUG \
   stefanvictora/hue-scheduler:0.10.0 \
-  <HOST> <ACCESS_TOKEN> \
+  <API_HOST> <ACCESS_TOKEN> \
   --lat <LATITUDE> \
   --long <LONGITUDE> \
   --elevation <ELEVATION> \

@@ -88,7 +88,7 @@ Hue Scheduler uses a simple text-based configuration format to define the behavi
 <Light/Group Name or ID>  <Start Time Expression>  [<Property>:<Value>]*
 ~~~
 
-**Light/Group Name or ID**: Define which light or group to control. Use names or IDs (e.g. `Couch`, `light.couch`). Multiple lights can be combined with a comma (`,`).
+**Light/Group Name or ID**: Define which light or group to control. Use names or IDs (e.g. `Couch' or `light.couch`). Multiple lights can be combined with a comma (`,`).
 
 **Start Time Expression**: Set either fixed times in 24-hour format (HH:mm:ss) (e.g. **`06:00`**, **`23:30:15`**) or solar times (e.g., **`sunrise`**, **`sunset`**). Adjust times relative to solar events in minutes (e.g., **`sunset-30`**).
 
@@ -172,7 +172,7 @@ To get started with Docker, follow these steps:
    ~~~
 
 > [!NOTE]
-> If your Raspberry Pi does not yet have Docker installed, please check out this [short guide](docs/docker_on_raspberrypi).
+> If your Raspberry Pi does not yet have Docker installed, please check out this [short guide](docs/docker_on_raspberrypi.md).
 
 ### Manually
 
