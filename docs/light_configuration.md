@@ -26,6 +26,9 @@ g2                                 civil_dusk  ct:2400
 
 **Numeric IDs** are only supported for Philips Hue bridges. You can look them up by manually sending a GET request to either the `/api/<username>/lights` or `/api/<username>/groups` endpoint of your bridge. The response will contain a list of all your lights and groups in your system. For Hue Scheduler to distinguish between light and group IDs, group IDs must be prefixed with the lowercase letter `g`.
 
+> [!NOTE]
+> If you have a group and light with the same name, Hue Scheduler prefers the group. Use IDs instead if you want to change this behavior.
+
 **Home Assistant** example:
 
 ~~~yacas
@@ -41,9 +44,6 @@ Hue Scheduler currently supports the following Home Assistant entity types:
 * `input_boolean`
 * `switch`
 * `fan`
-
-> [!NOTE]
-> If you have a group and light with the same name, Hue Scheduler prefers the group. Use IDs instead if you want to change this behavior.
 
 ## `<Start Time Expression>`
 

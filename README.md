@@ -10,9 +10,9 @@
 
 ## Introduction
 
-Hue Scheduler goes beyond basic automation solutions like Adaptive Lighting by providing comprehensive control over brightness, color temperature, color, power state, and custom interpolations between solar and absolute times. Designed to accommodate dumb wall switches, Hue Scheduler reschedules light states until they're reachable, ensuring consistent results even when lights are physically turned off. With version 0.10.0, Hue Scheduler is fully [dockerized](https://hub.docker.com/r/stefanvictora/hue-scheduler) for a faster setup.
+**New in Version 0.10.0**: **Full support for the Home Assistant REST and WebSocket APIs** :partying_face: Control even more devices in your home with Hue Scheduler.
 
-**New in Version 0.10.0**: **Full support for the Home Assistant REST and WebSocket APIs** :partying_face:. Control even more devices in your home with Hue Scheduler.
+Hue Scheduler goes beyond basic automation solutions like Adaptive Lighting by providing comprehensive control over brightness, color temperature, color, power state, and custom interpolations between solar and absolute times. Specifically designed to work with dumb wall switches, Hue Scheduler adjusts light states as soon as they're reachable, ensuring consistent results even when lights are physically turned off.
 
 ## Demo
 
@@ -23,9 +23,9 @@ Hue Scheduler allows you to configure your smart lights with a simple, text-base
 #### Daily Routines: Sun-Based Brightness & Color Temperature
 ~~~yacas
 # Office Lighting
-Office        sunrise     bri:100%  ct:6500  tr:5s                     
-Office	      sunrise+90            ct:5000  tr-before:20min           
-Office        sunset      bri:80%   ct:3000  tr-before:20min
+Office  sunrise     bri:100%  ct:6500  tr:5s                     
+Office  sunrise+90            ct:5000  tr-before:20min           
+Office  sunset      bri:80%   ct:3000  tr-before:20min
 ~~~
 
 In this example, the lights in your office adjust dynamically based on the sun's position, each with a smooth transition:
@@ -34,16 +34,16 @@ In this example, the lights in your office adjust dynamically based on the sun's
 - **90 Minutes After Sunrise**: Transition to a more neutral white (5000K).
 - **Sunset**: Lights dim slightly and warm up to a cozier tone (3000K).
 
-Note: Hue Scheduler does not automatically turn on your lights (unless explicitly specified with `on:true`), allowing you to maintain control while Hue Scheduler handles all the adjustments when the lights are manually turned on.
+Note: Hue Scheduler does not automatically turn on your lights (unless explicitly specified with `on:true`), allowing you to maintain control while Hue Scheduler handles all the adjustments once they are turned on.
 
 #### Dynamic Lighting: Smooth Transitions & Interpolations
     
 ~~~yacas
-Home          sunrise      bri:100%  ct:6500             tr-before:civil_dawn
-Home          noon         bri:100%  ct:5000             interpolate:true
-Home          sunset       bri:80%   ct:3000             tr-before:golden_hour+10
-Home          civil_dusk   bri:40%   ct:2000             interpolate:true
-Home          00:00        bri:20%   x:0.6024  y:0.3433  interpolate:true
+Home  sunrise     bri:100%  ct:6500             tr-before:civil_dawn
+Home  noon        bri:100%  ct:5000             interpolate:true
+Home  sunset      bri:80%   ct:3000             tr-before:golden_hour+10
+Home  civil_dusk  bri:40%   ct:2000             interpolate:true
+Home  00:00       bri:20%   x:0.6024  y:0.3433  interpolate:true
 ~~~
 
 This configuration creates smooth and continuous transitions throughout the day:
@@ -52,7 +52,7 @@ This configuration creates smooth and continuous transitions throughout the day:
 - **Sunrise to Noon**: Maintain brightness but continuously shift to a neutral white (5000K).
 - **Golden Hour to Sunset**: Slightly reduce brightness and mimic golden hour (3000K).
 - **Sunset to Civil Dusk**: Gradually dim and warm up (2000K).
-- **Civil Dusk to Midnight**: Dim to a low brightness (20%) with a specific color defined by x and y coordinates.
+- **Civil Dusk to Midnight**: Dim to a low brightness (20%) with a typ of red defined by x and y coordinates.
 
 #### Power Management: Manage On/Off States on Specific Weekdays
 
@@ -71,18 +71,18 @@ This setup manages power states based on time and weekdays:
 
 ~~~yacas
 # Living Room and Kitchen Lighting
-Living room   22:00       bri:100%  sat:150  effect:multi_colorloop  days:Fr,Sa
-Kitchen       22:00       color:#00835C                              days:Sa
+Living room  22:00  bri:100%  sat:150  effect:multi_colorloop  days:Fr,Sa
+Kitchen      22:00  color:#00835C                              days:Sa
 ~~~
 
 Enhance mood and ambiance with color effects:
 
-- **Living Room (Friday and Saturday)**: At 10:00 PM, set brightness to 100%, saturation to 150, and enable a multi-color loop effect.
-- **Kitchen (Saturday)**: At 10:00 PM, change the color to a specific shade of green (#00835C).
+- **Living Room**: At 22:00, set brightness to 100%, saturation to 150, and enable a multicolor loop effect.
+- **Kitchen**: At 22:00, change the color to a specific shade of green (#00835C).
 
 ### How It Works
 
-Hue Scheduler uses a simple text-based configuration format to define the behavior of your lights. Here’s a summary of the three key components:
+Hue Scheduler uses a simple text-based configuration format to define the behavior of your lights. Here’s a summary of the three key parts:
 
 ~~~yacas
 <Light/Group Name or ID>  <Start Time Expression>  [<Property>:<Value>]*
@@ -98,12 +98,12 @@ Hue Scheduler uses a simple text-based configuration format to define the behavi
     - **`bri`** (brightness): e.g., **`bri:100%`**
     - **`ct`** (color temperature): e.g., **`ct:6500`**, **`ct:153`**
     - **`on`** (on/off state): e.g., **`on:true`**
-    - **`days`** (specific days of the week): e.g., **`days:Mo-Fr`**
+    - **`days`** (specific days of the week): e.g., **`days:Mo-Fr`**, **`days:Tu,We`** 
 - **Color**:
     - **`color`** (hex or rgb): e.g., **`color:#3CD0E2`**, **``color:60, 208, 226``**
     - **`hue`** (color value): e.g., **`hue:2000`**
     - **`sat`** (saturation): e.g., **`sat:150`**, **`sat:70%`** 
-    - **`effect`** (color loop): e.g., **`effect:multi_colorloop`**, **`effect:none`**
+    - **`effect`** (color loop): e.g., **`effect:multi_colorloop`**, **`effect:colorloop`**, **`effect:none`**
 - **Advanced**:
     - **`x`** and **`y`** (CIE color space coordinates): e.g., **`x:0.6024 y:0.3433`**
     - **`force`** (ignore user modifications): e.g., **`force:true`**
@@ -115,7 +115,7 @@ Hue Scheduler uses a simple text-based configuration format to define the behavi
 If lights are turned on midway through a scheduled change, Hue Scheduler calculates the appropriate mid-transition state to continue the transition seamlessly. Additionally, any manual changes to your lights will temporarily suspend the schedule until they are turned off and on again.
 
 > [!TIP]
-> For more detailed information, including handling special cases and advanced properties, visit the [light configuration documentation](docs/light_configuration.md).
+> For more detailed information, including handling special cases and advanced properties, visit the [full light configuration documentation](docs/light_configuration.md).
 
 ## Prerequisites
 
