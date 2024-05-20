@@ -13,6 +13,7 @@ import at.sv.hue.api.ManualOverrideTrackerImpl;
 import at.sv.hue.api.PutCall;
 import at.sv.hue.api.RateLimiter;
 import at.sv.hue.api.hass.HassApiImpl;
+import at.sv.hue.api.hass.HassApiUtils;
 import at.sv.hue.api.hass.HassEventHandler;
 import at.sv.hue.api.hass.HassEventStreamReader;
 import at.sv.hue.api.hue.HueApiImpl;
@@ -58,36 +59,55 @@ public final class HueScheduler implements Runnable {
     private static final Logger LOG = LoggerFactory.getLogger(HueScheduler.class);
 
     private final Map<String, List<ScheduledState>> lightStates;
-    @Parameters(description = "The IP address of your Philips Hue Bridge or hostname of your HASS instance.")
-    String host;
-    @Parameters(description = "The Philips Hue Bridge username or HASS Bearer token used for authentication.")
-    String key;
-    @Parameters(paramLabel = "FILE", description = "The configuration file containing your schedules.")
-    Path inputFile;
-    @Option(names = "--lat", required = true, description = "The latitude of your location.")
+    @Parameters(
+            defaultValue = "${env:API_HOST}",
+            description = "The host for your Philips Hue Bridge or origin (i.e. scheme, host, port) for your Home Assistant instance. " +
+                          "Examples: Philips Hue e.g. 192.168.0.157; " +
+                          "Home Assistant e.g. http://localhost:8123, or https://UNIQUE_ID.ui.nabu.casa")
+    String apiHost;
+    @Parameters(
+            defaultValue = "${env:ACCESS_TOKEN}",
+            description = "The Philips Hue Bridge or Home Assistant access token used for authentication.")
+    String accessToken;
+    @Parameters(paramLabel = "CONFIG_FILE",
+            defaultValue = "${env:CONFIG_FILE}",
+            description = "The configuration file containing your schedules.")
+    Path configFile;
+    @Option(names = "--lat", required = true,
+            defaultValue = "${env:LAT}",
+            description = "The latitude of your location.")
     double latitude;
-    @Option(names = "--long", required = true, description = "The longitude of your location.")
+    @Option(names = "--long", required = true,
+            defaultValue = "${env:LONG}",
+            description = "The longitude of your location.")
     double longitude;
-    @Option(names = "--elevation", defaultValue = "0.0", description = "The optional elevation (in meters) of your location, " +
-                                                                       "used to provide more accurate sunrise and sunset times.")
+    @Option(names = "--elevation", paramLabel = "<meters>",
+            defaultValue = "${env:ELEVATION:-0.0}",
+            description = "The optional elevation (in meters) of your location, " +
+                          "used to provide more accurate sunrise and sunset times.")
     double elevation;
-    @Option(names = "--max-requests-per-second", paramLabel = "<requests>", defaultValue = "10.0",
+    @Option(names = "--max-requests-per-second", paramLabel = "<requests>",
+            defaultValue = "${env:MAX_REQUESTS_PER_SECOND:-10.0}",
             description = "The maximum number of PUT API requests to perform per second. Default and recommended: " +
                           "${DEFAULT-VALUE} requests per second.")
     double requestsPerSecond;
-    @Option(names = "--control-group-lights-individually", defaultValue = "false",
+    @Option(names = "--control-group-lights-individually",
+            defaultValue = "${env:CONTROL_GROUP_LIGHTS_INDIVIDUALLY:-false}",
             description = "Experimental: If the lights in a group should be controlled individually instead of using broadcast messages." +
                           " This might improve performance. Default: ${DEFAULT-VALUE}")
     boolean controlGroupLightsIndividually;
-    @Option(names = "--disable-user-modification-tracking", defaultValue = "false",
+    @Option(names = "--disable-user-modification-tracking",
+            defaultValue = "${env:DISABLE_USER_MODIFICATION_TRACKING:-false}",
             description = "Globally disable tracking of user modifications which would pause their schedules until they are turned off and on again." +
                           " Default: ${DEFAULT-VALUE}")
     boolean disableUserModificationTracking;
-    @Option(names = "--interpolate-all", defaultValue = "false",
+    @Option(names = "--interpolate-all",
+            defaultValue = "${env:INTERPOLATE_ALL:-false}",
             description = "Globally sets 'interpolate:true' for all states, unless explicitly set otherwise." +
                           " Default: ${DEFAULT-VALUE}")
     private boolean interpolateAll;
-    @Option(names = "--default-interpolation-transition-time", paramLabel = "<tr>", defaultValue = "4",
+    @Option(names = "--default-interpolation-transition-time", paramLabel = "<tr>",
+            defaultValue = "${env:DEFAULT_INTERPOLATION_TRANSITION_TIME:-4}",
             description = "The default transition time defined as a multiple of 100ms used for the interpolated call" +
                           " when turning a light on during a tr-before transition. Default: ${DEFAULT-VALUE} (=400 ms)." +
                           " You can also use, e.g., 2s for convenience.")
@@ -96,30 +116,36 @@ public final class HueScheduler implements Runnable {
      * The converted transition time as a multiple of 100ms.
      */
     Integer defaultInterpolationTransitionTime = 4;
-    @Option(names = "--power-on-reschedule-delay", paramLabel = "<delay>", defaultValue = "150",
+    @Option(names = "--power-on-reschedule-delay", paramLabel = "<delay>",
+            defaultValue = "${env:POWER_ON_RESCHEDULE_DELAY:-150}",
             description = "The delay in ms after the light on-event was received and the current state should be " +
                           "rescheduled again. Default: ${DEFAULT-VALUE} ms.")
     int powerOnRescheduleDelayInMs;
-    @Option(names = "--bridge-failure-retry-delay", paramLabel = "<delay>", defaultValue = "10",
+    @Option(names = "--bridge-failure-retry-delay", paramLabel = "<delay>",
+            defaultValue = "${env:BRIDGE_FAILURE_RETRY_DELAY:-10}",
             description = "The delay in seconds for retrying an API call, if the bridge could not be reached due to " +
                           "network failure, or if it returned an API error code. Default: ${DEFAULT-VALUE} seconds.")
     int bridgeFailureRetryDelayInSeconds;
-    @Option(names = "--multi-color-adjustment-delay", paramLabel = "<delay>", defaultValue = "4",
+    @Option(names = "--multi-color-adjustment-delay", paramLabel = "<delay>",
+            defaultValue = "${env:MULTI_COLOR_ADJUSTMENT_DELAY:-4}",
             description = "The adjustment delay in seconds for each light in a group when using the multi_color effect." +
                           " Adjust to change the hue values of 'neighboring' lights. Default: ${DEFAULT-VALUE} seconds.")
     int multiColorAdjustmentDelay;
-    @Option(names = "--event-stream-read-timeout", paramLabel = "<timout>", defaultValue = "120",
+    @Option(names = "--event-stream-read-timeout", paramLabel = "<timout>",
+            defaultValue = "${env:EVENT_STREAM_READ_TIMEOUT:-120}",
             description = "The read timeout of the API v2 SSE event stream in minutes. " +
                           "The connection is automatically restored after a timeout. Default: ${DEFAULT-VALUE} minutes.")
     int eventStreamReadTimeoutInMinutes;
     @Option(
-            names = "--api-cache-invalidation-interval", paramLabel = "<interval>", defaultValue = "15",
+            names = "--api-cache-invalidation-interval", paramLabel = "<interval>",
+            defaultValue = "${env:API_CACHE_INVALIDATION_INTERVAL:-15}",
             description = "The interval in which the api cache for groups and lights should be invalidated. " +
                           "Default: ${DEFAULT-VALUE} minutes."
     )
     int apiCacheInvalidationIntervalInMinutes;
     @Option(
-            names = "--min-tr-before-gap", paramLabel = "<gap>", defaultValue = "3",
+            names = "--min-tr-before-gap", paramLabel = "<gap>",
+            defaultValue = "${env:MIN_TR_BEFORE_GAP:-3}",
             description = "The minimum gap between multiple back-to-back tr-before states in minutes. This is needed as otherwise " +
                           "the hue bridge may not yet recognise the end value of the transition and incorrectly marks " +
                           "the light as manually overridden. This gap is automatically added between back-to-back " +
@@ -178,29 +204,40 @@ public final class HueScheduler implements Runnable {
         }
     }
 
-    @Command(name = "hass")
-    public void hass(@Option(names = "--port", description = "The port of your HASS instance", defaultValue = "8123") String port) {
+    /**
+     * The main entry point for the command line. Creating the necessary api clients for either Hue or Home Assistant.
+     */
+    @Override
+    public void run() {
         MDC.put("context", "init");
+        if (HassApiUtils.isHassConnection(accessToken)) {
+            setupHassApi();
+        } else {
+            setupHueApi();
+        }
+        createAndStart();
+    }
+
+    private void setupHassApi() {
         OkHttpClient httpClient = new OkHttpClient.Builder()
                 .addInterceptor(chain -> {
                     Request request = chain.request().newBuilder()
-                                           .header("Authorization", "Bearer " + key)
+                                           .header("Authorization", "Bearer " + accessToken)
                                            .build();
                     return chain.proceed(request);
                 })
                 .build();
-        api = new HassApiImpl(new HttpResourceProviderImpl(httpClient), host, port, RateLimiter.create(requestsPerSecond));
-        new HassEventStreamReader(host, port, key, httpClient, new HassEventHandler(lightEventListener)).start();
-        createAndStart();
+        RateLimiter rateLimiter = RateLimiter.create(requestsPerSecond);
+        api = new HassApiImpl(apiHost, new HttpResourceProviderImpl(httpClient), rateLimiter);
+        new HassEventStreamReader(HassApiUtils.getHassWebsocketOrigin(apiHost), accessToken, httpClient,
+                new HassEventHandler(lightEventListener)).start();
     }
 
-    @Override
-    public void run() {
-        MDC.put("context", "init");
-        OkHttpClient httpsClient = createHttpsClient();
-        api = new HueApiImpl(new HttpResourceProviderImpl(httpsClient), host, key, RateLimiter.create(requestsPerSecond));
-        new HueEventStreamReader(host, key, httpsClient, new HueEventHandler(lightEventListener), eventStreamReadTimeoutInMinutes).start();
-        createAndStart();
+    private void setupHueApi() {
+        OkHttpClient httpsClient = createHueHttpsClient();
+        RateLimiter rateLimiter = RateLimiter.create(requestsPerSecond);
+        api = new HueApiImpl(new HttpResourceProviderImpl(httpsClient), apiHost, accessToken, rateLimiter);
+        new HueEventStreamReader(apiHost, accessToken, httpsClient, new HueEventHandler(lightEventListener), eventStreamReadTimeoutInMinutes).start();
     }
 
     private void createAndStart() {
@@ -212,9 +249,9 @@ public final class HueScheduler implements Runnable {
         assertConnectionAndStart();
     }
 
-    private OkHttpClient createHttpsClient() {
+    private OkHttpClient createHueHttpsClient() {
         try {
-            return HueHttpsClientFactory.createHttpsClient(host);
+            return HueHttpsClientFactory.createHttpsClient(apiHost);
         } catch (Exception e) {
             System.err.println("Failed to create https client: " + e.getLocalizedMessage());
             System.exit(1);
@@ -231,8 +268,8 @@ public final class HueScheduler implements Runnable {
     }
 
     private void assertInputIsReadable() {
-        if (!Files.isReadable(inputFile)) {
-            System.err.println("Given input file '" + inputFile.toAbsolutePath() + "' does not exist or is not readable!");
+        if (!Files.isReadable(configFile)) {
+            System.err.println("Given config file '" + configFile.toAbsolutePath() + "' does not exist or is not readable!");
             System.exit(1);
         }
     }
@@ -249,7 +286,7 @@ public final class HueScheduler implements Runnable {
     private boolean assertConnection() {
         try {
             api.assertConnection();
-            LOG.info("Connected to bridge at {}.", host);
+            LOG.info("Connected to bridge at {}.", apiHost);
         } catch (BridgeConnectionFailure e) {
             LOG.warn("Bridge not reachable: '{}'. Retrying in 5s.", e.getCause().getLocalizedMessage());
             return false;
@@ -263,7 +300,7 @@ public final class HueScheduler implements Runnable {
 
     private void parseInput() {
         try {
-            Files.lines(inputFile)
+            Files.lines(configFile)
                  .filter(s -> !s.isEmpty())
                  .filter(s -> !s.startsWith("//") && !s.startsWith("#"))
                  .forEachOrdered(input -> {

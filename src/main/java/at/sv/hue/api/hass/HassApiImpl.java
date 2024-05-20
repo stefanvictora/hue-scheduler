@@ -37,7 +37,7 @@ public class HassApiImpl implements HueApi {
     private final HttpResourceProvider httpResourceProvider;
     private final RateLimiter rateLimiter;
     private final ObjectMapper mapper;
-    private final String baseApi;
+    private final String baseUrl;
 
     private final Object lightMapLock = new Object();
     private Map<String, State> availableStates;
@@ -45,13 +45,13 @@ public class HassApiImpl implements HueApi {
     private Map<String, List<State>> nameToStatesMap;
     private boolean nameToStatesMapInvalidated;
 
-    public HassApiImpl(HttpResourceProvider httpResourceProvider, String hostname, String port, RateLimiter rateLimiter) {
+    public HassApiImpl(String origin, HttpResourceProvider httpResourceProvider, RateLimiter rateLimiter) {
+        baseUrl = origin + "/api";
         this.httpResourceProvider = httpResourceProvider;
         this.rateLimiter = rateLimiter;
         mapper = new ObjectMapper();
         mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
-        baseApi = "http://" + hostname + ":" + port + "/api"; // todo: allow other schemas
     }
 
     @Override
@@ -248,7 +248,7 @@ public class HassApiImpl implements HueApi {
 
     private URL createUrl(String url) {
         try {
-            return new URI(baseApi + url).toURL();
+            return new URI(baseUrl + url).toURL();
         } catch (MalformedURLException | URISyntaxException e) {
             throw new IllegalArgumentException("Failed to construct API url", e);
         }

@@ -33,12 +33,8 @@ public class HassApiTest {
 
     @BeforeEach
     void setUp() {
-        String ip = "localhost";
-        String port = "8123";
         http = Mockito.mock(HttpResourceProvider.class);
-        api = new HassApiImpl(http, ip, port, permits -> {
-        });
-        baseUrl = "http://" + ip + ":" + port + "/api";
+        setupApi("http://localhost:8123");
     }
 
     @Test
@@ -1837,6 +1833,20 @@ public class HassApiTest {
     }
 
     @Test
+    void putState_supportsOtherOrigin() {
+        setupApi("https://123456789.ui.nabu.casa");
+
+        putState(PutCall.builder()
+                        .id("light.id")
+                        .bri(254)
+                        .x(0.354)
+                        .y(0.546));
+
+        verify(http).postResource(getUrl("/services/light/turn_on"),
+                "{\"entity_id\":\"light.id\",\"brightness\":255,\"xy_color\":[0.354,0.546]}");
+    }
+
+    @Test
     void putState_turnOn_xy_color() {
         putState(PutCall.builder()
                         .id("light.id")
@@ -2003,6 +2013,12 @@ public class HassApiTest {
 
         assertThat(api.isLightOff("light.on_off")).isTrue();
         assertThat(api.isGroupOff("light.on_off")).isTrue();
+    }
+
+    private void setupApi(String origin) {
+        api = new HassApiImpl(origin, http, permits -> {
+        });
+        baseUrl = origin + "/api";
     }
 
     private void setGetResponse(String expectedUrl, @Language("JSON") String response) {

@@ -39,12 +39,12 @@ class HueApiTest {
 
     @BeforeEach
     void setUp() {
-        String ip = "localhost";
-        String username = "username";
+        String host = "localhost";
+        String accessToken = "token";
         resourceProviderMock = Mockito.mock(HttpResourceProvider.class);
-        api = new HueApiImpl(resourceProviderMock, ip, username, permits -> {
+        api = new HueApiImpl(resourceProviderMock, host, accessToken, permits -> {
         });
-        baseUrl = "https://" + ip + "/api/" + username;
+        baseUrl = "https://" + host + "/api/" + accessToken;
     }
 
     @Test

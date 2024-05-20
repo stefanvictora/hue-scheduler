@@ -51,12 +51,12 @@ public final class HueApiImpl implements HueApi {
     private Map<String, String> groupNameToIdMap;
     private boolean groupNameToIdMapInvalidated;
 
-    public HueApiImpl(HttpResourceProvider resourceProvider, String ip, String username, RateLimiter rateLimiter) {
+    public HueApiImpl(HttpResourceProvider resourceProvider, String host, String accessToken, RateLimiter rateLimiter) {
         this.resourceProvider = resourceProvider;
         mapper = new ObjectMapper();
         mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
-        baseApi = "https://" + ip + "/api/" + username;
+        baseApi = "https://" + host + "/api/" + accessToken;
         this.rateLimiter = rateLimiter;
     }
 

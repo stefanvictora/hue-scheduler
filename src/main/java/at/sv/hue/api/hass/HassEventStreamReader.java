@@ -15,34 +15,31 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 public final class HassEventStreamReader {
 
-    private final String hostname;
-    private final String port;
-    private final String token;
+    private final String origin;
+    private final String accessToken;
     private final OkHttpClient client;
     private final HassEventHandler hassEventHandler;
     private int messageIdCounter = 1;
 
-    public HassEventStreamReader(String hostname, String port, String token, OkHttpClient client, HassEventHandler hassEventHandler) {
-        this.hostname = hostname;
-        this.port = port;
-        this.token = token;
+    public HassEventStreamReader(String origin, String accessToken, OkHttpClient client, HassEventHandler hassEventHandler) {
+        this.origin = origin;
+        this.accessToken = accessToken;
         this.client = client.newBuilder()
                 .retryOnConnectionFailure(true)
                 .pingInterval(30, TimeUnit.SECONDS)
                 .build();
         this.hassEventHandler = hassEventHandler;
-
     }
 
     public void start() {
-        Request request = new Request.Builder().url("ws://" + hostname + ":" + port + "/api/websocket").build();
+        Request request = new Request.Builder().url(origin + "/api/websocket").build();
         client.newWebSocket(request, new WebSocketListener() {
             @Override
             public void onOpen(@NotNull WebSocket webSocket, @NotNull Response response) {
                 MDC.put("context", "events");
                 authenticate(webSocket);
                 subscribeToEvents(webSocket);
-                log.trace("HASS event stream handler opened.");
+                log.trace("HA event stream handler opened.");
             }
 
             @Override
@@ -59,14 +56,14 @@ public final class HassEventStreamReader {
             @Override
             public void onFailure(@NotNull WebSocket webSocket, @NotNull Throwable t, @Nullable Response response) {
                 MDC.put("context", "events");
-                log.error("HASS event stream failed", t);
+                log.error("HA event stream failed", t);
                 start();
             }
         });
     }
 
     private void authenticate(WebSocket webSocket) {
-        String authMessage = String.format("{\"type\": \"auth\", \"access_token\": \"%s\"}", token);
+        String authMessage = String.format("{\"type\": \"auth\", \"access_token\": \"%s\"}", accessToken);
         webSocket.send(authMessage);
     }
 
