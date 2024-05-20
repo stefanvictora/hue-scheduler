@@ -21,8 +21,8 @@
 - **Documentation Update**: Restructured the README for better readability. Extracted detailed documentation into separate files:
   - [Light Configuration](docs/light_configuration)
   - [Philips Hue Authentication](docs/philips_hue_authentication.md)
-  - [Advanced Command Line Options](docs/advanced_options.md)
-  - [Docker on Raspberry Pi](docs/docker_raspberrypi.md)
+  - [Advanced Command Line Options](docs/advanced_command_line_options)
+  - [Docker on Raspberry Pi](docs/docker_on_raspberrypi)
   - [Docker Examples](docs/docker_examples.md)
 
 

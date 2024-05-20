@@ -34,8 +34,7 @@ In this example, the lights in your office adjust dynamically based on the sun's
 - **90 Minutes After Sunrise**: Transition to a more neutral white (5000K).
 - **Sunset**: Lights dim slightly and warm up to a cozier tone (3000K).
 
-> [!NOTE]
-> Hue Scheduler does not automatically turn on your lights (unless explicitly specified with `on:true`), allowing you to maintain control while Hue Scheduler handles all the adjustments when the lights are manually turned on.
+Note: Hue Scheduler does not automatically turn on your lights (unless explicitly specified with `on:true`), allowing you to maintain control while Hue Scheduler handles all the adjustments when the lights are manually turned on.
 
 #### Dynamic Lighting: Smooth Transitions & Interpolations
     
@@ -172,8 +171,8 @@ To get started with Docker, follow these steps:
    docker compose start
    ~~~
 
-> [!TIP]
-> If your Raspberry Pi does not yet have Docker installed, please check out this [short guide](docs/docker_raspberrypi.md).
+> [!NOTE]
+> If your Raspberry Pi does not yet have Docker installed, please check out this [short guide](docs/docker_on_raspberrypi).
 
 ### Manually
 
@@ -214,7 +213,7 @@ Provide your approximate location and optional elevation to allow Hue Scheduler 
 Specify the configuration file that tells Hue Scheduler how to control the lights in your home. Use the text-based file format described in detail in the [configuration documentation](docs/light_configuration).
 
 > [!NOTE]   
-> For additional configuration options, see the [list of advanced command line options](docs/advanced_options.md).
+> For additional configuration options, see the [list of advanced command line options](docs/advanced_command_line_options).
 
 ## FAQ
 
@@ -234,7 +233,7 @@ Both Adaptive Lighting and Hue Scheduler aim to automate the state of your light
 
 ### Does Hue Scheduler access the Internet?
 
-Hue Scheduler does not access the Internet unless you explicitly connect to a cloud-hosted Home Assistant instance. You can see exactly which REST requests Hue Scheduler sends to your devices by setting the `-Dlog.level=TRACE` JVM parameter or `log.level=TRACE` environment variable. See [Advanced Command Line Options](docs/advanced_options.md). The dynamic solar times are calculated locally using the [shred/commons-suncalc](https://github.com/shred/commons-suncalc) library, with no location data ever leaving your device.
+Hue Scheduler does not access the Internet unless you explicitly connect to a cloud-hosted Home Assistant instance. You can see exactly which REST requests Hue Scheduler sends to your devices by setting the `-Dlog.level=TRACE` JVM parameter or `log.level=TRACE` environment variable. See [Advanced Command Line Options](docs/advanced_command_line_options). The dynamic solar times are calculated locally using the [shred/commons-suncalc](https://github.com/shred/commons-suncalc) library, with no location data ever leaving your device.
 
 ### Does Hue Scheduler work with motion sensors?
 

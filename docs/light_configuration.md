@@ -111,8 +111,7 @@ Specify properties to control the state of your lights during the given interval
 
 - ``on``: Modifies the **on state** of the light: [``true``|``false``]. Hue Scheduler does not modify a light's on state unless explicitly specified. If a light is off or unreachable, Hue Scheduler waits until the light is turned on or reachable again.
 
-  > [!NOTE]  
-  > To smoothly turn on a light using a transition, specify another property like brightness or color temperature. Otherwise, the light will turn on immediately with the previous or default light state, ignoring the defined transition time. This is not an issue when turning the lights off.
+  > Note: To smoothly turn on a light using a transition, specify another property like brightness or color temperature. Otherwise, the light will turn on immediately with the previous or default light state, ignoring the defined transition time. This is not an issue when turning the lights off.
 
 - `days`: Defines the **days of the week** when the state is active. Supported values: [`Mo|Mon` | `Tu|Tue|Di` | `We|Wen|Mi` | `Th|Thu|Do` | `Fr|Fri` | `Sa|Sat` | `Su|Sun|So`]. Separate days with `,`, or use `-` for a range. For example: `days:Mo-We,Fr-Su`, `days:Sa-Tu` (shorthand for `Mo,Tu,Sa,Su`).
 
@@ -163,8 +162,7 @@ Hue Scheduler offers various transition-related properties to create the desired
 
 - ``tr``: Defines the transition time when the start time of a state is reached [``0``-``60000``]. Default: `4` (400ms). The value is a multiple of 100ms. For example, `tr:1` equals 100ms. The maximum value ``60000`` equals 100 minutes.
 
-  > [!TIP]
-  > Use `s` (seconds), `min` (minutes) and `h` (hours) units. Examples: `tr:10s`, `tr:2min`, `tr:1h`. Combinations are also possible (e.g., `1h20min5s10`).
+  > Tip: Use `s` (seconds), `min` (minutes) and `h` (hours) units. Examples: `tr:10s`, `tr:2min`, `tr:1h`. Combinations are also possible (e.g., `1h20min5s10`).
 
 - ``tr-before``: Defines the transition time *before* the start time. The additional transition type provided by Hue Scheduler. Realistically, the maximum value is 24 hours. Supports the same units but also absolute times, and dynamic solar times (see _Start Time Expression_):
 
@@ -176,8 +174,7 @@ Hue Scheduler offers various transition-related properties to create the desired
 
   In the first example, the transition starts 30 minutes before sunrise, while in the last example, it starts 5 minutes after ``civil_dawn`` to smoothly turn on the light to full brightness until sunrise.
 
-  > [!NOTE]
-  > The start time expression for ``tr-before`` must be before the defined state start, otherwise the property is ignored. Setting ``tr-before`` to more than 24 hours is not supported and leads to unexpected scheduling results.
+  > Note: The start time expression for ``tr-before`` must be before the defined state start, otherwise the property is ignored. Setting ``tr-before`` to more than 24 hours is not supported and leads to unexpected scheduling results.
 
   `tr-before` adjusts the transition time to the remaining duration if the light is turned on later. It calculates the mid-transition state based on the elapsed time, effectively interpolating from the previous state. For example:
 
@@ -192,8 +189,7 @@ Hue Scheduler offers various transition-related properties to create the desired
 
     3. If you turn on the lights after `09:00`, `tr-before` is ignored and `tr` is used (default: 400ms if not specified).
 
-  > [!NOTE]
-  > Hue Scheduler uses the previous state's ``tr`` property to determine the transition time for the interpolated calls. Set `tr:0` for the previous state to disable transitions for interpolated calls. If no ``tr`` property is defined, Hue Scheduler uses the default value defined via the ``--default-interpolation-transition-time`` (default: `4` = 400ms) global command line option.
+  > Note: Hue Scheduler uses the previous state's ``tr`` property to determine the transition time for the interpolated calls. Set `tr:0` for the previous state to disable transitions for interpolated calls. If no ``tr`` property is defined, Hue Scheduler uses the default value defined via the ``--default-interpolation-transition-time`` (default: `4` = 400ms) global command line option.
   > If the previous and current states have incompatible to interpolate between, Hue Scheduler ignores any ``tr-before`` and ``interpolate:true`` properties.
 
   **To summarize**: `tr-before` allows longer, smoother transitions that match the desired state, regardless of when they are turned on. Interpolations are available for all color modes (CT, XY/RGB, Hue/Sat), and Hue Scheduler converts between them for smooth transitions (e.g., from color temperature to a color value).
@@ -217,8 +213,7 @@ Hue Scheduler offers various transition-related properties to create the desired
   ~~~ 
   In this example, Hue Scheduler also interpolates between `sunset` and `sunrise`.
 
-  > [!TIP]
-  > Enable ``interpolate:true`` for all states by using the ``--interpolate-all`` command line flag. Customize this behavior by explicitly setting ``interpolate:false`` for individual states or by defining a custom ``tr-before`` which takes precedence over the ``interpolate`` property.
+  > Tip: Enable ``interpolate:true`` for all states by using the ``--interpolate-all`` command line flag. Customize this behavior by explicitly setting ``interpolate:false`` for individual states or by defining a custom ``tr-before`` which takes precedence over the ``interpolate`` property.
 
 ### Advanced Properties
 
