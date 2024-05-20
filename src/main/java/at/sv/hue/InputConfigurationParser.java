@@ -3,7 +3,7 @@ package at.sv.hue;
 import at.sv.hue.api.GroupNotFoundException;
 import at.sv.hue.api.HueApi;
 import at.sv.hue.api.LightCapabilities;
-import at.sv.hue.api.hass.HassSupportedEntityTypes;
+import at.sv.hue.api.hass.HassSupportedEntityType;
 import at.sv.hue.color.RGBToXYConverter;
 import at.sv.hue.time.StartTimeProvider;
 
@@ -53,7 +53,7 @@ public final class InputConfigurationParser {
                 id = "/lights/" + idPart;
                 name = api.getLightName(id);
                 groupState = false;
-            } else if (HassSupportedEntityTypes.isSupportedEntityType(idPart)) {
+            } else if (HassSupportedEntityType.isSupportedEntityType(idPart)) {
                 id = idPart;
                 name = api.getLightName(id);
                 groupState = false;

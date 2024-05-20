@@ -1917,6 +1917,43 @@ public class HassApiTest {
     }
 
     @Test
+    void putState_turnOn_inputBoolean_usesCorrectService() {
+        putState(PutCall.builder()
+                        .id("input_boolean.test_switch"));
+
+        verify(http).postResource(getUrl("/services/input_boolean/turn_on"),
+                "{\"entity_id\":\"input_boolean.test_switch\"}");
+    }
+
+    @Test
+    void putState_turnOff_inputBoolean_usesCorrectService() {
+        putState(PutCall.builder()
+                        .id("input_boolean.another_switch")
+                        .on(false));
+
+        verify(http).postResource(getUrl("/services/input_boolean/turn_off"),
+                "{\"entity_id\":\"input_boolean.another_switch\"}");
+    }
+
+    @Test
+    void putState_turnOn_switch_usesCorrectService() {
+        putState(PutCall.builder()
+                        .id("switch.tv_mute"));
+
+        verify(http).postResource(getUrl("/services/switch/turn_on"),
+                "{\"entity_id\":\"switch.tv_mute\"}");
+    }
+
+    @Test
+    void putState_turnOn_fan_usesCorrectService() {
+        putState(PutCall.builder()
+                        .id("fan.test_fan"));
+
+        verify(http).postResource(getUrl("/services/fan/turn_on"),
+                "{\"entity_id\":\"fan.test_fan\"}");
+    }
+
+    @Test
     void unsupportedType_exception() {
         assertThatThrownBy(() -> getLightState("sensor.sun_next_setting")).isInstanceOf(UnsupportedStateException.class);
         assertThatThrownBy(() -> api.getGroupStates("sensor.sun_next_setting")).isInstanceOf(UnsupportedStateException.class);

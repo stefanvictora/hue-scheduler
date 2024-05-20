@@ -392,7 +392,7 @@ public class HassApiImpl implements HueApi {
     }
 
     private static boolean isSupportedStateType(String entityId) {
-        return HassSupportedEntityTypes.fromEntityId(entityId) != null;
+        return HassSupportedEntityType.fromEntityId(entityId) != null;
     }
 
     private Float convertToSeconds(Integer transitionTime) {
@@ -403,11 +403,17 @@ public class HassApiImpl implements HueApi {
     }
 
     private URL getUpdateUrl(PutCall putCall) {
+        String service = getService(putCall.getId());
         if (Boolean.FALSE.equals(putCall.getOn())) {
-            return createUrl("/services/light/turn_off");
+            return createUrl("/services/" + service + "/turn_off");
         } else {
-            return createUrl("/services/light/turn_on");
+            return createUrl("/services/" + service + "/turn_on");
         }
+    }
+
+    private String getService(String id) {
+        HassSupportedEntityType type = HassSupportedEntityType.fromEntityId(id);
+        return type.name().toLowerCase(Locale.ROOT);
     }
 
     private String getBody(ChangeState changeState) {
