@@ -2,6 +2,30 @@
 
 ## [Unreleased]
 
+## [0.10.0] - 2024-05-20
+
+### Added
+- **Added support for Home Assistant (HA) Rest and WebSocket APIs** 🥳: Hue Scheduler can now control lights and devices through HA, allowing you to manage a wider range of smart home devices.
+  - **Setup**: Simply point Hue Scheduler to your HA instance (e.g., `http://ha.local:8123`) and provide a [long-lived access token](https://www.home-assistant.io/docs/authentication/), and you are good to go.
+  - **Supported Entity Types**: `light`, `input_boolean`, `switch`, `fan`.
+  - **Limitations**:
+    - HA always appends `on:true` to all state changes in API calls, which can cause manually turned-off lights in groups to turn back on, unlike the Hue API.
+    - `hue` and `sat` state properties are not yet supported.
+    
+- **Official Docker Image**: Published on Docker Hub at [stefanvictora/hue-scheduler](https://hub.docker.com/r/stefanvictora/hue-scheduler). Check the updated README for detailed usage instructions.
+
+### Changed
+- **Java Version Requirement**: Updated the minimum Java version to 21 to accommodate new features and enhancements.
+- **Virtual Threads**: Improved scheduling performance by adopting **virtual threads**.
+- **Scheduling Optimization**: Enhanced "off" detection for lights, reducing unnecessary API calls.
+- **Documentation Update**: Restructured the README for better readability. Extracted detailed documentation into separate files:
+  - [Light Configuration](docs/light_configuration)
+  - [Philips Hue Authentication](docs/philips_hue_authentication.md)
+  - [Advanced Command Line Options](docs/advanced_options.md)
+  - [Docker on Raspberry Pi](docs/docker_raspberrypi.md)
+  - [Docker Examples](docs/docker_examples.md)
+
+
 ## [0.9.0] - 2023-09-18
 
 ### Added
