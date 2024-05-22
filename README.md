@@ -12,17 +12,16 @@
 
 **New in Version 0.10.0**: **Full support for the Home Assistant REST and WebSocket APIs** :partying_face: Control even more devices in your home with Hue Scheduler.
 
-Hue Scheduler goes beyond basic automation solutions like Adaptive Lighting by providing comprehensive control over brightness, color temperature, color, power state, and custom interpolations between solar and absolute times. Specifically designed to work with dumb wall switches, Hue Scheduler adjusts light states as soon as they're reachable, ensuring consistent results even when lights are physically turned off.
+Hue Scheduler goes beyond tools like Adaptive Lighting by providing extended control over brightness, color temperature, color, power state, and custom interpolations between solar and absolute times. Specifically designed to work with dumb wall switches, Hue Scheduler adjusts light states as soon as they're reachable, ensuring consistent results even when lights have been physically turned off.
 
 ## Demo
 
-Hue Scheduler allows you to configure your smart lights with a simple, text-based configuration file. Below, you can see various examples demonstrating how to create daily routines, dynamic lighting effects, power management schedules, and ambiance settings.
+Hue Scheduler allows you to configure your smart lights with a simple, text-based configuration file. Below, you can see various examples demonstrating how to create daily routines, dynamic interpolations, power management schedules, and ambiance settings.
                                    
 ### Example Configurations
 
 #### Daily Routines: Sun-Based Brightness & Color Temperature
 ~~~yacas
-# Office Lighting
 Office  sunrise     bri:100%  ct:6500  tr:5s                     
 Office  sunrise+90            ct:5000  tr-before:20min           
 Office  sunset      bri:80%   ct:3000  tr-before:20min
@@ -36,7 +35,7 @@ In this example, the lights in your office adjust dynamically based on the sun's
 
 Note: Hue Scheduler does not automatically turn on your lights (unless explicitly specified with `on:true`), allowing you to maintain control while Hue Scheduler handles all the adjustments once they are turned on.
 
-#### Dynamic Lighting: Smooth Transitions & Interpolations
+#### Dynamic Lighting: Advanced Transitions & Interpolations
     
 ~~~yacas
 Home  sunrise     bri:100%  ct:6500             tr-before:civil_dawn
@@ -54,10 +53,13 @@ This configuration creates smooth and continuous transitions throughout the day:
 - **Sunset to Civil Dusk**: Gradually dim and warm up (2000K).
 - **Civil Dusk to Midnight**: Dim to a low brightness (20%) with a typ of red defined by x and y coordinates.
 
+> [!NOTE]
+> Any manual changes to your lights will temporarily suspend the schedule until they are turned off and on again.
+> If lights are turned on midway through a transition, Hue Scheduler calculates the appropriate mid-transition state to continue the transition seamlessly. 
+
 #### Power Management: Manage On/Off States on Specific Weekdays
 
 ~~~yacas
-# Garden Lighting
 light.garden  civil_dusk  on:true   bri:100%  tr:1min     days:Mo-Fr
 light.garden  01:00       on:false            tr:5min30s  days:Mo-Fr
 ~~~
@@ -70,7 +72,6 @@ This setup manages power states based on time and weekdays:
 #### Mood and Ambiance: Effects & Color
 
 ~~~yacas
-# Living Room and Kitchen Lighting
 Living room  22:00  bri:100%  sat:150  effect:multi_colorloop  days:Fr,Sa
 Kitchen      22:00  color:#00835C                              days:Sa
 ~~~
@@ -88,7 +89,7 @@ Hue Scheduler uses a simple text-based configuration format to define the behavi
 <Light/Group Name or ID>  <Start Time Expression>  [<Property>:<Value>]*
 ~~~
 
-**Light/Group Name or ID**: Define which light or group to control. Use names or IDs (e.g. `Couch' or `light.couch`). Multiple lights can be combined with a comma (`,`).
+**Light/Group Name or ID**: Define which light or group to control. Use names or IDs (e.g. `Couch` or `light.couch`). Multiple lights can be combined with a comma (`,`).
 
 **Start Time Expression**: Set either fixed times in 24-hour format (HH:mm:ss) (e.g. **`06:00`**, **`23:30:15`**) or solar times (e.g., **`sunrise`**, **`sunset`**). Adjust times relative to solar events in minutes (e.g., **`sunset-30`**).
 
@@ -112,10 +113,8 @@ Hue Scheduler uses a simple text-based configuration format to define the behavi
   - **`tr-before`**: Transition time before a state starts, allowing for smooth transitions. e.g., **`tr-before:30min`**, **`tr-before:06:00`**, **`tr-before:civil_dawn+5`**, 
   - **`interpolate`**: Automatic transitions from the previous state. e.g., **`interpolate:true`**
 
-If lights are turned on midway through a scheduled change, Hue Scheduler calculates the appropriate mid-transition state to continue the transition seamlessly. Additionally, any manual changes to your lights will temporarily suspend the schedule until they are turned off and on again.
-
 > [!TIP]
-> For more detailed information, including handling special cases and advanced properties, visit the [full light configuration documentation](docs/light_configuration.md).
+> Visit the [full documentation](docs/light_configuration.md) for more detailed information on how to configure your light schedules.
 
 ## Prerequisites
 
@@ -171,8 +170,7 @@ To get started with Docker, follow these steps:
    docker compose start
    ~~~
 
-> [!NOTE]
-> If your Raspberry Pi does not yet have Docker installed, please check out this [short guide](docs/docker_on_raspberrypi.md).
+> Note: If your Raspberry Pi does not yet have Docker installed, check out this [short guide](docs/docker_on_raspberrypi.md).
 
 ### Manually
 
@@ -227,7 +225,7 @@ Another limitation with dumb wall switches is that the Hue Bridge can take up to
 
 Both Adaptive Lighting and Hue Scheduler aim to automate the state of your lights based on the time of day. However, there are key differences:
 
-- **Control Over Light Properties**: Adaptive Lighting primarily adjusts the color temperature and brightness of your lights. In contrast, Hue Scheduler offers extended control, allowing you to also set specific colors and manage the on-state of your lights.
+- **Control Over Light Properties**: Adaptive Lighting primarily adjusts the color temperature and brightness of your lights. In contrast, Hue Scheduler offers extended control, allowing you to also set specific colors and manage the power state of your lights.
 
 - **Flexibility and Customization**: Adaptive Lighting operates with a continuous adjustment mechanism, offering limited manual intervention. Hue Scheduler, on the other hand, provides a more hands-on approach, empowering you with the flexibility to define your own schedule. You can even introduce multiple custom interpolations, all through a single, user-friendly configuration file.
 
