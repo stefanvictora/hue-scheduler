@@ -438,7 +438,15 @@ final class ScheduledState {
     }
 
     public boolean isNullState() {
-        return brightness == null && ct == null && on == null && x == null && y == null && hue == null && sat == null && effect == null;
+        return on == null && hasNoOtherPropertiesThanOn();
+    }
+
+    private boolean hasNoOtherPropertiesThanOn() {
+        return brightness == null && ct == null && x == null && y == null && hue == null && sat == null && effect == null;
+    }
+
+    public boolean hasOtherPropertiesThanOn() {
+        return !hasNoOtherPropertiesThanOn();
     }
 
     public boolean isOff() {

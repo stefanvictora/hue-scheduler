@@ -678,7 +678,7 @@ public final class HueScheduler implements Runnable {
     }
 
     private static boolean shouldRetryOnPowerOn(ScheduledState state) {
-        return !state.isOff() || state.isForced();
+        return !state.isOff() && state.hasOtherPropertiesThanOn() || state.isForced();
     }
 
     private void retryWhenBackOn(ScheduledState state) {

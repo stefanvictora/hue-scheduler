@@ -4333,6 +4333,54 @@ class HueSchedulerTest {
     }
 
     @Test
+    void run_execution_offState_withInvalidAdditionalProperties_doesNotRetryAfterPowerOn() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now, "on:false", "bri:10");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        runAndAssertPutCalls(scheduledRunnable,
+                expectedPutCall(1).on(false).bri(10) // bri actually does not make any sense here
+        );
+
+        ensureNextDayRunnable();
+
+        simulateLightOnEvent(); // not turned off again
+    }
+
+    @Test
+    void run_execution_onStateOnly_currentlyOff_doesNotFireOnEventAgainWhenSelfCausedPowerOnEvenIsDetected() {
+        addState(1, now, "on:true");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        setLightStateResponse(1, expectedState().on(false)); // light is currently off
+        runAndAssertPutCalls(scheduledRunnable,
+                expectedPutCall(1).on(true)
+        );
+
+        ensureNextDayRunnable();
+
+        simulateLightOnEvent(); // self caused power-on event
+    }
+
+    @Test
+    void run_execution_onStateOnly_currentlyOn_doesNotFireOnEventAgainWhenSelfCausedPowerOnEvenIsDetected() {
+        addState(1, now, "on:true");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        setLightStateResponse(1, expectedState().on(true)); // light is currently off
+        runAndAssertPutCalls(scheduledRunnable,
+                expectedPutCall(1).on(true) // we currently don't prevent a second "on" call, even if the light is already on
+        );
+
+        ensureNextDayRunnable();
+
+        simulateLightOnEvent(); // when turned off and on again
+    }
+
+    @Test
     void run_execution_multipleStates_userChangedStateManuallyBetweenStates_secondStateIsNotApplied_untilPowerCycle_detectsManualChangesAgainAfterwards() {
         enableUserModificationTracking();
 
