@@ -8,15 +8,16 @@ Below you can find a full `docker-compose.yml` example file for someone located 
 services:
   hue-scheduler:
     container_name: hue-scheduler
-    image: stefanvictora/hue-scheduler:0.10.0-SNAPSHOT
+    image: stefanvictora/hue-scheduler:0.10
     environment:
       - API_HOST=192.168.0.157
       - ACCESS_TOKEN=1028d66426293e821ecfd9ef1a0731df
       - LAT=48.208731
       - LONG=16.372599
       - ELEVATION=165
-      - CONFIG_FILE=/config/input.txt
+      - CONFIG_FILE=/config/input.txt # do not edit
       - log.level=TRACE
+      - TZ=Europe/Vienna
     volumes:
       - type: bind
         source: /home/stefan/.config/hue-scheduler/input.txt
@@ -29,36 +30,10 @@ If you are using Docker on Windows, make sure to adapt the source path of your i
 
 ## Docker Run Usage
 
-If you don't want to use docker compose, you can also directly create and run the container for Hue Scheduler with ``docker run``. Make sure to replace the placeholder values:
-
-**Using Powershell:**
-
-~~~powershell
-docker run -d `
-  --name hue-scheduler `
-  -v ${PWD}/input.txt:/config/input.txt:ro `
-  -e log.level=DEBUG `
-  stefanvictora/hue-scheduler:0.10.0 `
-  <API_HOST> <ACCESS_TOKEN> `
-  --lat <LATITUDE> `
-  --long <LONGITUDE> `
-  --elevation <ELEVATION> `
-  /config/input.txt
-~~~
-
-**Using Bash:**
+If you don't want to use docker compose, you can also directly create and run the container for Hue Scheduler with ``docker run``. Make sure to replace the placeholder values and adapt the `TZ` time zone variable:
 
 ~~~shell
-docker run -d \
-  --name hue-scheduler \
-  -v $(pwd)/input.txt:/config/input.txt:ro \
-  -e log.level=DEBUG \
-  stefanvictora/hue-scheduler:0.10.0 \
-  <API_HOST> <ACCESS_TOKEN> \
-  --lat <LATITUDE> \
-  --long <LONGITUDE> \
-  --elevation <ELEVATION> \
-  /config/input.txt
+docker run -d --name hue-scheduler -v $(pwd)/input.txt:/config/input.txt:ro -e log.level=DEBUG -e TZ=Europe/Vienna --restart unless-stopped stefanvictora/hue-scheduler:0.10 <API_HOST> <ACCESS_TOKEN> --lat <LATITUDE> --long <LONGITUDE> --elevation <ELEVATION> /config/input.txt
 ~~~
 
 **Stop / Start / Remove container:**

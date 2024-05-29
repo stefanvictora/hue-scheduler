@@ -1,12 +1,12 @@
 # Stage 1: Cache dependencies
-FROM maven:3.9-eclipse-temurin-22 AS dependencies
+FROM maven:3.9.6-eclipse-temurin-22 AS dependencies
 WORKDIR /build/
 COPY pom.xml .
 # Download all required dependencies first (this will only be re-run if the pom file changes)
 RUN mvn --batch-mode dependency:go-offline dependency:resolve-plugins
 
 # Stage 2: Build the Java application
-FROM maven:3.9-eclipse-temurin-22 AS build
+FROM maven:3.9.6-eclipse-temurin-22 AS build
 COPY --from=dependencies /root/.m2 /root/.m2
 WORKDIR /build/
 COPY pom.xml .

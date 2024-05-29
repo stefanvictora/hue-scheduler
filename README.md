@@ -138,7 +138,7 @@ To get started with Docker, follow these steps:
    services:
      hue-scheduler:
        container_name: hue-scheduler
-       image: stefanvictora/hue-scheduler:0.10.0
+       image: stefanvictora/hue-scheduler:0.10
        environment:
          - API_HOST= #<HOST>
          - ACCESS_TOKEN= #<TOKEN>
@@ -147,6 +147,7 @@ To get started with Docker, follow these steps:
          - ELEVATION= #<ELEVATION>
          - CONFIG_FILE=/config/input.txt # do not edit
          - log.level=DEBUG
+         - TZ=Europe/Vienna # replace with your time zone
        volumes:
          - type: bind
            source: #<CONFIG_FILE_PATH>
