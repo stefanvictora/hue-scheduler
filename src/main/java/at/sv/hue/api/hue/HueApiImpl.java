@@ -7,6 +7,7 @@ import at.sv.hue.api.EmptyGroupException;
 import at.sv.hue.api.GroupNotFoundException;
 import at.sv.hue.api.HttpResourceProvider;
 import at.sv.hue.api.HueApi;
+import at.sv.hue.api.InvalidConnectionException;
 import at.sv.hue.api.LightCapabilities;
 import at.sv.hue.api.LightNotFoundException;
 import at.sv.hue.api.LightState;
@@ -56,8 +57,15 @@ public final class HueApiImpl implements HueApi {
         mapper = new ObjectMapper();
         mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+        assertNotHttpSchemeProvided(host);
         baseApi = "https://" + host + "/api/" + accessToken;
         this.rateLimiter = rateLimiter;
+    }
+
+    private static void assertNotHttpSchemeProvided(String host) {
+        if (host.toLowerCase(Locale.ROOT).startsWith("http")) {
+            throw new InvalidConnectionException("Invalid host provided. Hue Bridge host can't contain a scheme: " + host);
+        }
     }
 
     @Override

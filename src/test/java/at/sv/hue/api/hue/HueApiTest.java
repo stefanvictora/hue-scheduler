@@ -8,6 +8,7 @@ import at.sv.hue.api.EmptyGroupException;
 import at.sv.hue.api.GroupNotFoundException;
 import at.sv.hue.api.HttpResourceProvider;
 import at.sv.hue.api.HueApi;
+import at.sv.hue.api.InvalidConnectionException;
 import at.sv.hue.api.LightCapabilities;
 import at.sv.hue.api.LightNotFoundException;
 import at.sv.hue.api.LightState;
@@ -45,6 +46,12 @@ class HueApiTest {
         api = new HueApiImpl(resourceProviderMock, host, accessToken, permits -> {
         });
         baseUrl = "https://" + host + "/api/" + accessToken;
+    }
+
+    @Test
+    void invalidHost_cantUseScheme_exception() {
+        assertThrows(InvalidConnectionException.class, () -> new HueApiImpl(resourceProviderMock, "hTtps://localhost", "TOKEN", permits -> {
+        }));
     }
 
     @Test

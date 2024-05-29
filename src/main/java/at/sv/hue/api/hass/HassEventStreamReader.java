@@ -10,6 +10,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.MDC;
 
+import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -56,7 +57,11 @@ public final class HassEventStreamReader {
             @Override
             public void onFailure(@NotNull WebSocket webSocket, @NotNull Throwable t, @Nullable Response response) {
                 MDC.put("context", "events");
-                log.error("HA event stream failed", t);
+                log.error("HA event stream failed. Retrying in 3s.", t);
+                try {
+                    Thread.sleep(Duration.ofSeconds(3));
+                } catch (InterruptedException ignore) {
+                }
                 start();
             }
         });

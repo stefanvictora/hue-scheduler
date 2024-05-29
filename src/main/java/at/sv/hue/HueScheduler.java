@@ -62,8 +62,8 @@ public final class HueScheduler implements Runnable {
     @Parameters(
             defaultValue = "${env:API_HOST}",
             description = "The host for your Philips Hue Bridge or origin (i.e. scheme, host, port) for your Home Assistant instance. " +
-                          "Examples: Philips Hue e.g. 192.168.0.157; " +
-                          "Home Assistant e.g. http://localhost:8123, or https://UNIQUE_ID.ui.nabu.casa")
+                          "Examples: Philips Hue: 192.168.0.157; " +
+                          "Home Assistant: http://localhost:8123, or https://UNIQUE_ID.ui.nabu.casa")
     String apiHost;
     @Parameters(
             defaultValue = "${env:ACCESS_TOKEN}",
@@ -286,13 +286,13 @@ public final class HueScheduler implements Runnable {
     private boolean assertConnection() {
         try {
             api.assertConnection();
-            LOG.info("Connected to bridge at {}.", apiHost);
+            LOG.info("Connected to {}.", apiHost);
         } catch (BridgeConnectionFailure e) {
-            LOG.warn("Bridge not reachable: '{}'. Retrying in 5s.", e.getCause().getLocalizedMessage());
+            LOG.warn("Api not reachable: '{}'. Retrying in 5s.", e.getCause().getLocalizedMessage());
             return false;
         } catch (BridgeAuthenticationFailure e) {
-            System.err.println("Bridge connection rejected: 'Unauthorized user'. Please make sure you use the correct" +
-                               " username from the setup process, or try to generate a new one.");
+            System.err.println("Api connection rejected: 'Unauthorized user'. Please make sure you use the correct" +
+                               " username or access token from the setup process, or try to generate a new one.");
             System.exit(3);
         }
         return true;
@@ -439,11 +439,11 @@ public final class HueScheduler implements Runnable {
                 putAdditionalInterpolatedStateIfNeeded(state);
                 putState(state);
             } catch (BridgeConnectionFailure e) {
-                LOG.warn("Bridge not reachable, retrying in {}s.", bridgeFailureRetryDelayInSeconds);
+                LOG.warn("Api not reachable, retrying in {}s.", bridgeFailureRetryDelayInSeconds);
                 retry(state, getMs(bridgeFailureRetryDelayInSeconds));
                 return;
             } catch (ApiFailure e) {
-                LOG.error("Hue api call failed: '{}'. Retrying in {}s.", e.getLocalizedMessage(), bridgeFailureRetryDelayInSeconds);
+                LOG.error("Api call failed: '{}'. Retrying in {}s.", e.getLocalizedMessage(), bridgeFailureRetryDelayInSeconds);
                 retry(state, getMs(bridgeFailureRetryDelayInSeconds));
                 return;
             }
