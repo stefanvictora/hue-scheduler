@@ -743,7 +743,12 @@ public final class HueScheduler implements Runnable {
 
     private void scheduleApiCacheClear() {
         stateScheduler.scheduleAtFixedRate(
-                api::clearCaches, apiCacheInvalidationIntervalInMinutes, apiCacheInvalidationIntervalInMinutes, TimeUnit.MINUTES);
+                this::clearCaches, apiCacheInvalidationIntervalInMinutes, apiCacheInvalidationIntervalInMinutes, TimeUnit.MINUTES);
+    }
+
+    private void clearCaches() {
+        api.clearCaches();
+        startTimeProvider.clearCaches();
     }
 
     LightEventListener getHueEventListener() {

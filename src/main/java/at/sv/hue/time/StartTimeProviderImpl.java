@@ -3,13 +3,17 @@ package at.sv.hue.time;
 import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class StartTimeProviderImpl implements StartTimeProvider {
 
     private final SunTimesProvider sunTimesProvider;
+    private final Map<String, LocalTime> timeCache;
 
     public StartTimeProviderImpl(SunTimesProvider sunTimesProvider) {
         this.sunTimesProvider = sunTimesProvider;
+        timeCache = new ConcurrentHashMap<>();
     }
 
     @Override
@@ -27,12 +31,17 @@ public final class StartTimeProviderImpl implements StartTimeProvider {
     }
 
     private LocalTime tryParseTimeString(String input) {
-        LocalTime time = null;
-        try {
-            time = LocalTime.parse(input);
-        } catch (Exception ignore) {
+        if (!Character.isDigit(input.charAt(0))) {
+            return null;
         }
-        return time;
+
+        return timeCache.computeIfAbsent(input, k -> {
+            try {
+                return LocalTime.parse(input);
+            } catch (Exception ignore) {
+                return null;
+            }
+        });
     }
 
     private boolean isOffsetExpression(String input) {
@@ -71,5 +80,11 @@ public final class StartTimeProviderImpl implements StartTimeProvider {
     @Override
     public String toDebugString(ZonedDateTime dateTime) {
         return sunTimesProvider.toDebugString(dateTime);
+    }
+
+    @Override
+    public void clearCaches() {
+        sunTimesProvider.clearCache();
+        timeCache.clear();
     }
 }

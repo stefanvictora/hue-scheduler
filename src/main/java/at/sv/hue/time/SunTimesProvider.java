@@ -29,4 +29,6 @@ public interface SunTimesProvider {
     ZonedDateTime getAstronomicalStart(ZonedDateTime dateTime);
 
     String toDebugString(ZonedDateTime dateTime);
+
+    void clearCache();
 }

@@ -5,6 +5,8 @@ import org.shredzone.commons.suncalc.SunTimes;
 import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class SunTimesProviderImpl implements SunTimesProvider {
 
@@ -14,10 +16,13 @@ public final class SunTimesProviderImpl implements SunTimesProvider {
     private final double lng;
     private final double elevation;
 
+    private final Map<String, SunTimes> cache;
+
     public SunTimesProviderImpl(double lat, double lng, double elevation) {
         this.lat = lat;
         this.lng = lng;
         this.elevation = elevation;
+        cache = new ConcurrentHashMap<>();
     }
 
     @Override
@@ -85,11 +90,16 @@ public final class SunTimesProviderImpl implements SunTimesProvider {
     }
 
     private SunTimes sunTimesFor(ZonedDateTime dateTime, SunTimes.Twilight twilight) {
-        return getProviderFor(dateTime).twilight(twilight).execute();
+        String key = generateKey(dateTime, twilight);
+        return cache.computeIfAbsent(key, k -> getProviderFor(dateTime).twilight(twilight).execute());
     }
 
     private SunTimes.Parameters getProviderFor(ZonedDateTime dateTime) {
         return SunTimes.compute().at(lat, lng).elevation(elevation).on(dateTime.with(LocalTime.MIDNIGHT));
+    }
+
+    private String generateKey(ZonedDateTime dateTime, SunTimes.Twilight twilight) {
+        return dateTime.toLocalDate().toString() + "-" + twilight.toString();
     }
 
     @Override
@@ -107,6 +117,11 @@ public final class SunTimesProviderImpl implements SunTimesProvider {
                "\nnautical_dusk: " + format(getNauticalEnd(dateTime)) +
                "\nastronomical_dusk: " + format(getAstronomicalEnd(dateTime)) +
                "";
+    }
+
+    @Override
+    public void clearCache() {
+        cache.clear();
     }
 
     private String format(ZonedDateTime time) {
