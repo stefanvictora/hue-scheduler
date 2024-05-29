@@ -17,7 +17,7 @@
 ### Changed
 - **Java Version Requirement**: Updated the minimum Java version to 21 to accommodate new features and enhancements.
 - **Virtual Threads**: Improved scheduling performance by adopting **virtual threads**.
-- **Scheduling Optimization**: Enhanced "off" detection for lights, reducing unnecessary API calls.
+- **Scheduling Optimization**: Enhanced "off" detection for lights, reducing unnecessary API calls. Improved start time calculation performance, reducing overall start-up time.
 - **Documentation Update**: Restructured the README for better readability. Extracted detailed documentation into separate files:
   - [Light Configuration](docs/light_configuration)
   - [Philips Hue Authentication](docs/philips_hue_authentication.md)
