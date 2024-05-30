@@ -8,10 +8,7 @@
 - **Added support for Home Assistant (HA) Rest and WebSocket APIs** 🥳: Hue Scheduler can now control lights and devices through HA, allowing you to manage a wider range of smart home devices.
   - **Setup**: Simply point Hue Scheduler to your HA instance (e.g., `http://ha.local:8123`) and provide a [long-lived access token](https://www.home-assistant.io/docs/authentication/), and you are good to go.
   - **Supported Entity Types**: `light`, `input_boolean`, `switch`, `fan`.
-  - **Limitations**:
-    - HA always appends `on:true` to all state changes in API calls, which can cause manually turned-off lights in groups to turn back on, unlike the Hue API.
-    - `hue` and `sat` state properties are not yet supported.
-    
+  - **Limitation**: HA always appends `on:true` to all state changes in API calls, which can cause manually turned-off lights in groups to turn back on, unlike the Hue API.
 - **Official Docker Image**: Published on Docker Hub at [stefanvictora/hue-scheduler](https://hub.docker.com/r/stefanvictora/hue-scheduler). Check the updated README for detailed usage instructions.
 
 ### Changed

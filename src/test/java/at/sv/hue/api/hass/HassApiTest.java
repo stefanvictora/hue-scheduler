@@ -1891,19 +1891,18 @@ public class HassApiTest {
                 "{\"entity_id\":\"light.id\",\"brightness\":0,\"effect\":\"colorloop\"}");
     }
 
-//    @Test
-//    void putState_turnOn_hs_color() { // todo: add Hue/Sat support
-//        api.putState(PutCall.builder()
-//                            .id("light.id")
-//                            .bri(254)
-//                   .hue()
-//                            .x(0.354)
-//                            .y(0.546)
-//                            .build());
-//
-//        verify(http).postResource(getUrl("/services/light/turn_on"),
-//                "{\"entity_id\":\"light.id\",\"brightness\":255,\"xy_color\":[0.354,0.546]}");
-//    }
+    @Test
+    void putState_turnOn_hs_color() {
+        api.putState(PutCall.builder()
+                            .id("light.id")
+                            .bri(254)
+                            .hue(1000)
+                            .sat(50)
+                            .build());
+
+        verify(http).postResource(getUrl("/services/light/turn_on"),
+                "{\"entity_id\":\"light.id\",\"brightness\":255,\"xy_color\":[0.3832,0.3286]}");
+    }
 
     @Test
     void putState_turnOff_transition_callsCorrectEndpoint() {

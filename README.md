@@ -249,6 +249,7 @@ Yes, but you should probably use a third-party app like iConnectHue to configure
 - [ ] **Date-based scheduling** -- schedule state only during a specific date range
 - [ ] **Support for gradients** -- support setting gradients to supported lights
 - [ ] **Support for scenes** -- support scheduling scenes for groups
+- [ ] **Support for Hue APIv2 effects** -- support for more effects
 - [ ] **Min/Max for sunrise/sunset** -- ensure that a dynamic start time is not active before or past a certain time
 - [ ] **GUI for configuring and updating light schedules** -- via a web interface
 - [ ] **Home Assistant Addon support** -- package Hue Scheduler as an easy to install Home Assistant addon

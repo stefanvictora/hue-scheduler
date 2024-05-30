@@ -1,5 +1,6 @@
 package at.sv.hue.api.hass;
 
+import at.sv.hue.ColorMode;
 import at.sv.hue.api.ApiFailure;
 import at.sv.hue.api.Capability;
 import at.sv.hue.api.EmptyGroupException;
@@ -11,6 +12,7 @@ import at.sv.hue.api.LightNotFoundException;
 import at.sv.hue.api.LightState;
 import at.sv.hue.api.PutCall;
 import at.sv.hue.api.RateLimiter;
+import at.sv.hue.color.ColorModeConverter;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -107,6 +109,9 @@ public class HassApiImpl implements HueApi {
         changeState.setColor_temp(putCall.getCt());
         changeState.setEffect(putCall.getEffect());
         changeState.setTransition(convertToSeconds(putCall.getTransitionTime())); // todo: find out the max value of home assistant
+        if (putCall.getHue() != null && putCall.getSat() != null) {
+            ColorModeConverter.convertIfNeeded(putCall, null, ColorMode.HS, ColorMode.XY); // todo: we don't have a gamut available, which means the conversion is not perfect
+        }
         if (putCall.getX() != null && putCall.getY() != null) {
             changeState.setXy_color(new Double[]{putCall.getX(), putCall.getY()});
         }
@@ -429,7 +434,6 @@ public class HassApiImpl implements HueApi {
         String entity_id;
         Integer brightness;
         Integer color_temp;
-        String hs_color;
         Double[] xy_color;
         String effect;
         Float transition;
