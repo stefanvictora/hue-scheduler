@@ -10,7 +10,7 @@
 
 ## Introduction
 
-**New in Version 0.10.0**: **Full support for the Home Assistant REST and WebSocket APIs** :partying_face: Control even more devices in your home with Hue Scheduler.
+**New in Version 0.10.0**: **Full support for the Home Assistant REST API** :partying_face: Control even more devices in your home with Hue Scheduler.
 
 Hue Scheduler goes beyond tools like Adaptive Lighting by providing extended control over brightness, color temperature, color, power state, and custom interpolations between solar and absolute times. Specifically designed to work with dumb wall switches, Hue Scheduler adjusts light states as soon as they're reachable, ensuring consistent results even when lights have been physically turned off.
 
@@ -246,12 +246,12 @@ Yes, but you should probably use a third-party app like iConnectHue to configure
 - [x] **Advanced state interpolations** -- easily create full-day state interpolations without explicitly using `tr-before`
 - [x] **Docker support** -- provide a prebuilt docker images for easier setup
 - [x] **Home Assistant API support** -- allow controlling lights via the Home Assistant API
-- [ ] **Home Assistant Addon support** -- package Hue Scheduler as an easy to install Home Assistant addon
 - [ ] **Date-based scheduling** -- schedule state only during a specific date range
 - [ ] **Support for gradients** -- support setting gradients to supported lights
 - [ ] **Support for scenes** -- support scheduling scenes for groups
 - [ ] **Min/Max for sunrise/sunset** -- ensure that a dynamic start time is not active before or past a certain time
 - [ ] **GUI for configuring and updating light schedules** -- via a web interface
+- [ ] **Home Assistant Addon support** -- package Hue Scheduler as an easy to install Home Assistant addon
 
 ## Developing
 

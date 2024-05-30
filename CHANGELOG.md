@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-## [0.10.0] - 2024-05-20
+## [0.10.0] - 2024-05-30
 
 ### Added
 - **Added support for Home Assistant (HA) Rest and WebSocket APIs** 🥳: Hue Scheduler can now control lights and devices through HA, allowing you to manage a wider range of smart home devices.
