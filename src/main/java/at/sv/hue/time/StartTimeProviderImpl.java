@@ -3,13 +3,17 @@ package at.sv.hue.time;
 import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class StartTimeProviderImpl implements StartTimeProvider {
 
     private final SunTimesProvider sunTimesProvider;
+    private final Map<String, LocalTime> timeCache;
 
     public StartTimeProviderImpl(SunTimesProvider sunTimesProvider) {
         this.sunTimesProvider = sunTimesProvider;
+        timeCache = new ConcurrentHashMap<>();
     }
 
     @Override
@@ -27,12 +31,17 @@ public final class StartTimeProviderImpl implements StartTimeProvider {
     }
 
     private LocalTime tryParseTimeString(String input) {
-        LocalTime time = null;
-        try {
-            time = LocalTime.parse(input);
-        } catch (Exception ignore) {
+        if (!Character.isDigit(input.charAt(0))) {
+            return null;
         }
-        return time;
+
+        return timeCache.computeIfAbsent(input, k -> {
+            try {
+                return LocalTime.parse(input);
+            } catch (Exception ignore) {
+                return null;
+            }
+        });
     }
 
     private boolean isOffsetExpression(String input) {
@@ -51,43 +60,31 @@ public final class StartTimeProviderImpl implements StartTimeProvider {
     }
 
     private ZonedDateTime parseSunKeywords(String input, ZonedDateTime dateTime) {
-        switch (input.toLowerCase(Locale.ENGLISH)) {
-            case "astronomical_start":
-            case "astronomical_dawn":
-                return sunTimesProvider.getAstronomicalStart(dateTime);
-            case "nautical_start":
-            case "nautical_dawn":
-                return sunTimesProvider.getNauticalStart(dateTime);
-            case "civil_start":
-            case "civil_dawn":
-                return sunTimesProvider.getCivilStart(dateTime);
-            case "sunrise":
-                return sunTimesProvider.getSunrise(dateTime);
-            case "noon":
-                return sunTimesProvider.getNoon(dateTime);
-            case "golden_hour":
-                return sunTimesProvider.getGoldenHour(dateTime);
-            case "sunset":
-                return sunTimesProvider.getSunset(dateTime);
-            case "blue_hour":
-                return sunTimesProvider.getBlueHour(dateTime);
-            case "civil_end":
-            case "civil_dusk":
-                return sunTimesProvider.getCivilEnd(dateTime);
-            case "night_hour":
-                return sunTimesProvider.getNightHour(dateTime);
-            case "nautical_end":
-            case "nautical_dusk":
-                return sunTimesProvider.getNauticalEnd(dateTime);
-            case "astronomical_end":
-            case "astronomical_dusk":
-                return sunTimesProvider.getAstronomicalEnd(dateTime);
-        }
-        throw new IllegalArgumentException("Invalid sun keyword: '" + input + "'");
+        return switch (input.toLowerCase(Locale.ENGLISH)) {
+            case "astronomical_start", "astronomical_dawn" -> sunTimesProvider.getAstronomicalStart(dateTime);
+            case "nautical_start", "nautical_dawn" -> sunTimesProvider.getNauticalStart(dateTime);
+            case "civil_start", "civil_dawn" -> sunTimesProvider.getCivilStart(dateTime);
+            case "sunrise" -> sunTimesProvider.getSunrise(dateTime);
+            case "noon" -> sunTimesProvider.getNoon(dateTime);
+            case "golden_hour" -> sunTimesProvider.getGoldenHour(dateTime);
+            case "sunset" -> sunTimesProvider.getSunset(dateTime);
+            case "blue_hour" -> sunTimesProvider.getBlueHour(dateTime);
+            case "civil_end", "civil_dusk" -> sunTimesProvider.getCivilEnd(dateTime);
+            case "night_hour" -> sunTimesProvider.getNightHour(dateTime);
+            case "nautical_end", "nautical_dusk" -> sunTimesProvider.getNauticalEnd(dateTime);
+            case "astronomical_end", "astronomical_dusk" -> sunTimesProvider.getAstronomicalEnd(dateTime);
+            default -> throw new IllegalArgumentException("Invalid sun keyword: '" + input + "'");
+        };
     }
 
     @Override
     public String toDebugString(ZonedDateTime dateTime) {
         return sunTimesProvider.toDebugString(dateTime);
+    }
+
+    @Override
+    public void clearCaches() {
+        sunTimesProvider.clearCache();
+        timeCache.clear();
     }
 }

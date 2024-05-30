@@ -33,7 +33,7 @@ final class ScheduledState {
 
     private final String name;
     @Getter
-    private final int updateId;
+    private final String id;
     private final String startString;
     private final Integer brightness;
     private final Integer ct;
@@ -75,12 +75,12 @@ final class ScheduledState {
     private BiFunction<ScheduledState, ZonedDateTime, ScheduledStateSnapshot> previousStateLookup;
 
     @Builder
-    public ScheduledState(String name, int updateId, String startString, Integer brightness, Integer ct, Double x, Double y,
+    public ScheduledState(String name, String id, String startString, Integer brightness, Integer ct, Double x, Double y,
                           Integer hue, Integer sat, String effect, Boolean on, String transitionTimeBeforeString, Integer definedTransitionTime,
                           Set<DayOfWeek> daysOfWeek, StartTimeProvider startTimeProvider, LightCapabilities capabilities,
                           int minTrBeforeGapInMinutes, Boolean force, Boolean interpolate, boolean groupState, boolean temporary) {
         this.name = name;
-        this.updateId = updateId;
+        this.id = id;
         this.startString = startString;
         this.interpolate = interpolate;
         if (daysOfWeek == null || daysOfWeek.isEmpty()) {
@@ -119,7 +119,7 @@ final class ScheduledState {
     }
 
     private static ScheduledState createTemporaryCopy(ScheduledState state, String start, ZonedDateTime end) {
-        ScheduledState copy = new ScheduledState(state.name, state.updateId, start,
+        ScheduledState copy = new ScheduledState(state.name, state.id, start,
                 state.brightness, state.ct, state.x, state.y, state.hue, state.sat, state.effect, state.on,
                 state.transitionTimeBeforeString, state.definedTransitionTime, state.daysOfWeek, state.startTimeProvider,
                 state.capabilities, state.minTrBeforeGapInMinutes, state.force, state.interpolate, state.groupState, true);
@@ -155,7 +155,7 @@ final class ScheduledState {
     private void assertBrightnessSupported() {
         if (!capabilities.isBrightnessSupported()) {
             throw new BrightnessNotSupported(getFormattedName() + "' does not support setting brightness! "
-                    + "Capabilities: " + capabilities.getCapabilities());
+                                             + "Capabilities: " + capabilities.getCapabilities());
         }
     }
 
@@ -169,7 +169,7 @@ final class ScheduledState {
         }
         if (ct > capabilities.getCtMax() || ct < capabilities.getCtMin()) {
             throw new InvalidColorTemperatureValue("Invalid ct value '" + ct + "'. Support integer range for " + getFormattedName() + ": "
-                    + capabilities.getCtMin() + "-" + capabilities.getCtMax());
+                                                   + capabilities.getCtMin() + "-" + capabilities.getCtMax());
         }
         return ct;
     }
@@ -177,7 +177,7 @@ final class ScheduledState {
     private void assertCtSupported() {
         if (!capabilities.isCtSupported()) {
             throw new ColorTemperatureNotSupported(getFormattedName() + "' does not support setting color temperature! "
-                    + "Capabilities: " + capabilities.getCapabilities());
+                                                   + "Capabilities: " + capabilities.getCapabilities());
         }
     }
 
@@ -212,7 +212,7 @@ final class ScheduledState {
     private void assertColorCapabilities() {
         if (isColorState() && !capabilities.isColorSupported()) {
             throw new ColorNotSupported(getFormattedName() + "' does not support setting color! "
-                    + "Capabilities: " + capabilities.getCapabilities());
+                                        + "Capabilities: " + capabilities.getCapabilities());
         }
     }
 
@@ -352,13 +352,6 @@ final class ScheduledState {
         return daysOfWeek.containsAll(Arrays.asList(day));
     }
 
-    public String getIdV1() {
-        if (groupState) {
-            return "/groups/" + updateId;
-        }
-        return "/lights/" + updateId;
-    }
-
     private String getEffect() {
         if (isMultiColorLoop()) {
             return COLOR_LOOP;
@@ -445,7 +438,15 @@ final class ScheduledState {
     }
 
     public boolean isNullState() {
-        return brightness == null && ct == null && on == null && x == null && y == null && hue == null && sat == null && effect == null;
+        return on == null && hasNoOtherPropertiesThanOn();
+    }
+
+    private boolean hasNoOtherPropertiesThanOn() {
+        return brightness == null && ct == null && x == null && y == null && hue == null && sat == null && effect == null;
+    }
+
+    public boolean hasOtherPropertiesThanOn() {
+        return !hasNoOtherPropertiesThanOn();
     }
 
     public boolean isOff() {
@@ -496,7 +497,7 @@ final class ScheduledState {
     }
 
     public PutCall getPutCall(ZonedDateTime now, ZonedDateTime definedStart) {
-        return PutCall.builder().id(updateId)
+        return PutCall.builder().id(id)
                       .bri(brightness)
                       .ct(ct)
                       .x(x)
@@ -513,26 +514,26 @@ final class ScheduledState {
     @Override
     public String toString() {
         return getFormattedName() + " {" +
-                "id=" + updateId +
-                (temporary && !retryAfterPowerOnState ? ", temporary" : "") +
-                (retryAfterPowerOnState ? ", power-on-event" : "") +
-                ", start=" + getFormattedStart() +
-                ", end=" + getFormattedEnd() +
-                getFormattedPropertyIfSet("on", on) +
-                getFormattedPropertyIfSet("bri", brightness) +
-                getFormattedPropertyIfSet("ct", ct) +
-                getFormattedPropertyIfSet("x", x) +
-                getFormattedPropertyIfSet("y", y) +
-                getFormattedPropertyIfSet("hue", hue) +
-                getFormattedPropertyIfSet("sat", sat) +
-                getFormattedPropertyIfSet("effect", effect) +
-                getFormattedDaysOfWeek() +
-                getFormattedTransitionTimeBefore() +
-                getFormattedTransitionTimeIfSet("tr", definedTransitionTime) +
-                getFormattedPropertyIfSet("lastSeen", getFormattedTime(lastSeen)) +
-                getFormattedPropertyIfSet("force", force) +
-                getFormattedPropertyIfSet("interpolate", interpolate) +
-                '}';
+               "id=" + id +
+               (temporary && !retryAfterPowerOnState ? ", temporary" : "") +
+               (retryAfterPowerOnState ? ", power-on-event" : "") +
+               ", start=" + getFormattedStart() +
+               ", end=" + getFormattedEnd() +
+               getFormattedPropertyIfSet("on", on) +
+               getFormattedPropertyIfSet("bri", brightness) +
+               getFormattedPropertyIfSet("ct", ct) +
+               getFormattedPropertyIfSet("x", x) +
+               getFormattedPropertyIfSet("y", y) +
+               getFormattedPropertyIfSet("hue", hue) +
+               getFormattedPropertyIfSet("sat", sat) +
+               getFormattedPropertyIfSet("effect", effect) +
+               getFormattedDaysOfWeek() +
+               getFormattedTransitionTimeBefore() +
+               getFormattedTransitionTimeIfSet("tr", definedTransitionTime) +
+               getFormattedPropertyIfSet("lastSeen", getFormattedTime(lastSeen)) +
+               getFormattedPropertyIfSet("force", force) +
+               getFormattedPropertyIfSet("interpolate", interpolate) +
+               '}';
     }
 
     public String getFormattedName() {
@@ -577,7 +578,7 @@ final class ScheduledState {
         }
         if (lastStart != null) {
             return formatPropertyName("tr-before") + transitionTimeBeforeString +
-                    " (" + formatTransitionTimeBefore(parseTransitionTimeBefore(lastStart)) + ")";
+                   " (" + formatTransitionTimeBefore(parseTransitionTimeBefore(lastStart)) + ")";
         }
         return formatPropertyName("tr-before") + transitionTimeBeforeString;
     }

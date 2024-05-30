@@ -11,13 +11,13 @@ import java.io.IOException;
 import java.net.URL;
 
 @Slf4j
-public class HttpsResourceProviderImpl implements HttpResourceProvider {
+public class HttpResourceProviderImpl implements HttpResourceProvider {
 
     public static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
 
     private final OkHttpClient httpClient;
 
-    public HttpsResourceProviderImpl(OkHttpClient httpClient) {
+    public HttpResourceProviderImpl(OkHttpClient httpClient) {
         this.httpClient = httpClient;
     }
 
@@ -43,6 +43,17 @@ public class HttpsResourceProviderImpl implements HttpResourceProvider {
         }
     }
 
+    @Override
+    public String postResource(URL url, String body) {
+        log.trace("Post: {}: {}", url, body);
+        try (Response response = callHttpClient(postRequest(url, body))) {
+            assertSuccessful(response);
+            return getBody(response);
+        } catch (IOException e) {
+            throw new BridgeConnectionFailure("Failed to POST '" + url + "'", e);
+        }
+    }
+
     private static Request getRequest(URL url) {
         return new Request.Builder()
                 .url(url)
@@ -57,11 +68,22 @@ public class HttpsResourceProviderImpl implements HttpResourceProvider {
                 .build();
     }
 
+    private static Request postRequest(URL url, String json) {
+        RequestBody requestBody = RequestBody.create(json, JSON);
+        return new Request.Builder()
+                .url(url)
+                .post(requestBody)
+                .build();
+    }
+
     private Response callHttpClient(Request request) throws IOException {
         return httpClient.newCall(request).execute();
     }
 
     private static void assertSuccessful(Response response) throws IOException {
+        if (response.code() == 401) {
+            throw new BridgeAuthenticationFailure();
+        }
         if (!response.isSuccessful()) {
             throw new IOException("Unexpected return code " + response);
         }

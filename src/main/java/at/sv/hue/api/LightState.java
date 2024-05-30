@@ -1,12 +1,14 @@
 package at.sv.hue.api;
 
 import at.sv.hue.ColorMode;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 
 import java.util.EnumSet;
 
 @Data
+@AllArgsConstructor
 @Builder
 public final class LightState {
     private final Integer brightness;

@@ -124,6 +124,11 @@ class StartTimeProviderTest {
             public String toDebugString(ZonedDateTime dateTime) {
                 return null;
             }
+
+            @Override
+            public void clearCache() {
+
+            }
         });
     }
 
@@ -131,6 +136,8 @@ class StartTimeProviderTest {
     void parse_simpleDateTime_returnsLocalTime() {
         assertStart("07:00", now.with(LocalTime.of(7, 0)));
         assertStart("08:00", now.with(LocalTime.of(8, 0)));
+        assertStart("12:59", now.with(LocalTime.of(12, 59)));
+        assertStart("17:05", now.with(LocalTime.of(17, 5)));
     }
 
     @Test

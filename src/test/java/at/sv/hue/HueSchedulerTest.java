@@ -1,10 +1,10 @@
 package at.sv.hue;
 
+import at.sv.hue.api.ApiFailure;
 import at.sv.hue.api.BridgeConnectionFailure;
 import at.sv.hue.api.Capability;
 import at.sv.hue.api.GroupNotFoundException;
 import at.sv.hue.api.HueApi;
-import at.sv.hue.api.HueApiFailure;
 import at.sv.hue.api.LightCapabilities;
 import at.sv.hue.api.LightNotFoundException;
 import at.sv.hue.api.LightState;
@@ -21,7 +21,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import org.mockito.Mockito;
-import org.mockito.stubbing.OngoingStubbing;
 
 import java.time.DayOfWeek;
 import java.time.Duration;
@@ -184,15 +183,19 @@ class HueSchedulerTest {
     }
 
     private void mockLightIdForName(String name, int id) {
-        when(mockedHueApi.getLightId(name)).thenReturn(id);
+        when(mockedHueApi.getLightId(name)).thenReturn("/lights/" + id);
     }
 
     private void mockGroupLightsForId(int groupId, Integer... lights) {
-        when(mockedHueApi.getGroupLights(groupId)).thenReturn(Arrays.asList(lights));
+        List<String> lightIds = Arrays.stream(lights)
+                                      .map(String::valueOf)
+                                      .map(id -> "/lights/" + id)
+                                      .toList();
+        when(mockedHueApi.getGroupLights("/groups/" + groupId)).thenReturn(lightIds);
     }
 
     private void mockGroupIdForName(String name, int id) {
-        when(mockedHueApi.getGroupId(name)).thenReturn(id);
+        when(mockedHueApi.getGroupId(name)).thenReturn("/groups/" + id);
     }
 
     private void addDefaultState() {
@@ -242,27 +245,26 @@ class HueSchedulerTest {
     }
 
     private void setLightStateResponse(int id, LightState.LightStateBuilder lightStateBuilder) {
-        setLightStateResponse(id, lightStateBuilder.build());
+        setLightStateResponse("/lights/" + id, lightStateBuilder);
     }
 
-    private void setLightStateResponse(int id, LightState lightState) {
-        when(mockedHueApi.getLightState(id)).thenReturn(lightState);
+    private void setLightStateResponse(String id, LightState.LightStateBuilder lightStateBuilder) {
+        when(mockedHueApi.getLightState(id)).thenReturn(lightStateBuilder.build());
     }
 
     private void setLightStateResponse(int id, boolean reachable, boolean on, String effect) {
-        LightState lightState = LightState.builder()
+        LightState.LightStateBuilder lightStateBuilder = LightState.builder()
                                           .brightness(DEFAULT_BRIGHTNESS)
                                           .colorTemperature(DEFAULT_CT)
                                           .effect(effect)
                                           .reachable(reachable)
                                           .on(on)
-                                          .lightCapabilities(defaultCapabilities)
-                                          .build();
-        setLightStateResponse(id, lightState);
+                                          .lightCapabilities(defaultCapabilities);
+        setLightStateResponse(id, lightStateBuilder);
     }
 
     private void addGroupStateResponses(int id, LightState... lightStates) {
-        when(mockedHueApi.getGroupStates(id)).thenReturn(Arrays.asList(lightStates));
+        when(mockedHueApi.getGroupStates("/groups/" + id)).thenReturn(Arrays.asList(lightStates));
     }
 
     private ScheduledRunnable ensureNextDayRunnable() {
@@ -280,7 +282,7 @@ class HueSchedulerTest {
     }
 
     private ScheduledRunnable ensureRunnable(ZonedDateTime scheduleStart) {
-        ScheduledRunnable state = ensureScheduledStates(1).get(0);
+        ScheduledRunnable state = ensureScheduledStates(1).getFirst();
         assertScheduleStart(state, scheduleStart);
         return state;
     }
@@ -317,15 +319,15 @@ class HueSchedulerTest {
     }
 
     private void mockLightCapabilities(int id, LightCapabilities.LightCapabilitiesBuilder capabilitiesBuilder) {
-        mockLightCapabilities(id, capabilitiesBuilder.build());
+        mockLightCapabilities("/lights/" + id, capabilitiesBuilder.build());
     }
 
-    private void mockLightCapabilities(int id, LightCapabilities capabilities) {
-        when(mockedHueApi.getLightCapabilities(id)).thenReturn(capabilities);
+    private void mockLightCapabilities(Object id, LightCapabilities capabilities) {
+        when(mockedHueApi.getLightCapabilities(id.toString())).thenReturn(capabilities);
     }
 
     private void mockDefaultLightCapabilities(int id) {
-        mockLightCapabilities(id, defaultCapabilities);
+        mockLightCapabilities("/lights/" + id, defaultCapabilities);
     }
 
     private void mockDefaultGroupCapabilities(int id) {
@@ -337,18 +339,22 @@ class HueSchedulerTest {
     }
 
     private void mockGroupCapabilities(int id, LightCapabilities capabilities) {
-        when(mockedHueApi.getGroupCapabilities(id)).thenReturn(capabilities);
+        when(mockedHueApi.getGroupCapabilities("/groups/" + id)).thenReturn(capabilities);
     }
 
     private void mockAssignedGroups(int lightId, List<Integer> groups) {
-        lenient().when(mockedHueApi.getAssignedGroups(lightId)).thenReturn(groups);
+        List<String> groupIds = groups.stream()
+                                      .map(String::valueOf)
+                                      .map(id -> "/groups/" + id)
+                                      .toList();
+        lenient().when(mockedHueApi.getAssignedGroups("/lights/" + lightId)).thenReturn(groupIds);
     }
 
     private ScheduledRunnable startWithDefaultState() {
         addDefaultState();
         startScheduler();
 
-        return ensureScheduledStates(1).get(0);
+        return ensureScheduledStates(1).getFirst();
     }
 
     private ScheduledRunnable startAndGetSingleRunnable(ZonedDateTime scheduledStart, ZonedDateTime endExclusive) {
@@ -366,33 +372,33 @@ class HueSchedulerTest {
     private ScheduledRunnable startAndGetSingleRunnable() {
         startScheduler();
 
-        return ensureScheduledStates(1).get(0);
+        return ensureScheduledStates(1).getFirst();
     }
 
     private List<ScheduledRunnable> simulateLightOnEvent(ExpectedRunnable... expectedRunnables) {
-        simulateLightOnEvent("/lights/" + ID);
+        return simulateLightOnEvent("/lights/" + ID, expectedRunnables);
+    }
+
+    private List<ScheduledRunnable> simulateLightOnEvent(String id, ExpectedRunnable... expectedRunnables) {
+        simulateLightOnEvent(id);
         return ensureScheduledStates(expectedRunnables);
     }
 
-    private void simulateLightOnEvent(String idv1) {
-        scheduler.getHueEventListener().onLightOn(idv1, null, false);
+    private void simulateLightOnEvent(String id) {
+        scheduler.getHueEventListener().onLightOn(id, false);
     }
 
     private ScheduledRunnable simulateLightOnEventExpectingSingleScheduledState() {
         simulateLightOnEvent("/lights/" + ID);
-        return ensureScheduledStates(1).get(0);
+        return ensureScheduledStates(1).getFirst();
     }
 
     private ScheduledRunnable simulateLightOnEventExpectingSingleScheduledState(ZonedDateTime endExclusive) {
-        return simulateLightOnEvent(expectedPowerOnEnd(endExclusive)).get(0);
+        return simulateLightOnEvent(expectedPowerOnEnd(endExclusive)).getFirst();
     }
 
-    private void mockPutReturnValue(boolean value) {
-        getPutStateMock().thenReturn(value);
-    }
-
-    private OngoingStubbing<Boolean> getPutStateMock() {
-        return when(mockedHueApi.putState(any()));
+    private void mockPutStateThrowable(Throwable throwable) {
+        doThrow(throwable).when(mockedHueApi).putState(any());
     }
 
     private void enableUserModificationTracking() {
@@ -418,7 +424,6 @@ class HueSchedulerTest {
         mockedHueApi = mock(HueApi.class);
         orderVerifier = inOrder(mockedHueApi);
         expectedPutCalls = 0;
-        mockPutReturnValue(true); // defaults to true, to signal success
         setCurrentAndInitialTimeTo(ZonedDateTime.of(2021, 1, 1, 0, 0, 0,
                 0, ZoneId.of("Europe/Vienna")));
         startTimeProvider = new StartTimeProviderImpl(new SunTimesProviderImpl(48.20, 16.39, 165));
@@ -435,7 +440,7 @@ class HueSchedulerTest {
         disableUserModificationTracking = true;
         defaultInterpolationTransitionTimeInMs = null;
         interpolateAll = false;
-        when(mockedHueApi.getLightName(ID)).thenReturn("Test");
+        when(mockedHueApi.getLightName("/lights/" + ID)).thenReturn("Test");
         create();
     }
 
@@ -463,7 +468,7 @@ class HueSchedulerTest {
         );
 
         // group state still calls api as the groups and lamps have different end states
-        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(0), defaultPutCall().groupState(true));
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(), defaultGroupPutCall());
 
         ensureNextDayRunnable();
     }
@@ -489,7 +494,7 @@ class HueSchedulerTest {
                 expectedRunnable(now.plusHours(1), now.plusHours(2))
         );
 
-        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(0), defaultPutCall());
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(), defaultPutCall());
 
         ensureRunnable(now.plusHours(2), now.plusDays(1).plusHours(1));
     }
@@ -531,14 +536,14 @@ class HueSchedulerTest {
 
     @Test
     void parse_unknownLightId_exception() {
-        when(mockedHueApi.getLightName(1)).thenThrow(new LightNotFoundException("Light not foune"));
+        when(mockedHueApi.getLightName("/lights/1")).thenThrow(new LightNotFoundException("Light not found"));
 
         assertThrows(LightNotFoundException.class, () -> addStateNow("1"));
     }
 
     @Test
     void parse_unknownGroupId_exception() {
-        when(mockedHueApi.getGroupName(1)).thenThrow(new GroupNotFoundException("Group not found"));
+        when(mockedHueApi.getGroupName("/groups/1")).thenThrow(new GroupNotFoundException("Group not found"));
 
         assertThrows(GroupNotFoundException.class, () -> addStateNow("g1"));
     }
@@ -637,6 +642,67 @@ class HueSchedulerTest {
         );
 
         ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
+    void parse_hassEntityId_light_correctlyParsed() {
+        mockLightCapabilities("light.test", defaultCapabilities);
+        addStateNow("light.test", "bri:" + DEFAULT_BRIGHTNESS);
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
+                expectedPutCall("light.test").bri(DEFAULT_BRIGHTNESS)
+        );
+
+        ensureRunnable(initialNow.plusDays(1));
+        verify(mockedHueApi).getLightName("light.test");
+    }
+
+    @Test
+    void parse_hassEntityId_detectsPowerOffAndOn() {
+        mockLightCapabilities("light.test", defaultCapabilities);
+        addStateNow("light.test", "bri:" + DEFAULT_BRIGHTNESS);
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        mockIsLightOff("light.test", true);
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnable); // no put calls, as light off
+        mockIsLightOff("light.test", false);
+
+        // simulte power on
+
+        List<ScheduledRunnable> powerOnRunnable = simulateLightOnEvent("light.test",
+                expectedPowerOnEnd(initialNow.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(powerOnRunnable.getFirst(),
+                expectedPutCall("light.test").bri(DEFAULT_BRIGHTNESS)
+        );
+
+        ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
+    void parse_hassEntityId_detectsManualOverrides() {
+        enableUserModificationTracking();
+        mockLightCapabilities("light.test", defaultCapabilities);
+        addState("light.test", "00:00", "bri:" + DEFAULT_BRIGHTNESS);
+        addState("light.test", "01:00", "bri:" + (DEFAULT_BRIGHTNESS + 10));
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusHours(1)),
+                expectedRunnable(now.plusHours(1), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall("light.test").bri(DEFAULT_BRIGHTNESS)
+        );
+
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusHours(1)); // next day
+
+        setLightStateResponse("light.test", expectedState().brightness(DEFAULT_BRIGHTNESS + 5)); // overridden
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(1));
     }
 
     @Test
@@ -790,7 +856,7 @@ class HueSchedulerTest {
                 expectedRunnable(now.plusHours(12), now.plusHours(12)) // zero length
         );
 
-        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(0),
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
                 expectedPutCall(1).bri(1), // interpolated call
                 expectedPutCall(1).bri(254).transitionTime(tr("1h"))
         );
@@ -822,7 +888,7 @@ class HueSchedulerTest {
                 expectedRunnable(sunrise, noon),
                 expectedRunnable(noon, sunset)
         );
-        ScheduledRunnable previousDaySunriseState = scheduledRunnables.get(0);
+        ScheduledRunnable previousDaySunriseState = scheduledRunnables.getFirst();
 
         advanceTimeAndRunAndAssertPutCalls(previousDaySunriseState,
                 expectedPutCall(1).bri(50), // interpolated call
@@ -871,7 +937,7 @@ class HueSchedulerTest {
                 expectedRunnable(now, initialNow.plusDays(1)),
                 expectedRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(10))
         );
-        ScheduledRunnable trRunnable = scheduledRunnables.get(0);
+        ScheduledRunnable trRunnable = scheduledRunnables.getFirst();
 
         advanceTimeAndRunAndAssertPutCalls(trRunnable,
                 expectedPutCall(1).bri(10),
@@ -909,7 +975,7 @@ class HueSchedulerTest {
                 expectedRunnable(initialNow.plusMinutes(10), initialNow.plusDays(1)), // tr-runnable
                 expectedRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(10))
         );
-        ScheduledRunnable trRunnable = scheduledRunnables.get(0);
+        ScheduledRunnable trRunnable = scheduledRunnables.getFirst();
 
         // first split
 
@@ -922,7 +988,7 @@ class HueSchedulerTest {
                 expectedRunnable(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)), // scheduled second split of transition
                 expectedRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)) // next day
         );
-        ScheduledRunnable followUpRunnable = followUpRunnables.get(0);
+        ScheduledRunnable followUpRunnable = followUpRunnables.getFirst();
 
         // run follow-up call for the second split
 
@@ -992,7 +1058,7 @@ class HueSchedulerTest {
         // 3h30min -> split to: 100min + 100min + 10min
 
         List<ScheduledRunnable> scheduledRunnables = startScheduler(2);
-        ScheduledRunnable trRunnable = scheduledRunnables.get(0);
+        ScheduledRunnable trRunnable = scheduledRunnables.getFirst();
 
         assertScheduleStart(trRunnable, now, initialNow.plusDays(1));
 
@@ -1007,7 +1073,7 @@ class HueSchedulerTest {
                 expectedRunnable(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)), // scheduled second split of transition
                 expectedRunnable(initialNow.plusDays(1), initialNow.plusDays(2)) // next day
         );
-        ScheduledRunnable followUpRunnable = followUpRunnables.get(0);
+        ScheduledRunnable followUpRunnable = followUpRunnables.getFirst();
 
         // run follow-up call for the second split
 
@@ -1037,7 +1103,7 @@ class HueSchedulerTest {
         manualOverrideTracker.onManuallyOverridden("/lights/" + 1); // start directly with overridden state
 
         List<ScheduledRunnable> scheduledRunnables = startScheduler(2);
-        ScheduledRunnable trRunnable = scheduledRunnables.get(0);
+        ScheduledRunnable trRunnable = scheduledRunnables.getFirst();
         assertScheduleStart(trRunnable, now, initialNow.plusDays(1));
 
         trRunnable.run(); // no interaction, as directly skipped
@@ -1055,7 +1121,7 @@ class HueSchedulerTest {
                 expectedRunnable(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)), // scheduled second split of transition
                 expectedRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)) // next day
         );
-        ScheduledRunnable followUpRunnable = followUpRunnables.get(0);
+        ScheduledRunnable followUpRunnable = followUpRunnables.getFirst();
 
         // no user modification since split call -> proceeds normally
 
@@ -1113,7 +1179,7 @@ class HueSchedulerTest {
                 expectedRunnable(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)), // scheduled final split of transition
                 expectedRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)) // next day
         );
-        ScheduledRunnable finalSplit = followUpRunnables.get(0);
+        ScheduledRunnable finalSplit = followUpRunnables.getFirst();
 
         // second power on, right at the start of the gap
 
@@ -1177,7 +1243,7 @@ class HueSchedulerTest {
                 expectedRunnable(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)), // scheduled second split of transition
                 expectedRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)) // next day
         );
-        ScheduledRunnable secondSplit = followUpRunnables.get(0);
+        ScheduledRunnable secondSplit = followUpRunnables.getFirst();
 
         // second split -> detect override
 
@@ -1276,7 +1342,7 @@ class HueSchedulerTest {
                 expectedRunnable(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)), // scheduled second split of transition
                 expectedRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)) // next day
         );
-        ScheduledRunnable secondSplit = followUpRunnables.get(0);
+        ScheduledRunnable secondSplit = followUpRunnables.getFirst();
 
         // Power on, right at the start of the gap
 
@@ -1341,7 +1407,7 @@ class HueSchedulerTest {
                 expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length state
         );
 
-        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(0),
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
                 expectedPutCall(1).bri(1),
                 expectedPutCall(1).bri(19 - 1).transitionTime(MAX_TRANSITION_TIME_WITH_BUFFER)
         );
@@ -1365,7 +1431,7 @@ class HueSchedulerTest {
     }
 
     @Test
-    void parse_transitionTImeBefore_longDuration_putCallReturnsFalseForSplitCall_skipsFurtherSplitCallsUntilPowerOn() {
+    void parse_transitionTImeBefore_longDuration_lightIsConsideredOffForSplitCall_skipsFurtherSplitCallsUntilPowerOn() {
         addKnownLightIdsWithDefaultCapabilities(1);
         addState(1, now, "bri:1");
         addState(1, now, "bri:254", "tr-before:24h");
@@ -1374,7 +1440,7 @@ class HueSchedulerTest {
                 expectedRunnable(now, now.plusDays(1)),
                 expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length state
         );
-        ScheduledRunnable firstSplit = scheduledRunnables.get(0);
+        ScheduledRunnable firstSplit = scheduledRunnables.getFirst();
 
         advanceTimeAndRunAndAssertPutCalls(firstSplit,
                 expectedPutCall(1).bri(1), // interpolated call
@@ -1385,35 +1451,25 @@ class HueSchedulerTest {
                 expectedRunnable(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), now.plusDays(1)), // next split
                 expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
         );
-        ScheduledRunnable secondSplit = followUpStates.get(0);
+        ScheduledRunnable secondSplit = followUpStates.getFirst();
 
-        mockPutReturnValue(false); // put will return false, indicating light off
-        advanceTimeAndRunAndAssertPutCalls(secondSplit,
-                expectedPutCall(1).bri(36).transitionTime(MAX_TRANSITION_TIME_WITH_BUFFER)
-        );
-        mockPutReturnValue(true);
+        mockIsLightOff(1, true);
+        advanceTimeAndRunAndAssertPutCalls(secondSplit); // no split call
+        mockIsLightOff(1, false);
 
-        ScheduledRunnable thirdSplit = ensureRunnable(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)); // next split
+        // no further split calls scheduled
 
-        // third split -> no put calls, skipped
-
-        advanceTimeAndRunAndAssertPutCalls(thirdSplit);
-
-        ensureScheduledStates(0); // no further split calls scheduled
-
-        // power on event -> re tries third split
+        // power on event -> re tries second split
 
         List<ScheduledRunnable> powerOnEvents = simulateLightOnEvent(
                 expectedPowerOnEnd(initialNow.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS)),
-                expectedPowerOnEnd(initialNow.plus(ScheduledState.MAX_TRANSITION_TIME_MS * 2, ChronoUnit.MILLIS)),
-                expectedPowerOnEnd(initialNow.plusDays(1)) // third split again
+                expectedPowerOnEnd(initialNow.plusDays(1)) // second split again
         );
 
         powerOnEvents.get(0).run(); // already ended
-        powerOnEvents.get(1).run(); // already ended
-        advanceTimeAndRunAndAssertPutCalls(powerOnEvents.get(2),
-                expectedPutCall(1).bri(36), // end of second split
-                expectedPutCall(1).bri(53).transitionTime(MAX_TRANSITION_TIME_WITH_BUFFER)
+        advanceTimeAndRunAndAssertPutCalls(powerOnEvents.get(1),
+                expectedPutCall(1).bri(19), // end of first split
+                expectedPutCall(1).bri(36).transitionTime(MAX_TRANSITION_TIME_WITH_BUFFER)
         );
 
         ensureRunnable(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)); // next split
@@ -1514,7 +1570,7 @@ class HueSchedulerTest {
                 expectedRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(1))
         );
 
-        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(0),
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
                 expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 1).transitionTime(1),
                 expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 10).transitionTime(tr("8min"))
         );
@@ -1551,7 +1607,7 @@ class HueSchedulerTest {
                 expectedRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(1))
         );
 
-        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(0),
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
                 expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 1).transitionTime(2),  // uses default
                 expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 10).transitionTime(tr("8min"))
         );
@@ -1574,7 +1630,7 @@ class HueSchedulerTest {
                 expectedRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(1))
         );
 
-        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(0),
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
                 expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 1).transitionTime(0), // reused previous value
                 expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 10).transitionTime(tr("8min"))
         );
@@ -1686,7 +1742,7 @@ class HueSchedulerTest {
                 expectedRunnable(now.plusMinutes(5), now.plusDays(1))
         );
 
-        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(0),
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
                 // no interpolated call, as second state is not scheduled on Sunday (the day before)
                 expectedPutCall(1).bri(DEFAULT_BRIGHTNESS) // no tr since state from day before is already reached
         );
@@ -1944,7 +2000,7 @@ class HueSchedulerTest {
 
         advanceCurrentTime(Duration.ofMinutes(10)); // here we cross over to tomorrow
 
-        runAndAssertPutCalls(scheduledRunnables.get(0),
+        runAndAssertPutCalls(scheduledRunnables.getFirst(),
                 expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 10) // no transition time expected
         );
 
@@ -1985,7 +2041,7 @@ class HueSchedulerTest {
                 expectedRunnable(now.plus(adjustedNextStart, ChronoUnit.MILLIS), sunset), // next split call
                 expectedRunnable(nextDaySunrise.minusHours(8), nextDaySunset) // sunrise rescheduled for the next day
         );
-        ScheduledRunnable firstSplitCall = followUpRunnables.get(0);
+        ScheduledRunnable firstSplitCall = followUpRunnables.getFirst();
 
         advanceTimeAndRunAndAssertPutCalls(firstSplitCall,
                 expectedPutCall(1).bri(112 - 1).transitionTime(MAX_TRANSITION_TIME_WITH_BUFFER)
@@ -2130,7 +2186,7 @@ class HueSchedulerTest {
                 expectedRunnable(now.plusMinutes(10), now.plusDays(1))
         );
 
-        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(0),
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
                 expectedPutCall(1).bri(10) // removes tr
         );
 
@@ -2164,7 +2220,7 @@ class HueSchedulerTest {
                 expectedRunnable(now.plusMinutes(7), now.plusDays(1))
         );
 
-        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(0),
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
                 expectedPutCall(1).bri(10).transitionTime(tr("2min")) // adjusts to custom gap
         );
 
@@ -2318,8 +2374,8 @@ class HueSchedulerTest {
         advanceCurrentTime(Duration.ofMinutes(15));
 
         runAndAssertPutCalls(scheduledRunnables.get(1),
-                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 5).groupState(true), // interpolated call
-                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 10).transitionTime(tr("5min")).groupState(true)
+                expectedGroupPutCall(1).bri(DEFAULT_BRIGHTNESS + 5), // interpolated call
+                expectedGroupPutCall(1).bri(DEFAULT_BRIGHTNESS + 10).transitionTime(tr("5min"))
         );
 
         ensureRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)); // next day
@@ -2536,7 +2592,7 @@ class HueSchedulerTest {
         setCurrentTimeTo(now.plusHours(2).plusMinutes(45)); // 15 minutes after start
 
         List<ScheduledRunnable> scheduledRunnables = startScheduler(2);
-        ScheduledRunnable trBeforeRunnable = scheduledRunnables.get(0);
+        ScheduledRunnable trBeforeRunnable = scheduledRunnables.getFirst();
 
         advanceTimeAndRunAndAssertPutCalls(trBeforeRunnable,
                 expectedPutCall(1).ct(300),  // correct interpolated ct value
@@ -2598,8 +2654,8 @@ class HueSchedulerTest {
         setCurrentTimeTo(now.plusMinutes(30)); // 10 minutes after start
 
         runAndAssertPutCalls(trBeforeRunnable,
-                expectedPutCall(5).bri(DEFAULT_BRIGHTNESS + 10).ct(DEFAULT_CT + 10).groupState(true),
-                expectedPutCall(5).bri(DEFAULT_BRIGHTNESS + 20).ct(DEFAULT_CT + 20).groupState(true).transitionTime(tr("10min"))
+                expectedGroupPutCall(5).bri(DEFAULT_BRIGHTNESS + 10).ct(DEFAULT_CT + 10),
+                expectedGroupPutCall(5).bri(DEFAULT_BRIGHTNESS + 20).ct(DEFAULT_CT + 20).transitionTime(tr("10min"))
         );
 
         ensureRunnable(initialNow.plusDays(1).plusMinutes(20), initialNow.plusDays(2));
@@ -2848,7 +2904,7 @@ class HueSchedulerTest {
                 expectedRunnable(now.plusDays(1).minusMinutes(40), now.plusDays(1).minusMinutes(30)),
                 expectedRunnable(now.plusDays(1).minusMinutes(30), now.plusDays(1).minusMinutes(10))
         );
-        ScheduledRunnable trBeforeRunnable = scheduledRunnables.get(0);
+        ScheduledRunnable trBeforeRunnable = scheduledRunnables.getFirst();
 
         advanceTimeAndRunAndAssertPutCalls(trBeforeRunnable,
                 expectedPutCall(1).ct(DEFAULT_CT + 10),
@@ -2905,7 +2961,7 @@ class HueSchedulerTest {
                 expectedRunnable(now.plusHours(9), now.plusHours(10)),
                 expectedRunnable(now.plusHours(14), now.plusDays(1)) // ends at end of day
         );
-        ScheduledRunnable crossOverState = scheduledRunnables.get(0);
+        ScheduledRunnable crossOverState = scheduledRunnables.getFirst();
 
         advanceTimeAndRunAndAssertPutCalls(crossOverState,
                 expectedPutCall(1).ct(200)
@@ -3063,7 +3119,7 @@ class HueSchedulerTest {
 
         setCurrentTimeTo(initialNow.plusDays(1)); // Tuesday
 
-        scheduledRunnables.get(0).run(); // already ended, state is not scheduled on Tuesday
+        scheduledRunnables.getFirst().run(); // already ended, state is not scheduled on Tuesday
 
         ScheduledRunnable nextRunnable = ensureRunnable(initialNow.plusDays(2), initialNow.plusDays(2).plusHours(12));
 
@@ -3087,7 +3143,7 @@ class HueSchedulerTest {
 
         setCurrentTimeTo(initialNow.plusDays(1).plusHours(11)); // Tuesday, AM
 
-        scheduledRunnables.get(0).run(); // already ended, state is not scheduled on Tuesday; schedule next week
+        scheduledRunnables.getFirst().run(); // already ended, state is not scheduled on Tuesday; schedule next week
 
         ensureRunnable(initialNow.plusDays(7), initialNow.plusDays(8));
     }
@@ -3229,7 +3285,7 @@ class HueSchedulerTest {
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
-                expectedPutCall(ID).x(x).y(y).groupState(true)
+                expectedGroupPutCall(ID).x(x).y(y)
         );
 
         ensureRunnable(initialNow.plusDays(1));
@@ -3336,7 +3392,7 @@ class HueSchedulerTest {
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
-                expectedPutCall(ID).effect("colorloop").groupState(true)
+                expectedGroupPutCall(ID).effect("colorloop")
         );
 
         ensureRunnable(initialNow.plusDays(1));
@@ -3357,13 +3413,13 @@ class HueSchedulerTest {
         setLightStateResponse(5, true, true, "colorloop");
         setLightStateResponse(6, false, false, "colorloop"); // ignored, because unreachable and off
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
-                expectedPutCall(1).effect("colorloop").groupState(true)
+                expectedGroupPutCall(1).effect("colorloop")
         );
 
         List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(2); // adjustment, and next day
-        assertScheduleStart(scheduledRunnables.get(0), now.plusSeconds(multiColorAdjustmentDelay)); // first adjustment
+        assertScheduleStart(scheduledRunnables.getFirst(), now.plusSeconds(multiColorAdjustmentDelay)); // first adjustment
 
-        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(0),
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
                 expectedPutCall(2).on(false)  // turns off light 2
         );
 
@@ -3401,7 +3457,7 @@ class HueSchedulerTest {
         setLightStateResponse(1, true, true, null);
         setLightStateResponse(2, true, true, "colorloop");
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
-                expectedPutCall(1).effect("colorloop").groupState(true)
+                expectedGroupPutCall(1).effect("colorloop")
         );
 
         List<ScheduledRunnable> scheduledRunnables = ensureScheduledStates(2);
@@ -3413,9 +3469,9 @@ class HueSchedulerTest {
         );
 
         List<ScheduledRunnable> round2 = ensureScheduledStates(1);
-        assertScheduleStart(round2.get(0), now.plus(300, ChronoUnit.MILLIS)); // turn on again
+        assertScheduleStart(round2.getFirst(), now.plus(300, ChronoUnit.MILLIS)); // turn on again
 
-        advanceTimeAndRunAndAssertPutCalls(round2.get(0),
+        advanceTimeAndRunAndAssertPutCalls(round2.getFirst(),
                 expectedPutCall(2).effect("colorloop").on(true)  // turns on light 2
         );
     }
@@ -3429,7 +3485,7 @@ class HueSchedulerTest {
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
-                expectedPutCall(ID).effect("colorloop").groupState(true)
+                expectedGroupPutCall(ID).effect("colorloop")
         );
 
         ensureRunnable(initialNow.plusDays(1));
@@ -3463,19 +3519,19 @@ class HueSchedulerTest {
 
     @Test
     void parse_colorInput_hue_butLightDoesNotSupportColor_exception() {
-        mockLightCapabilities(1, LightCapabilities.NO_CAPABILITIES);
+        mockLightCapabilities(1, LightCapabilities.builder());
         assertThrows(ColorNotSupported.class, () -> addStateNow("1", "hue:200"));
     }
 
     @Test
     void parse_colorInput_sat_butLightDoesNotSupportColor_exception() {
-        mockLightCapabilities(1, LightCapabilities.NO_CAPABILITIES);
+        mockLightCapabilities(1, LightCapabilities.builder());
         assertThrows(ColorNotSupported.class, () -> addStateNow("1", "sat:200"));
     }
 
     @Test
     void parse_colorInput_effect_butLightDoesNotSupportColor_exception() {
-        mockLightCapabilities(1, LightCapabilities.NO_CAPABILITIES);
+        mockLightCapabilities(1, LightCapabilities.builder());
         assertThrows(ColorNotSupported.class, () -> addStateNow("1", "effect:colorloop"));
     }
 
@@ -3511,7 +3567,7 @@ class HueSchedulerTest {
 
     @Test
     void parse_ct_butLightDoesNotSupportCt_exception() {
-        mockLightCapabilities(1, LightCapabilities.NO_CAPABILITIES);
+        mockLightCapabilities(1, LightCapabilities.builder());
         assertThrows(ColorTemperatureNotSupported.class, () -> addStateNow("1", "ct:200"));
     }
 
@@ -3926,7 +3982,7 @@ class HueSchedulerTest {
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
-                defaultPutCall().groupState(true)
+                defaultGroupPutCall()
         );
 
         ensureRunnable(initialNow.plusDays(1));
@@ -3942,17 +3998,17 @@ class HueSchedulerTest {
 
         setLightStateResponse(1, true, true, null);
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
-                defaultPutCall().id(1),
-                defaultPutCall().id(2),
-                defaultPutCall().id(3)
+                defaultPutCall().id("/lights/1"),
+                defaultPutCall().id("/lights/2"),
+                defaultPutCall().id("/lights/3")
         );
 
         ScheduledRunnable nextDay = ensureRunnable(now.plusDays(1));
 
         advanceTimeAndRunAndAssertPutCalls(nextDay,
-                defaultPutCall().id(1),
-                defaultPutCall().id(2),
-                defaultPutCall().id(3)
+                defaultPutCall().id("/lights/1"),
+                defaultPutCall().id("/lights/2"),
+                defaultPutCall().id("/lights/3")
         );
 
         ensureRunnable(now.plusDays(1));
@@ -3969,7 +4025,7 @@ class HueSchedulerTest {
                 expectedRunnable(now.plusHours(8), now.plusDays(1))
         );
 
-        advanceTimeAndRunAndAssertPutCalls(initialStates.get(0),
+        advanceTimeAndRunAndAssertPutCalls(initialStates.getFirst(),
                 defaultPutCall()
         );
 
@@ -4010,7 +4066,7 @@ class HueSchedulerTest {
                 expectedRunnable(now.plusHours(1), now.plusDays(1))
         );
 
-        advanceTimeAndRunAndAssertPutCalls(initialStates.get(0),
+        advanceTimeAndRunAndAssertPutCalls(initialStates.getFirst(),
                 defaultPutCall()
         );
 
@@ -4052,7 +4108,7 @@ class HueSchedulerTest {
                 expectedRunnable(now.plusSeconds(10), now.plusDays(1))
         );
 
-        advanceTimeAndRunAndAssertPutCalls(initialStates.get(0),
+        advanceTimeAndRunAndAssertPutCalls(initialStates.getFirst(),
                 defaultPutCall()
         );
 
@@ -4083,7 +4139,7 @@ class HueSchedulerTest {
         );
 
         // run cross over state
-        advanceTimeAndRunAndAssertPutCalls(states.get(0),
+        advanceTimeAndRunAndAssertPutCalls(states.getFirst(),
                 defaultPutCall()
         );
 
@@ -4108,7 +4164,7 @@ class HueSchedulerTest {
                 expectedRunnable(now.plusMinutes(10), now.plusDays(1))
         );
 
-        advanceTimeAndRunAndAssertPutCalls(initialStates.get(0),
+        advanceTimeAndRunAndAssertPutCalls(initialStates.getFirst(),
                 defaultPutCall()
         );
 
@@ -4160,13 +4216,12 @@ class HueSchedulerTest {
     void run_execution_putApiConnectionFailure_retries() {
         ScheduledRunnable scheduledRunnable = startWithDefaultState();
 
-        getPutStateMock().thenThrow(new BridgeConnectionFailure("Failed test connection"));
+        mockPutStateThrowable(new BridgeConnectionFailure("Failed test connection"));
         setCurrentTimeToAndRun(scheduledRunnable); // fails but retries
 
         ScheduledRunnable retryState = ensureConnectionFailureRetryState();
 
         resetMockedApi();
-        mockPutReturnValue(true);
         runAndAssertNextDay(retryState);
     }
 
@@ -4174,13 +4229,12 @@ class HueSchedulerTest {
     void run_execution_putInvalidApiResponse_retries() {
         ScheduledRunnable scheduledRunnable = startWithDefaultState();
 
-        getPutStateMock().thenThrow(new HueApiFailure("Invalid response"));
+        mockPutStateThrowable(new ApiFailure("Invalid response"));
         setCurrentTimeToAndRun(scheduledRunnable); // failes but retries
 
         ScheduledRunnable retryState = ensureConnectionFailureRetryState();
 
         resetMockedApi();
-        mockPutReturnValue(true);
         runAndAssertNextDay(retryState);
     }
 
@@ -4188,7 +4242,7 @@ class HueSchedulerTest {
     void run_execution_getConnectionFailure_retries() {
         ScheduledRunnable scheduledRunnable = startWithDefaultState();
 
-        getPutStateMock().thenThrow(new BridgeConnectionFailure("Failed test connection"));
+        mockPutStateThrowable(new BridgeConnectionFailure("Failed test connection"));
         // fails on GET, retries
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
                 defaultPutCall()
@@ -4197,7 +4251,6 @@ class HueSchedulerTest {
         ScheduledRunnable retryState = ensureConnectionFailureRetryState();
 
         resetMockedApi();
-        mockPutReturnValue(true);
         runAndAssertNextDay(retryState);
     }
 
@@ -4280,6 +4333,54 @@ class HueSchedulerTest {
     }
 
     @Test
+    void run_execution_offState_withInvalidAdditionalProperties_doesNotRetryAfterPowerOn() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now, "on:false", "bri:10");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        runAndAssertPutCalls(scheduledRunnable,
+                expectedPutCall(1).on(false).bri(10) // bri actually does not make any sense here
+        );
+
+        ensureNextDayRunnable();
+
+        simulateLightOnEvent(); // not turned off again
+    }
+
+    @Test
+    void run_execution_onStateOnly_currentlyOff_doesNotFireOnEventAgainWhenSelfCausedPowerOnEvenIsDetected() {
+        addState(1, now, "on:true");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        setLightStateResponse(1, expectedState().on(false)); // light is currently off
+        runAndAssertPutCalls(scheduledRunnable,
+                expectedPutCall(1).on(true)
+        );
+
+        ensureNextDayRunnable();
+
+        simulateLightOnEvent(); // self caused power-on event
+    }
+
+    @Test
+    void run_execution_onStateOnly_currentlyOn_doesNotFireOnEventAgainWhenSelfCausedPowerOnEvenIsDetected() {
+        addState(1, now, "on:true");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        setLightStateResponse(1, expectedState().on(true)); // light is currently off
+        runAndAssertPutCalls(scheduledRunnable,
+                expectedPutCall(1).on(true) // we currently don't prevent a second "on" call, even if the light is already on
+        );
+
+        ensureNextDayRunnable();
+
+        simulateLightOnEvent(); // when turned off and on again
+    }
+
+    @Test
     void run_execution_multipleStates_userChangedStateManuallyBetweenStates_secondStateIsNotApplied_untilPowerCycle_detectsManualChangesAgainAfterwards() {
         enableUserModificationTracking();
 
@@ -4357,7 +4458,7 @@ class HueSchedulerTest {
 
         ensureScheduledStates(0);
 
-        verify(mockedHueApi, times(3)).getLightState(1);
+        verify(mockedHueApi, times(3)).getLightState("/lights/1");
     }
 
     @Test
@@ -4381,7 +4482,7 @@ class HueSchedulerTest {
 
         // first state is set normally
         advanceTimeAndRunAndAssertPutCalls(firstState,
-                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).groupState(true)
+                expectedGroupPutCall(1).bri(DEFAULT_BRIGHTNESS)
         );
 
         ensureRunnable(initialNow.plusDays(1)); // for next day
@@ -4417,7 +4518,7 @@ class HueSchedulerTest {
 
         // re-run third state after power on -> applies state as state is enforced
         advanceTimeAndRunAndAssertPutCalls(powerOnEvents.get(2),
-                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 20).groupState(true)
+                expectedGroupPutCall(1).bri(DEFAULT_BRIGHTNESS + 20)
         );
 
         ensureRunnable(initialNow.plusDays(1).plusHours(2), initialNow.plusDays(1).plusHours(3)); // third state, for next day
@@ -4429,7 +4530,7 @@ class HueSchedulerTest {
         addGroupStateResponses(1, sameStateAsThird, sameStateAsThird);
 
         advanceTimeAndRunAndAssertPutCalls(fourthState,
-                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 30).groupState(true)
+                expectedGroupPutCall(1).bri(DEFAULT_BRIGHTNESS + 30)
         );
 
         ensureRunnable(initialNow.plusDays(1).plusHours(3), initialNow.plusDays(1).plusHours(4)); // fourth state, for next day
@@ -4445,7 +4546,7 @@ class HueSchedulerTest {
 
         ensureScheduledStates(0);
 
-        verify(mockedHueApi, times(3)).getGroupStates(1);
+        verify(mockedHueApi, times(3)).getGroupStates("/groups/1");
     }
 
     @Test
@@ -4520,7 +4621,7 @@ class HueSchedulerTest {
 
         ensureScheduledStates(0);
 
-        scheduler.getHueEventListener().onLightOn("/lights/" + lightId, null, true);
+        scheduler.getHueEventListener().onLightOn("/lights/" + lightId, true);
 
         ensureScheduledStates(3); // individual light, as well as contained groups are rescheduled
     }
@@ -4570,7 +4671,7 @@ class HueSchedulerTest {
         manualOverrideTracker.onManuallyOverridden("/lights/" + 1); // start with overridden state
 
         List<ScheduledRunnable> scheduledRunnables = startScheduler(2);
-        ScheduledRunnable firstState = scheduledRunnables.get(0);
+        ScheduledRunnable firstState = scheduledRunnables.getFirst();
 
         firstState.run(); // rescheduled when power on
 
@@ -4596,7 +4697,7 @@ class HueSchedulerTest {
         manualOverrideTracker.onManuallyOverridden("/lights/" + 1); // start with overridden state
 
         List<ScheduledRunnable> scheduledRunnables = startScheduler(3);
-        ScheduledRunnable firstState = scheduledRunnables.get(0);
+        ScheduledRunnable firstState = scheduledRunnables.getFirst();
 
         firstState.run(); // rescheduled when power on
 
@@ -4640,7 +4741,7 @@ class HueSchedulerTest {
                 expectedPowerOnEnd(nextDaySunrise)
         );
 
-        powerOnRunnables.get(0).run(); // already ended, but schedules the same state again for the same day sunrise
+        powerOnRunnables.getFirst().run(); // already ended, but schedules the same state again for the same day sunrise
 
         ensureRunnable(nextDaySunrise, nextDaySunrise.plusHours(1));
     }
@@ -4705,7 +4806,7 @@ class HueSchedulerTest {
     }
 
     @Test
-    void run_execution_manualOverride_secondPutCallNotSuccessful_doesNotDetectChangesForThirdState() {
+    void run_execution_manualOverride_lightConsideredOffAtSecondPutCall_doesNotDetectChangesForThirdState() {
         enableUserModificationTracking();
 
         addKnownLightIdsWithDefaultCapabilities(1);
@@ -4733,14 +4834,11 @@ class HueSchedulerTest {
 
         setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS)); // same as first
 
-        mockPutReturnValue(false); // put call fails for second state
-        advanceTimeAndRunAndAssertPutCalls(secondState,
-                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 10)
-        );
-        ensureRunnable(initialNow.plusDays(1).plusHours(1)); // for next day
-        mockPutReturnValue(true); // api call works again
+        mockIsLightOff(1, true);
+        advanceTimeAndRunAndAssertPutCalls(secondState); // no put calls as off
+        mockIsLightOff(1, false);
 
-        advanceTimeAndRunAndAssertPutCalls(thirdState); // no put call expected, as light has been set to off
+        advanceTimeAndRunAndAssertPutCalls(thirdState); // still no put call expected, as light has been set to off
 
         List<ScheduledRunnable> powerOnRunnables = simulateLightOnEvent(
                 expectedPowerOnEnd(initialNow.plusHours(1)), // already ended
@@ -4776,14 +4874,10 @@ class HueSchedulerTest {
         ScheduledRunnable firstState = scheduledRunnables.get(0);
         ScheduledRunnable secondState = scheduledRunnables.get(1);
 
-        mockPutReturnValue(false);
+        mockIsLightOff(1, true);
         // not marked as seen
-        advanceTimeAndRunAndAssertPutCalls(firstState,
-                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS)
-        );
-        mockPutReturnValue(true);
-
-        ensureRunnable(now.plusDays(1), now.plusDays(1).plusHours(1)); // next day
+        advanceTimeAndRunAndAssertPutCalls(firstState);
+        mockIsLightOff(1, false);
 
         // Power on -> reruns first state
 
@@ -4792,6 +4886,8 @@ class HueSchedulerTest {
         advanceTimeAndRunAndAssertPutCalls(powerOnRunnable,
                 expectedPutCall(1).bri(DEFAULT_BRIGHTNESS)
         );
+
+        ensureRunnable(now.plusDays(1), now.plusDays(1).plusHours(1)); // next day
 
         // Second state -> detects manual override
 
@@ -4814,7 +4910,7 @@ class HueSchedulerTest {
                 expectedRunnable(now, now.plusDays(1)),
                 expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
         );
-        ScheduledRunnable trBeforeRunnable = scheduledRunnables.get(0);
+        ScheduledRunnable trBeforeRunnable = scheduledRunnables.getFirst();
 
         advanceTimeAndRunAndAssertPutCalls(trBeforeRunnable,
                 expectedPutCall(1).bri(DEFAULT_BRIGHTNESS), // interpolated call
@@ -4825,7 +4921,7 @@ class HueSchedulerTest {
                 expectedRunnable(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), now.plusDays(1)), // next split
                 expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
         );
-        ScheduledRunnable secondSplit = followUpStates.get(0);
+        ScheduledRunnable secondSplit = followUpStates.getFirst();
 
         // second split -> no override detected
 
@@ -4943,11 +5039,9 @@ class HueSchedulerTest {
 
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
-        mockPutReturnValue(false);
-        advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
-                expectedPutCall(ID).on(false)
-        );
-        mockPutReturnValue(true);
+        mockIsLightOff(ID, true);
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnable); // no put call
+        mockIsLightOff(ID, false);
 
         ScheduledRunnable nextDayRunnable = ensureRunnable(initialNow.plusDays(1)); // next day
 
@@ -4961,105 +5055,155 @@ class HueSchedulerTest {
     }
 
     @Test
-    void run_execution_putReturnsFalse_signalsLightIsOff_skipsNextState_untilPowerOnEvent() {
+    void run_execution_lightsIsOff_doesNotMakeAnyCalls_unlessStateHasOnProperty() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        addState(1, now, "bri:" + DEFAULT_BRIGHTNESS);
-        addState(1, now.plusHours(1), "bri:" + (DEFAULT_BRIGHTNESS + 10));
-        addState(1, now.plusHours(2), "bri:" + (DEFAULT_BRIGHTNESS + 20));
+        addState(1, "00:00", "bri:" + DEFAULT_BRIGHTNESS);
+        addState(1, "01:00", "bri:" + (DEFAULT_BRIGHTNESS + 10), "force:true"); // force does not have any effect
+        addState(1, "02:00", "on:true", "bri:" + (DEFAULT_BRIGHTNESS + 20));
 
         List<ScheduledRunnable> scheduledRunnables = startScheduler(3);
         ScheduledRunnable firstState = scheduledRunnables.get(0);
         ScheduledRunnable secondState = scheduledRunnables.get(1);
         ScheduledRunnable thirdState = scheduledRunnables.get(2);
 
-        mockPutReturnValue(false);
-        advanceTimeAndRunAndAssertPutCalls(firstState,
-                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS)
-        );
-        ensureRunnable(initialNow.plusDays(1)); // for next day
-        mockPutReturnValue(true);
+        mockIsLightOff(1, true);
+        advanceTimeAndRunAndAssertPutCalls(firstState); // no put call
 
         // second state is skipped
 
-        advanceTimeAndRunAndAssertPutCalls(secondState); // no put calls expected
+        advanceTimeAndRunAndAssertPutCalls(secondState); // still no put calls, does not check "off" state again
 
-        // simulate light turning on -> re runs second state
-
-        List<ScheduledRunnable> powerOnRunnables = simulateLightOnEvent(
-                expectedPowerOnEnd(initialNow.plusHours(1)), // already ended
-                expectedPowerOnEnd(initialNow.plusHours(2))
-        );
-
-        powerOnRunnables.get(0).run(); // already ended
-        // no put calls expected
-
-        advanceTimeAndRunAndAssertPutCalls(powerOnRunnables.get(1),
-                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 10)
-        );
-
-        ensureRunnable(initialNow.plusDays(1).plusHours(1)); // for next day
-
-        // third state is run normally again
-
+        // third state has "on:true" property -> is run normally again
         advanceTimeAndRunAndAssertPutCalls(thirdState,
-                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 20)
+                expectedPutCall(1).on(true).bri(DEFAULT_BRIGHTNESS + 20)
         );
 
         ensureRunnable(initialNow.plusDays(1).plusHours(2)); // for next day
+
+        List<ScheduledRunnable> powerOnRunnables = simulateLightOnEvent(
+                expectedPowerOnEnd(initialNow.plusHours(1)),
+                expectedPowerOnEnd(initialNow.plusHours(2)),
+                expectedPowerOnEnd(initialNow.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(powerOnRunnables.get(0)); // already ended
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusHours(1)); // next day
+        advanceTimeAndRunAndAssertPutCalls(powerOnRunnables.get(1)); // already ended
+        ensureRunnable(initialNow.plusDays(1).plusHours(1), initialNow.plusDays(1).plusHours(2)); // next day
+
+        verify(mockedHueApi, times(1)).isLightOff("/lights/1");
+        verify(mockedHueApi, never()).isGroupOff("/groups/1");
     }
 
     @Test
-    void run_execution_putReturnsFalse_lightConsideredOff_updatesSkipped_untilStateHasOnProperty() {
-        addKnownLightIdsWithDefaultCapabilities(1);
-        addState(1, now, "bri:" + DEFAULT_BRIGHTNESS);
-        addState(1, now.plusHours(1), "bri:" + (DEFAULT_BRIGHTNESS + 10));
-        addState(1, now.plusHours(2), "on:true", "bri:" + (DEFAULT_BRIGHTNESS + 20));
+    void run_execution_groupIsOff_doesNotMakeAnyCalls_unlessStateHasOnProperty() {
+        mockGroupLightsForId(1, 1, 2);
+        mockDefaultGroupCapabilities(1);
+        addState("g1", "00:00", "bri:" + DEFAULT_BRIGHTNESS);
+        addState("g1", "01:00", "bri:" + (DEFAULT_BRIGHTNESS + 10));
+        addState("g1", "02:00", "on:true", "bri:" + (DEFAULT_BRIGHTNESS + 20));
 
         List<ScheduledRunnable> scheduledRunnables = startScheduler(3);
         ScheduledRunnable firstState = scheduledRunnables.get(0);
         ScheduledRunnable secondState = scheduledRunnables.get(1);
         ScheduledRunnable thirdState = scheduledRunnables.get(2);
 
-        mockPutReturnValue(false);
-        advanceTimeAndRunAndAssertPutCalls(firstState, expectedPutCall(1).bri(DEFAULT_BRIGHTNESS));
-        ensureRunnable(initialNow.plusDays(1)); // for next day
-        mockPutReturnValue(true);
+        mockIsGroupOff(1, true);
+        advanceTimeAndRunAndAssertPutCalls(firstState); // no put call
 
         // second state is skipped
 
-        setCurrentTimeTo(secondState);
-        secondState.run(); // no put calls expected
-        assertAllPutCallsAsserted();
+        advanceTimeAndRunAndAssertPutCalls(secondState); // still no put calls, does not check "off" state again
 
         // third state has "on:true" property -> is run normally again
-
         advanceTimeAndRunAndAssertPutCalls(thirdState,
-                expectedPutCall(1).on(true).bri(DEFAULT_BRIGHTNESS + 20)
+                expectedGroupPutCall(1).on(true).bri(DEFAULT_BRIGHTNESS + 20)
         );
 
         ensureRunnable(initialNow.plusDays(1).plusHours(2)); // for next day
 
-        List<ScheduledRunnable> powerOnRunnables = simulateLightOnEvent(
-                expectedPowerOnEnd(initialNow.plusHours(1)), // already ended
-                expectedPowerOnEnd(initialNow.plusHours(2)), // already ended
-                expectedPowerOnEnd(initialNow.plusDays(1)) // third state again
+        List<ScheduledRunnable> powerOnRunnables = simulateLightOnEvent("/groups/1",
+                expectedPowerOnEnd(initialNow.plusHours(1)),
+                expectedPowerOnEnd(initialNow.plusHours(2)),
+                expectedPowerOnEnd(initialNow.plusDays(1))
         );
 
-        powerOnRunnables.get(0).run();
-        powerOnRunnables.get(1).run();
-        ensureRunnable(initialNow.plusDays(1).plusHours(1)); // next day for skipped second state
+        advanceTimeAndRunAndAssertPutCalls(powerOnRunnables.get(0)); // already ended
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusHours(1)); // next day
+        advanceTimeAndRunAndAssertPutCalls(powerOnRunnables.get(1)); // already ended
+        ensureRunnable(initialNow.plusDays(1).plusHours(1), initialNow.plusDays(1).plusHours(2)); // next day
 
-        advanceTimeAndRunAndAssertPutCalls(powerOnRunnables.get(2),
-                expectedPutCall(1).on(true).bri(DEFAULT_BRIGHTNESS + 20)
+        verify(mockedHueApi, times(1)).isGroupOff("/groups/1");
+        verify(mockedHueApi, never()).isLightOff("/lights/1");
+    }
+
+    @Test
+    void run_execution_lightsIsOff_doesNotMakeAnyCalls_checksEvenOnPowerOn() {
+        addKnownLightIdsWithDefaultCapabilities(2);
+        addState(2, "00:00", "bri:" + DEFAULT_BRIGHTNESS);
+        addState(2, "01:00", "bri:" + (DEFAULT_BRIGHTNESS + 10));
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(2);
+        ScheduledRunnable firstState = scheduledRunnables.get(0);
+        ScheduledRunnable secondState = scheduledRunnables.get(1);
+
+        mockIsLightOff(2, true);
+        advanceTimeAndRunAndAssertPutCalls(firstState); // no put call
+
+        // first power on -> still considered off
+
+        List<ScheduledRunnable> powerOnRunnables = simulateLightOnEvent("/lights/2",
+                expectedPowerOnEnd(initialNow.plusHours(1))
         );
+
+        advanceTimeAndRunAndAssertPutCalls(powerOnRunnables.getFirst()); // bridge still says light is off
+
+        // second power on -> now on
+
+        List<ScheduledRunnable> powerOnRunnables2 = simulateLightOnEvent("/lights/2",
+                expectedPowerOnEnd(initialNow.plusHours(1))
+        );
+
+        mockIsLightOff(2, false);
+        advanceTimeAndRunAndAssertPutCalls(powerOnRunnables2.getFirst(), expectedPutCall(2).bri(DEFAULT_BRIGHTNESS)); // now correctly called
+
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusHours(1)); // next day
+
+        advanceTimeAndRunAndAssertPutCalls(secondState, expectedPutCall(2).bri(DEFAULT_BRIGHTNESS + 10));
+
+        ensureRunnable(initialNow.plusDays(1).plusHours(1), initialNow.plusDays(2)); // next day
+    }
+
+    private void mockIsLightOff(int id, boolean value) {
+        mockIsLightOff("/lights/" + id, value);
+    }
+
+    private void mockIsLightOff(String id, boolean value) {
+        when(mockedHueApi.isLightOff(id)).thenReturn(value);
+    }
+
+    private void mockIsGroupOff(int id, boolean value) {
+        when(mockedHueApi.isGroupOff("/groups/" + id)).thenReturn(value);
+    }
+
+    private static PutCall.PutCallBuilder expectedGroupPutCall(int id) {
+        return expectedPutCall("/groups/" + id).groupState(true);
     }
 
     private static PutCall.PutCallBuilder expectedPutCall(int id) {
-        return PutCall.builder().id(id);
+        return expectedPutCall("/lights/" + id);
+    }
+
+    private static PutCall.PutCallBuilder expectedPutCall(Object id) {
+        return PutCall.builder().id(id.toString());
     }
 
     private static PutCall.PutCallBuilder defaultPutCall() {
         return expectedPutCall(ID).bri(DEFAULT_BRIGHTNESS).ct(DEFAULT_CT);
+    }
+
+    private static PutCall.PutCallBuilder defaultGroupPutCall() {
+        return expectedGroupPutCall(ID).bri(DEFAULT_BRIGHTNESS).ct(DEFAULT_CT);
     }
 
     private LightState.LightStateBuilder expectedState() {

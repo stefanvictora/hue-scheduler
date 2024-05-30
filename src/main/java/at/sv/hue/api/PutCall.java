@@ -11,7 +11,7 @@ import java.util.stream.Stream;
 @Data
 @Builder(toBuilder = true)
 public final class PutCall {
-    int id;
+    String id;
     Integer bri;
     Integer ct;
     Double x;
@@ -46,18 +46,18 @@ public final class PutCall {
     @Override
     public String toString() {
         return "PutCall {" +
-                "id=" + id +
-                getFormattedPropertyIfSet("on", on) +
-                getFormattedPropertyIfSet("bri", bri) +
-                getFormattedPropertyIfSet("ct", ct) +
-                getFormattedPropertyIfSet("x", x) +
-                getFormattedPropertyIfSet("y", y) +
-                getFormattedPropertyIfSet("hue", hue) +
-                getFormattedPropertyIfSet("sat", sat) +
-                getFormattedPropertyIfSet("effect", effect) +
-                getFormattedTransitionTimeIfSet() +
-                (groupState ? ", group=true" : "") +
-                "}";
+               "id=" + id +
+               getFormattedPropertyIfSet("on", on) +
+               getFormattedPropertyIfSet("bri", bri) +
+               getFormattedPropertyIfSet("ct", ct) +
+               getFormattedPropertyIfSet("x", x) +
+               getFormattedPropertyIfSet("y", y) +
+               getFormattedPropertyIfSet("hue", hue) +
+               getFormattedPropertyIfSet("sat", sat) +
+               getFormattedPropertyIfSet("effect", effect) +
+               getFormattedTransitionTimeIfSet() +
+               (groupState ? ", group=true" : "") +
+               "}";
     }
 
     private String getFormattedPropertyIfSet(String name, Object property) {

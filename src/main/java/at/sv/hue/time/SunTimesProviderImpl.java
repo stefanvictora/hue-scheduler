@@ -5,6 +5,8 @@ import org.shredzone.commons.suncalc.SunTimes;
 import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class SunTimesProviderImpl implements SunTimesProvider {
 
@@ -12,12 +14,15 @@ public final class SunTimesProviderImpl implements SunTimesProvider {
 
     private final double lat;
     private final double lng;
-    private final double height;
+    private final double elevation;
 
-    public SunTimesProviderImpl(double lat, double lng, double height) {
+    private final Map<String, SunTimes> cache;
+
+    public SunTimesProviderImpl(double lat, double lng, double elevation) {
         this.lat = lat;
         this.lng = lng;
-        this.height = height;
+        this.elevation = elevation;
+        cache = new ConcurrentHashMap<>();
     }
 
     @Override
@@ -85,28 +90,38 @@ public final class SunTimesProviderImpl implements SunTimesProvider {
     }
 
     private SunTimes sunTimesFor(ZonedDateTime dateTime, SunTimes.Twilight twilight) {
-        return getProviderFor(dateTime).twilight(twilight).execute();
+        String key = generateKey(dateTime, twilight);
+        return cache.computeIfAbsent(key, k -> getProviderFor(dateTime).twilight(twilight).execute());
     }
 
     private SunTimes.Parameters getProviderFor(ZonedDateTime dateTime) {
-        return SunTimes.compute().at(lat, lng).height(height).on(dateTime.with(LocalTime.MIDNIGHT));
+        return SunTimes.compute().at(lat, lng).elevation(elevation).on(dateTime.with(LocalTime.MIDNIGHT));
+    }
+
+    private String generateKey(ZonedDateTime dateTime, SunTimes.Twilight twilight) {
+        return dateTime.toLocalDate().toString() + "-" + twilight.toString();
     }
 
     @Override
     public String toDebugString(ZonedDateTime dateTime) {
         return "astronomical_dawn: " + format(getAstronomicalStart(dateTime)) +
-                "\nnautical_dawn: " + format(getNauticalStart(dateTime)) +
-                "\ncivil_dawn: " + format(getCivilStart(dateTime)) +
-                "\nsunrise: " + format(getSunrise(dateTime)) +
-                "\nnoon: " + format(getNoon(dateTime)) +
-                "\ngolden_hour: " + format(getGoldenHour(dateTime)) +
-                "\nsunset: " + format(getSunset(dateTime)) +
-                "\nblue_hour: " + format(getBlueHour(dateTime)) +
-                "\ncivil_dusk: " + format(getCivilEnd(dateTime)) +
-                "\nnight_hour: " + format(getNightHour(dateTime)) +
-                "\nnautical_dusk: " + format(getNauticalEnd(dateTime)) +
-                "\nastronomical_dusk: " + format(getAstronomicalEnd(dateTime)) +
-                "";
+               "\nnautical_dawn: " + format(getNauticalStart(dateTime)) +
+               "\ncivil_dawn: " + format(getCivilStart(dateTime)) +
+               "\nsunrise: " + format(getSunrise(dateTime)) +
+               "\nnoon: " + format(getNoon(dateTime)) +
+               "\ngolden_hour: " + format(getGoldenHour(dateTime)) +
+               "\nsunset: " + format(getSunset(dateTime)) +
+               "\nblue_hour: " + format(getBlueHour(dateTime)) +
+               "\ncivil_dusk: " + format(getCivilEnd(dateTime)) +
+               "\nnight_hour: " + format(getNightHour(dateTime)) +
+               "\nnautical_dusk: " + format(getNauticalEnd(dateTime)) +
+               "\nastronomical_dusk: " + format(getAstronomicalEnd(dateTime)) +
+               "";
+    }
+
+    @Override
+    public void clearCache() {
+        cache.clear();
     }
 
     private String format(ZonedDateTime time) {

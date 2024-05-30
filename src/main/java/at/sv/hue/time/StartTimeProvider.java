@@ -13,4 +13,6 @@ public interface StartTimeProvider {
     ZonedDateTime getStart(String input, ZonedDateTime dateTime);
 
     String toDebugString(ZonedDateTime dateTime);
+
+    void clearCaches();
 }
