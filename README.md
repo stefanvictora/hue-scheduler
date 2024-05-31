@@ -43,22 +43,23 @@ switch.sensor_hallway_activated   22:00   on:false   days:Mo-Fr
 
 ## How It Works
 
-Hue Scheduler uses a simple text-based configuration format to define the behavior of your lights. Here’s a summary of the three key parts:
+Each configuration line has three parts:
 
 ~~~yacas
 <Light/Group Name or ID>  <Start Time Expression>  [<Property>:<Value>]*
 ~~~
 
-**Light/Group Name or ID**: Define which light or group to control. Use names or IDs (e.g. `Couch` or `light.couch`). Multiple lights can be combined with a comma (`,`). The following Home Assistant entity types are currently supported: `light`, `input_boolean`, `switch`, `fan`.
+**Light/Group Name or ID:**
+- Define which light or group to control. Use names or IDs (e.g. `Couch` or `light.couch`). Multiple lights can be combined with a comma (`,`). The following Home Assistant entity types are currently supported: `light`, `input_boolean`, `switch`, `fan`.
 
-**Start Time Expression**: Set either fixed times in 24-hour format (HH:mm:ss) (e.g. `06:00`, `23:30:15`) or solar times (e.g., `sunrise`, `sunset`). Adjust times relative to solar events in minutes (e.g., `sunset-30`).
-The following dynamic solar time constants are available, in chronological order: `astronomical_dawn`, `nautical_dawn`, `civil_dawn`, `sunrise`, `noon`, `golden_hour`, `sunset`, `blue_hour`, `civil_dusk`, `night_hour`, `nautical_dusk`, `astronomical_dusk`.
+**Start Time Expression:** 
+- Set either fixed times in 24-hour format (HH:mm:ss) (e.g. `06:00`, `23:30:15`) or solar times (e.g., `sunrise`, `sunset`). Adjust times relative to solar events in minutes (e.g., `sunset-30`). The following dynamic solar time constants are available, in chronological order: `astronomical_dawn`, `nautical_dawn`, `civil_dawn`, `sunrise`, `noon`, `golden_hour`, `sunset`, `blue_hour`, `civil_dusk`, `night_hour`, `nautical_dusk`, `astronomical_dusk`.
 
-**Properties**:
+**Properties:**
 
 - **Basic**:
     - **`bri`** (brightness): e.g., `bri:100%`
-    - **`ct`** (color temperature) [``6500``-``2000``] (Kelvin) or [``153``-``500``] (Mired): e.g., `ct:6500`, `ct:153`
+    - **`ct`** (color temperature) [``6500``-``2000``|``153``-``500``]: e.g., `ct:6500`, `ct:153`
     - **`on`** (on/off state): e.g., `on:true`
     - **`days`** (specific days of the week): e.g., `days:Mo-Fr`, `days:Tu,We`
 - **Color**:
@@ -118,15 +119,15 @@ To get started with Docker, follow these steps:
    You can find a filled-out docker-compose example [here](docs/docker_examples.md).
 
 2. **Provide the required parameters:**
-    - `API_HOST`: IP address or host of your Philips Hue bridge or Home Assistant instance, e.g., `192.168.0.157`, `http://ha.local:8123`, or `https://UNIQUE_ID.ui.nabu.casa`
+    - `API_HOST`: IP address or host of your Philips Hue bridge or Home Assistant instance, e.g., `192.168.0.157`, `http://ha.local:8123`, or `https://UNIQUE_ID.ui.nabu.casa` (untested)
     - `ACCESS_TOKEN`: A [Philips Hue bridge username](https://github.com/stefanvictora/hue-scheduler/blob/main/docs/philips_hue_authentication.md) or [Home Assistant access token](https://www.home-assistant.io/docs/authentication/).
     - `LAT`, `LONG` & `ELEVATION`: Location details to calculate local solar times.
     - `TZ`: Your time zone.
     - `SOURCE`: Path to the [configuration file](docs/light_configuration.md) containing the light schedules.
- 
-    > For additional configuration options, see the [list of advanced command line options](docs/advanced_command_line_options.md).
+    
+    For additional configuration options, see the [list of advanced command line options](docs/advanced_command_line_options.md).
   
-3. **Run Docker Compose commands:**:
+3. **Run Docker Compose commands:**
 
    ~~~shell
    # Create and run container:
@@ -142,7 +143,7 @@ If your Raspberry Pi does not yet have Docker installed, check out this [short g
 
 To run Hue Scheduler manually, follow these steps:
 
-1. **Download the latest release** from GitHub [here](https://github.com/stefanvictora/hue-scheduler/releases/latest). Ensure you have at least Java 21 installed on your device.
+1. **Download the latest release** from GitHub [here](https://github.com/stefanvictora/hue-scheduler/releases/latest).
 2. **Run the application** using the following command. Replace the placeholders enclosed in `<>` with your actual values:
    ~~~shell
    java -jar hue-scheduler.jar <API_HOST> <ACCESS_TOKEN> --lat=<LATITUDE> --long=<LONGITUDE> --elevation=<ELEVATION> <CONFIG_FILE_PATH>
