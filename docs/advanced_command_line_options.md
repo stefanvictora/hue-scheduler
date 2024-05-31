@@ -2,7 +2,7 @@
  
 The following advanced command line options are available.
 
-> [!HINT]
+> [!NOTE]
 > You can set all command line options also via environment variables. E.g. instead of `--interpolate-all` you can also set `INTERPOLATE_ALL=true` as an environment variable.
 
 ### `--interpolate-all`

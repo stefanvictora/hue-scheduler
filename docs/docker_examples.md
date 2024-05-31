@@ -15,9 +15,9 @@ services:
       - LAT=48.208731
       - LONG=16.372599
       - ELEVATION=165
+      - TZ=Europe/Vienna
       - CONFIG_FILE=/config/input.txt # do not edit
       - log.level=TRACE
-      - TZ=Europe/Vienna
     volumes:
       - type: bind
         source: /home/stefan/.config/hue-scheduler/input.txt

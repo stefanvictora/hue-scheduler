@@ -91,27 +91,27 @@ Hue Scheduler uses a simple text-based configuration format to define the behavi
 
 **Light/Group Name or ID**: Define which light or group to control. Use names or IDs (e.g. `Couch` or `light.couch`). Multiple lights can be combined with a comma (`,`).
 
-**Start Time Expression**: Set either fixed times in 24-hour format (HH:mm:ss) (e.g. **`06:00`**, **`23:30:15`**) or solar times (e.g., **`sunrise`**, **`sunset`**). Adjust times relative to solar events in minutes (e.g., **`sunset-30`**).
+**Start Time Expression**: Set either fixed times in 24-hour format (HH:mm:ss) (e.g. `06:00`, `23:30:15`) or solar times (e.g., `sunrise`, `sunset`, `civil_dusk`). Adjust times relative to solar events in minutes (e.g., `sunset-30`).
 
 **Properties**:
 
 - **Basic**:
-    - **`bri`** (brightness): e.g., **`bri:100%`**
-    - **`ct`** (color temperature): e.g., **`ct:6500`**, **`ct:153`**
-    - **`on`** (on/off state): e.g., **`on:true`**
-    - **`days`** (specific days of the week): e.g., **`days:Mo-Fr`**, **`days:Tu,We`** 
+    - **`bri`** (brightness): e.g., `bri:100%`
+    - **`ct`** (color temperature): e.g., `ct:6500`, `ct:153`
+    - **`on`** (on/off state): e.g., `on:true`
+    - **`days`** (specific days of the week): e.g., `days:Mo-Fr`, `days:Tu,We`
 - **Color**:
-    - **`color`** (hex or rgb): e.g., **`color:#3CD0E2`**, **``color:60, 208, 226``**
-    - **`hue`** (color value): e.g., **`hue:2000`**
-    - **`sat`** (saturation): e.g., **`sat:150`**, **`sat:70%`** 
-    - **`effect`** (color loop): e.g., **`effect:multi_colorloop`**, **`effect:colorloop`**, **`effect:none`**
+    - **`color`** (hex or rgb): e.g., `color:#3CD0E2`, `color:60, 208, 226`
+    - **`hue`** (color value): e.g., `hue:2000`
+    - **`sat`** (saturation): e.g., `sat:150`, `sat:70%`
+    - **`effect`** (color loop): e.g., `effect:multi_colorloop`, `effect:colorloop`, `effect:none`
 - **Advanced**:
-    - **`x`** and **`y`** (CIE color space coordinates): e.g., **`x:0.6024 y:0.3433`**
-    - **`force`** (ignore user modifications): e.g., **`force:true`**
+    - **`x`** and **`y`** (CIE color space coordinates): e.g., `x:0.6024  y:0.3433`
+    - **`force`** (ignore user modifications): e.g., `force:true`
 - **Transitions**:
-  - **`tr`**: Transition time when a state starts. e.g., **`tr:10s`**
-  - **`tr-before`**: Transition time before a state starts, allowing for smooth transitions. e.g., **`tr-before:30min`**, **`tr-before:06:00`**, **`tr-before:civil_dawn+5`**, 
-  - **`interpolate`**: Automatic transitions from the previous state. e.g., **`interpolate:true`**
+    - **`tr`**: Transition time when a state starts. e.g., `tr:10s`
+    - **`tr-before`**: Transition time before a state starts, allowing for smooth transitions. e.g., `tr-before:30min`, `tr-before:06:00`, `tr-before:civil_dawn+5`
+    - **`interpolate`**: Automatic transitions from the previous state. e.g., `interpolate:true`
 
 > [!TIP]
 > Visit the [full documentation](docs/light_configuration.md) for more detailed information on how to configure your light schedules.
@@ -132,7 +132,7 @@ You can run Hue Scheduler in two ways: using the official Docker image or by man
        
 To get started with Docker, follow these steps:
 
-1. **Create a `docker-compose.yml` file** with the following content. Replace the placeholder values (`#<>`) with your actual information (see _Configuration_):
+1. **Create a `docker-compose.yml` template:**
 
    ~~~yaml
    services:
@@ -140,24 +140,32 @@ To get started with Docker, follow these steps:
        container_name: hue-scheduler
        image: stefanvictora/hue-scheduler:0.10
        environment:
-         - API_HOST= #<HOST>
-         - ACCESS_TOKEN= #<TOKEN>
-         - LAT= #<LATITUDE>
-         - LONG= #<LONGITUDE>
-         - ELEVATION= #<ELEVATION>
+         - API_HOST=
+         - ACCESS_TOKEN=
+         - LAT=
+         - LONG=
+         - ELEVATION=
+         - TZ=
          - CONFIG_FILE=/config/input.txt # do not edit
-         - log.level=DEBUG
-         - TZ=Europe/Vienna # replace with your time zone
        volumes:
          - type: bind
-           source: #<CONFIG_FILE_PATH>
+           source: # <- Insert your config file path
            target: /config/input.txt
            read_only: true
        restart: unless-stopped
    ~~~
    You can find a filled-out docker-compose example [here](docs/docker_examples.md).
+
+2. **Provide the required parameters:**
+    - `API_HOST`: IP address or host of your Philips Hue bridge or Home Assistant instance, e.g., `192.168.0.157`, `http://ha.local:8123`, or `https://UNIQUE_ID.ui.nabu.casa`
+    - `ACCESS_TOKEN`: A [Philips Hue bridge username](https://github.com/stefanvictora/hue-scheduler/blob/main/docs/philips_hue_authentication.md) or [Home Assistant access token](https://www.home-assistant.io/docs/authentication/).
+    - `LAT`, `LONG` & `ELEVATION`: Location details to calculate local sunrise and sunset times.
+    - `TZ`: Your timezone
+    - `SOURCE`: Path to the [configuration file](docs/light_configuration.md) that controls the lights.
+ 
+    > For additional configuration options, see the [list of advanced command line options](docs/advanced_command_line_options.md).
   
-2. **Run Docker Compose** commands to manage your container:
+3. **Run Docker Compose commands:**:
 
    ~~~shell
    # Create and run container:
@@ -165,13 +173,9 @@ To get started with Docker, follow these steps:
    
    # Stop and remove container:
    docker compose down
-   
-   # Just stop/start container:
-   docker compose stop
-   docker compose start
    ~~~
 
-> Note: If your Raspberry Pi does not yet have Docker installed, check out this [short guide](docs/docker_on_raspberrypi.md).
+If your Raspberry Pi does not yet have Docker installed, check out this [short guide](docs/docker_on_raspberrypi.md).
 
 ### Manually
 
@@ -182,37 +186,6 @@ To run Hue Scheduler manually, follow these steps:
    ~~~shell
    java -jar hue-scheduler.jar <API_HOST> <ACCESS_TOKEN> --lat=<LATITUDE> --long=<LONGITUDE> --elevation=<ELEVATION> <CONFIG_FILE_PATH>
    ~~~
-
-### Configuration
-
-Hue Scheduler requires the following configuration parameters, which can be provided via command line arguments or environment variables.
-
-#### API Host
-
-Specify where Hue Scheduler can access your Philips Hue bridge or Home Assistant instance.
-
-- **Philips Hue**: Provide the IP address of your bridge. Example: `192.168.0.157` or `hue.local`. To identify your bridge in the network, refer to the detailed [Hue authentication process](docs/philips_hue_authentication.md).
-- **Home Assistant**: Provide the full origin, including the scheme, host, and port if needed. Example: `http://localhost:8123`, `http://ha.local:8123`, or `https://UNIQUE_ID.ui.nabu.casa`.
-
-#### Access Token
-
-Create or provide an authentication token for connecting to your Philips Hue bridge or Home Assistant instance.
-
-- **Philips Hue**: Follow the [Hue authentication process](docs/philips_hue_authentication.md) to create an access token.
-- **Home Assistant**: Create a [long-lived access token](https://www.home-assistant.io/docs/authentication/) via the Security tab in the user settings.
-
-Write down the generated tokens and insert them into your configuration.
-
-#### Latitude, Longitude & Elevation
-
-Provide your approximate location and optional elevation to allow Hue Scheduler to calculate your local sunrise and sunset times. This calculation is performed locally using the [shred/commons-suncalc](https://github.com/shred/commons-suncalc) library, ensuring no data is collected or sent to the Internet.
-
-#### Config File
-
-Specify the configuration file that tells Hue Scheduler how to control the lights in your home. Use the text-based file format described in detail in the [configuration documentation](docs/light_configuration.md).
-
-> [!NOTE]   
-> For additional configuration options, see the [list of advanced command line options](docs/advanced_command_line_options.md).
 
 ## FAQ
 
