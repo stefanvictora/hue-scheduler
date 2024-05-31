@@ -12,76 +12,36 @@
 
 **New in Version 0.10.0**: **Full support for the Home Assistant REST API** :partying_face: Control even more devices in your home with Hue Scheduler.
 
-Hue Scheduler goes beyond tools like Adaptive Lighting by providing extended control over brightness, color temperature, color, power state, and custom interpolations between solar and absolute times. Specifically designed to work with dumb wall switches, Hue Scheduler adjusts light states as soon as they're reachable, ensuring consistent results even when lights have been physically turned off.
+Hue Scheduler goes beyond tools like Adaptive Lighting by providing extended control over brightness, color temperature, color, power state, and custom interpolations between solar and absolute times. Specifically designed to work with dumb wall switches, it adjusts light states as soon as they're reachable, ensuring consistent results even when lights have been physically turned off.
 
 ## Demo
 
 Hue Scheduler allows you to configure your smart lights with a simple, text-based configuration file. Below, you can see various examples demonstrating how to create daily routines, dynamic interpolations, power management schedules, and ambiance settings.
-                                   
-### Example Configurations
+                     
+~~~
+# Living Room
+light.living_room  sunrise      bri:80%    ct:6000         tr:10s
+light.living_room  sunrise+60   bri:100%   ct:5000         interpolate:true
+light.living_room  sunset       bri:60%    ct:3000         tr-before:golden_hour-20
+light.living_room  23:00        bri:40%    color:#FE275D   tr-before:1h
 
-#### Daily Routines: Sun-Based Brightness & Color Temperature
-~~~yacas
-Office  sunrise     bri:100%  ct:6500  tr:5s                     
-Office  sunrise+90            ct:5000  tr-before:20min           
-Office  sunset      bri:80%   ct:3000  tr-before:20min
+# Porch Light: Control power state
+Porch Light  civil_dusk   on:true    bri:100%   tr:1min
+Porch Light  23:00        on:false              tr:5min
+
+# Motion Sensor: Inactive at night on weekdays
+switch.sensor_hallway_activated   08:00   on:true
+switch.sensor_hallway_activated   22:00   on:false   days:Mo-Fr
 ~~~
 
-In this example, the lights in your office adjust dynamically based on the sun's position, each with a smooth transition:
-
-- **Sunrise**: Lights turn to a bright, blue-white (6500K) for an energetic start.
-- **90 Minutes After Sunrise**: Transition to a more neutral white (5000K).
-- **Sunset**: Lights dim slightly and warm up to a cozier tone (3000K).
-
-Note: Hue Scheduler does not automatically turn on your lights (unless explicitly specified with `on:true`), allowing you to maintain control while Hue Scheduler handles all the adjustments once they are turned on.
-
-#### Dynamic Lighting: Advanced Transitions & Interpolations
-    
-~~~yacas
-Home  sunrise     bri:100%  ct:6500             tr-before:civil_dawn
-Home  noon        bri:100%  ct:5000             interpolate:true
-Home  sunset      bri:80%   ct:3000             tr-before:golden_hour+10
-Home  civil_dusk  bri:40%   ct:2000             interpolate:true
-Home  00:00       bri:20%   x:0.6024  y:0.3433  interpolate:true
-~~~
-
-This configuration creates smooth and continuous transitions throughout the day:
-
-- **Civil Dawn to Sunrise**: Lights transition to full brightness (100%) with a blue-white tone (6500K).
-- **Sunrise to Noon**: Maintain brightness but continuously shift to a neutral white (5000K).
-- **Golden Hour to Sunset**: Slightly reduce brightness and mimic golden hour (3000K).
-- **Sunset to Civil Dusk**: Gradually dim and warm up (2000K).
-- **Civil Dusk to Midnight**: Dim to a low brightness (20%) with a typ of red defined by x and y coordinates.
+> [!TIP]
+> Hue Scheduler does not automatically turn on your lights (unless explicitly specified with `on:true`), allowing you to maintain control while it handles all the adjustments once they are turned on.
 
 > [!NOTE]
 > Any manual changes to your lights will temporarily suspend the schedule until they are turned off and on again.
-> If lights are turned on midway through a transition, Hue Scheduler calculates the appropriate mid-transition state to continue the transition seamlessly. 
+> If lights are turned on midway through a transition, Hue Scheduler calculates the appropriate mid-transition state to continue the transition seamlessly.
 
-#### Power Management: Manage On/Off States on Specific Weekdays
-
-~~~yacas
-light.garden  civil_dusk  on:true   bri:100%  tr:1min     days:Mo-Fr
-light.garden  01:00       on:false            tr:5min30s  days:Mo-Fr
-~~~
-
-This setup manages power states based on time and weekdays:
-
-- **Civil Dusk (Monday to Friday)**: Turn garden lights on at full brightness (100%) with a 1-minute transition.
-- **1:00 AM (Monday to Friday)**: Turn garden lights off with a smooth 5.5-minute transition.
-
-#### Mood and Ambiance: Effects & Color
-
-~~~yacas
-Living room  22:00  bri:100%  sat:150  effect:multi_colorloop  days:Fr,Sa
-Kitchen      22:00  color:#00835C                              days:Sa
-~~~
-
-Enhance mood and ambiance with color effects:
-
-- **Living Room**: At 22:00, set brightness to 100%, saturation to 150, and enable a multicolor loop effect.
-- **Kitchen**: At 22:00, change the color to a specific shade of green (#00835C).
-
-### How It Works
+## How It Works
 
 Hue Scheduler uses a simple text-based configuration format to define the behavior of your lights. Here’s a summary of the three key parts:
 
@@ -89,44 +49,45 @@ Hue Scheduler uses a simple text-based configuration format to define the behavi
 <Light/Group Name or ID>  <Start Time Expression>  [<Property>:<Value>]*
 ~~~
 
-**Light/Group Name or ID**: Define which light or group to control. Use names or IDs (e.g. `Couch` or `light.couch`). Multiple lights can be combined with a comma (`,`).
+**Light/Group Name or ID**: Define which light or group to control. Use names or IDs (e.g. `Couch` or `light.couch`). Multiple lights can be combined with a comma (`,`). The following Home Assistant entity types are currently supported: `light`, `input_boolean`, `switch`, `fan`.
 
-**Start Time Expression**: Set either fixed times in 24-hour format (HH:mm:ss) (e.g. `06:00`, `23:30:15`) or solar times (e.g., `sunrise`, `sunset`, `civil_dusk`). Adjust times relative to solar events in minutes (e.g., `sunset-30`).
+**Start Time Expression**: Set either fixed times in 24-hour format (HH:mm:ss) (e.g. `06:00`, `23:30:15`) or solar times (e.g., `sunrise`, `sunset`). Adjust times relative to solar events in minutes (e.g., `sunset-30`).
+The following dynamic solar time constants are available, in chronological order: `astronomical_dawn`, `nautical_dawn`, `civil_dawn`, `sunrise`, `noon`, `golden_hour`, `sunset`, `blue_hour`, `civil_dusk`, `night_hour`, `nautical_dusk`, `astronomical_dusk`.
 
 **Properties**:
 
 - **Basic**:
     - **`bri`** (brightness): e.g., `bri:100%`
-    - **`ct`** (color temperature): e.g., `ct:6500`, `ct:153`
+    - **`ct`** (color temperature) [``6500``-``2000``] (Kelvin) or [``153``-``500``] (Mired): e.g., `ct:6500`, `ct:153`
     - **`on`** (on/off state): e.g., `on:true`
     - **`days`** (specific days of the week): e.g., `days:Mo-Fr`, `days:Tu,We`
 - **Color**:
     - **`color`** (hex or rgb): e.g., `color:#3CD0E2`, `color:60, 208, 226`
-    - **`hue`** (color value): e.g., `hue:2000`
-    - **`sat`** (saturation): e.g., `sat:150`, `sat:70%`
+    - **`hue`** (color value) [``0``-``65535``]: e.g., `hue:2000`
+    - **`sat`** (saturation) [``0``-``254``] or [``0%``-``100%``]: e.g., `sat:150`, `sat:70%`
     - **`effect`** (color loop): e.g., `effect:multi_colorloop`, `effect:colorloop`, `effect:none`
 - **Advanced**:
     - **`x`** and **`y`** (CIE color space coordinates): e.g., `x:0.6024  y:0.3433`
     - **`force`** (ignore user modifications): e.g., `force:true`
 - **Transitions**:
-    - **`tr`**: Transition time when a state starts. e.g., `tr:10s`
+    - **`tr`**: Transition time when a state starts. e.g., `tr:10s`, `tr:1h5min`
     - **`tr-before`**: Transition time before a state starts, allowing for smooth transitions. e.g., `tr-before:30min`, `tr-before:06:00`, `tr-before:civil_dawn+5`
     - **`interpolate`**: Automatic transitions from the previous state. e.g., `interpolate:true`
 
 > [!TIP]
 > Visit the [full documentation](docs/light_configuration.md) for more detailed information on how to configure your light schedules.
 
-## Prerequisites
+## Quick Start Guide
+
+You can run Hue Scheduler in two ways: using the official Docker image or by manually downloading and running the Java application. The configuration differs slightly for each method, as detailed below.
+
+### Prerequisites
 
 To run Hue Scheduler, you will need the following:
 
 - An up-to-date Philips Hue Bridge or Home Assistant instance.
 - A computer or device (e.g., a Raspberry Pi) running continuously on your network.
 - Docker or Java 21 installed on your device.
-
-## Quick Start Guide
-
-You can run Hue Scheduler in two ways: using the official Docker image or by manually downloading and running the Java application. The configuration differs slightly for each method, as detailed below.
 
 ### Via Docker
        
@@ -159,9 +120,9 @@ To get started with Docker, follow these steps:
 2. **Provide the required parameters:**
     - `API_HOST`: IP address or host of your Philips Hue bridge or Home Assistant instance, e.g., `192.168.0.157`, `http://ha.local:8123`, or `https://UNIQUE_ID.ui.nabu.casa`
     - `ACCESS_TOKEN`: A [Philips Hue bridge username](https://github.com/stefanvictora/hue-scheduler/blob/main/docs/philips_hue_authentication.md) or [Home Assistant access token](https://www.home-assistant.io/docs/authentication/).
-    - `LAT`, `LONG` & `ELEVATION`: Location details to calculate local sunrise and sunset times.
-    - `TZ`: Your timezone
-    - `SOURCE`: Path to the [configuration file](docs/light_configuration.md) that controls the lights.
+    - `LAT`, `LONG` & `ELEVATION`: Location details to calculate local solar times.
+    - `TZ`: Your time zone.
+    - `SOURCE`: Path to the [configuration file](docs/light_configuration.md) containing the light schedules.
  
     > For additional configuration options, see the [list of advanced command line options](docs/advanced_command_line_options.md).
   

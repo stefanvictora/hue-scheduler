@@ -10,40 +10,36 @@ Each line contains the following parts, separated either by a tab character or a
 
 ## `<Light/Group Name or ID>`
 
-The light or group (i.e., room or zone) to control, defined either through its name or ID. To simplify the configuration for multiple groups or lights, you can combine their names or IDs with a comma (`,`).
+The light or group (i.e., room or zone) to control, defined either through its name or ID. To simplify the configuration for multiple groups or lights, you can combine their names or IDs with a comma (`,`). The following Home Assistant entity types are currently supported: `light`, `input_boolean`, `switch`, `fan`.
          
-**Philips Hue** example:
+**Philips Hue example:**
                         
 ~~~yacas
 Kitchen, Living room, Desk lamp    civil_dusk  ct:2400
+
 # Is equal to:
 g1, g2, 1                          civil_dusk  ct:2400
+
 # Is equal to:
 g1                                 civil_dusk  ct:2400
 g2                                 civil_dusk  ct:2400
 1                                  civil_dusk  ct:2400
 ~~~
 
-**Numeric IDs** are only supported for Philips Hue bridges. You can look them up by manually sending a GET request to either the `/api/<username>/lights` or `/api/<username>/groups` endpoint of your bridge. The response will contain a list of all your lights and groups in your system. For Hue Scheduler to distinguish between light and group IDs, group IDs must be prefixed with the lowercase letter `g`.
+You can look up Philips Hue IDs by manually sending a GET request to either the `/api/<username>/lights` or `/api/<username>/groups` endpoint of your bridge. The response will contain a list of all your lights and groups in your system. For Hue Scheduler to distinguish between light and group IDs, group IDs must be prefixed with the lowercase letter `g`.
 
-> [!NOTE]
-> If you have a group and light with the same name, Hue Scheduler prefers the group. Use IDs instead if you want to change this behavior.
+Note: If you have a group and light with the same name, Hue Scheduler prefers the group. Use IDs instead if you want to change this behavior.
 
-**Home Assistant** example:
+**Home Assistant example:**
 
 ~~~yacas
 Kitchen, Test Switch, TV Mute      civil_dusk  on:true
+
 # Is equal to:
 light.kitchen                      civil_dusk  on:true
 input_boolean.test_switch          civil_dusk  on:true
 switch.tv_mute                     civil_dusk  on:true
 ~~~
-           
-Hue Scheduler currently supports the following Home Assistant entity types:
-* `light`
-* `input_boolean`
-* `switch`
-* `fan`
 
 ## `<Start Time Expression>`
 
@@ -72,7 +68,7 @@ Additionally, you can **adjust the start time relative to these solar times** us
 
 For example: ``sunset-30`` starts 30 minutes before sunset, and ``sunrise+60`` starts one hour after sunrise. These expressions are dynamically updated each day to reflect the current solar times at your location.
 
-Further details about the different solar times can be found at [Twilight - Wikipedia](https://en.wikipedia.org/wiki/Twilight) and [Twilight - commons-suncalc](https://shredzone.org/maven/commons-suncalc/usage.html#twilight).
+> Note: Further background info about the different solar times can be found at [Twilight - Wikipedia](https://en.wikipedia.org/wiki/Twilight) and [Twilight - commons-suncalc](https://shredzone.org/maven/commons-suncalc/usage.html#twilight).
 
 #### FAQ: How Does Hue Scheduler Determine the End of States?
 
