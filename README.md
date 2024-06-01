@@ -175,12 +175,13 @@ Yes, but you should probably use a third-party app like iConnectHue to configure
 
 ## Roadmap
 
-- [x] **Conditional states** -- set light state only if it has not been manually changed since its previously scheduled state
+- [x] **Detect manual overrides** -- set light state only if it has not been manually changed since its previously scheduled state
 - [x] **Enforce states** -- ensure that a state is always set; allow no manual override
 - [x] **Interpolate between states** -- support more advanced interpolations between states when using `tr-before`
 - [x] **Advanced state interpolations** -- easily create full-day state interpolations without explicitly using `tr-before`
 - [x] **Docker support** -- provide a prebuilt docker images for easier setup
 - [x] **Home Assistant API support** -- allow controlling lights via the Home Assistant API
+- [ ] **Conditional states** -- set light state only if the given conditions are satisfied
 - [ ] **Date-based scheduling** -- schedule state only during a specific date range
 - [ ] **Support for gradients** -- support setting gradients to supported lights
 - [ ] **Support for scenes** -- support scheduling scenes for groups
