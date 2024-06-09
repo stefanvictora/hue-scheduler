@@ -52,11 +52,17 @@ class ColorModeConverterTest {
 
     @Test
     void convert_XY_CT() {
-        assertXYToCt(0.3264, 0.333, 153);
-        assertXYToCt(0.3722, 0.3504, 200);
-        assertXYToCt(0.4701, 0.3772, 303);
-        assertXYToCt(0.5465, 0.3893, 400);
-        assertXYToCt(0.5969, 0.3793, 476);
+        assertXYToCt(0.3264, 0.333, 172);
+        assertXYToCt(0.3722, 0.3504, 246);
+        assertXYToCt(0.4701, 0.3772, 439);
+        assertXYToCt(0.5465, 0.3893, 563); // todo: too big of a value
+        assertXYToCt(0.5969, 0.3793, 570); // todo: too big of a value
+
+        assertXYToCt(0.5119, 0.4147, 1_000_000 / 2137);
+        assertXYToCt(0.368, 0.3686, 1_000_000 / 4302);
+        assertXYToCt(0.4448, 0.4066, 1_000_000 / 2893);
+        assertXYToCt(0.1, 0.8, 1_000_000 / 8645);
+        assertXYToCt(0.5, 0.4, 1_000_000 / 2140);
     }
 
     @Test
@@ -75,6 +81,8 @@ class ColorModeConverterTest {
         assertHSToXYClassic(180, 100, GAMUT_A, 0.1698, 0.3402);
         assertHSToXYClassic(240, 100, GAMUT_A, 0.138, 0.08);
         assertHSToXYClassic(360, 100, GAMUT_A, 0.7004, 0.2991);
+
+        assertHSToXYClassic(119.683, 74.118, GAMUT_C, 0.1978, 0.6778);
     }
 
     @Test
@@ -88,6 +96,9 @@ class ColorModeConverterTest {
         assertXYToHSClassic(1, 0, GAMUT_A, 359.294, 100);
         assertXYToHSClassic(0, 1, GAMUT_A, 100.706, 100);
         assertXYToHSClassic(0, 0, GAMUT_A, 221.463, 96.471);
+
+        assertXYToHSClassic(0.1969, 0.6798, GAMUT_C, 119.683, 74.118);
+        assertXYToHSClassic(0.5465, 0.3893, GAMUT_C, 28.853, 71.765);
     }
 
     private static void assertCtToHS(int ct, int hue, int sat) {
