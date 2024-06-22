@@ -3,12 +3,8 @@ package at.sv.hue;
 import at.sv.hue.api.LightCapabilities;
 import at.sv.hue.api.LightState;
 import at.sv.hue.api.PutCall;
-import at.sv.hue.color.XYColorGamutCorrection;
+import at.sv.hue.color.ColorComparator;
 import lombok.RequiredArgsConstructor;
-
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.util.Objects;
 
 @RequiredArgsConstructor
 public class LightStateComparator {
@@ -22,8 +18,8 @@ public class LightStateComparator {
         }
         return isOnAndStateDiffers() ||
                brightnessDiffers() ||
-               colorModeOrValuesDiffer() ||
-               effectDiffers();
+               effectDiffers() ||
+               colorModeOrValuesDiffer();
     }
 
     private boolean brightnessDiffers() {
@@ -39,16 +35,27 @@ public class LightStateComparator {
         if (colorModeNotSupportedByState(colorMode)) {
             return false;
         }
-        if (colorModeDiffers(colorMode)) {
+        if (incompatibleColorMode(colorMode)) {
             return true;
         }
-        return switch (colorMode) {
-            case CT -> ctDiffers();
-            case HS -> lastPutCall.getHue() != null && !lastPutCall.getHue().equals(currentState.getHue()) ||
-                       lastPutCall.getSat() != null && !lastPutCall.getSat().equals(currentState.getSat());
-            case XY -> xyDiffers();
-            default -> false; // should not happen, but as a fallback we just ignore unknown color modes
-        };
+        if (colorMode == ColorMode.CT) {
+            return ctDiffers();
+        }
+        switch (colorMode) {
+            case HS -> {
+                return ColorComparator.colorDiffers(currentState.getX(), currentState.getY(),
+                        lastPutCall.getHue(), lastPutCall.getSat());
+            }
+            case XY -> {
+                if (currentState.getX() == null) {
+                    return true;
+                }
+                Double[][] gamut = currentState.getLightCapabilities().getColorGamut();
+                return ColorComparator.colorDiffers(currentState.getX(), currentState.getY(),
+                        lastPutCall.getX(), lastPutCall.getY(), gamut);
+            }
+        }
+        return false;
     }
 
     private boolean colorModeNotSupportedByState(ColorMode colorMode) {
@@ -57,8 +64,9 @@ public class LightStateComparator {
                || colorMode == ColorMode.XY && !currentState.isColorSupported();
     }
 
-    private boolean colorModeDiffers(ColorMode colorMode) {
-        return !Objects.equals(colorMode, currentState.getColormode());
+    private boolean incompatibleColorMode(ColorMode colorMode) {
+        return colorMode == ColorMode.CT && currentState.getColormode() != ColorMode.CT ||
+               currentState.getColormode() == ColorMode.CT && colorMode != ColorMode.CT;
     }
 
     private boolean ctDiffers() {
@@ -79,33 +87,6 @@ public class LightStateComparator {
         }
     }
 
-    private boolean xyDiffers() {
-        if (currentState.getX() == null) {
-            return true;
-        }
-        XY current = getAdjustedXY(currentState.getX(), currentState.getY());
-        XY adjustedLast = getAdjustedXY(lastPutCall.getX(), lastPutCall.getY());
-        return doubleDiffers(adjustedLast.x, current.x) || doubleDiffers(adjustedLast.y, current.y);
-    }
-
-    private XY getAdjustedXY(double x, double y) {
-        Double[][] gamut = currentState.getLightCapabilities().getColorGamut();
-        if (gamut == null) {
-            return new XY(x, y);
-        }
-        XYColorGamutCorrection correction = new XYColorGamutCorrection(x, y, gamut);
-        return new XY(correction.getX(), correction.getY());
-    }
-
-    private static boolean doubleDiffers(double last, double current) {
-        return getBigDecimal(last).setScale(2, RoundingMode.HALF_UP)
-                                  .compareTo(getBigDecimal(current).setScale(2, RoundingMode.HALF_UP)) != 0;
-    }
-
-    private static BigDecimal getBigDecimal(Double value) {
-        return new BigDecimal(value.toString()).setScale(3, RoundingMode.HALF_UP);
-    }
-
     private boolean effectDiffers() {
         String lastEffect = lastPutCall.getEffect();
         if (lastEffect == null) {
@@ -123,11 +104,5 @@ public class LightStateComparator {
      */
     private boolean isOnAndStateDiffers() {
         return lastPutCall.getOn() != null && currentState.isOnOffSupported() && lastPutCall.isOn() && !currentState.isOn();
-    }
-
-    @RequiredArgsConstructor
-    private static final class XY {
-        public final double x;
-        public final double y;
     }
 }

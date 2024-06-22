@@ -871,7 +871,7 @@ public class HassApiTest {
         assertThat(lightState).isEqualTo(LightState.builder()
                                                    .on(true)
                                                    .reachable(true)
-                                                   .brightness(199) // adjusted correclty
+                                                   .brightness(199) // adjusted correctly
                                                    .effect("none")
                                                    .lightCapabilities(LightCapabilities.builder()
                                                                                        .capabilities(EnumSet.of(Capability.BRIGHTNESS,
@@ -1888,20 +1888,70 @@ public class HassApiTest {
                         .effect("colorloop"));
 
         verify(http).postResource(getUrl("/services/light/turn_on"),
-                "{\"entity_id\":\"light.id\",\"brightness\":0,\"effect\":\"colorloop\"}");
+                "{\"entity_id\":\"light.id\",\"brightness\":1,\"effect\":\"colorloop\"}");
     }
 
     @Test
-    void putState_turnOn_hs_color() {
+    void putState_turnOn_hs_hueLargerThan360_color() {
         api.putState(PutCall.builder()
                             .id("light.id")
                             .bri(254)
-                            .hue(1000)
+                            .hue(10000)
                             .sat(50)
                             .build());
 
         verify(http).postResource(getUrl("/services/light/turn_on"),
-                "{\"entity_id\":\"light.id\",\"brightness\":255,\"xy_color\":[0.3832,0.3286]}");
+                "{\"entity_id\":\"light.id\",\"brightness\":255,\"hs_color\":[54,19]}");
+    }
+
+    @Test
+    void putState_turnOn_hs_maxValues_color() {
+        api.putState(PutCall.builder()
+                            .id("light.id")
+                            .bri(254)
+                            .hue(65535)
+                            .sat(254)
+                            .build());
+
+        verify(http).postResource(getUrl("/services/light/turn_on"),
+                "{\"entity_id\":\"light.id\",\"brightness\":255,\"hs_color\":[360,100]}");
+    }
+
+    @Test
+    void putState_turnOn_hs_minValues_color() {
+        api.putState(PutCall.builder()
+                            .id("light.id")
+                            .bri(254)
+                            .hue(0)
+                            .sat(0)
+                            .build());
+
+        verify(http).postResource(getUrl("/services/light/turn_on"),
+                "{\"entity_id\":\"light.id\",\"brightness\":255,\"hs_color\":[0,0]}");
+    }
+
+    @Test
+    void putState_turnOn_hs_onlyHueValue_unsupported_ignored() {
+        api.putState(PutCall.builder()
+                            .id("light.id")
+                            .bri(254)
+                            .hue(65535)
+                            .build());
+
+        verify(http).postResource(getUrl("/services/light/turn_on"),
+                "{\"entity_id\":\"light.id\",\"brightness\":255}");
+    }
+
+    @Test
+    void putState_turnOn_hs_onlySatValue_unsupported_ignored() {
+        api.putState(PutCall.builder()
+                            .id("light.id")
+                            .bri(254)
+                            .sat(254)
+                            .build());
+
+        verify(http).postResource(getUrl("/services/light/turn_on"),
+                "{\"entity_id\":\"light.id\",\"brightness\":255}");
     }
 
     @Test

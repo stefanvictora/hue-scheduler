@@ -82,7 +82,7 @@ public final class HueApiImpl implements HueApi {
     private LightState createLightState(Light light) {
         State state = light.state;
         return new LightState(
-                state.bri, state.ct, getX(state.xy), getY(state.xy), state.hue, state.sat, state.effect, state.colormode, state.reachable, state.on,
+                state.bri, state.ct, getX(state.xy), getY(state.xy), state.effect, state.colormode, state.reachable, state.on,
                 createLightCapabilities(light));
     }
 

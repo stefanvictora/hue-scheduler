@@ -1,13 +1,12 @@
 package at.sv.hue.color;
 
-import lombok.Data;
-
 import java.awt.*;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
 /**
  * See: <a href="https://developers.meethue.com/develop/application-design-guidance/color-conversion-formulas-rgb-to-xy-and-back/">developers.meethue.com</a>
+ * And: <a href="https://viereck.ch/hue-xy-rgb/">RGB/xy Color Conversion -- Thomas Lochmatter</a>
  */
 public final class RGBToXYConverter {
 
@@ -16,24 +15,23 @@ public final class RGBToXYConverter {
 
     public static XYColor convert(String hex, Double[][] gamut) {
         Color color = Color.decode(hex);
-        return convert(color.getRed(), color.getGreen(), color.getBlue(), gamut);
+        return rgbToXY(color.getRed(), color.getGreen(), color.getBlue(), gamut);
     }
 
     public static XYColor convert(String r, String g, String b, Double[][] gamut) {
-        return convert(parseInt(r), parseInt(g), parseInt(b), gamut);
+        return rgbToXY(parseInt(r), parseInt(g), parseInt(b), gamut);
     }
 
     private static int parseInt(String s) {
         return Integer.parseInt(s.trim());
     }
 
-    public static XYColor convert(int r, int g, int b, Double[][] gamut) {
-        double red = gammaCorrect(r / 255f);
-        double green = gammaCorrect(g / 255f);
-        double blue = gammaCorrect(b / 255f);
-        double X = red * 0.664511f + green * 0.154324f + blue * 0.162028f;
-        double Y = red * 0.283881f + green * 0.668433f + blue * 0.047685f;
-        double Z = red * 0.000088f + green * 0.072310f + blue * 0.986039f;
+    public static XYColor rgbToXY(int r, int g, int b, Double[][] gamut) {
+        double[] XYZ = rgbToXYZ(r, g, b);
+        double X = XYZ[0];
+        double Y = XYZ[1];
+        double Z = XYZ[2];
+
         double sum = X + Y + Z;
         double x;
         double y;
@@ -49,11 +47,24 @@ public final class RGBToXYConverter {
             x = correction.getX();
             y = correction.getY();
         }
-        return new XYColor(getDoubleValueWithFixedPrecision(x), getDoubleValueWithFixedPrecision(y), (int) (Y * 255f));
+        double maxY = findMaximumY(x, y, gamut);
+        int brightness = (int) Math.round(Y / maxY * 255);
+        return new XYColor(getDoubleValueWithFixedPrecision(x), getDoubleValueWithFixedPrecision(y),
+                clampBrightness(brightness));
     }
 
-    private static double gammaCorrect(float color) {
-        return (color > 0.04045f) ? Math.pow((color + 0.055f) / (1.0f + 0.055f), 2.4000000953674316f) : (color / 12.92f);
+    private static int clampBrightness(int brightness) {
+        return Math.max(1, Math.min(254, brightness)); // 1..254
+    }
+
+    public static double[] rgbToXYZ(int r, int g, int b) {
+        double red = GammaCorrection.sRGBToLinear(r / 255f);
+        double green = GammaCorrection.sRGBToLinear(g / 255f);
+        double blue = GammaCorrection.sRGBToLinear(b / 255f);
+        double X = red * 0.412453 + green * 0.357580 + blue * 0.180423;
+        double Y = red * 0.212671 + green * 0.715160 + blue * 0.072169;
+        double Z = red * 0.019334 + green * 0.119193 + blue * 0.950227;
+        return new double[]{X, Y, Z};
     }
 
     /**
@@ -61,16 +72,40 @@ public final class RGBToXYConverter {
      * Apache License
      * Version 2.0, January 2004
      * http://www.apache.org/licenses/
+     * <br>
+     * And: <a href="https://viereck.ch/hue-xy-rgb/">RGB/xy Color Conversion</a>
+     * Author: Thomas Lochmatter, https://viereck.ch/thomas
+     * License: MIT
      */
-    public static int[] convert(double x, double y, int brightness, Double[][] gamut) {
+    public static int[] xyToRgb(double x, double y, int brightness, Double[][] gamut) { // todo: check if it makes sense to use customizable brightness
+        double maxY = findMaximumY(x, y, gamut);
+        double[] rgb = xyYToRgb(x, y, maxY * brightness / 255, gamut);
+        int r = Math.min((int) (rgb[0] * 255), 255);
+        int g = Math.min((int) (rgb[1] * 255), 255);
+        int b = Math.min((int) (rgb[2] * 255), 255);
+        return new int[]{r, g, b};
+    }
+
+    public static double findMaximumY(double x, double y, Double[][] gamut) {
+        double bri = 1.0;
+        for (int i = 0; i < 10; i++) {
+            double[] rgb = xyYToRgb(x, y, bri, gamut);
+            double maxComponent = Math.max(rgb[0], Math.max(rgb[1], rgb[2]));
+            if (maxComponent > 1) {
+                bri /= maxComponent;
+            }
+        }
+        return bri;
+    }
+
+    private static double[] xyYToRgb(double x, double y, double Y, Double[][] gamut) {
         if (gamut != null) {
             XYColorGamutCorrection correction = new XYColorGamutCorrection(x, y, gamut);
             x = correction.getX();
             y = correction.getY();
         }
-        double Y = brightness / 255.0;
         if (Y == 0.0) {
-            return new int[]{0, 0, 0};
+            return new double[]{0.0, 0.0, 0.0};
         }
         if (y == 0.0) {
             y += 0.00000000001;
@@ -78,36 +113,43 @@ public final class RGBToXYConverter {
         double z = 1 - x - y;
         double X = (Y / y) * x;
         double Z = (Y / y) * z;
-        double red = X * 1.656492 - Y * 0.354851 - Z * 0.255038;
-        double green = -X * 0.707196 + Y * 1.655397 + Z * 0.036152;
-        double blue = X * 0.051713 - Y * 0.121364 + Z * 1.011530;
-        red = inverseGammaCorrect(red);
-        green = inverseGammaCorrect(green);
-        blue = inverseGammaCorrect(blue);
-        red = Math.max(0, red);
-        green = Math.max(0, green);
-        blue = Math.max(0, blue);
-        double maxComponent = Math.max(red, Math.max(green, blue));
-        if (maxComponent > 1) {
-            red /= maxComponent;
-            green /= maxComponent;
-            blue /= maxComponent;
-        }
-        return new int[]{(int) (red * 255), (int) (green * 255), (int) (blue * 255)};
-    }
-
-    private static double inverseGammaCorrect(double color) {
-        return (color <= 0.0031308) ? 12.92 * color : (1.0 + 0.055) * Math.pow(color, 1.0 / 2.4) - 0.055;
+        double red = X * 3.240479 - Y * 1.53715 - Z * 0.498535;
+        double green = -X * 0.969256 + Y * 1.875991 + Z * 0.041556;
+        double blue = X * 0.055648 - Y * 0.204043 + Z * 1.057311;
+        double r = GammaCorrection.linearToSRGB(red);
+        double g = GammaCorrection.linearToSRGB(green);
+        double b = GammaCorrection.linearToSRGB(blue);
+        return new double[]{Math.max(0, r), Math.max(0, g), Math.max(0, b)};
     }
 
     private static double getDoubleValueWithFixedPrecision(double value) {
         return BigDecimal.valueOf(value).setScale(4, RoundingMode.HALF_UP).doubleValue();
     }
 
-    @Data
-    public static final class XYColor {
-        private final double x;
-        private final double y;
-        private final int brightness;
+    public record XYColor(double x, double y, int brightness) {
+    }
+
+    private static final class GammaCorrection {
+        private static final double gamma = 2.4;
+        private static final double transition = 0.0031308;
+        private static final double slope = 12.92;
+        private static final double offset = 0.055;
+
+        public static double linearToSRGB(double value) {
+            if (value <= transition) {
+                return slope * value;
+            } else {
+                return (1 + offset) * Math.pow(value, 1 / gamma) - offset;
+            }
+        }
+
+        public static double sRGBToLinear(double value) {
+            double transitionInv = linearToSRGB(transition);
+            if (value <= transitionInv) {
+                return value / slope;
+            } else {
+                return Math.pow((value + offset) / (1 + offset), gamma);
+            }
+        }
     }
 }

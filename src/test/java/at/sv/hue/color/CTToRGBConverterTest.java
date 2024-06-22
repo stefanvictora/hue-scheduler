@@ -18,9 +18,31 @@ class CTToRGBConverterTest {
         assertRGBFromAndToKelvin(2000, 255, 136, 13); // least blue
     }
 
+    @Test
+    void convert_RGB_CT() {
+        assertRgbToCt(255, 147, 41, 454); // approx warm white
+        assertRgbToCt(255, 255, 255, 151); // white
+        assertRgbToCt(255, 56, 0, 1000);  // red todo: too big of a value
+    }
+
+    @Test
+    void convert_CT_RGB() {
+        assertMiredToRgb(454, 255, 146, 39); // warm white
+        assertMiredToRgb(151, 255, 255, 255); // white
+        assertMiredToRgb(1000, 255, 67, 0);  // red todo: too big of a value
+    }
+
     private static void assertRGBFromAndToKelvin(int kelvin, int red, int green, int blue) {
         int mired = 1_000_000 / kelvin;
-        assertThat(CTToRGBConverter.approximateRGBFromMired(mired)).containsExactly(red, green, blue);
-        assertThat(CTToRGBConverter.approximateMiredFromRGB(red, green, blue)).isEqualTo(mired);
+        assertMiredToRgb(mired, red, green, blue);
+        assertRgbToCt(red, green, blue, mired);
+    }
+
+    private static void assertMiredToRgb(int mired, int r, int g, int b) {
+        assertThat(CTToRGBConverter.approximateRGBFromMired(mired)).containsExactly(r, g, b);
+    }
+
+    private static void assertRgbToCt(int r, int g, int b, int mired) {
+        assertThat(CTToRGBConverter.approximateMiredFromRGB(r, g, b)).isEqualTo(mired);
     }
 }

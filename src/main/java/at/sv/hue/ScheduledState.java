@@ -97,6 +97,7 @@ final class ScheduledState {
         this.y = assertValidXAndY(y);
         this.hue = assertValidHueValue(hue);
         this.sat = assertValidSaturationValue(sat);
+        assertValidHueAndSat();
         this.on = on;
         this.definedTransitionTime = assertValidTransitionTime(definedTransitionTime);
         this.transitionTimeBeforeString = transitionTimeBeforeString;
@@ -200,6 +201,12 @@ final class ScheduledState {
             throw new InvalidSaturationValue("Invalid saturation value '" + sat + "'. Allowed integer range: 0-254");
         }
         return sat;
+    }
+
+    private void assertValidHueAndSat() {
+        if (hue != null && sat == null || hue == null && sat != null) {
+            throw new InvalidPropertyValue("Hue and sat can only occur at the same time.");
+        }
     }
 
     private Integer assertValidTransitionTime(Integer transitionTime) {
@@ -508,6 +515,7 @@ final class ScheduledState {
                       .effect(getEffect())
                       .transitionTime(now != null ? getTransitionTime(now, definedStart) : null)
                       .groupState(groupState)
+                      .gamut(capabilities != null ? capabilities.getColorGamut() : null)
                       .build();
     }
 

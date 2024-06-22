@@ -7,6 +7,7 @@ import at.sv.hue.api.hass.HassSupportedEntityType;
 import at.sv.hue.color.RGBToXYConverter;
 import at.sv.hue.time.StartTimeProvider;
 
+import java.awt.*;
 import java.time.DayOfWeek;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -127,19 +128,28 @@ public final class InputConfigurationParser {
                         break;
                     case "color":
                         RGBToXYConverter.XYColor xyColor;
+                        int red;
+                        int green;
+                        int blue;
                         if (value.contains(",")) {
                             String[] rgb = value.split(",");
                             if (rgb.length != 3) {
                                 throw new InvalidPropertyValue("Invalid RGB value '" + value + "'. Make sure to separate the color values with ','.");
                             }
-                            xyColor = RGBToXYConverter.convert(rgb[0], rgb[1], rgb[2], capabilities.getColorGamut());
+                            red = parseInteger(rgb[0], "color");
+                            green = parseInteger(rgb[1], "color");
+                            blue = parseInteger(rgb[2], "color");
                         } else {
-                            xyColor = RGBToXYConverter.convert(value, capabilities.getColorGamut());
+                            Color color = Color.decode(value);
+                            red = color.getRed();
+                            green = color.getGreen();
+                            blue = color.getBlue();
                         }
-                        x = xyColor.getX();
-                        y = xyColor.getY();
+                        xyColor = RGBToXYConverter.rgbToXY(red, green, blue, capabilities.getColorGamut());
+                        x = xyColor.x();
+                        y = xyColor.y();
                         if (bri == null) {
-                            bri = xyColor.getBrightness();
+                            bri = xyColor.brightness();
                         }
                         break;
                     case "effect":
@@ -209,7 +219,7 @@ public final class InputConfigurationParser {
     }
 
     private static Integer parseInteger(String value, String parameter) {
-        return parseValueWithErrorHandling(value, parameter, "integer", Integer::valueOf);
+        return parseValueWithErrorHandling(value.trim(), parameter, "integer", Integer::valueOf);
     }
 
     private Double parseDouble(String value, String parameter) {
