@@ -1,6 +1,7 @@
 package at.sv.hue.api.hue;
 
 import at.sv.hue.api.LightEventListener;
+import at.sv.hue.api.SceneEventListener;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -19,10 +20,12 @@ public final class HueEventHandler implements BackgroundEventHandler {
     private static final TypeReference<List<HueEventContainer>> typeRef = new TypeReference<>() {
     };
     private final LightEventListener lightEventListener;
+    private final SceneEventListener sceneEventListener;
     private final ObjectMapper objectMapper;
 
-    public HueEventHandler(LightEventListener lightEventListener) {
+    public HueEventHandler(LightEventListener lightEventListener, SceneEventListener sceneEventListener) {
         this.lightEventListener = lightEventListener;
+        this.sceneEventListener = sceneEventListener;
         objectMapper = new ObjectMapper();
         objectMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
     }
@@ -49,6 +52,8 @@ public final class HueEventHandler implements BackgroundEventHandler {
                                   lightEventListener.onLightOff(hueEvent.getId_v1());
                               } else if (hueEvent.isLightOrGroup() && hueEvent.isOnEvent()) {
                                   lightEventListener.onLightOn(hueEvent.getId_v1(), hueEvent.isPhysical());
+                              } else if (hueEvent.isScene() && hueEvent.isSceneActivated()) {
+                                  sceneEventListener.onSceneActivated(hueEvent.getId_v1());
                               }
                           });
     }
@@ -109,6 +114,22 @@ public final class HueEventHandler implements BackgroundEventHandler {
 
         public boolean isGroup() {
             return "grouped_light".equals(type) || id_v1 != null && id_v1.startsWith("/groups/");
+        }
+
+        public boolean isScene() {
+            return "scene".equals(type);
+        }
+
+        public boolean isSceneActivated() {
+            String sceneStatus = getSceneStatus();
+            return "static".equals(sceneStatus) || "dynamic_palette".equals(sceneStatus);
+        }
+
+        private String getSceneStatus() {
+            if (status != null && status.get("active") != null) {
+                return status.get("active").asText();
+            }
+            return null;
         }
 
         @Data

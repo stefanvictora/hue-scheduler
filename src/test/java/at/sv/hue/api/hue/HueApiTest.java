@@ -457,6 +457,87 @@ class HueApiTest {
     }
 
     @Test
+    void getAffectedIdsByScene_returnsLightIdsFor_empty_ignoredAffectedByScene() {
+        setGetResponse("/scenes", """
+                {
+                }
+                """);
+
+        List<String> sceneLights = api.getAffectedIdsByScene("/scene/12345ABC");
+
+        assertThat(sceneLights).isEmpty();
+    }
+
+    @Test
+    void getAffectedIdsByScene_returnsLightIdsAndGroupIdFor_correctIdsAffectedByScene() {
+        setGetResponse("/scenes", """
+                {
+                  "8V1DI3muI6bSns1": {
+                    "name": "Video Chat",
+                    "type": "LightScene",
+                    "lights": [
+                      "6",
+                      "19",
+                      "47"
+                    ],
+                    "owner": "9e3ebcc4-2ead-4b29-8382-eb27f459fb53",
+                    "recycle": false,
+                    "locked": false,
+                    "appdata": {
+                      "version": 1,
+                      "data": "E5FD4543:AA01000"
+                    },
+                    "picture": "",
+                    "lastupdated": "2023-04-27T20:17:21",
+                    "version": 2
+                  },
+                  "bqd6wEsNlIHQ2-b": {
+                    "name": "Soft Chill",
+                    "type": "LightScene",
+                    "lights": [
+                      "1",
+                      "2",
+                      "3"
+                    ],
+                    "owner": "9e3ebcc4-2ead-4b29-8382-eb27f459fb53",
+                    "recycle": false,
+                    "locked": false,
+                    "appdata": {
+                      "version": 1,
+                      "data": "A32B0391:AA01000"
+                    },
+                    "picture": "",
+                    "lastupdated": "2023-04-27T20:17:21",
+                    "version": 2
+                  },
+                  "4yoLHdxJsSHArWN": {
+                    "name": "Tag",
+                    "type": "GroupScene",
+                    "group": "13",
+                    "lights": [
+                      "46",
+                      "47"
+                    ],
+                    "owner": "9e3ebcc4-2ead-4b29-8382-eb27f459fb53",
+                    "recycle": false,
+                    "locked": true,
+                    "appdata": {
+                      "version": 0,
+                      "data": "AF5B49B3:AB0D000"
+                    },
+                    "picture": "",
+                    "lastupdated": "2024-01-18T06:33:46",
+                    "version": 2
+                  }
+                }
+                """);
+
+        assertThat(api.getAffectedIdsByScene("/scenes/8V1DI3muI6bSns1")).containsExactly("/lights/6", "/lights/19", "/lights/47");
+        assertThat(api.getAffectedIdsByScene("/scenes/bqd6wEsNlIHQ2-b")).containsExactly("/lights/1", "/lights/2", "/lights/3");
+        assertThat(api.getAffectedIdsByScene("/scenes/4yoLHdxJsSHArWN")).containsExactly("/lights/46", "/lights/47", "/groups/13");
+    }
+
+    @Test
     void getAssignedGroups_givenLightId_returnsGroupIds() {
         setGetResponse("/groups", """
                 {

@@ -1,16 +1,22 @@
 # Changelog
 
-## [Unreleased]
+## [0.11.0] - 2024-06-29
+
+### Added
+- **Scene Activation Detection**: Hue Scheduler now temporarily disables turn-on event tracking for affected lights and groups when scenes are activated. This prevents it from taking over control when lights are turned on via scenes (#10).
+  - A new `--scene-activation-ignore-window` command line option has been added to fine-tune this behavior, with a default value of `5` seconds.
+  - To disable this behavior, you can either disable user modification tracking entirely (see `--disable-user-modification-tracking`) or set the `force:true` property on a state-by-state basis.
+  - Limitations: When connected to Home Assistant, scenes turned on via the Hue bridge (e.g., via apps, smart switches, etc.) cannot be detected due to Home Assistant limitations. However, Hue-based scenes turned on via Home Assistant can still be detected.
 
 ### Changed
-- **Improved color accuracy**: Improved algorithm for RGB to XY as well as XY to CT conversion
-- **Improved color comparison**: Manual overrides for color and brightness are now detected using similarity thresholds instead of exact comparisons
-    
+- **Color Accuracy**: Enhanced algorithms for RGB to XY and XY to CT conversions.
+- **Color Comparison**: Implemented similarity thresholds for detecting manual overrides in color and brightness, replacing exact matches.
+
 ### Fixed
-- Fixed support for `effect:colorloop` for Home Assistant. More effects will be added in upcoming releases.
+- **Home Assistant**: Resolved an issue with using `effect:colorloop`. More effects will be added in upcoming releases.
 
 ### Removed
-- Removed support for setting `hue` and `sat` properties independently: This was only supported by Hue API v1.
+- **Hue and Saturation**: Removed support for setting `hue` and `sat` properties independently, as this feature was only available in Hue API v1.
 
 ## [0.10.0] - 2024-05-30
 

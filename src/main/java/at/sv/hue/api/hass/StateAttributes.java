@@ -7,6 +7,7 @@ import java.util.List;
 @Data
 final class StateAttributes {
     String friendly_name;
+    String group_name;
     String color_mode;
     Integer brightness;
     Integer color_temp;

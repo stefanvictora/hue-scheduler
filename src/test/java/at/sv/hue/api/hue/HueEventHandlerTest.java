@@ -1,6 +1,7 @@
 package at.sv.hue.api.hue;
 
 import at.sv.hue.api.LightEventListener;
+import at.sv.hue.api.SceneEventListener;
 import com.launchdarkly.eventsource.MessageEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,11 +16,13 @@ class HueEventHandlerTest {
 
     @Mock
     private LightEventListener lightEventListener;
+    @Mock
+    private SceneEventListener sceneEventListener;
     private HueEventHandler handler;
 
     @BeforeEach
     void setUp() {
-        handler = new HueEventHandler(lightEventListener);
+        handler = new HueEventHandler(lightEventListener, sceneEventListener);
     }
 
     @Test
@@ -115,7 +118,7 @@ class HueEventHandlerTest {
     }
 
     @Test
-    void onMessage_sceneEvents_noErrorIsThrown() throws Exception {
+    void onMessage_sceneEvents_notifiesEventListener() throws Exception {
         handler.onMessage("", new MessageEvent("""
                 [
                   {
@@ -136,6 +139,25 @@ class HueEventHandlerTest {
                           "active": "static"
                         },
                         "type": "scene"
+                      },
+                      {
+                        "id": "f9b4085b-1409-4b12-ae0d-4ffe2be28b79",
+                        "id_v1": "/scenes/eOapgitzaquU3c2",
+                        "status": {
+                          "active": "dynamic_palette"
+                        },
+                        "type": "scene"
+                      },
+                      {
+                        "id": "f9b4085b-1409-4b12-ae0d-4ffe2be28b79",
+                        "id_v1": "/scenes/v5Q0GsblLw4Ytxx4",
+                        "type": "scene"
+                      },
+                      {
+                        "id": "f9b4085b-1409-4b12-ae0d-4ffe2be28b79",
+                        "id_v1": "/scenes/45648789711",
+                        "status": "connected",
+                        "type": "scene"
                       }
                     ],
                     "id": "5cf1f272-c33c-4c6c-9e74-9366cac5d969",
@@ -144,7 +166,10 @@ class HueEventHandlerTest {
                 ]
                 """));
 
+        verify(sceneEventListener).onSceneActivated("/scenes/IaVm23klVFrfDGQ");
+        verify(sceneEventListener).onSceneActivated("/scenes/eOapgitzaquU3c2");
         verifyNoInteractions(lightEventListener);
+        verifyNoMoreInteractions(sceneEventListener);
     }
 
     @Test

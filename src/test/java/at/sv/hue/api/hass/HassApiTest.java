@@ -1615,7 +1615,7 @@ public class HassApiTest {
     }
 
     @Test
-    void getAssignedGroups_returnsGroupIdsTheGivenLightIdIsContained() {
+    void getAssignedGroups_returnsGroupIdsTheGivenLightIdIsContained_ignoresScenes() {
         setGetResponse("/states", """
                 [
                     {
@@ -1810,6 +1810,26 @@ public class HassApiTest {
                         "parent_id": null,
                         "user_id": null
                       }
+                    },
+                    {
+                        "entity_id": "scene.test_scene",
+                        "state": "2024-06-22T20:26:10.406785+00:00",
+                        "attributes": {
+                            "entity_id": [
+                                "light.couch_light",
+                                "light.another_light"
+                            ],
+                            "id": "1719087533616",
+                            "friendly_name": "Test Scene"
+                        },
+                        "last_changed": "2024-06-22T20:26:48.309168+00:00",
+                        "last_reported": "2024-06-22T20:26:48.309168+00:00",
+                        "last_updated": "2024-06-22T20:26:48.309168+00:00",
+                        "context": {
+                            "id": "01J10T2K3NY0G61R0PE3K95TXZ",
+                            "parent_id": null,
+                            "user_id": null
+                        }
                     }
                   ]
                 """);
@@ -1817,6 +1837,160 @@ public class HassApiTest {
         assertThat(api.getAssignedGroups("light.couch_light")).containsExactlyInAnyOrder("light.couch_group",
                 "light.couch_group2");
         assertThat(api.getAssignedGroups("light.another_light")).containsExactlyInAnyOrder("light.another_group");
+    }
+
+    @Test
+    void getAffectedIdsByScene_returnsIds() {
+        setGetResponse("/states", """
+                [
+                  {
+                    "entity_id": "scene.test_scene",
+                    "state": "2024-06-22T20:26:10.406785+00:00",
+                    "attributes": {
+                      "entity_id": [
+                        "light.1",
+                        "light.2"
+                      ],
+                      "id": "1719087533616",
+                      "friendly_name": "Test Scene"
+                    },
+                    "last_changed": "2024-06-22T20:26:48.309168+00:00",
+                    "last_reported": "2024-06-22T20:26:48.309168+00:00",
+                    "last_updated": "2024-06-22T20:26:48.309168+00:00",
+                    "context": {
+                      "id": "01J10T2K3NY0G61R0PE3K95TXZ",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  },
+                  {
+                    "entity_id": "scene.hue_scene",
+                    "state": "unknown",
+                    "attributes": {
+                      "group_name": "Wohnzimmer",
+                      "group_type": "room",
+                      "name": "Miami",
+                      "speed": 0.6904761904761905,
+                      "brightness": 80.0,
+                      "is_dynamic": true,
+                      "friendly_name": "Wohnzimmer Miami"
+                    },
+                    "last_changed": "2024-06-23T11:52:38.272542+00:00",
+                    "last_reported": "2024-06-23T12:01:28.811621+00:00",
+                    "last_updated": "2024-06-23T11:52:38.272542+00:00",
+                    "context": {
+                      "id": "01J12F1V40TBK47BJVWE3KPBJR",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  },
+                  {
+                    "entity_id": "scene.hue_scene_broken1",
+                    "state": "unknown",
+                    "attributes": {
+                      "group_name": "NOT FOUND",
+                      "group_type": "room",
+                      "name": "Miami",
+                      "speed": 0.6904761904761905,
+                      "brightness": 80.0,
+                      "is_dynamic": true,
+                      "friendly_name": "not known"
+                    },
+                    "last_changed": "2024-06-23T11:52:38.272542+00:00",
+                    "last_reported": "2024-06-23T12:01:28.811621+00:00",
+                    "last_updated": "2024-06-23T11:52:38.272542+00:00",
+                    "context": {
+                      "id": "01J12F1V40TBK47BJVWE3KPBJR",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  },
+                  {
+                    "entity_id": "scene.hue_scene_broken2",
+                    "state": "unknown",
+                    "attributes": {
+                      "group_name": "Light 1",
+                      "group_type": "room",
+                      "name": "Miami",
+                      "speed": 0.6904761904761905,
+                      "brightness": 80.0,
+                      "is_dynamic": true,
+                      "friendly_name": "not known"
+                    },
+                    "last_changed": "2024-06-23T11:52:38.272542+00:00",
+                    "last_reported": "2024-06-23T12:01:28.811621+00:00",
+                    "last_updated": "2024-06-23T11:52:38.272542+00:00",
+                    "context": {
+                      "id": "01J12F1V40TBK47BJVWE3KPBJR",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  },
+                  {
+                    "entity_id": "light.wohnzimmer",
+                    "state": "on",
+                    "attributes": {
+                      "is_hue_group": true,
+                      "hue_scenes": [
+                        "Miami"
+                      ],
+                      "hue_type": "room",
+                      "lights": [
+                        "Light 1",
+                        "Light 3"
+                      ],
+                      "friendly_name": "Wohnzimmer",
+                      "supported_features": 40
+                    },
+                    "last_changed": "2024-06-28T07:15:30.973498+00:00",
+                    "last_reported": "2024-06-28T07:15:32.571302+00:00",
+                    "last_updated": "2024-06-28T07:15:32.571302+00:00",
+                    "context": {
+                      "id": "01J1EV622V51EZPV8480BNYY5J",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  },
+                  {
+                    "entity_id": "light.1",
+                    "state": "on",
+                    "attributes": {
+                      "friendly_name": "Light 1",
+                      "supported_features": 40
+                    },
+                    "last_changed": "2024-06-28T07:15:30.790775+00:00",
+                    "last_reported": "2024-06-28T07:15:32.442080+00:00",
+                    "last_updated": "2024-06-28T07:15:32.442080+00:00",
+                    "context": {
+                      "id": "01J1EV61YTBP7RKF3H66D2XD7W",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  },
+                  {
+                    "entity_id": "light.3",
+                    "state": "on",
+                    "attributes": {
+                      "friendly_name": "Light 3",
+                      "supported_features": 40
+                    },
+                    "last_changed": "2024-06-28T07:15:30.774358+00:00",
+                    "last_reported": "2024-06-28T07:15:32.424046+00:00",
+                    "last_updated": "2024-06-28T07:15:32.424046+00:00",
+                    "context": {
+                      "id": "01J1EV61Y8B2Q7ENQYK8YTY9EP",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  }
+                ]
+                """);
+
+        assertThat(api.getAffectedIdsByScene("scene.unknown")).isEmpty();
+        assertThat(api.getAffectedIdsByScene("scene.test_scene")).containsExactly("light.1", "light.2");
+        assertThat(api.getAffectedIdsByScene("scene.hue_scene")).containsExactly("light.wohnzimmer", "light.1", "light.3");
+        assertThat(api.getAffectedIdsByScene("scene.hue_scene_broken1")).isEmpty();
+        assertThat(api.getAffectedIdsByScene("scene.hue_scene_broken2")).isEmpty();
     }
 
     @Test
@@ -2015,6 +2189,8 @@ public class HassApiTest {
         assertThatThrownBy(() -> api.isLightOff("sensor.sun_next_setting")).isInstanceOf(UnsupportedStateException.class);
         assertThatThrownBy(() -> api.isGroupOff("sensor.sun_next_setting")).isInstanceOf(UnsupportedStateException.class);
         assertThatThrownBy(() -> api.putState(PutCall.builder().id("sensor.sun_next_setting").build())).isInstanceOf(UnsupportedStateException.class);
+
+        assertThatThrownBy(() -> api.putState(PutCall.builder().id("scene.test_scene").build())).isInstanceOf(UnsupportedStateException.class);
     }
 
     @Test
