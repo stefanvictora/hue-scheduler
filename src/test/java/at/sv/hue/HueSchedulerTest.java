@@ -45,8 +45,8 @@ class HueSchedulerTest {
     private static final int ID = 1;
     private static final int DEFAULT_BRIGHTNESS = 50;
     private static final int DEFAULT_CT = 400; // very warm. [153-500]
-    private static final double DEFAULT_X = 0.2319;
-    private static final double DEFAULT_Y = 0.4675;
+    private static final double DEFAULT_X = 0.2862;
+    private static final double DEFAULT_Y = 0.4311;
 
     private TestStateScheduler stateScheduler;
     private ManualOverrideTracker manualOverrideTracker;
@@ -254,12 +254,12 @@ class HueSchedulerTest {
 
     private void setLightStateResponse(int id, boolean reachable, boolean on, String effect) {
         LightState.LightStateBuilder lightStateBuilder = LightState.builder()
-                                          .brightness(DEFAULT_BRIGHTNESS)
-                                          .colorTemperature(DEFAULT_CT)
-                                          .effect(effect)
-                                          .reachable(reachable)
-                                          .on(on)
-                                          .lightCapabilities(defaultCapabilities);
+                                                                   .brightness(DEFAULT_BRIGHTNESS)
+                                                                   .colorTemperature(DEFAULT_CT)
+                                                                   .effect(effect)
+                                                                   .reachable(reachable)
+                                                                   .on(on)
+                                                                   .lightCapabilities(defaultCapabilities);
         setLightStateResponse(id, lightStateBuilder);
     }
 
@@ -1248,7 +1248,7 @@ class HueSchedulerTest {
         // second split -> detect override
 
         setCurrentTimeTo(secondSplit);
-        setLightStateResponse(1, expectedState().brightness(initialBrightness + 101)); // second modification
+        setLightStateResponse(1, expectedState().brightness(initialBrightness + 130)); // second modification
         secondSplit.run(); // detects manual override
 
         // advance time to final split -> skips second split, as not relevant anymore
@@ -2700,9 +2700,28 @@ class HueSchedulerTest {
     }
 
     @Test
+    void parse_transitionTimeBefore_interpolate_rgb_xy() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addStateNow(1, "color:#558af3");
+        addState(1, now.plusMinutes(40), "x:0.2108", "y:0.2496", "tr-before:20min");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(2);
+        ScheduledRunnable trBeforeRunnable = scheduledRunnables.get(1);
+
+        setCurrentTimeTo(now.plusMinutes(30));
+
+        runAndAssertPutCalls(trBeforeRunnable,
+                expectedPutCall(1).bri(228).x(0.20615).y(0.2171),
+                expectedPutCall(1).x(0.2108).y(0.2496).transitionTime(tr("10min"))
+        );
+
+        ensureRunnable(initialNow.plusDays(1).plusMinutes(20), initialNow.plusDays(2));
+    }
+
+    @Test
     void parse_transitionTimeBefore_longDuration_multipleStates_multipleProperty_previousStateHasNoBrightness_noLongTransition_noStartAdjustment() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        addStateNow(1, "ct:166", "x:0.4", "y:0.5", "hue:2000", "tr:1"); // 00:00-12:00
+        addStateNow(1, "ct:166", "x:0.4", "y:0.5", "tr:1"); // 00:00-12:00
         addState(1, "12:00", "bri:" + DEFAULT_BRIGHTNESS, "tr-before:00:00"); // 12:00 -> no overlapping properties, not start adjustment
 
         List<ScheduledRunnable> scheduledRunnables = startScheduler(
@@ -2715,7 +2734,7 @@ class HueSchedulerTest {
         advanceCurrentTime(Duration.ofMinutes(30));
 
         runAndAssertPutCalls(firstState,
-                expectedPutCall(1).ct(166).x(0.4).y(0.5).hue(2000).transitionTime(1)
+                expectedPutCall(1).ct(166).x(0.4).y(0.5).transitionTime(1)
         );
 
         ScheduledRunnable firstStateNextDay = ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusHours(12));
@@ -2727,7 +2746,7 @@ class HueSchedulerTest {
         ensureRunnable(initialNow.plusDays(1).plusHours(12), initialNow.plusDays(2));
 
         advanceTimeAndRunAndAssertPutCalls(firstStateNextDay,
-                expectedPutCall(1).ct(166).x(0.4).y(0.5).hue(2000).transitionTime(1)
+                expectedPutCall(1).ct(166).x(0.4).y(0.5).transitionTime(1)
         );
 
         ensureRunnable(initialNow.plusDays(2), initialNow.plusDays(2).plusHours(12));
@@ -3199,12 +3218,12 @@ class HueSchedulerTest {
 
     private void assertAppliedSaturation(String input, int expected) {
         addKnownLightIdsWithDefaultCapabilities(1);
-        addStateNow(1, "sat:" + input);
+        addStateNow(1, "hue:1000", "sat:" + input);
 
         ScheduledRunnable runnable = startAndGetSingleRunnable();
 
         advanceTimeAndRunAndAssertPutCalls(runnable,
-                expectedPutCall(1).sat(expected)
+                expectedPutCall(1).hue(1000).sat(expected)
         );
 
         ensureRunnable(initialNow.plusDays(1));
@@ -3314,11 +3333,9 @@ class HueSchedulerTest {
 
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
-        int bri = 94;
-        double x = 0.2319;
-        double y = 0.4675;
+        int bri = 125;
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
-                expectedPutCall(ID).bri(bri).x(x).y(y)
+                expectedPutCall(ID).bri(bri).x(DEFAULT_X).y(DEFAULT_Y)
         );
 
         ensureRunnable(initialNow.plusDays(1));
@@ -3346,7 +3363,7 @@ class HueSchedulerTest {
 
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
-        int bri = 94;
+        int bri = 125;
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
                 expectedPutCall(ID).bri(bri).x(DEFAULT_X).y(DEFAULT_Y)
         );
@@ -3518,15 +3535,21 @@ class HueSchedulerTest {
     }
 
     @Test
-    void parse_colorInput_hue_butLightDoesNotSupportColor_exception() {
+    void parse_colorInput_hueAndSat_butLightDoesNotSupportColor_exception() {
         mockLightCapabilities(1, LightCapabilities.builder());
-        assertThrows(ColorNotSupported.class, () -> addStateNow("1", "hue:200"));
+        assertThrows(ColorNotSupported.class, () -> addStateNow("1", "sat:200", "hue:200"));
     }
 
     @Test
-    void parse_colorInput_sat_butLightDoesNotSupportColor_exception() {
-        mockLightCapabilities(1, LightCapabilities.builder());
-        assertThrows(ColorNotSupported.class, () -> addStateNow("1", "sat:200"));
+    void parse_satOnly_exception() {
+        mockDefaultGroupCapabilities(1);
+        assertThrows(InvalidPropertyValue.class, () -> addStateNow("1", "sat:200"));
+    }
+
+    @Test
+    void parse_hueOnly_exception() {
+        mockDefaultGroupCapabilities(1);
+        assertThrows(InvalidPropertyValue.class, () -> addStateNow("1", "hue:1000"));
     }
 
     @Test
@@ -4945,7 +4968,7 @@ class HueSchedulerTest {
 
         // fourth split -> detects override
 
-        setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS + 42)); // overridden
+        setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS + 50)); // overridden
 
         setCurrentTimeTo(fourthSplit);
         fourthSplit.run(); // detects override

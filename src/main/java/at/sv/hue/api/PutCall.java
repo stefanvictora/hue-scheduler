@@ -3,6 +3,7 @@ package at.sv.hue.api;
 import at.sv.hue.ColorMode;
 import lombok.Builder;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 import java.time.Duration;
 import java.util.Objects;
@@ -22,6 +23,8 @@ public final class PutCall {
     String effect;
     Integer transitionTime;
     boolean groupState;
+    @EqualsAndHashCode.Exclude
+    Double[][] gamut;
 
     public boolean isNullCall() {
         return Stream.of(bri, ct, x, y, hue, sat, on, effect).allMatch(Objects::isNull);
@@ -30,7 +33,7 @@ public final class PutCall {
     public ColorMode getColorMode() {
         if (ct != null) {
             return ColorMode.CT;
-        } else if (x != null) {
+        } else if (x != null && y != null) {
             return ColorMode.XY;
         } else if (hue != null || sat != null) {
             return ColorMode.HS;
@@ -41,7 +44,6 @@ public final class PutCall {
     public boolean isOn() {
         return on == Boolean.TRUE;
     }
-
 
     @Override
     public String toString() {

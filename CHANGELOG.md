@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Changed
+- **Improved color accuracy**: Improved algorithm for RGB to XY as well as XY to CT conversion
+- **Improved color comparison**: Manual overrides for color and brightness are now detected using similarity thresholds instead of exact comparisons
+    
+### Fixed
+- Fixed support for `effect:colorloop` for Home Assistant. More effects will be added in upcoming releases.
+
+### Removed
+- Removed support for setting `hue` and `sat` properties independently: This was only supported by Hue API v1.
+
 ## [0.10.0] - 2024-05-30
 
 ### Added

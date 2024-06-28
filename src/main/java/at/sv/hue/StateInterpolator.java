@@ -55,14 +55,13 @@ public final class StateInterpolator {
         BigDecimal interpolatedTime = getInterpolatedTime();
         PutCall previous = previousState.getPutCall(dateTime);
         PutCall target = state.getPutCall(dateTime);
-        Double[][] colorGamut = previousState.getCapabilities().getColorGamut();
 
-        return interpolate(previous, target, interpolatedTime, colorGamut, keepPreviousPropertiesForNullTargets);
+        return interpolate(previous, target, interpolatedTime, keepPreviousPropertiesForNullTargets);
     }
 
-    private static PutCall interpolate(PutCall previous, PutCall target, BigDecimal interpolatedTime, Double[][] colorGamut,
+    private static PutCall interpolate(PutCall previous, PutCall target, BigDecimal interpolatedTime,
                                        boolean previousPropertiesForNullTargets) {
-        convertColorModeIfNeeded(previous, target, colorGamut);
+        convertColorModeIfNeeded(previous, target);
 
         previous.setBri(interpolateInteger(interpolatedTime, target.getBri(), previous.getBri(), previousPropertiesForNullTargets));
         previous.setCt(interpolateInteger(interpolatedTime, target.getCt(), previous.getCt(), previousPropertiesForNullTargets));
@@ -78,7 +77,7 @@ public final class StateInterpolator {
      * would be possible. Here we don't care about the time differences, but just the available properties of the put calls.
      */
     public static boolean hasNoOverlappingProperties(PutCall previous, PutCall target) {
-        PutCall putCall = interpolate(previous, target, BigDecimal.ONE, null, false);
+        PutCall putCall = interpolate(previous, target, BigDecimal.ONE, false);
         putCall.setOn(null); // do not reuse on property
         return putCall.isNullCall();
     }
@@ -94,8 +93,8 @@ public final class StateInterpolator {
     }
 
 
-    private static void convertColorModeIfNeeded(PutCall previousPutCall, PutCall target, Double[][] colorGamut) {
-        ColorModeConverter.convertIfNeeded(previousPutCall, colorGamut, previousPutCall.getColorMode(), target.getColorMode());
+    private static void convertColorModeIfNeeded(PutCall previousPutCall, PutCall target) {
+        ColorModeConverter.convertIfNeeded(previousPutCall, target.getColorMode());
     }
 
     private static Integer interpolateInteger(BigDecimal interpolatedTime, Integer target, Integer previous,

@@ -1,6 +1,5 @@
 package at.sv.hue.api.hass;
 
-import at.sv.hue.ColorMode;
 import at.sv.hue.api.ApiFailure;
 import at.sv.hue.api.Capability;
 import at.sv.hue.api.EmptyGroupException;
@@ -12,7 +11,6 @@ import at.sv.hue.api.LightNotFoundException;
 import at.sv.hue.api.LightState;
 import at.sv.hue.api.PutCall;
 import at.sv.hue.api.RateLimiter;
-import at.sv.hue.color.ColorModeConverter;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -33,6 +31,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+
+import static at.sv.hue.api.hass.BrightnessConverter.hassToHueBrightness;
+import static at.sv.hue.api.hass.BrightnessConverter.hueToHassBrightness;
 
 public class HassApiImpl implements HueApi {
 
@@ -107,16 +108,32 @@ public class HassApiImpl implements HueApi {
         changeState.setEntity_id(id);
         changeState.setBrightness(hueToHassBrightness(putCall.getBri()));
         changeState.setColor_temp(putCall.getCt());
-        changeState.setEffect(putCall.getEffect());
+        changeState.setEffect(hueToHassEffect(putCall));
         changeState.setTransition(convertToSeconds(putCall.getTransitionTime())); // todo: find out the max value of home assistant
         if (putCall.getHue() != null && putCall.getSat() != null) {
-            ColorModeConverter.convertIfNeeded(putCall, null, ColorMode.HS, ColorMode.XY); // todo: we don't have a gamut available, which means the conversion is not perfect
-        }
-        if (putCall.getX() != null && putCall.getY() != null) {
-            changeState.setXy_color(new Double[]{putCall.getX(), putCall.getY()});
+            changeState.setHs_color(getHsColor(putCall));
+        } else if (putCall.getX() != null && putCall.getY() != null) {
+            changeState.setXy_color(getXyColor(putCall));
         }
 
         httpResourceProvider.postResource(getUpdateUrl(putCall), getBody(changeState));
+    }
+
+    private static String hueToHassEffect(PutCall putCall) {
+        if ("colorloop".equals(putCall.getEffect())) {
+            return "prism";
+        }
+        return putCall.getEffect();
+    }
+
+    private Integer[] getHsColor(PutCall putCall) {
+        int hue = (int) (putCall.getHue() / 65535.0 * 360.0);
+        int sat = (int) (putCall.getSat() / 254.0 * 100.0);
+        return new Integer[]{hue, sat};
+    }
+
+    private static Double[] getXyColor(PutCall putCall) {
+        return new Double[]{putCall.getX(), putCall.getY()};
     }
 
     @Override
@@ -262,28 +279,9 @@ public class HassApiImpl implements HueApi {
     private LightState createLightState(State state) {
         StateAttributes attributes = state.getAttributes();
         return new LightState(hassToHueBrightness(attributes.brightness), attributes.color_temp, getXY(attributes.xy_color, 0),
-                getXY(attributes.xy_color, 1), null, null, getEffect(attributes.effect), getColorMode(attributes.color_mode),
-                getReachable(state.state), getOn(state.state), createLightCapabilities(state));
-    }
-
-    /**
-     * Convert hass format 0..255 to hue brightness 1..254
-     */
-    private static Integer hassToHueBrightness(Integer hassBrightness) {
-        if (hassBrightness == null) {
-            return null;
-        }
-        return Math.round(((float) hassBrightness / 255) * 253 + 1);
-    }
-
-    /**
-     * Convert hass format 0..255 to hue brightness 1..254
-     */
-    private static Integer hueToHassBrightness(Integer hueBrightness) {
-        if (hueBrightness == null) {
-            return null;
-        }
-        return Math.round(((float) hueBrightness - 1) / 253 * 255);
+                getXY(attributes.xy_color, 1),
+                getEffect(attributes.effect), getColorMode(attributes.color_mode), getReachable(state.state),
+                getOn(state.state), createLightCapabilities(state));
     }
 
     private static Double getXY(Double[] xy, int i) {
@@ -435,6 +433,7 @@ public class HassApiImpl implements HueApi {
         Integer brightness;
         Integer color_temp;
         Double[] xy_color;
+        Integer[] hs_color;
         String effect;
         Float transition;
     }

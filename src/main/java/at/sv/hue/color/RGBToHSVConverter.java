@@ -1,6 +1,6 @@
 package at.sv.hue.color;
 
-final class RGBToHSVConverter {
+public final class RGBToHSVConverter {
 
     private RGBToHSVConverter() {
     }
