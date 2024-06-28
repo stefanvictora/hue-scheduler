@@ -100,7 +100,7 @@ To get started with Docker, follow these steps:
    services:
      hue-scheduler:
        container_name: hue-scheduler
-       image: stefanvictora/hue-scheduler:0.10
+       image: stefanvictora/hue-scheduler:0.11
        environment:
          - API_HOST=
          - ACCESS_TOKEN=
