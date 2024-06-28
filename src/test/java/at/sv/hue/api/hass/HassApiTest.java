@@ -1888,7 +1888,7 @@ public class HassApiTest {
                         .effect("colorloop"));
 
         verify(http).postResource(getUrl("/services/light/turn_on"),
-                "{\"entity_id\":\"light.id\",\"brightness\":1,\"effect\":\"colorloop\"}");
+                "{\"entity_id\":\"light.id\",\"brightness\":1,\"effect\":\"prism\"}");
     }
 
     @Test

@@ -108,7 +108,7 @@ public class HassApiImpl implements HueApi {
         changeState.setEntity_id(id);
         changeState.setBrightness(hueToHassBrightness(putCall.getBri()));
         changeState.setColor_temp(putCall.getCt());
-        changeState.setEffect(putCall.getEffect());
+        changeState.setEffect(hueToHassEffect(putCall));
         changeState.setTransition(convertToSeconds(putCall.getTransitionTime())); // todo: find out the max value of home assistant
         if (putCall.getHue() != null && putCall.getSat() != null) {
             changeState.setHs_color(getHsColor(putCall));
@@ -117,6 +117,13 @@ public class HassApiImpl implements HueApi {
         }
 
         httpResourceProvider.postResource(getUpdateUrl(putCall), getBody(changeState));
+    }
+
+    private static String hueToHassEffect(PutCall putCall) {
+        if ("colorloop".equals(putCall.getEffect())) {
+            return "prism";
+        }
+        return putCall.getEffect();
     }
 
     private Integer[] getHsColor(PutCall putCall) {
