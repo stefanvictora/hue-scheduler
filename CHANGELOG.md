@@ -4,8 +4,9 @@
 
 ### Added
 - **Scene Activation Detection**: Hue Scheduler now temporarily disables turn-on event tracking for affected lights and groups when scenes are activated. This prevents it from taking over control when lights are turned on via scenes (#10).
-  - Added new `--scene-activation-ignore-window` command line option to fine-tune this behavior, with a default value of `5` seconds.
-  - Limitations: When connected to Home Assistant, scenes turned on via the Hue bridge (e.g., via apps, smart switches, etc.) can't be detected due to Home Assistant limitations. However, it can still detect Hue-based scenes turned on via Home Assistant.
+  - A new `--scene-activation-ignore-window` command line option has been added to fine-tune this behavior, with a default value of `5` seconds.
+  - To disable this behavior, you can either disable user modification tracking entirely (see `--disable-user-modification-tracking`) or set the `force:true` property on a state-by-state basis.
+  - Limitations: When connected to Home Assistant, scenes turned on via the Hue bridge (e.g., via apps, smart switches, etc.) cannot be detected due to Home Assistant limitations. However, Hue-based scenes turned on via Home Assistant can still be detected.
 
 ### Changed
 - **Color Accuracy**: Enhanced algorithms for RGB to XY and XY to CT conversions.
