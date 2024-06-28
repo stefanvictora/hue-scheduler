@@ -23,8 +23,11 @@ public class LightStateComparator {
     }
 
     private boolean brightnessDiffers() {
-        return lastPutCall.getBri() != null && currentState.isBrightnessSupported() &&
-               !lastPutCall.getBri().equals(currentState.getBrightness());
+        return lastPutCall.getBri() != null && currentState.isBrightnessSupported() && brightnessIsNotSimilar();
+    }
+
+    private boolean brightnessIsNotSimilar() {
+        return Math.abs(lastPutCall.getBri() - currentState.getBrightness()) >= 5;
     }
 
     private boolean colorModeOrValuesDiffer() {
@@ -38,24 +41,14 @@ public class LightStateComparator {
         if (incompatibleColorMode(colorMode)) {
             return true;
         }
-        if (colorMode == ColorMode.CT) {
-            return ctDiffers();
-        }
-        switch (colorMode) {
-            case HS -> {
-                return ColorComparator.colorDiffers(currentState.getX(), currentState.getY(),
-                        lastPutCall.getHue(), lastPutCall.getSat());
-            }
-            case XY -> {
-                if (currentState.getX() == null) {
-                    return true;
-                }
-                Double[][] gamut = currentState.getLightCapabilities().getColorGamut();
-                return ColorComparator.colorDiffers(currentState.getX(), currentState.getY(),
-                        lastPutCall.getX(), lastPutCall.getY(), gamut);
-            }
-        }
-        return false;
+        return switch (colorMode) {
+            case CT -> ctDiffers();
+            case HS -> ColorComparator.colorDiffers(currentState.getX(), currentState.getY(),
+                    lastPutCall.getHue(), lastPutCall.getSat());
+            case XY -> ColorComparator.colorDiffers(currentState.getX(), currentState.getY(),
+                    lastPutCall.getX(), lastPutCall.getY(), currentState.getLightCapabilities().getColorGamut());
+            default -> false;
+        };
     }
 
     private boolean colorModeNotSupportedByState(ColorMode colorMode) {

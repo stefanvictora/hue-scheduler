@@ -605,18 +605,33 @@ class ScheduledStateTest {
     }
 
     @Test
-    void lightStateDiffers_differentBrightness_true() {
+    void lightStateDiffers_differentBrightness_aboveThreshold_true() {
         ScheduledState scheduledState = ScheduledState.builder()
                                                       .brightness(10)
                                                       .capabilities(defaultCapabilities)
                                                       .build();
         LightState lightState = LightState.builder()
                                           .on(true)
-                                          .brightness(200)
+                                          .brightness(15)
                                           .lightCapabilities(BRIGHTNESS_ONLY)
                                           .build();
 
         assertLightStateDiffers(scheduledState, lightState, true);
+    }
+
+    @Test
+    void lightStateDiffers_differentBrightness_belowThreshold_false() {
+        ScheduledState scheduledState = ScheduledState.builder()
+                                                      .brightness(10)
+                                                      .capabilities(defaultCapabilities)
+                                                      .build();
+        LightState lightState = LightState.builder()
+                                          .on(true)
+                                          .brightness(14)
+                                          .lightCapabilities(BRIGHTNESS_ONLY)
+                                          .build();
+
+        assertLightStateDiffers(scheduledState, lightState, false);
     }
 
     @Test

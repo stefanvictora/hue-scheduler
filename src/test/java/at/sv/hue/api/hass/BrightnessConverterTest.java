@@ -27,7 +27,7 @@ class BrightnessConverterTest {
         assertHueToHassAndBack(128, 128);
         assertHueToHassAndBack(129, 129);
         assertHueToHassAndBack(191, 192);
-        assertHueToHassAndBack(192, 193); // todo: the HA API returns actually 192
+        assertHueToHassAndBack(192, 193); // the HA API returns actually 192
         assertHueToHassAndBack(199, 200);
         assertHueToHassAndBack(200, 201);
         assertHueToHassAndBack(253, 254);

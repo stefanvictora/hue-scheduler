@@ -1248,7 +1248,7 @@ class HueSchedulerTest {
         // second split -> detect override
 
         setCurrentTimeTo(secondSplit);
-        setLightStateResponse(1, expectedState().brightness(initialBrightness + 101)); // second modification
+        setLightStateResponse(1, expectedState().brightness(initialBrightness + 130)); // second modification
         secondSplit.run(); // detects manual override
 
         // advance time to final split -> skips second split, as not relevant anymore
@@ -4968,7 +4968,7 @@ class HueSchedulerTest {
 
         // fourth split -> detects override
 
-        setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS + 42)); // overridden
+        setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS + 50)); // overridden
 
         setCurrentTimeTo(fourthSplit);
         fourthSplit.run(); // detects override
