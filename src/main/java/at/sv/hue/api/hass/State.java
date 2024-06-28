@@ -19,4 +19,8 @@ final class State {
     boolean isUnavailable() {
         return "unavailable".equals(state);
     }
+
+    public boolean isScene() {
+        return entity_id.startsWith("scene.");
+    }
 }

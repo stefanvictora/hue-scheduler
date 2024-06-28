@@ -30,7 +30,7 @@ public class ManualOverrideTrackerImpl implements ManualOverrideTracker {
         TrackedState trackedState = getOrCreateTrackedState(id);
         trackedState.setManuallyOverridden(false);
         trackedState.setLightIsOff(false);
-        trackedState.setEnforceSchedule(true);
+        trackedState.setJustTurnedOn(true);
     }
 
     @Override
@@ -44,15 +44,15 @@ public class ManualOverrideTrackerImpl implements ManualOverrideTracker {
     }
 
     @Override
-    public boolean shouldEnforceSchedule(String id) {
-        return getOrDefaultState(id).isEnforceSchedule();
+    public boolean wasJustTurnedOn(String id) {
+        return getOrDefaultState(id).isJustTurnedOn();
     }
 
     @Override
     public void onAutomaticallyAssigned(String id) {
         TrackedState trackedState = getOrCreateTrackedState(id);
         trackedState.setManuallyOverridden(false);  // maybe not needed, as this flag is overridden also on light-on events
-        trackedState.setEnforceSchedule(false);
+        trackedState.setJustTurnedOn(false);
     }
 
     private TrackedState getOrCreateTrackedState(String id) {
@@ -67,7 +67,7 @@ public class ManualOverrideTrackerImpl implements ManualOverrideTracker {
     @Setter
     private static final class TrackedState {
         private boolean manuallyOverridden;
-        private boolean enforceSchedule;
+        private boolean justTurnedOn;
         private boolean lightIsOff;
     }
 }

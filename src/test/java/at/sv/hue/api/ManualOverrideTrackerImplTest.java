@@ -39,36 +39,36 @@ class ManualOverrideTrackerImplTest {
     }
 
     @Test
-    void shouldEnforceSchedule_onlyActiveAfterUserTTurnsOnLights_eventAlsoResetsManualOverrideFlag() {
-        assertShouldEnforceSchedule("1", false);
-        assertShouldEnforceSchedule("2", false);
+    void wasJustTurnedOn_onlyActiveAfterUserTTurnsOnLights_eventAlsoResetsManualOverrideFlag() {
+        assertWasJustTurnedOn("1", false);
+        assertWasJustTurnedOn("2", false);
 
         tracker.onManuallyOverridden("1");
         tracker.onManuallyOverridden("2");
 
-        assertShouldEnforceSchedule("1", false);
-        assertShouldEnforceSchedule("2", false);
+        assertWasJustTurnedOn("1", false);
+        assertWasJustTurnedOn("2", false);
 
         tracker.onLightTurnedOn("1");
 
         assertIsManuallyOverridden("1", false);
         assertIsManuallyOverridden("2", true); // light 2 remains unaffected
-        assertShouldEnforceSchedule("1", true);
-        assertShouldEnforceSchedule("2", false); // light 2 remains unaffected
+        assertWasJustTurnedOn("1", true);
+        assertWasJustTurnedOn("2", false); // light 2 remains unaffected
     }
 
     @Test
-    void shouldEnforceSchedule_resetAfterAutomaticallyAssigned() {
+    void wasJustTurnedOn_resetAfterAutomaticallyAssigned() {
         tracker.onManuallyOverridden("1");
         tracker.onLightTurnedOn("1");
 
         tracker.onAutomaticallyAssigned("1");
 
-        assertShouldEnforceSchedule("1", false);
+        assertWasJustTurnedOn("1", false);
     }
 
-    private void assertShouldEnforceSchedule(String lightId, boolean expected) {
-        assertThat(tracker.shouldEnforceSchedule(lightId)).isEqualTo(expected);
+    private void assertWasJustTurnedOn(String lightId, boolean expected) {
+        assertThat(tracker.wasJustTurnedOn(lightId)).isEqualTo(expected);
     }
 
     private void assertIsManuallyOverridden(String lightId, boolean expected) {

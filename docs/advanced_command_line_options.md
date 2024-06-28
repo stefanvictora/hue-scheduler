@@ -17,6 +17,15 @@ Flag to globally disable tracking of user modifications of lights. Per default H
 
 **Default**: false
 
+### `--scene-activation-ignore-window`
+
+Only relevant and active if user modification tracking is not disabled (see `--disable-user-modification-tracking`).
+Defines the delay in seconds during which turn-on events for affected lights and groups are ignored
+after a scene activation has been detected. This prevents Hue Scheduler from taking over after lights or groups have
+been turned on via a scene.
+
+**Default**: `5` seconds
+
 ### `--default-interpolation-transition-time`
 
 Flag to configure the default transition time used for the interpolated call when turning a light on during a `tr-before` transition. Defined either as a multiple of 100ms or with the already mentioned shorthands e.g. `5s`. If the previous state already contains a ``tr`` property, Hue Scheduler reuses the custom value instead.

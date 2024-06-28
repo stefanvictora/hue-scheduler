@@ -1,6 +1,5 @@
 package at.sv.hue.color;
 
-import java.awt.*;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
@@ -11,19 +10,6 @@ import java.math.RoundingMode;
 public final class RGBToXYConverter {
 
     private RGBToXYConverter() {
-    }
-
-    public static XYColor convert(String hex, Double[][] gamut) {
-        Color color = Color.decode(hex);
-        return rgbToXY(color.getRed(), color.getGreen(), color.getBlue(), gamut);
-    }
-
-    public static XYColor convert(String r, String g, String b, Double[][] gamut) {
-        return rgbToXY(parseInt(r), parseInt(g), parseInt(b), gamut);
-    }
-
-    private static int parseInt(String s) {
-        return Integer.parseInt(s.trim());
     }
 
     public static XYColor rgbToXY(int r, int g, int b, Double[][] gamut) {

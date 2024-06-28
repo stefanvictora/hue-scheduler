@@ -18,12 +18,15 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.LoadingCache;
 import lombok.Data;
 
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -51,6 +54,7 @@ public final class HueApiImpl implements HueApi {
     private boolean lightNameToIdMapInvalidated;
     private Map<String, String> groupNameToIdMap;
     private boolean groupNameToIdMapInvalidated;
+    private final LoadingCache<String, Map<String, Scene>> availableScenesCache;
 
     public HueApiImpl(HttpResourceProvider resourceProvider, String host, String accessToken, RateLimiter rateLimiter) {
         this.resourceProvider = resourceProvider;
@@ -60,6 +64,9 @@ public final class HueApiImpl implements HueApi {
         assertNotHttpSchemeProvided(host);
         baseApi = "https://" + host + "/api/" + accessToken;
         this.rateLimiter = rateLimiter;
+        availableScenesCache = Caffeine.newBuilder()
+                                       .expireAfterWrite(Duration.ofMinutes(5))
+                                       .build(key -> lookupScenes());
     }
 
     private static void assertNotHttpSchemeProvided(String host) {
@@ -208,6 +215,33 @@ public final class HueApiImpl implements HueApi {
             throw new EmptyGroupException("Group with id '" + groupId + "' has no lights to control!");
         }
         return lights;
+    }
+
+    @Override
+    public List<String> getAffectedIdsByScene(String sceneId) {
+        Scene scene = getAvailableScenes().get(sceneId);
+        if (scene == null) {
+            return List.of();
+        }
+        return scene.getAffectedIds();
+    }
+
+    private Map<String, Scene> getAvailableScenes() {
+        return availableScenesCache.get("allScenes");
+    }
+
+    private Map<String, Scene> lookupScenes() {
+        String response = getResourceAndAssertNoErrors(getScenesUrl());
+        try {
+            return addKeyPrefix(mapper.readValue(response, new TypeReference<>() {
+            }), "/scenes/");
+        } catch (JsonProcessingException e) {
+            throw new ApiFailure("Failed to parse lights response '" + response + "': " + e.getLocalizedMessage());
+        }
+    }
+
+    private URL getScenesUrl() {
+        return createUrl("/scenes");
     }
 
     @Override
@@ -456,6 +490,23 @@ public final class HueApiImpl implements HueApi {
             return createUrl(id + "/action");
         } else {
             return createUrl(id + "/state");
+        }
+    }
+
+    @Data
+    private static final class Scene {
+        String name;
+        String group;
+        private List<String> lights = new ArrayList<>();
+
+        List<String> getAffectedIds() {
+            List<String> ids = lights.stream()
+                                     .map(id -> "/lights/" + id)
+                                     .collect(Collectors.toList());
+            if (group != null) {
+                ids.add("/groups/" + group);
+            }
+            return ids;
         }
     }
 

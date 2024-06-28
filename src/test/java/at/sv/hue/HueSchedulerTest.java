@@ -108,7 +108,7 @@ class HueSchedulerTest {
         scheduler = new HueScheduler(mockedHueApi, stateScheduler, startTimeProvider,
                 () -> now, 10.0, controlGroupLightsIndividually, disableUserModificationTracking,
                 defaultInterpolationTransitionTimeInMs, 0, connectionFailureRetryDelay,
-                multiColorAdjustmentDelay, minTrGap, interpolateAll);
+                multiColorAdjustmentDelay, minTrGap, 5, interpolateAll);
         manualOverrideTracker = scheduler.getManualOverrideTracker();
     }
 
@@ -192,6 +192,9 @@ class HueSchedulerTest {
                                       .map(id -> "/lights/" + id)
                                       .toList();
         when(mockedHueApi.getGroupLights("/groups/" + groupId)).thenReturn(lightIds);
+        for (Integer light : lights) {
+            mockAssignedGroups(light, List.of(groupId));
+        }
     }
 
     private void mockGroupIdForName(String name, int id) {
@@ -5195,6 +5198,289 @@ class HueSchedulerTest {
         advanceTimeAndRunAndAssertPutCalls(secondState, expectedPutCall(2).bri(DEFAULT_BRIGHTNESS + 10));
 
         ensureRunnable(initialNow.plusDays(1).plusHours(1), initialNow.plusDays(2)); // next day
+    }
+
+    @Test
+    void sceneTurnedOn_containsLightThatHaveSchedules_insideSceneIgnoreWindow_doesNotApplySchedules() {
+        enableUserModificationTracking();
+        addKnownLightIdsWithDefaultCapabilities(2);
+        addState(2, now, "bri:" + DEFAULT_BRIGHTNESS);
+        addState(2, now.plusMinutes(10), "bri:" + (DEFAULT_BRIGHTNESS + 10));
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+        );
+
+        setLightStateResponse(2, expectedState().brightness(DEFAULT_BRIGHTNESS));
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(2).bri(DEFAULT_BRIGHTNESS)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
+        );
+
+        // simulate scene activated
+        simulateSceneActivated("/scenes/123456ABC", "/lights/1", "/lights/2");
+        setLightStateResponse(2, expectedState().brightness(DEFAULT_BRIGHTNESS - 10));
+
+        // wait a bit, but still inside ignore window
+        advanceCurrentTime(Duration.ofSeconds(4));
+
+        ScheduledRunnable powerOnRunnable = simulateLightOnEvent("/lights/2",
+                expectedPowerOnEnd(initialNow.plusMinutes(10))
+        ).getFirst();
+
+        advanceTimeAndRunAndAssertPutCalls(powerOnRunnable); // no put call, as inside the ignore window of the scene turn-on
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(1)); // no put calls, as state is detected as overridden by scene
+
+        /* simulate another power-on: now the state is applied and rescheduled for next day */
+        List<ScheduledRunnable> secondPowerOnRunnables = simulateLightOnEvent("/lights/2",
+                expectedPowerOnEnd(initialNow.plusMinutes(10)), // already ended
+                expectedPowerOnEnd(initialNow.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(secondPowerOnRunnables.get(1),
+                expectedPutCall(2).bri(DEFAULT_BRIGHTNESS + 10)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)) // next day
+        );
+    }
+
+    @Test
+    void sceneTurnedOn_containsLightOfGroupThatHasSchedule_ignoresGroup() {
+        enableUserModificationTracking();
+        addKnownLightIdsWithDefaultCapabilities(2);
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 2); // group contains /lights/2
+        addState("g1", now, "bri:" + DEFAULT_BRIGHTNESS);
+        addState("g1", now.plusMinutes(10), "bri:" + (DEFAULT_BRIGHTNESS + 10));
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+        );
+
+        setLightStateResponse(2, expectedState().brightness(DEFAULT_BRIGHTNESS));
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedGroupPutCall(1).bri(DEFAULT_BRIGHTNESS)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
+        );
+
+        // simulate scene activated
+        simulateSceneActivated("/scenes/123456ABC", "/lights/1", "/lights/2");
+        setLightStateResponse(2, expectedState().brightness(DEFAULT_BRIGHTNESS - 10));
+
+        ScheduledRunnable powerOnRunnable = simulateLightOnEvent("/groups/1",
+                expectedPowerOnEnd(now.plusMinutes(10))
+        ).getFirst();
+
+        advanceTimeAndRunAndAssertPutCalls(powerOnRunnable); // no put call, as inside the ignore window of the scene turn-on
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(1)); // no put calls, as state is detected as overridden by scene
+
+        /* simulate another power-on: now the state is applied and rescheduled for next day */
+        List<ScheduledRunnable> secondPowerOnRunnables = simulateLightOnEvent("/groups/1",
+                expectedPowerOnEnd(initialNow.plusMinutes(10)), // already ended
+                expectedPowerOnEnd(initialNow.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(secondPowerOnRunnables.get(1),
+                expectedGroupPutCall(1).bri(DEFAULT_BRIGHTNESS + 10)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)) // next day
+        );
+    }
+
+    @Test
+    void sceneTurnOn_containsLightThatHaveSchedules_lightTurneOnAfterIgnoreWindow_stillApplied() {
+        enableUserModificationTracking();
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now, "bri:" + DEFAULT_BRIGHTNESS);
+        addState(1, now.plusMinutes(10), "bri:" + (DEFAULT_BRIGHTNESS + 10));
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+        );
+
+        setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS));
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
+        );
+
+        // simulate scene activated
+        simulateSceneActivated("/scenes/123456ABC", "/lights/1", "/lights/2");
+        setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS - 10));
+
+        // wait until ignore window passed
+        advanceCurrentTime(Duration.ofSeconds(5));
+
+        ScheduledRunnable powerOnRunnable = simulateLightOnEvent("/lights/1",
+                expectedPowerOnEnd(initialNow.plusMinutes(10))
+        ).getFirst();
+
+        advanceTimeAndRunAndAssertPutCalls(powerOnRunnable,
+                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS)
+        ); // still applied
+
+        setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS));
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(1),
+                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 10)
+        ); // no modification detected
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)) // next day
+        );
+    }
+
+    @Test
+    void sceneTurnedOn_containsLightThatHaveSchedules_forceProperty_stillAppliesSchedules() {
+        enableUserModificationTracking();
+        addKnownLightIdsWithDefaultCapabilities(3);
+        addState(3, now, "bri:" + DEFAULT_BRIGHTNESS, "force:true");
+        addState(3, now.plusMinutes(10), "bri:" + (DEFAULT_BRIGHTNESS + 10));
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+        );
+
+        setLightStateResponse(3, expectedState().brightness(DEFAULT_BRIGHTNESS));
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(3).bri(DEFAULT_BRIGHTNESS)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
+        );
+
+        // simulate scene activated
+        simulateSceneActivated("/scenes/57892IA", "/lights/40", "/lights/3");
+
+        ScheduledRunnable powerOnRunnable = simulateLightOnEvent("/lights/3",
+                expectedPowerOnEnd(now.plusMinutes(10))
+        ).getFirst();
+
+        advanceTimeAndRunAndAssertPutCalls(powerOnRunnable,
+                expectedPutCall(3).bri(DEFAULT_BRIGHTNESS) // put was forced
+        );
+    }
+
+    @Test
+    void sceneTurnedOn_lightWasAlreadyOn_notModifiedByScene_nextStateScheduledNormally() {
+        enableUserModificationTracking();
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now, "bri:" + DEFAULT_BRIGHTNESS);
+        addState(1, now.plusMinutes(10), "bri:" + (DEFAULT_BRIGHTNESS + 10));
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+        );
+
+        setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS));
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
+        );
+
+        advanceCurrentTime(Duration.ofMinutes(10));
+        // simulate scene activated
+        simulateSceneActivated("/scenes/789AI", "/lights/40", "/lights/1");
+
+        // no light on event, light was already on; light has not been modified by scene
+
+        // next runnable: applied normally
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(1),
+                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 10)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)) // next day
+        );
+    }
+
+    @Test
+    void sceneTurnedOn_lightWasAlreadyOn_modifiedByScene_detectsModification() {
+        enableUserModificationTracking();
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now, "bri:" + DEFAULT_BRIGHTNESS);
+        addState(1, now.plusMinutes(10), "bri:" + (DEFAULT_BRIGHTNESS + 10));
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+        );
+
+        setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS));
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
+        );
+
+        advanceCurrentTime(Duration.ofMinutes(10));
+        // simulate scene activated
+        simulateSceneActivated("/scenes/789AI", "/lights/40", "/lights/1");
+        // modifies light state
+        setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS + 5));
+
+        // next runnable: detects modification
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(1)); // no put
+    }
+
+    @Test
+    void sceneTurnedOn_noUserModificationTracking_stillScheduled() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now, "bri:" + DEFAULT_BRIGHTNESS);
+        addState(1, now.plusMinutes(10), "bri:" + (DEFAULT_BRIGHTNESS + 10));
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
+        );
+
+        // simulate scene activated
+        simulateSceneActivated("/scenes/57892IA", "/lights/1");
+
+        ScheduledRunnable powerOnRunnable = simulateLightOnEventExpectingSingleScheduledState(now.plusMinutes(10));
+
+        advanceTimeAndRunAndAssertPutCalls(powerOnRunnable,
+                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS) // not ignored
+        );
+    }
+
+    private void simulateSceneActivated(String sceneId, String... containedLights) {
+        when(mockedHueApi.getAffectedIdsByScene(sceneId)).thenReturn(Arrays.asList(containedLights));
+
+        scheduler.getSceneEventListener().onSceneActivated(sceneId);
     }
 
     private void mockIsLightOff(int id, boolean value) {

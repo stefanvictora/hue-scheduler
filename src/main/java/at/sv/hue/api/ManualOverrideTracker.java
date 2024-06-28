@@ -12,7 +12,7 @@ public interface ManualOverrideTracker {
 
     boolean isOff(String id);
 
-    boolean shouldEnforceSchedule(String id);
+    boolean wasJustTurnedOn(String id);
 
     void onAutomaticallyAssigned(String id);
 }

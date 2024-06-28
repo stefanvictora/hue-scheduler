@@ -81,6 +81,7 @@ public class HassApiImpl implements HueApi {
         return groupLights.stream()
                           .map(currentStates::get)
                           .filter(Objects::nonNull)
+                          .filter(HassApiImpl::isSupportedStateType)
                           .map(this::createLightState)
                           .collect(Collectors.toList());
     }
@@ -157,6 +158,28 @@ public class HassApiImpl implements HueApi {
             throw new EmptyGroupException("Group with id '" + groupId + "' does not contain any lights!");
         }
         return groupLights;
+    }
+
+    @Override
+    public List<String> getAffectedIdsByScene(String sceneId) {
+        State scene = getOrLookupStates().get(sceneId);
+        if (scene == null) {
+            return List.of();
+        }
+        List<String> affectedIds = new ArrayList<>();
+        StateAttributes sceneAttributes = scene.getAttributes();
+        if (sceneAttributes.getEntity_id() != null) { // HA scene
+            affectedIds.addAll(sceneAttributes.getEntity_id());
+        }
+        if (sceneAttributes.getGroup_name() != null) { // Hue scene
+            try {
+                String groupId = getGroupId(sceneAttributes.getGroup_name());
+                affectedIds.add(groupId);
+                affectedIds.addAll(getGroupLights(groupId));
+            } catch (Exception ignore) {
+            }
+        }
+        return affectedIds;
     }
 
     @Override
@@ -260,7 +283,6 @@ public class HassApiImpl implements HueApi {
             List<State> states = mapper.readValue(response, new TypeReference<>() {
             });
             return states.stream()
-                         .filter(HassApiImpl::isSupportedStateType)
                          .collect(Collectors.toMap(State::getEntity_id, Function.identity()));
         } catch (JsonProcessingException | NullPointerException e) {
             throw new ApiFailure("Failed to parse light states response '" + response + ":" + e.getLocalizedMessage());
@@ -365,7 +387,7 @@ public class HassApiImpl implements HueApi {
     }
 
     private static boolean isHassGroup(State state) {
-        return state.attributes.entity_id != null;
+        return state.attributes.entity_id != null && !state.isScene();
     }
 
     private boolean containsLightIdOrName(State state, String lightId, String lightName) {

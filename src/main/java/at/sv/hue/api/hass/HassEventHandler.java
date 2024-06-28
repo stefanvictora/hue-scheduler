@@ -2,6 +2,7 @@ package at.sv.hue.api.hass;
 
 import at.sv.hue.api.BridgeAuthenticationFailure;
 import at.sv.hue.api.LightEventListener;
+import at.sv.hue.api.SceneEventListener;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -11,9 +12,11 @@ public final class HassEventHandler {
 
     private final ObjectMapper objectMapper;
     private final LightEventListener eventListener;
+    private final SceneEventListener sceneEventListener;
 
-    public HassEventHandler(LightEventListener eventListener) {
+    public HassEventHandler(LightEventListener eventListener, SceneEventListener sceneEventListener) {
         this.eventListener = eventListener;
+        this.sceneEventListener = sceneEventListener;
         objectMapper = new ObjectMapper();
         objectMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
     }
@@ -40,6 +43,8 @@ public final class HassEventHandler {
             eventListener.onLightOn(entityId, true);
         } else if (oldState.isOn() && (newState.isOff() || newState.isUnavailable())) {
             eventListener.onLightOff(entityId);
+        } else if (newState.isScene() && !newState.isUnavailable()) {
+            sceneEventListener.onSceneActivated(entityId);
         }
     }
 

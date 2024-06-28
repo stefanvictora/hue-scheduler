@@ -2,6 +2,7 @@ package at.sv.hue.api.hass;
 
 import at.sv.hue.api.BridgeAuthenticationFailure;
 import at.sv.hue.api.LightEventListener;
+import at.sv.hue.api.SceneEventListener;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -12,13 +13,15 @@ import static org.mockito.Mockito.verifyNoInteractions;
 
 class HassEventHandlerTest {
 
-    private LightEventListener eventListener;
+    private LightEventListener lightEventListener;
+    private SceneEventListener sceneEventListener;
     private HassEventHandler handler;
 
     @BeforeEach
     void setUp() {
-        eventListener = Mockito.mock(LightEventListener.class);
-        handler = new HassEventHandler(eventListener);
+        lightEventListener = Mockito.mock(LightEventListener.class);
+        sceneEventListener = Mockito.mock(SceneEventListener.class);
+        handler = new HassEventHandler(lightEventListener, sceneEventListener);
     }
 
     @Test
@@ -30,7 +33,7 @@ class HassEventHandlerTest {
                 }"""))
                 .isInstanceOf(BridgeAuthenticationFailure.class);
 
-        verifyNoInteractions(eventListener);
+        verifyNoEvents();
     }
 
     @Test
@@ -133,7 +136,7 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verify(eventListener).onLightOn("light.schreibtisch_r", false);
+        verify(lightEventListener).onLightOn("light.schreibtisch_r", false);
     }
 
     @Test
@@ -234,7 +237,7 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verify(eventListener).onLightOn("light.schreibtisch_r", true);
+        verify(lightEventListener).onLightOn("light.schreibtisch_r", true);
     }
 
     @Test
@@ -353,7 +356,7 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verifyNoInteractions(eventListener);
+        verifyNoEvents();
     }
 
     @Test
@@ -472,7 +475,7 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verifyNoInteractions(eventListener);
+        verifyNoEvents();
     }
 
     @Test
@@ -591,7 +594,7 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verifyNoInteractions(eventListener);
+        verifyNoEvents();
     }
 
     @Test
@@ -694,7 +697,7 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verify(eventListener).onLightOff("light.schreibtisch_l");
+        verify(lightEventListener).onLightOff("light.schreibtisch_l");
     }
 
     @Test
@@ -795,7 +798,7 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verify(eventListener).onLightOff("light.schreibtisch_l");
+        verify(lightEventListener).onLightOff("light.schreibtisch_l");
     }
 
     @Test
@@ -914,7 +917,7 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verifyNoInteractions(eventListener);
+        verifyNoEvents();
     }
 
     @Test
@@ -943,7 +946,7 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verifyNoInteractions(eventListener);
+        verifyNoEvents();
     }
 
     @Test
@@ -957,6 +960,142 @@ class HassEventHandlerTest {
                   }
                   """);
 
-        verifyNoInteractions(eventListener);
+        verifyNoEvents();
+    }
+
+    @Test
+    void onMessage_hueSceneStateChanged_triggersEvent() {
+        handler.onMessage("""
+                {
+                   "type": "event",
+                   "event": {
+                     "event_type": "state_changed",
+                     "data": {
+                       "entity_id": "scene.living_room_night",
+                       "old_state": {
+                         "entity_id": "scene.living_room_night",
+                         "state": "unknown",
+                         "attributes": {
+                           "group_name": "Zuhause",
+                           "group_type": "zone",
+                           "name": "At Night",
+                           "speed": 0.5,
+                           "brightness": 8.3,
+                           "is_dynamic": false,
+                           "friendly_name": "Home At Night"
+                         },
+                         "last_changed": "2024-06-15T20:11:11.149695+00:00",
+                         "last_reported": "2024-06-15T20:11:11.149695+00:00",
+                         "last_updated": "2024-06-15T20:11:11.149695+00:00",
+                         "context": {
+                           "id": "01J0ERCYXDH6KCE5D3B0VG1M2W",
+                           "parent_id": null,
+                           "user_id": null
+                         }
+                       },
+                       "new_state": {
+                         "entity_id": "scene.living_room_night",
+                         "state": "2024-06-19T18:45:44.425350+00:00",
+                         "attributes": {
+                           "group_name": "Zuhause",
+                           "group_type": "zone",
+                           "name": "At Night",
+                           "speed": 0.5,
+                           "brightness": 8.3,
+                           "is_dynamic": false,
+                           "friendly_name": "Home At Night"
+                         },
+                         "last_changed": "2024-06-19T18:45:44.425536+00:00",
+                         "last_reported": "2024-06-19T18:45:44.425536+00:00",
+                         "last_updated": "2024-06-19T18:45:44.425536+00:00",
+                         "context": {
+                           "id": "01J0RX3CB83RBV370M80HPNDV6",
+                           "parent_id": null,
+                           "user_id": null
+                         }
+                       }
+                     },
+                     "origin": "LOCAL",
+                     "time_fired": "2024-06-19T18:45:44.425536+00:00",
+                     "context": {
+                       "id": "01J0RX3CB83RBV370M80HPNDV6",
+                       "parent_id": null,
+                       "user_id": null
+                     }
+                   },
+                   "id": 30
+                 }
+                """);
+
+        verify(sceneEventListener).onSceneActivated("scene.living_room_night");
+    }
+
+    @Test
+    void onMesssage_haScene_unavailable_noEventTriggered() {
+        handler.onMessage("""
+                {
+                    "type": "event",
+                    "event": {
+                        "event_type": "state_changed",
+                        "data": {
+                            "entity_id": "scene.test_scene",
+                            "old_state": {
+                                "entity_id": "scene.test_scene",
+                                "state": "2024-06-22T20:26:10.406785+00:00",
+                                "attributes": {
+                                    "entity_id": [
+                                        "light.schreibtisch_r",
+                                        "light.schreibtisch_l"
+                                    ],
+                                    "id": "1719087533616",
+                                    "icon": "mdi:cake-layered",
+                                    "friendly_name": "Test Scene"
+                                },
+                                "last_changed": "2024-06-22T20:26:10.407069+00:00",
+                                "last_reported": "2024-06-22T20:26:10.407069+00:00",
+                                "last_updated": "2024-06-22T20:26:10.407069+00:00",
+                                "context": {
+                                    "id": "01J10T1E35VD9HE07PNHTNRH8C",
+                                    "parent_id": null,
+                                    "user_id": null
+                                }
+                            },
+                            "new_state": {
+                                "entity_id": "scene.test_scene",
+                                "state": "unavailable",
+                                "attributes": {
+                                    "restored": true,
+                                    "icon": "mdi:cake-layered",
+                                    "friendly_name": "Test Scene",
+                                    "supported_features": 0
+                                },
+                                "last_changed": "2024-06-22T20:26:48.307492+00:00",
+                                "last_reported": "2024-06-22T20:26:48.307492+00:00",
+                                "last_updated": "2024-06-22T20:26:48.307492+00:00",
+                                "context": {
+                                    "id": "01J10T2K3KT0HPWM86VZ1EZYKK",
+                                    "parent_id": null,
+                                    "user_id": null
+                                }
+                            }
+                        },
+                        "origin": "LOCAL",
+                        "time_fired": "2024-06-22T20:26:48.307492+00:00",
+                        "context": {
+                            "id": "01J10T2K3KT0HPWM86VZ1EZYKK",
+                            "parent_id": null,
+                            "user_id": null
+                        }
+                    },
+                    "id": 30
+                }
+                """);
+
+        verifyNoEvents();
+    }
+
+    private void verifyNoEvents() {
+        verifyNoInteractions(lightEventListener);
+        verifyNoInteractions(sceneEventListener);
     }
 }
