@@ -50,6 +50,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
@@ -525,23 +526,26 @@ public final class HueScheduler implements Runnable {
             return false;
         }
         if (scheduledState.isGroupState()) {
-            return groupLightStatesDiffer(api.getGroupStates(scheduledState.getId()), lastSeenState);
+            return api.getGroupStates(scheduledState.getId()).stream().anyMatch(this::isGroupStateDifferent);
         } else {
             return lastSeenState.lightStateDiffers(api.getLightState(scheduledState.getId()));
         }
     }
 
-    private boolean groupLightStatesDiffer(List<LightState> groupLightStates, ScheduledState lastSeenGroupState) {
-        for (LightState lightState : groupLightStates) {
-            ScheduledState lastSeenLightState = getLastSeenState(lightState.getId());
-            if (lastSeenLightState == null && lastSeenGroupState.lightStateDiffers(lightState)) {
-                return true;
-            }
-            if (lastSeenLightState != null && lastSeenLightState.lightStateDiffers(lightState)) {
-                return true;
-            }
+    private boolean isGroupStateDifferent(LightState lightState) {
+        ScheduledState lastSeenLightState = getLastSeenState(lightState.getId());
+        if (lastSeenLightState != null) {
+            return lastSeenLightState.lightStateDiffers(lightState);
         }
-        return false;
+        return allSeenGroupStatesDiffer(lightState);
+    }
+
+    private boolean allSeenGroupStatesDiffer(LightState lightState) {
+        return api.getAssignedGroups(lightState.getId())
+                  .stream()
+                  .map(this::getLastSeenState)
+                  .filter(Objects::nonNull)
+                  .allMatch(lastSeenGroupState -> lastSeenGroupState.lightStateDiffers(lightState));
     }
 
     private ScheduledState getLastSeenState(ScheduledState currentState) {
