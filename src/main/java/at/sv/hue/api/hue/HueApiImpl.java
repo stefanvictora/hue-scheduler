@@ -80,28 +80,34 @@ public final class HueApiImpl implements HueApi {
         String response = getResourceAndAssertNoErrors(createUrl(id));
         try {
             Light light = mapper.readValue(response, Light.class);
-            return createLightState(light);
+            return createLightState(id, light);
         } catch (JsonProcessingException | NullPointerException e) {
             throw new ApiFailure("Failed to parse light state response '" + response + "' for id " + id + ": " + e.getLocalizedMessage());
         }
     }
 
-    private LightState createLightState(Light light) {
+    private LightState createLightState(String id, Light light) {
         State state = light.state;
-        return new LightState(
+        return new LightState(id,
                 state.bri, state.ct, getX(state.xy), getY(state.xy), state.effect, state.colormode, state.reachable, state.on,
                 createLightCapabilities(light));
     }
 
     @Override
     public List<LightState> getGroupStates(String id) {
-        List<String> groupLights = getGroupLights(id);
         Map<String, Light> currentLights = lookupLights();
-        return groupLights.stream()
-                          .map(currentLights::get)
-                          .filter(Objects::nonNull)
-                          .map(this::createLightState)
-                          .collect(Collectors.toList());
+        return getGroupLights(id).stream()
+                                 .map(lightId -> getLightState(currentLights, lightId))
+                                 .filter(Objects::nonNull)
+                                 .collect(Collectors.toList());
+    }
+
+    private LightState getLightState(Map<String, Light> lights, String lightId) {
+        Light light = lights.get(lightId);
+        if (light == null) {
+            return null;
+        }
+        return createLightState(lightId, light);
     }
 
     private String getResourceAndAssertNoErrors(URL url) {

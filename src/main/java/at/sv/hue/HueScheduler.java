@@ -525,17 +525,38 @@ public final class HueScheduler implements Runnable {
             return false;
         }
         if (scheduledState.isGroupState()) {
-            return api.getGroupStates(scheduledState.getId()).stream().anyMatch(lastSeenState::lightStateDiffers);
+            return groupLightStatesDiffer(api.getGroupStates(scheduledState.getId()), lastSeenState);
         } else {
             return lastSeenState.lightStateDiffers(api.getLightState(scheduledState.getId()));
         }
     }
 
+    private boolean groupLightStatesDiffer(List<LightState> groupLightStates, ScheduledState lastSeenGroupState) {
+        for (LightState lightState : groupLightStates) {
+            ScheduledState lastSeenLightState = getLastSeenState(lightState.getId());
+            if (lastSeenLightState == null && lastSeenGroupState.lightStateDiffers(lightState)) {
+                return true;
+            }
+            if (lastSeenLightState != null && lastSeenLightState.lightStateDiffers(lightState)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private ScheduledState getLastSeenState(ScheduledState currentState) {
-        return getLightStatesForId(currentState).stream()
-                                                .filter(state -> state.getLastSeen() != null)
-                                                .max(Comparator.comparing(ScheduledState::getLastSeen))
-                                                .orElse(null);
+        return getLastSeenState(currentState.getId());
+    }
+
+    private ScheduledState getLastSeenState(String id) {
+        List<ScheduledState> lightStatesForId = getLightStatesForId(id);
+        if (lightStatesForId == null) {
+            return null;
+        }
+        return lightStatesForId.stream()
+                               .filter(state -> state.getLastSeen() != null)
+                               .max(Comparator.comparing(ScheduledState::getLastSeen))
+                               .orElse(null);
     }
 
     private void putAdditionalInterpolatedStateIfNeeded(ScheduledState state) {
@@ -607,7 +628,11 @@ public final class HueScheduler implements Runnable {
     }
 
     private List<ScheduledState> getLightStatesForId(ScheduledState state) {
-        return lightStates.get(state.getId());
+        return getLightStatesForId(state.getId());
+    }
+
+    private List<ScheduledState> getLightStatesForId(String id) {
+        return lightStates.get(id);
     }
 
     private long getMs(long seconds) {

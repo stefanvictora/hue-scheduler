@@ -11,6 +11,7 @@ import java.util.EnumSet;
 @AllArgsConstructor
 @Builder
 public final class LightState {
+    private final String id;
     private final Integer brightness;
     private final Integer colorTemperature;
     private final Double x;

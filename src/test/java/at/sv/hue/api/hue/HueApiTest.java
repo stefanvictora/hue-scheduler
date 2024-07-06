@@ -151,6 +151,7 @@ class HueApiTest {
         assertLightState(
                 lightState, LightState
                         .builder()
+                        .id("/lights/22")
                         .on(true)
                         .reachable(true)
                         .x(0.6715)
@@ -192,6 +193,7 @@ class HueApiTest {
 
         assertLightState(lightState, LightState
                 .builder()
+                .id("/lights/11")
                 .on(false)
                 .reachable(false)
                 .x(0.5111)
@@ -208,7 +210,7 @@ class HueApiTest {
 
     @Test
     void getState_whiteBulbOnly_noNullPointerException() {
-        int lightId = 11;
+        int lightId = 12;
         setGetResponse("/lights/" + lightId, """
                 {
                   "state": {
@@ -224,6 +226,7 @@ class HueApiTest {
 
         assertLightState(lightState, LightState
                 .builder()
+                .id("/lights/12")
                 .on(true)
                 .reachable(true)
                 .brightness(41)
@@ -250,6 +253,7 @@ class HueApiTest {
 
         assertLightState(lightState, LightState
                 .builder()
+                .id("/lights/11")
                 .on(true)
                 .reachable(true)
                 .lightCapabilities(LightCapabilities.builder()
@@ -382,6 +386,7 @@ class HueApiTest {
 
         assertThat(getGroupStates("/groups/17")).containsExactly(
                 LightState.builder()
+                          .id("/lights/8")
                           .on(true)
                           .brightness(43)
                           .effect("none")
@@ -399,6 +404,7 @@ class HueApiTest {
                                                               .build())
                           .build(),
                 LightState.builder()
+                          .id("/lights/16")
                           .on(false)
                           .brightness(127)
                           .reachable(true)
@@ -407,6 +413,7 @@ class HueApiTest {
                                                               .build())
                           .build(),
                 LightState.builder()
+                          .id("/lights/21")
                           .on(false)
                           .brightness(184)
                           .colorTemperature(366)
@@ -423,6 +430,7 @@ class HueApiTest {
 
         assertThat(getGroupStates("/groups/18")).containsExactly(
                 LightState.builder()
+                          .id("/lights/24")
                           .on(false)
                           .reachable(true)
                           .lightCapabilities(LightCapabilities.builder()

@@ -300,7 +300,7 @@ public class HassApiImpl implements HueApi {
 
     private LightState createLightState(State state) {
         StateAttributes attributes = state.getAttributes();
-        return new LightState(hassToHueBrightness(attributes.brightness), attributes.color_temp, getXY(attributes.xy_color, 0),
+        return new LightState(state.entity_id, hassToHueBrightness(attributes.brightness), attributes.color_temp, getXY(attributes.xy_color, 0),
                 getXY(attributes.xy_color, 1),
                 getEffect(attributes.effect), getColorMode(attributes.color_mode), getReachable(state.state),
                 getOn(state.state), createLightCapabilities(state));

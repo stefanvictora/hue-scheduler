@@ -308,6 +308,7 @@ public class HassApiTest {
                                                                        Capability.ON_OFF))
                                                                .build();
         assertThat(lightState).isEqualTo(LightState.builder()
+                                                   .id("light.schreibtisch_r")
                                                    .on(true)
                                                    .reachable(true)
                                                    .x(0.6024)
@@ -375,6 +376,7 @@ public class HassApiTest {
         LightState lightState = getLightState("light.schreibtisch_r");
 
         assertThat(lightState).isEqualTo(LightState.builder()
+                                                   .id("light.schreibtisch_r")
                                                    .on(true)
                                                    .reachable(true)
                                                    .colorTemperature(161)
@@ -446,6 +448,7 @@ public class HassApiTest {
         LightState lightState = getLightState("light.ct_only");
 
         assertThat(lightState).isEqualTo(LightState.builder()
+                                                   .id("light.ct_only")
                                                    .on(true)
                                                    .reachable(true)
                                                    .colorTemperature(366)
@@ -506,6 +509,7 @@ public class HassApiTest {
         LightState lightState = getLightState("light.xy_only");
 
         assertThat(lightState).isEqualTo(LightState.builder()
+                                                   .id("light.xy_only")
                                                    .on(true)
                                                    .reachable(true)
                                                    .x(0.6311)
@@ -556,6 +560,7 @@ public class HassApiTest {
         LightState lightState = getLightState("light.ceiling");
 
         assertThat(lightState).isEqualTo(LightState.builder()
+                                                   .id("light.ceiling")
                                                    .on(false)
                                                    .reachable(false)
                                                    .lightCapabilities(LightCapabilities.builder()
@@ -603,6 +608,7 @@ public class HassApiTest {
         LightState lightState = getLightState("light.off");
 
         assertThat(lightState).isEqualTo(LightState.builder()
+                                                   .id("light.off")
                                                    .on(false)
                                                    .reachable(true)
                                                    .lightCapabilities(LightCapabilities.builder()
@@ -642,6 +648,7 @@ public class HassApiTest {
         LightState lightState = getLightState("light.on_off");
 
         assertThat(lightState).isEqualTo(LightState.builder()
+                                                   .id("light.on_off")
                                                    .on(true)
                                                    .reachable(true)
                                                    .lightCapabilities(LightCapabilities.builder()
@@ -674,6 +681,7 @@ public class HassApiTest {
         LightState lightState = getLightState("switch.switch_demo");
 
         assertThat(lightState).isEqualTo(LightState.builder()
+                                                   .id("switch.switch_demo")
                                                    .on(true)
                                                    .reachable(true)
                                                    .lightCapabilities(LightCapabilities.builder()
@@ -706,6 +714,7 @@ public class HassApiTest {
         LightState lightState = getLightState("input_boolean.test_toggle");
 
         assertThat(lightState).isEqualTo(LightState.builder()
+                                                   .id("input_boolean.test_toggle")
                                                    .on(true)
                                                    .reachable(true)
                                                    .lightCapabilities(LightCapabilities.builder()
@@ -737,6 +746,7 @@ public class HassApiTest {
         LightState lightState = getLightState("light.on_off");
 
         assertThat(lightState).isEqualTo(LightState.builder()
+                                                   .id("light.on_off")
                                                    .on(false)
                                                    .reachable(false)
                                                    .lightCapabilities(LightCapabilities.builder()
@@ -779,6 +789,7 @@ public class HassApiTest {
         LightState lightState = getLightState("light.brightness");
 
         assertThat(lightState).isEqualTo(LightState.builder()
+                                                   .id("light.brightness")
                                                    .on(true)
                                                    .reachable(true)
                                                    .brightness(254) // adjusted to max value for hue
@@ -824,6 +835,7 @@ public class HassApiTest {
         LightState lightState = getLightState("light.brightness");
 
         assertThat(lightState).isEqualTo(LightState.builder()
+                                                   .id("light.brightness")
                                                    .on(true)
                                                    .reachable(true)
                                                    .brightness(1) // adjusted to min value for hue
@@ -869,6 +881,7 @@ public class HassApiTest {
         LightState lightState = getLightState("light.brightness");
 
         assertThat(lightState).isEqualTo(LightState.builder()
+                                                   .id("light.brightness")
                                                    .on(true)
                                                    .reachable(true)
                                                    .brightness(199) // adjusted correctly
@@ -1582,6 +1595,7 @@ public class HassApiTest {
 
         assertThat(groupStates).containsExactly(
                 LightState.builder()
+                          .id("light.schreibtisch_l")
                           .on(true)
                           .reachable(true)
                           .colormode("ct")
@@ -1597,6 +1611,7 @@ public class HassApiTest {
                                                               .build())
                           .build(),
                 LightState.builder()
+                          .id("light.schreibtisch_r")
                           .on(true)
                           .reachable(true)
                           .colormode("ct")
