@@ -4,6 +4,8 @@ import at.sv.hue.api.LightCapabilities;
 import at.sv.hue.api.LightState;
 import at.sv.hue.api.PutCall;
 import at.sv.hue.time.StartTimeProvider;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
@@ -57,6 +59,7 @@ final class ScheduledState {
     @Getter
     private final LightCapabilities capabilities;
     private final int minTrBeforeGapInMinutes;
+    private final Cache<ZonedDateTime, ScheduledStateSnapshot> snapshotCache;
     @Getter
     @Setter
     private ZonedDateTime end;
@@ -109,6 +112,9 @@ final class ScheduledState {
         retryAfterPowerOnState = false;
         previousStateLookup = (state, dateTime) -> null;
         assertColorCapabilities();
+        snapshotCache = Caffeine.newBuilder()
+                                .expireAfterWrite(Duration.ofDays(3))
+                                .build();
     }
 
     public static ScheduledState createTemporaryCopy(ScheduledState state) {
@@ -302,8 +308,8 @@ final class ScheduledState {
     }
 
     public ScheduledStateSnapshot getSnapshot(ZonedDateTime dateTime) {
-        ZonedDateTime definedStart = getDefinedStart(dateTime);
-        return new ScheduledStateSnapshot(this, definedStart);
+        return snapshotCache.get(getDefinedStart(dateTime),
+                definedStart -> new ScheduledStateSnapshot(this, definedStart));
     }
 
     /**
@@ -388,52 +394,8 @@ final class ScheduledState {
         return (int) between.toMillis() / 100;
     }
 
-    public boolean isSplitState() {
-        return Duration.between(lastStart, lastDefinedStart).compareTo(Duration.ofMillis(MAX_TRANSITION_TIME_MS)) > 0;
-    }
-
-    public boolean isInsideSplitCallWindow(ZonedDateTime now) {
-        return getNextTransitionTimeSplitStart(now).isBefore(lastDefinedStart);
-    }
-
-    public ZonedDateTime calculateNextPowerOnEnd(ZonedDateTime now) {
-        if (isInsideSplitCallWindow(now)) {
-            return getNextTransitionTimeSplitStart(now).minusSeconds(1);
-        } else {
-            return getEnd();
-        }
-    }
-
-    public PutCall getNextInterpolatedSplitPutCall(ZonedDateTime now, ScheduledStateSnapshot previousState) {
-        ZonedDateTime nextSplitStart = getNextTransitionTimeSplitStart(now).minusMinutes(getRequiredGap()); // add buffer
-        PutCall interpolatedSplitPutCall = new StateInterpolator(getSnapshot(lastDefinedStart), previousState, nextSplitStart, false)
-                .getInterpolatedPutCall();
-        if (interpolatedSplitPutCall == null) {
-            return null; // no interpolation possible
-        }
-        Duration between = Duration.between(now, nextSplitStart);
-        if (between.isZero() || between.isNegative()) {
-            return null; // we are inside the required gap, skip split call
-        }
-        interpolatedSplitPutCall.setTransitionTime((int) between.toMillis() / 100);
-        return interpolatedSplitPutCall;
-    }
-
     public int getRequiredGap() {
         return minTrBeforeGapInMinutes;
-    }
-
-    public long getNextInterpolationSplitDelayInMs(ZonedDateTime now) {
-        ZonedDateTime nextSplitStart = getNextTransitionTimeSplitStart(now);
-        return Duration.between(now, nextSplitStart).toMillis();
-    }
-
-    private ZonedDateTime getNextTransitionTimeSplitStart(ZonedDateTime now) {
-        ZonedDateTime splitStart = lastStart.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS);
-        while (splitStart.isBefore(now) || splitStart.isEqual(now)) {
-            splitStart = splitStart.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS);
-        }
-        return splitStart;
     }
 
     public boolean endsBefore(ZonedDateTime now) {
