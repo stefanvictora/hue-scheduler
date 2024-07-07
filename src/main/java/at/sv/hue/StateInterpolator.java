@@ -13,13 +13,13 @@ import java.time.temporal.ChronoUnit;
 @RequiredArgsConstructor
 public final class StateInterpolator {
 
-    private final ScheduledState state;
+    private final ScheduledStateSnapshot state;
     private final ScheduledStateSnapshot previousState;
     private final ZonedDateTime dateTime;
     private final boolean keepPreviousPropertiesForNullTargets;
 
     public PutCall getInterpolatedPutCall() {
-        ZonedDateTime lastDefinedStart = state.getLastDefinedStart();
+        ZonedDateTime lastDefinedStart = state.getDefinedStart();
         if (lastDefinedStart.isBefore(dateTime) || lastDefinedStart.isEqual(dateTime)) {
             return null; // the state is already reached
         }
@@ -33,7 +33,7 @@ public final class StateInterpolator {
     }
 
     private boolean isDirectlyAtStartOfState() {
-        return state.getLastStart().truncatedTo(ChronoUnit.SECONDS)
+        return state.getStart().truncatedTo(ChronoUnit.SECONDS)
                     .isEqual(dateTime.truncatedTo(ChronoUnit.SECONDS));
     }
 
@@ -86,8 +86,8 @@ public final class StateInterpolator {
      * t = (current_time - start_time) / (end_time - start_time)
      */
     private BigDecimal getInterpolatedTime() {
-        Duration durationAfterStart = Duration.between(state.getLastStart(), dateTime);
-        Duration totalDuration = Duration.between(state.getLastStart(), state.getLastDefinedStart());
+        Duration durationAfterStart = Duration.between(state.getStart(), dateTime);
+        Duration totalDuration = Duration.between(state.getStart(), state.getDefinedStart());
         return BigDecimal.valueOf(durationAfterStart.toMillis())
                          .divide(BigDecimal.valueOf(totalDuration.toMillis()), 7, RoundingMode.HALF_UP);
     }

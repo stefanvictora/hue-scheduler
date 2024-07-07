@@ -46,6 +46,8 @@ class HueSchedulerTest {
     private static final int DEFAULT_CT = 400; // very warm. [153-500]
     private static final double DEFAULT_X = 0.2862;
     private static final double DEFAULT_Y = 0.4311;
+    private final String sceneSyncName = "synced-scene";
+    private final int sceneSyncInterpolationInterval = 1;
 
     private TestStateScheduler stateScheduler;
     private ManualOverrideTracker manualOverrideTracker;
@@ -66,6 +68,7 @@ class HueSchedulerTest {
     private int minTrGap = 2; // in minutes
     private final int MAX_TRANSITION_TIME_WITH_BUFFER = ScheduledState.MAX_TRANSITION_TIME - minTrGap * 600;
     private boolean interpolateAll;
+    private boolean enableSceneSync = false;
 
     private void setCurrentTimeToAndRun(ScheduledRunnable scheduledRunnable) {
         setCurrentTimeTo(scheduledRunnable);
@@ -107,7 +110,8 @@ class HueSchedulerTest {
         scheduler = new HueScheduler(mockedHueApi, stateScheduler, startTimeProvider,
                 () -> now, 10.0, controlGroupLightsIndividually, disableUserModificationTracking,
                 defaultInterpolationTransitionTimeInMs, 0, connectionFailureRetryDelay,
-                multiColorAdjustmentDelay, minTrGap, 5, interpolateAll);
+                multiColorAdjustmentDelay, minTrGap, 5, interpolateAll,
+                enableSceneSync, sceneSyncName, sceneSyncInterpolationInterval);
         manualOverrideTracker = scheduler.getManualOverrideTracker();
     }
 
@@ -408,6 +412,11 @@ class HueSchedulerTest {
 
     private void enableUserModificationTracking() {
         disableUserModificationTracking = false;
+        create();
+    }
+
+    private void enableSceneSync() {
+        enableSceneSync = true;
         create();
     }
 
@@ -2921,7 +2930,7 @@ class HueSchedulerTest {
         addState(1, now.minusMinutes(50), "ct:" + (DEFAULT_CT - 15)); // 23:10
         addState(1, now.minusMinutes(40), "ct:" + DEFAULT_CT); // 23:20, should be picked as previous state
         addState(1, now, "ct:" + (DEFAULT_CT + 20), "tr-before:20min"); // 23:40
-        setCurrentAndInitialTimeTo(now.minusMinutes(10)); // 23:30
+        setCurrentAndInitialTimeTo(now.minusMinutes(10)); // 23:50
 
         List<ScheduledRunnable> scheduledRunnables = startScheduler(
                 expectedRunnable(now, now.plusDays(1).minusMinutes(40)),
@@ -5797,6 +5806,132 @@ class HueSchedulerTest {
         );
     }
 
+    @Test
+    void sceneSync_groupState_createsAndUpdatesScene_evenIfLightIsOff() {
+        enableSceneSync();
+
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 5, 6);
+        addState("g1", now, "bri:100");
+        addState("g1", now.plusMinutes(10), "bri:150");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.getFirst(),
+                expectedGroupPutCall(1).bri(100)
+        );
+
+        assertSceneUpdate("/groups/1", expectedGroupPutCall(1).bri(100));
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
+        );
+
+        mockIsGroupOff(1, true);
+        advanceTimeAndRunAndAssertPutCalls(runnables.get(1)); // no put call
+
+        // still updates scene
+        assertSceneUpdate("/groups/1", expectedGroupPutCall(1).bri(150));
+    }
+
+    @Test
+    void sceneSync_groupState_createsAndUpdatesScene_interpolation_updatesSceneWithInterpolatedState_schedulesAdditionalSceneSync() {
+        enableSceneSync();
+
+        mockDefaultGroupCapabilities(2);
+        mockGroupLightsForId(2, 5, 6);
+        addState("g2", now, "bri:100");
+        addState("g2", now.plusMinutes(10), "bri:150", "interpolate:true");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1)),
+                expectedRunnable(now.plusDays(1), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.getFirst(),
+                expectedGroupPutCall(2).bri(100),
+                expectedGroupPutCall(2).bri(150).transitionTime(tr("10min"))
+        );
+
+        assertSceneUpdate("/groups/2", expectedGroupPutCall(2).bri(100));
+
+        List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(
+                expectedRunnable(now.plusMinutes(1), now.plusDays(1)), // scene sync schedule
+                expectedRunnable(initialNow.plusDays(1), initialNow.plusDays(2)) // next day
+        );
+
+        advanceCurrentTime(Duration.ofMinutes(sceneSyncInterpolationInterval));
+        followUpRunnables.getFirst().run();
+
+        assertSceneUpdate("/groups/2", expectedGroupPutCall(2).bri(105));
+
+        ScheduledRunnable syncRunnable2 = ensureRunnable(now.plusMinutes(sceneSyncInterpolationInterval)); // next sync
+
+        // power on
+        advanceCurrentTime(Duration.ofMinutes(4));
+        mockIsGroupOff(2, false);
+        ScheduledRunnable powerOnRunnable = simulateLightOnEvent("/groups/2",
+                expectedRunnable(now, initialNow.plusDays(1))
+        ).getFirst();
+
+        advanceTimeAndRunAndAssertPutCalls(powerOnRunnable,
+                expectedGroupPutCall(2).bri(125),
+                expectedGroupPutCall(2).bri(150).transitionTime(tr("5min"))
+        );
+
+        advanceCurrentTime(Duration.ofDays(1).minusMinutes(5)); // exactly at end
+
+        syncRunnable2.run(); // already ended, no additional sync
+    }
+
+    // todo: test already ended of sync call for long durations aka split calls; the end calculation is not bound to the snapshot yet
+
+    @Test
+    void sceneSync_lightState_ignored() {
+        enableSceneSync();
+
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now, "bri:100");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.getFirst(),
+                expectedPutCall(1).bri(100)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
+        );
+
+        verify(mockedHueApi, never()).createOrUpdateScene(any(), any(), any());
+    }
+
+    @Test
+    void sceneSync_groupState_notEnabled_ignored() {
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 5, 6);
+        addState("g1", now, "bri:100");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.getFirst(),
+                expectedGroupPutCall(1).bri(100)
+        );
+
+        verify(mockedHueApi, never()).createOrUpdateScene(any(), any(), any());
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
+        );
+    }
+
     private void simulateSceneActivated(String sceneId, String... containedLights) {
         when(mockedHueApi.getAffectedIdsByScene(sceneId)).thenReturn(Arrays.asList(containedLights));
 
@@ -5848,6 +5983,10 @@ class HueSchedulerTest {
 
     private ExpectedRunnable expectedPowerOnEnd(ZonedDateTime endExclusive) {
         return expectedRunnable(now, endExclusive);
+    }
+
+    private void assertSceneUpdate(String groupId, PutCall.PutCallBuilder expectedPutCall) {
+        verify(mockedHueApi).createOrUpdateScene(groupId, expectedPutCall.build(), sceneSyncName);
     }
 
     @RequiredArgsConstructor

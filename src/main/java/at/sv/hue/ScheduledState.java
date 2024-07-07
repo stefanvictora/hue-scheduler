@@ -129,6 +129,7 @@ final class ScheduledState {
         copy.lastDefinedStart = state.lastDefinedStart;
         copy.lastSeen = state.lastSeen;
         copy.originalState = state.originalState;
+        copy.previousStateLookup = state.previousStateLookup;
         return copy;
     }
 
@@ -387,12 +388,6 @@ final class ScheduledState {
         return (int) between.toMillis() / 100;
     }
 
-    public PutCall getInterpolatedPutCall(ScheduledStateSnapshot previousState, ZonedDateTime dateTime,
-                                          boolean keepPreviousPropertiesForNullTargets) {
-        return new StateInterpolator(this, previousState, dateTime, keepPreviousPropertiesForNullTargets)
-                .getInterpolatedPutCall();
-    }
-
     public boolean isSplitState() {
         return Duration.between(lastStart, lastDefinedStart).compareTo(Duration.ofMillis(MAX_TRANSITION_TIME_MS)) > 0;
     }
@@ -411,7 +406,8 @@ final class ScheduledState {
 
     public PutCall getNextInterpolatedSplitPutCall(ZonedDateTime now, ScheduledStateSnapshot previousState) {
         ZonedDateTime nextSplitStart = getNextTransitionTimeSplitStart(now).minusMinutes(getRequiredGap()); // add buffer
-        PutCall interpolatedSplitPutCall = getInterpolatedPutCall(previousState, nextSplitStart, false);
+        PutCall interpolatedSplitPutCall = new StateInterpolator(getSnapshot(lastDefinedStart), previousState, nextSplitStart, false)
+                .getInterpolatedPutCall();
         if (interpolatedSplitPutCall == null) {
             return null; // no interpolation possible
         }

@@ -240,6 +240,11 @@ public class HassApiImpl implements HueApi {
     }
 
     @Override
+    public void createOrUpdateScene(String groupId, PutCall putCall, String sceneSyncName) {
+        // todo
+    }
+
+    @Override
     public void clearCaches() {
         synchronized (lightMapLock) {
             availableStatesInvalidated = true;

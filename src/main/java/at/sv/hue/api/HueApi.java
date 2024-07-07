@@ -100,6 +100,8 @@ public interface HueApi {
      */
     LightCapabilities getGroupCapabilities(String id);
 
+    void createOrUpdateScene(String groupId, PutCall putCall, String sceneSyncName);
+
     /**
      * Clears caches for both the /lights and /groups resources, so that up-to-date information is fetched next time
      */

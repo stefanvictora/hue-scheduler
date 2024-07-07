@@ -423,6 +423,12 @@ public final class HueApiImpl implements HueApi {
     }
 
     @Override
+    public void createOrUpdateScene(String groupId, PutCall putCall, String sceneSyncName) {
+        System.out.println("Sync scene: " + groupId + ". " + putCall + ". " + sceneSyncName);
+        // todo
+    }
+
+    @Override
     public void clearCaches() {
         synchronized (lightMapLock) {
             availableLightsInvalidated = true;

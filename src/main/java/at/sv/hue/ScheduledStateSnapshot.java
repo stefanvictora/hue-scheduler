@@ -15,12 +15,28 @@ public class ScheduledStateSnapshot {
     private final ScheduledState scheduledState;
     private final ZonedDateTime definedStart;
 
+    public String getId() {
+        return scheduledState.getId();
+    }
+
     public ZonedDateTime getStart() {
         return scheduledState.getStart(definedStart);
     }
 
+    public ZonedDateTime getEnd() {
+        return scheduledState.getEnd(); // todo: this seems not right; as it will change and not be a snapshot
+    }
+
     public boolean isForced() {
         return scheduledState.isForced();
+    }
+
+    public boolean isOn() {
+        return scheduledState.isOn();
+    }
+
+    public boolean hasTransitionBefore() {
+        return scheduledState.hasTransitionBefore();
     }
 
     public boolean isNullState() {
