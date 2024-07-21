@@ -1,5 +1,6 @@
 package at.sv.hue;
 
+import at.sv.hue.api.Identifier;
 import at.sv.hue.api.LightCapabilities;
 import at.sv.hue.api.LightState;
 import at.sv.hue.api.PutCall;
@@ -23,8 +24,6 @@ import java.util.function.BiFunction;
 
 final class ScheduledState {
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
-    private static final String MULTI_COLOR_LOOP = "multi_colorloop";
-    private static final String COLOR_LOOP = "colorloop";
     public static final int MAX_HUE_VALUE = 65535;
     public static final int MIDDLE_HUE_VALUE = 32768;
     /**
@@ -33,9 +32,7 @@ final class ScheduledState {
     public static final int MAX_TRANSITION_TIME = 60000;
     public static final int MAX_TRANSITION_TIME_MS = MAX_TRANSITION_TIME * 100;
 
-    private final String name;
-    @Getter
-    private final String id;
+    private final Identifier identifier;
     private final String startString;
     private final Integer brightness;
     private final Integer ct;
@@ -78,12 +75,11 @@ final class ScheduledState {
     private BiFunction<ScheduledState, ZonedDateTime, ScheduledStateSnapshot> previousStateLookup;
 
     @Builder
-    public ScheduledState(String name, String id, String startString, Integer brightness, Integer ct, Double x, Double y,
+    public ScheduledState(Identifier identifier, String startString, Integer brightness, Integer ct, Double x, Double y,
                           Integer hue, Integer sat, String effect, Boolean on, String transitionTimeBeforeString, Integer definedTransitionTime,
                           Set<DayOfWeek> daysOfWeek, StartTimeProvider startTimeProvider, LightCapabilities capabilities,
                           int minTrBeforeGapInMinutes, Boolean force, Boolean interpolate, boolean groupState, boolean temporary) {
-        this.name = name;
-        this.id = id;
+        this.identifier = identifier;
         this.startString = startString;
         this.interpolate = interpolate;
         if (daysOfWeek == null || daysOfWeek.isEmpty()) {
@@ -126,7 +122,7 @@ final class ScheduledState {
     }
 
     private static ScheduledState createTemporaryCopy(ScheduledState state, String start, ZonedDateTime end) {
-        ScheduledState copy = new ScheduledState(state.name, state.id, start,
+        ScheduledState copy = new ScheduledState(state.identifier, start,
                 state.brightness, state.ct, state.x, state.y, state.hue, state.sat, state.effect, state.on,
                 state.transitionTimeBeforeString, state.definedTransitionTime, state.daysOfWeek, state.startTimeProvider,
                 state.capabilities, state.minTrBeforeGapInMinutes, state.force, state.interpolate, state.groupState, true);
@@ -140,11 +136,20 @@ final class ScheduledState {
     }
 
     private String assertValidEffectValue(String effect) {
-        if (effect != null && !"none".equals(effect) && !COLOR_LOOP.equals(effect) && !MULTI_COLOR_LOOP.equals(effect)) {
-            throw new InvalidPropertyValue("Unsupported value for effect property: '" + effect + "'");
+        if (effect == null) {
+            return null;
         }
-        if (!isGroupState() && MULTI_COLOR_LOOP.equals(effect)) {
-            throw new InvalidPropertyValue("Multi color loop is only supported for groups.");
+        if (groupState) {
+            throw new InvalidPropertyValue("Effects are not supported by groups.");
+        }
+        if (capabilities.getEffects() == null) {
+            throw new InvalidPropertyValue("Light does not support any effects.");
+        }
+        if (effect.equals("none")) {
+            return effect;
+        }
+        if (!capabilities.getEffects().contains(effect)) {
+            throw new InvalidPropertyValue("Unsupported value for effect property: '" + effect + "'");
         }
         return effect;
     }
@@ -231,7 +236,7 @@ final class ScheduledState {
     }
 
     private boolean isColorState() {
-        return x != null || y != null || hue != null || sat != null || effect != null;
+        return x != null || y != null || hue != null || sat != null;
     }
 
     /**
@@ -366,17 +371,6 @@ final class ScheduledState {
         return daysOfWeek.containsAll(Arrays.asList(day));
     }
 
-    private String getEffect() {
-        if (isMultiColorLoop()) {
-            return COLOR_LOOP;
-        }
-        return effect;
-    }
-
-    public boolean isMultiColorLoop() {
-        return MULTI_COLOR_LOOP.equals(effect);
-    }
-
     private Integer getTransitionTime(ZonedDateTime now, ZonedDateTime definedStart) {
         int adjustedTrBefore = getAdjustedTransitionTimeBefore(now, definedStart);
         if (adjustedTrBefore == 0) {
@@ -462,7 +456,7 @@ final class ScheduledState {
     }
 
     public PutCall getPutCall(ZonedDateTime now, ZonedDateTime definedStart) {
-        return PutCall.builder().id(id)
+        return PutCall.builder().id(identifier.id())
                       .bri(brightness)
                       .ct(ct)
                       .x(x)
@@ -470,17 +464,21 @@ final class ScheduledState {
                       .hue(hue)
                       .sat(sat)
                       .on(on)
-                      .effect(getEffect())
+                      .effect(effect)
                       .transitionTime(now != null ? getTransitionTime(now, definedStart) : null)
                       .groupState(groupState)
                       .gamut(capabilities != null ? capabilities.getColorGamut() : null)
                       .build();
     }
 
+    public String getId() {
+        return identifier.id();
+    }
+
     @Override
     public String toString() {
         return getFormattedName() + " {" +
-               "id=" + id +
+               "id=" + identifier.id() +
                (temporary && !retryAfterPowerOnState ? ", temporary" : "") +
                (retryAfterPowerOnState ? ", power-on-event" : "") +
                ", start=" + getFormattedStart() +
@@ -504,13 +502,13 @@ final class ScheduledState {
 
     public String getFormattedName() {
         if (groupState) {
-            return "Group '" + name + "'";
+            return "Group '" + identifier.name() + "'";
         }
-        return "Light '" + name + "'";
+        return "Light '" + identifier.name() + "'";
     }
 
     public String getContextName() {
-        String context = name;
+        String context = identifier.name();
         if (isRetryAfterPowerOnState()) {
             context += " (power-on)";
         } else if (temporary) {

@@ -115,7 +115,7 @@ Specify properties to control the state of your lights during the given interval
     Office        sunrise     bri:254  ct:6500  tr:10s  days:Mo-Fr
     Office        sunset      bri:200  ct:3000  tr-before:20min  days:Mo-Fr
 
-    Living room   22:00       bri:100   effect:multi_colorloop  days:Fr,Sa
+    Living room   22:00       bri:100   effect:prism  days:Fr,Sa
     Living room   23:59       days:Fr,Sa
     ~~~
 
@@ -129,9 +129,7 @@ Hue Scheduler offers several ways to define the color of supported lights:
 
 - ``sat``: Defines the **saturation** color value of the light: [``0``-``254``] or [``0%``-``100%``], from white to fully colored. Requires ``hue``.
 
-- ``effect``: Makes the light **loop through all their hues** with their ``bri`` values. The lights loop until they are turned off or set to `none`. This means you can adjust the brightness, while the lights keep looping. Supported values: [`colorloop`|`multi_colorloop`|`none`].
-
-  The `multi_colorloop` is only for groups, as Hue Scheduler adjusts each light in the group to have a different starting hue during the loop. This is achieved by turning each light on and off with a delay, adjustable through the `--multi-color-adjustment-delay` command line argument.
+- ``effect``: Activates the given effect for the light or group. Can't be combined with other color properties or `ct`. The effect is active until the light is turned off or the effect set to `none`. This means you can adjust the brightness, while the effect remains active. The supported effects depend on the light model. Some supported values for Philips Hue color lights are `candle`, `fire`, `prism`, `sparkle`, `opal`, `glisten`.
 
 - ``x`` and ``y``: (advanced) Modifies the **color** using x and y coordinates in the [CIE color space](https://en.wikipedia.org/wiki/CIE_1931_color_space): [``0.0``-``1.0``]. Useful for setting an exact color value obtained from the Hue API. For example: `x:0.1652  y=0.3103`. Cannot be combined with other color properties.
 
@@ -140,7 +138,7 @@ Hue Scheduler offers several ways to define the color of supported lights:
 Desk  10:00  color:#3CD0E2
 Desk  11:00  color:60, 208, 226
 Desk  12:00  hue:2000  sat:100
-Desk  13:00  effect:colorloop  bri:50%
+Desk  13:00  effect:candle  bri:50%
 Desk  14:00  effect:none
 Desk  15:00  x:0.1652  y=0.3103
 ~~~

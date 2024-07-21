@@ -66,7 +66,7 @@ Each configuration line has three parts:
     - **`color`** (hex or rgb): e.g., `color:#3CD0E2`, `color:60, 208, 226`
     - **`hue`** (color value) [``0``-``65535``]: e.g., `hue:2000`
     - **`sat`** (saturation) [``0``-``254``] or [``0%``-``100%``]: e.g., `sat:150`, `sat:70%`
-    - **`effect`** (color loop): e.g., `effect:multi_colorloop`, `effect:colorloop`, `effect:none`
+    - **`effect`**: e.g., `effect:prism`, `effect:fire`, `effect:none`
 - **Advanced**:
     - **`x`** and **`y`** (CIE color space coordinates): e.g., `x:0.6024  y:0.3433`
     - **`force`** (ignore user modifications): e.g., `force:true`

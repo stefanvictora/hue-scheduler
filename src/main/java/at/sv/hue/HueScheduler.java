@@ -107,7 +107,7 @@ public final class HueScheduler implements Runnable {
     boolean disableUserModificationTracking;
     @Option(names = "--enable-scene-sync",
             defaultValue = "${env:ENABLE_SCENE_SYNC:-false}",
-            description = "Enable the creating of Hue scenes that always match the state of a scheduled group or zone." +
+            description = "Enable the creating of Hue scenes that always match the state of a scheduled room or zone." +
                           " Default: ${DEFAULT-VALUE}")
     boolean enableSceneSync;
     @Option(names = "--scene-sync-name",
@@ -145,11 +145,6 @@ public final class HueScheduler implements Runnable {
             description = "The delay in seconds for retrying an API call, if the bridge could not be reached due to " +
                           "network failure, or if it returned an API error code. Default: ${DEFAULT-VALUE} seconds.")
     int bridgeFailureRetryDelayInSeconds;
-    @Option(names = "--multi-color-adjustment-delay", paramLabel = "<delay>",
-            defaultValue = "${env:MULTI_COLOR_ADJUSTMENT_DELAY:-4}",
-            description = "The adjustment delay in seconds for each light in a group when using the multi_color effect." +
-                          " Adjust to change the hue values of 'neighboring' lights. Default: ${DEFAULT-VALUE} seconds.")
-    int multiColorAdjustmentDelay;
     @Option(names = "--event-stream-read-timeout", paramLabel = "<timout>",
             defaultValue = "${env:EVENT_STREAM_READ_TIMEOUT:-120}",
             description = "The read timeout of the API v2 SSE event stream in minutes. " +
@@ -194,7 +189,7 @@ public final class HueScheduler implements Runnable {
                         StartTimeProvider startTimeProvider, Supplier<ZonedDateTime> currentTime,
                         double requestsPerSecond, boolean controlGroupLightsIndividually,
                         boolean disableUserModificationTracking, String defaultInterpolationTransitionTimeString,
-                        int powerOnRescheduleDelayInMs, int bridgeFailureRetryDelayInSeconds, int multiColorAdjustmentDelay,
+                        int powerOnRescheduleDelayInMs, int bridgeFailureRetryDelayInSeconds,
                         int minTrBeforeGapInMinutes, int sceneActivationIgnoreWindowInSeconds, boolean interpolateAll,
                         boolean enableSceneSync, String sceneSyncName, int sceneSyncInterpolationIntervalInMinutes) {
         this();
@@ -211,7 +206,6 @@ public final class HueScheduler implements Runnable {
         this.defaultInterpolationTransitionTimeString = defaultInterpolationTransitionTimeString;
         this.powerOnRescheduleDelayInMs = powerOnRescheduleDelayInMs;
         this.bridgeFailureRetryDelayInSeconds = bridgeFailureRetryDelayInSeconds;
-        this.multiColorAdjustmentDelay = multiColorAdjustmentDelay;
         this.minTrBeforeGapInMinutes = minTrBeforeGapInMinutes;
         this.sceneActivationIgnoreWindowInSeconds = sceneActivationIgnoreWindowInSeconds;
         defaultInterpolationTransitionTime = parseInterpolationTransitionTime(defaultInterpolationTransitionTimeString);
@@ -270,7 +264,7 @@ public final class HueScheduler implements Runnable {
     private void setupHueApi() {
         OkHttpClient httpsClient = createHueHttpsClient();
         RateLimiter rateLimiter = RateLimiter.create(requestsPerSecond);
-        api = new HueApiImpl(new HttpResourceProviderImpl(httpsClient), apiHost, accessToken, rateLimiter);
+        api = new HueApiImpl(new HttpResourceProviderImpl(httpsClient), apiHost, rateLimiter, apiCacheInvalidationIntervalInMinutes);
         sceneEventListener = new SceneEventListenerImpl(api, Ticker.systemTicker(), sceneActivationIgnoreWindowInSeconds);
         new HueEventStreamReader(apiHost, accessToken, httpsClient, new HueEventHandler(lightEventListener, sceneEventListener),
                 eventStreamReadTimeoutInMinutes).start();
@@ -287,7 +281,7 @@ public final class HueScheduler implements Runnable {
 
     private OkHttpClient createHueHttpsClient() {
         try {
-            return HueHttpsClientFactory.createHttpsClient(apiHost);
+            return HueHttpsClientFactory.createHttpsClient(apiHost, accessToken);
         } catch (Exception e) {
             System.err.println("Failed to create https client: " + e.getLocalizedMessage());
             System.exit(1);
@@ -505,15 +499,16 @@ public final class HueScheduler implements Runnable {
             if (shouldRetryOnPowerOn(snapshot)) {
                 retryWhenBackOn(createPowerOnCopy(snapshot));
             }
-            if (shouldAdjustMultiColorLoopOffset(snapshot)) {
-                scheduleMultiColorLoopOffsetAdjustments(snapshot);
-            }
             reschedule(state);
         }, currentTime.get().plus(delayInMs, ChronoUnit.MILLIS), state.getEnd());
     }
 
     private boolean shouldSyncScene(ScheduledStateSnapshot state) {
-        return state.isGroupState() && enableSceneSync && !manualOverrideTracker.wasJustTurnedOn(state.getId());
+        return state.isGroupState() && enableSceneSync && wasNotJustTurnedOn(state);
+    }
+
+    private boolean wasNotJustTurnedOn(ScheduledStateSnapshot state) {
+        return !manualOverrideTracker.wasJustTurnedOn(state.getId());
     }
 
     private void syncScene(ScheduledStateSnapshot state) {
@@ -822,49 +817,6 @@ public final class HueScheduler implements Runnable {
 
     private void retryWhenBackOn(ScheduledState state) {
         lightEventListener.runWhenTurnedOn(state.getId(), () -> schedule(state, powerOnRescheduleDelayInMs));
-    }
-
-    private boolean shouldAdjustMultiColorLoopOffset(ScheduledStateSnapshot state) {
-        return state.isMultiColorLoop() && getGroupLights(state).size() > 1;
-    }
-
-    private void scheduleMultiColorLoopOffsetAdjustments(ScheduledStateSnapshot state) {
-        scheduleMultiColorLoopOffsetAdjustments(getGroupLights(state), 1);
-    }
-
-    private void scheduleMultiColorLoopOffsetAdjustments(List<String> groupLights, int i) {
-        stateScheduler.schedule(() -> offsetMultiColorLoopForLight(groupLights, i),
-                currentTime.get().plusSeconds(multiColorAdjustmentDelay), null);
-    }
-
-    private void offsetMultiColorLoopForLight(List<String> groupLights, int i) {
-        String light = groupLights.get(i);
-        LightState lightState = api.getLightState(light);
-        boolean delayNext = false;
-        if (lightState.isOn() && lightState.isColorLoopEffect()) {
-            turnOff(light);
-            scheduleTurnOn(light);
-            delayNext = true;
-        }
-        if (i + 1 >= groupLights.size()) return;
-        if (delayNext) {
-            scheduleMultiColorLoopOffsetAdjustments(groupLights, i + 1);
-        } else {
-            offsetMultiColorLoopForLight(groupLights, i + 1);
-        }
-    }
-
-    private void turnOff(String light) {
-        putOnState(light, false, null);
-    }
-
-    private void scheduleTurnOn(String light) {
-        stateScheduler.schedule(() -> putOnState(light, true, "colorloop"),
-                currentTime.get().plus(300, ChronoUnit.MILLIS), null);
-    }
-
-    private void putOnState(String light, boolean on, String effect) {
-        api.putState(PutCall.builder().id(light).on(on).effect(effect).build());
     }
 
     private void scheduleSolarDataInfoLog() {

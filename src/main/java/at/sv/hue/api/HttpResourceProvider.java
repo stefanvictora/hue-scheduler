@@ -6,7 +6,7 @@ public interface HttpResourceProvider {
     /**
      * @return the requested resource as string. Not null.
      * @throws BridgeConnectionFailure     if an IOException occurred
-     * @throws BridgeAuthenticationFailure if the server rejected the response as unauthorized
+     * @throws BridgeAuthenticationFailure if the server rejected the response as unauthorized (401, 403)
      */
     String getResource(URL url);
 

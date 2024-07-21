@@ -25,7 +25,7 @@ public final class SceneEventListenerImpl implements SceneEventListener {
 
     @Override
     public void onSceneActivated(String id) {
-        MDC.put("context", "on-event " + id);
+        MDC.put("context", "scene-on-event " + id);
         List<String> sceneLights = hueApi.getAffectedIdsByScene(id);
         sceneLights.forEach(lightId -> recentlyAffectedIds.put(lightId, lightId));
         sceneLights.stream()

@@ -1,5 +1,24 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- **Scene Sync Feature**: Hue Scheduler can now sync the state to scenes
+  - Those synced scenes allow turning on lights always in their correct state via smart switched and motion sensors
+  - This feature has to be enabled via the new ``--enable-scene-sync`` command line flag or ``ENABLE_SCENE_SYNC=true`` environment variable (default: `false`).
+  - Added additional `--scene-sync-name` (default: `HueScheduler`) and `--scene-sync-interpolation-interval` (default `2` minutes) properties to fine-tune this feature. See [Advanced Command Line Options](docs/advanced_command_line_options.md).
+- **APIv2 Effects**: Now all supported Hue APIv2 light effects can be scheduled.
+  - Include e.g. `candle`, `fire`, `prism`, `sparkle`, `opal`, `glisten`.
+  - The exact supported values depend on the light model and is verified during startup.
+
+### Changed
+- Fully switched to Hue APIv2
+
+### Removed
+- Due to Hue APIv2 limitations, effects can't be applied to groups anymore.
+  - `colorloop` and `multip_colorloop` effects are not supported anymore. For single lights use `prism` instead.
+  - Removed `--multi-color-adjustment-delay` configuration parameter.
+
 ## [0.11.0] - 2024-06-29
 
 ### Added

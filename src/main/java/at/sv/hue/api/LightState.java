@@ -17,15 +17,10 @@ public final class LightState {
     private final Double x;
     private final Double y;
     private final String effect;
-    private final String colormode;
-    private final boolean reachable;
+    private final ColorMode colormode;
     private final boolean on;
     @Builder.Default
-    private final LightCapabilities lightCapabilities = LightCapabilities.NO_CAPABILITIES;
-
-    public ColorMode getColormode() {
-        return ColorMode.parse(colormode);
-    }
+    private final LightCapabilities lightCapabilities = LightCapabilities.builder().build();
 
     public boolean isColorLoopEffect() {
         return "colorloop".equals(getEffect());

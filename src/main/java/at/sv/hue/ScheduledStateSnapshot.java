@@ -107,10 +107,6 @@ public class ScheduledStateSnapshot {
         return scheduledState.isRetryAfterPowerOnState();
     }
 
-    public boolean isMultiColorLoop() {
-        return scheduledState.isMultiColorLoop();
-    }
-
     public PutCall getPutCall(ZonedDateTime now) {
         return scheduledState.getPutCall(now, definedStart);
     }

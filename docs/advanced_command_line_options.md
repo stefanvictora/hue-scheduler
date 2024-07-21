@@ -17,6 +17,24 @@ Flag to globally disable tracking of user modifications of lights. Per default H
 
 **Default**: false
 
+### `--enable-scene-sync`
+
+Enable the creating of Hue scenes that always match the state of a scheduled room or zone.
+
+**Default**: false
+
+### `--scene-sync-name`
+
+The name of the synced scene. Related to `--enable-scene-sync`'`.
+
+**Default**: `HueScheduler`
+
+### `--scene-sync-interpolation-interval`
+
+The interval for syncing interpolated states to scenes in minutes. Related to `--enable-scene-sync`.
+
+**Default**: `2` minutes
+
 ### `--scene-activation-ignore-window`
 
 Only relevant and active if user modification tracking is not disabled (see `--disable-user-modification-tracking`).
@@ -78,12 +96,6 @@ Toggle if Hue Scheduler should control lights found in a group individually inst
 Note: Hue Scheduler does not validate in such cases if all the lights inside the group support the given command. Furthermore, this option might not be suitable for groups with mixed capabilities, i.e. setting color for a group that also contains a color temperature only light. In such cases, the unsupported light is not updated.
 
 **Default**: false
-
-### `--multi-color-adjustment-delay`
-
-The adjustment delay in seconds for each light in a group when using the multi_color effect. Adjust this parameter to change the hue values of 'neighboring' lights.
-
-**Default**: `4` seconds
 
 ### `--bridge-failure-retry-delay`
 

@@ -28,6 +28,7 @@ public class HttpResourceProviderImpl implements HttpResourceProvider {
             assertSuccessful(response);
             return getBody(response);
         } catch (IOException e) {
+            log.error("Failed to GET '{}'", url, e);
             throw new BridgeConnectionFailure("Failed to GET '" + url + "'", e);
         }
     }
@@ -39,6 +40,7 @@ public class HttpResourceProviderImpl implements HttpResourceProvider {
             assertSuccessful(response);
             return getBody(response);
         } catch (IOException e) {
+            log.error("Failed to PUT '{}'", url, e);
             throw new BridgeConnectionFailure("Failed to PUT '" + url + "'", e);
         }
     }
@@ -50,6 +52,7 @@ public class HttpResourceProviderImpl implements HttpResourceProvider {
             assertSuccessful(response);
             return getBody(response);
         } catch (IOException e) {
+            log.error("Failed to POST '{}'", url, e);
             throw new BridgeConnectionFailure("Failed to POST '" + url + "'", e);
         }
     }
@@ -81,11 +84,14 @@ public class HttpResourceProviderImpl implements HttpResourceProvider {
     }
 
     private static void assertSuccessful(Response response) throws IOException {
-        if (response.code() == 401) {
+        if (response.code() == 401 || response.code() == 403) {
             throw new BridgeAuthenticationFailure();
         }
+        if (response.code() == 404) {
+            throw new ResourceNotFoundException("Resource not found: " + getBody(response));
+        }
         if (!response.isSuccessful()) {
-            throw new IOException("Unexpected return code " + response);
+            throw new IOException("Unexpected return code " + response + ". " + getBody(response));
         }
     }
 

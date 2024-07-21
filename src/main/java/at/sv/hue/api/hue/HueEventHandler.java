@@ -49,11 +49,11 @@ public final class HueEventHandler implements BackgroundEventHandler {
                           .flatMap(container -> container.getData().stream())
                           .forEach(hueEvent -> {
                               if (hueEvent.isLightOrGroup() && hueEvent.isOffEvent()) {
-                                  lightEventListener.onLightOff(hueEvent.getId_v1());
+                                  lightEventListener.onLightOff(hueEvent.getId());
                               } else if (hueEvent.isLightOrGroup() && hueEvent.isOnEvent()) {
-                                  lightEventListener.onLightOn(hueEvent.getId_v1(), hueEvent.isPhysical());
+                                  lightEventListener.onLightOn(hueEvent.getId(), hueEvent.isPhysical());
                               } else if (hueEvent.isScene() && hueEvent.isSceneActivated()) {
-                                  sceneEventListener.onSceneActivated(hueEvent.getId_v1());
+                                  sceneEventListener.onSceneActivated(hueEvent.getId());
                               }
                           });
     }
@@ -82,6 +82,7 @@ public final class HueEventHandler implements BackgroundEventHandler {
         private String id_v1;
         private On on;
         private JsonNode status;
+        private Resource owner;
         private String type;
 
         private String getStatus() {
@@ -113,7 +114,7 @@ public final class HueEventHandler implements BackgroundEventHandler {
         }
 
         public boolean isGroup() {
-            return "grouped_light".equals(type) || id_v1 != null && id_v1.startsWith("/groups/");
+            return "grouped_light".equals(type);
         }
 
         public boolean isScene() {
@@ -135,6 +136,12 @@ public final class HueEventHandler implements BackgroundEventHandler {
         @Data
         private static final class On {
             private boolean on;
+        }
+
+        @Data
+        private static final class Resource {
+            String rid;
+            String rtype;
         }
     }
 }
