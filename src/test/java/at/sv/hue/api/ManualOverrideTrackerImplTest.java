@@ -67,6 +67,15 @@ class ManualOverrideTrackerImplTest {
         assertWasJustTurnedOn("1", false);
     }
 
+    @Test
+    void wasJustTurnedOn_resetAfterManuallyOverridden() {
+        tracker.onLightTurnedOn("1");
+
+        tracker.onManuallyOverridden("1");
+
+        assertWasJustTurnedOn("1", false);
+    }
+
     private void assertWasJustTurnedOn(String lightId, boolean expected) {
         assertThat(tracker.wasJustTurnedOn(lightId)).isEqualTo(expected);
     }

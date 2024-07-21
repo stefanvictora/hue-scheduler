@@ -5413,7 +5413,7 @@ class HueSchedulerTest {
     }
 
     @Test
-    void run_execution_lightsIsOff_doesNotMakeAnyCalls_checksEvenOnPowerOn() {
+    void run_execution_lightsIsOff_doesNotMakeAnyCalls_ignoresOffCheckOnPowerOn() {
         addKnownLightIdsWithDefaultCapabilities(2);
         addState(2, "00:00", "bri:" + DEFAULT_BRIGHTNESS);
         addState(2, "01:00", "bri:" + (DEFAULT_BRIGHTNESS + 10));
@@ -5425,28 +5425,21 @@ class HueSchedulerTest {
         mockIsLightOff(2, true);
         advanceTimeAndRunAndAssertPutCalls(firstState); // no put call
 
-        // first power on -> still considered off
+        // power on -> ignores off state
 
         List<ScheduledRunnable> powerOnRunnables = simulateLightOnEvent("/lights/2",
                 expectedPowerOnEnd(initialNow.plusHours(1))
         );
 
-        advanceTimeAndRunAndAssertPutCalls(powerOnRunnables.getFirst()); // bridge still says light is off
-
-        // second power on -> now on
-
-        List<ScheduledRunnable> powerOnRunnables2 = simulateLightOnEvent("/lights/2",
-                expectedPowerOnEnd(initialNow.plusHours(1))
+        advanceTimeAndRunAndAssertPutCalls(powerOnRunnables.getFirst(),
+                expectedPutCall(2).bri(DEFAULT_BRIGHTNESS)
         );
-
-        mockIsLightOff(2, false);
-        advanceTimeAndRunAndAssertPutCalls(powerOnRunnables2.getFirst(), expectedPutCall(2).bri(DEFAULT_BRIGHTNESS)); // now correctly called
 
         ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusHours(1)); // next day
 
-        advanceTimeAndRunAndAssertPutCalls(secondState, expectedPutCall(2).bri(DEFAULT_BRIGHTNESS + 10));
+        // second state, detects off again
 
-        ensureRunnable(initialNow.plusDays(1).plusHours(1), initialNow.plusDays(2)); // next day
+        advanceTimeAndRunAndAssertPutCalls(secondState);
     }
 
     @Test

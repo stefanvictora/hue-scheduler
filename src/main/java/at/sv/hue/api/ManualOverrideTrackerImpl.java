@@ -17,7 +17,9 @@ public class ManualOverrideTrackerImpl implements ManualOverrideTracker {
 
     @Override
     public void onManuallyOverridden(String id) {
-        getOrCreateTrackedState(id).setManuallyOverridden(true);
+        TrackedState trackedState = getOrCreateTrackedState(id);
+        trackedState.setManuallyOverridden(true);
+        trackedState.setJustTurnedOn(false);
     }
 
     @Override
