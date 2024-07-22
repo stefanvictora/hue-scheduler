@@ -22,6 +22,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import org.mockito.Mockito;
+import org.slf4j.MDC;
 
 import java.time.DayOfWeek;
 import java.time.Duration;
@@ -49,6 +50,7 @@ class HueSchedulerTest {
     private static final double DEFAULT_Y = 0.4311;
     private static final LightCapabilities NO_CAPABILITIES = LightCapabilities.builder().build();
     private final String sceneSyncName = "synced-scene";
+    private final String unsyncedSceneName = "user-scene";
     private final int sceneSyncInterpolationInterval = 1;
 
     private TestStateScheduler stateScheduler;
@@ -85,6 +87,7 @@ class HueSchedulerTest {
             throw new IllegalArgumentException("New time is before now: " + newTime);
         }
         if (!newTime.equals(now)) {
+            MDC.put("context", "test");
             log.info("New time: {} [+{}] ({})", newTime, Duration.between(now, newTime), DayOfWeek.from(newTime));
         }
         now = newTime;
@@ -332,7 +335,7 @@ class HueSchedulerTest {
     }
 
     private void mockLightCapabilities(String id, LightCapabilities capabilities) {
-        when(mockedHueApi.getLightIdentifier(id)).thenReturn(new Identifier(id, "light name"));
+        when(mockedHueApi.getLightIdentifier(id)).thenReturn(new Identifier(id, "test light"));
         when(mockedHueApi.getLightCapabilities(id)).thenReturn(capabilities);
     }
 
@@ -350,7 +353,7 @@ class HueSchedulerTest {
 
     private void mockGroupCapabilities(int id, LightCapabilities capabilities) {
         String groupId = "/groups/" + id;
-        when(mockedHueApi.getGroupIdentifier(groupId)).thenReturn(new Identifier(groupId, "group name"));
+        when(mockedHueApi.getGroupIdentifier(groupId)).thenReturn(new Identifier(groupId, "test group"));
         when(mockedHueApi.getGroupCapabilities(groupId)).thenReturn(capabilities);
     }
 
@@ -3416,7 +3419,7 @@ class HueSchedulerTest {
 
         assertThrows(InvalidPropertyValue.class, () -> addStateNow("1", "effect:effect"));
     }
-    
+
     @Test
     void parse_canHandleEffect_supportedEffect() {
         mockLightCapabilities("/lights/1", LightCapabilities.builder()
@@ -5494,6 +5497,53 @@ class HueSchedulerTest {
     }
 
     @Test
+    void sceneTurnedOn_syncedScene_insideIgnoreWindow_stillSchedulesState() {
+        enableUserModificationTracking();
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now, "bri:" + DEFAULT_BRIGHTNESS);
+        addState(1, now.plusMinutes(10), "bri:" + (DEFAULT_BRIGHTNESS + 10));
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+        );
+
+        setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS));
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
+        );
+
+        // simulate synced scene activated
+        simulateSyncedSceneActivated("/scenes/123456ABC", "/lights/1", "/lights/2");
+
+        // wait a bit, but still inside ignore window
+        advanceCurrentTime(Duration.ofSeconds(4));
+
+        ScheduledRunnable powerOnRunnable = simulateLightOnEvent("/lights/1",
+                expectedPowerOnEnd(initialNow.plusMinutes(10))
+        ).getFirst();
+
+        // modify current light state
+        setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS - 10));
+        advanceTimeAndRunAndAssertPutCalls(powerOnRunnable,
+                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS) // still applied, as just turned on and synced scene is ignored
+        );
+
+        setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS));
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(1),
+                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 10) // also second state is correctly applied
+        ); 
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)) // next day
+        );
+    }
+
+    @Test
     void sceneTurnedOn_containsLightOfGroupThatHasSchedule_ignoresGroup() {
         enableUserModificationTracking();
         addKnownLightIdsWithDefaultCapabilities(2);
@@ -5846,7 +5896,16 @@ class HueSchedulerTest {
     }
 
     private void simulateSceneActivated(String sceneId, String... containedLights) {
+        simulateSceneWithNameActivated(sceneId, unsyncedSceneName, containedLights);
+    }
+
+    private void simulateSyncedSceneActivated(String sceneId, String... containedLights) {
+        simulateSceneWithNameActivated(sceneId, sceneSyncName, containedLights);
+    }
+
+    private void simulateSceneWithNameActivated(String sceneId, String sceneName, String... containedLights) {
         when(mockedHueApi.getAffectedIdsByScene(sceneId)).thenReturn(Arrays.asList(containedLights));
+        when(mockedHueApi.getSceneName(sceneId)).thenReturn(sceneName);
 
         scheduler.getSceneEventListener().onSceneActivated(sceneId);
     }

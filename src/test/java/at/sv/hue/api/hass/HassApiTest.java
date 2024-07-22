@@ -1846,7 +1846,7 @@ public class HassApiTest {
     }
 
     @Test
-    void getAffectedIdsByScene_returnsIds() {
+    void getAffectedIdsByScene_getSceneName_returnsIds_andName() {
         setGetResponse("/states", """
                 [
                   {
@@ -1997,6 +1997,10 @@ public class HassApiTest {
         assertThat(api.getAffectedIdsByScene("scene.hue_scene")).containsExactly("light.wohnzimmer", "light.1", "light.3");
         assertThat(api.getAffectedIdsByScene("scene.hue_scene_broken1")).isEmpty();
         assertThat(api.getAffectedIdsByScene("scene.hue_scene_broken2")).isEmpty();
+
+        assertThat(api.getSceneName("scene.test_scene")).isEqualTo("Test Scene");
+        assertThat(api.getSceneName("scene.hue_scene")).isEqualTo("Wohnzimmer Miami");
+        assertThat(api.getSceneName("scene.unknown")).isNull();
     }
 
     @Test

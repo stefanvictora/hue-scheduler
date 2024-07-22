@@ -27,6 +27,10 @@ public class ScheduledStateSnapshot {
         return scheduledState.getId();
     }
 
+    public String getContextName() {
+        return scheduledState.getContextName();
+    }
+
     public ZonedDateTime getStart() {
         if (cachedStart == null) {
             cachedStart = scheduledState.getStart(definedStart);

@@ -208,6 +208,15 @@ public final class HueApiImpl implements HueApi {
     }
 
     @Override
+    public String getSceneName(String sceneId) {
+        Scene scene = getAvailableScenes().get(sceneId);
+        if (scene == null) {
+            return null;
+        }
+        return scene.getName();
+    }
+
+    @Override
     public List<String> getAffectedIdsByScene(String sceneId) {
         Scene scene = getAvailableScenes().get(sceneId);
         if (scene == null) {
@@ -260,7 +269,7 @@ public final class HueApiImpl implements HueApi {
     @Override
     public void createOrUpdateScene(String groupedLightId, PutCall putCall, String sceneSyncName) {
         rateLimiter.acquire(10);
-        log.trace("Sync scene for group '{}': {}", groupedLightId, putCall);
+        log.trace("Sync scene: {}", putCall);
 
         Light groupedLight = getAndAssertGroupedLightExists(groupedLightId);
         Group group = getAndAssertGroupExists(groupedLight.getOwner());
@@ -278,7 +287,8 @@ public final class HueApiImpl implements HueApi {
             String response = resourceProvider.postResource(createUrl("/scene"), getBody(newScene));
             availableScenesCache.invalidateAll();
         } else {
-            Scene updatedScene = new Scene(sceneSyncName, null, sceneActions);
+            // todo: we could check if the actions actually differ from the current scene actions -> and only then update
+            Scene updatedScene = new Scene(sceneActions);
             String response = resourceProvider.putResource(createUrl("/scene/" + scene.getId()), getBody(updatedScene));
         }
     }
@@ -388,14 +398,6 @@ public final class HueApiImpl implements HueApi {
         Group group = getAvailableZones().get(groupId);
         if (group == null) {
             throw new GroupNotFoundException("Zone with id '" + groupId + "' was not found!");
-        }
-        return group;
-    }
-
-    private Group getAndAssertGroupExists(String groupId) { // todo: get rid of this
-        Group group = getAvailableGroups().get(groupId);
-        if (group == null) {
-            throw new GroupNotFoundException("Group with id '" + groupId + "' not found.");
         }
         return group;
     }

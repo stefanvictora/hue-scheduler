@@ -168,6 +168,15 @@ public class HassApiImpl implements HueApi {
     }
 
     @Override
+    public String getSceneName(String sceneId) {
+        State scene = getOrLookupStates().get(sceneId);
+        if (scene == null) {
+            return null;
+        }
+        return scene.attributes.friendly_name;
+    }
+
+    @Override
     public List<String> getAffectedIdsByScene(String sceneId) {
         State scene = getOrLookupStates().get(sceneId);
         if (scene == null) {

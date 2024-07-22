@@ -856,7 +856,14 @@ class HueApiTest {
     }
 
     @Test
-    void getAffectedIdsByScene_returnsLightIdsAndGroupLightId_correctIdsAffectedByScene() {
+    void getSceneName_sceneNotFound_returnsNull() {
+        setGetResponse("/scene", EMPTY_RESPONSE);
+
+        assertThat(api.getSceneName("123456789")).isNull();
+    }
+
+    @Test
+    void getAffectedIdsByScene_getSceneName_returnsLightIdsAndGroupLightId_correctIdsAffectedByScene() {
         setGetResponse("/room", """
                 {
                   "errors": [],
@@ -1040,6 +1047,9 @@ class HueApiTest {
         assertThat(api.getAffectedIdsByScene("f96f02db-9765-401c-9aa5-86d59fbdde8e"))
                 .containsExactly("1aa6083d-3692-49e5-92f7-b926b302dd49", "1271bf6f-be63-42fc-b18c-3ad462914d8e",
                         "eeb336d9-243b-4756-8455-1c69f50efd31");
+
+        assertThat(api.getSceneName("4b5a905c-cc5e-48be-bc15-84da7deb5da7")).isEqualTo("Scene_1");
+        assertThat(api.getSceneName("f96f02db-9765-401c-9aa5-86d59fbdde8e")).isEqualTo("Scene_2");
     }
 
     @Test
@@ -3036,9 +3046,6 @@ class HueApiTest {
 
         verifyPut("/scene/4b5a905c-cc5e-48be-bc15-84da7deb5da7", """
                 {
-                  "metadata": {
-                    "name": "Scene_1"
-                  },
                   "actions": [
                     {
                       "target": {
@@ -3100,9 +3107,6 @@ class HueApiTest {
 
         verifyPut("/scene/f96f02db-9765-401c-9aa5-86d59fbdde8e", """
                 {
-                  "metadata": {
-                    "name": "Scene_3"
-                  },
                   "actions": [
                     {
                       "target": {

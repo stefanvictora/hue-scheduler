@@ -196,7 +196,7 @@ public final class HueScheduler implements Runnable {
         this.api = api;
         ZonedDateTime initialTime = currentTime.get();
         this.sceneEventListener = new SceneEventListenerImpl(api,
-                () -> Duration.between(initialTime, currentTime.get()).toNanos(), sceneActivationIgnoreWindowInSeconds);
+                sceneSyncName, () -> Duration.between(initialTime, currentTime.get()).toNanos(), sceneActivationIgnoreWindowInSeconds);
         this.stateScheduler = stateScheduler;
         this.startTimeProvider = startTimeProvider;
         this.currentTime = currentTime;
@@ -256,7 +256,7 @@ public final class HueScheduler implements Runnable {
                 .build();
         RateLimiter rateLimiter = RateLimiter.create(requestsPerSecond);
         api = new HassApiImpl(apiHost, new HttpResourceProviderImpl(httpClient), rateLimiter);
-        sceneEventListener = new SceneEventListenerImpl(api, Ticker.systemTicker(), sceneActivationIgnoreWindowInSeconds);
+        sceneEventListener = new SceneEventListenerImpl(api, sceneSyncName, Ticker.systemTicker(), sceneActivationIgnoreWindowInSeconds);
         new HassEventStreamReader(HassApiUtils.getHassWebsocketOrigin(apiHost), accessToken, httpClient,
                 new HassEventHandler(lightEventListener, sceneEventListener)).start();
     }
@@ -265,7 +265,7 @@ public final class HueScheduler implements Runnable {
         OkHttpClient httpsClient = createHueHttpsClient();
         RateLimiter rateLimiter = RateLimiter.create(requestsPerSecond);
         api = new HueApiImpl(new HttpResourceProviderImpl(httpsClient), apiHost, rateLimiter, apiCacheInvalidationIntervalInMinutes);
-        sceneEventListener = new SceneEventListenerImpl(api, Ticker.systemTicker(), sceneActivationIgnoreWindowInSeconds);
+        sceneEventListener = new SceneEventListenerImpl(api, sceneSyncName, Ticker.systemTicker(), sceneActivationIgnoreWindowInSeconds);
         new HueEventStreamReader(apiHost, accessToken, httpsClient, new HueEventHandler(lightEventListener, sceneEventListener),
                 eventStreamReadTimeoutInMinutes).start();
     }
@@ -534,6 +534,7 @@ public final class HueScheduler implements Runnable {
     private void scheduleNextSceneSync(ScheduledStateSnapshot stateSnapshot) {
         ZonedDateTime end = stateSnapshot.getEnd();
         stateScheduler.schedule(() -> {
+            MDC.put("context", stateSnapshot.getContextName() + " (scene sync)");
             if (currentTime.get().isAfter(end)) {
                 return;
             }

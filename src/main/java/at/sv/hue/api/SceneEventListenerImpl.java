@@ -13,10 +13,12 @@ import java.util.List;
 public final class SceneEventListenerImpl implements SceneEventListener {
 
     private final HueApi hueApi;
+    private final String sceneSyncName;
     private final Cache<String, String> recentlyAffectedIds;
 
-    public SceneEventListenerImpl(HueApi hueApi, Ticker ticker, int ignoreWindowInSeconds) {
+    public SceneEventListenerImpl(HueApi hueApi, String sceneSyncName, Ticker ticker, int ignoreWindowInSeconds) {
         this.hueApi = hueApi;
+        this.sceneSyncName = sceneSyncName;
         recentlyAffectedIds = Caffeine.newBuilder()
                                       .ticker(ticker)
                                       .expireAfterWrite(Duration.ofSeconds(ignoreWindowInSeconds))
@@ -26,6 +28,11 @@ public final class SceneEventListenerImpl implements SceneEventListener {
     @Override
     public void onSceneActivated(String id) {
         MDC.put("context", "scene-on-event " + id);
+        String sceneName = hueApi.getSceneName(id);
+        if (sceneSyncName.equals(sceneName)) {
+            return;
+        }
+        MDC.put("context", "scene-on-event " + sceneName);
         List<String> sceneLights = hueApi.getAffectedIdsByScene(id);
         sceneLights.forEach(lightId -> recentlyAffectedIds.put(lightId, lightId));
         sceneLights.stream()
