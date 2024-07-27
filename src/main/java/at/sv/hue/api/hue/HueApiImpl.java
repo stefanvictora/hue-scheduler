@@ -51,9 +51,9 @@ public final class HueApiImpl implements HueApi {
     private final String baseApi;
     private final RateLimiter rateLimiter;
     private final LoadingCache<String, Map<String, Light>> availableLightsCache;
-    private final LoadingCache<String, Map<String, Scene>> availableScenesCache;
     private final LoadingCache<String, Map<String, Device>> availableDevicesCache;
     private final LoadingCache<String, Map<String, Light>> availableGroupedLightsCache;
+    private final LoadingCache<String, Map<String, Scene>> availableScenesCache;
     private final LoadingCache<String, Map<String, Group>> availableZonesCache;
     private final LoadingCache<String, Map<String, Group>> availableRoomsCache;
 
@@ -66,10 +66,10 @@ public final class HueApiImpl implements HueApi {
         assertNotHttpSchemeProvided(host);
         baseApi = "https://" + host + "/clip/v2/resource";
         this.rateLimiter = rateLimiter;
-        availableScenesCache = createCache(this::lookupScenes, apiCacheInvalidationIntervalInMinutes);
-        availableDevicesCache = createCache(this::lookupDevices, apiCacheInvalidationIntervalInMinutes);
         availableLightsCache = createCache(this::lookupLights, apiCacheInvalidationIntervalInMinutes);
+        availableDevicesCache = createCache(this::lookupDevices, apiCacheInvalidationIntervalInMinutes);
         availableGroupedLightsCache = createCache(this::lookupGroupedLights, apiCacheInvalidationIntervalInMinutes);
+        availableScenesCache = createCache(this::lookupScenes, apiCacheInvalidationIntervalInMinutes);
         availableZonesCache = createCache(this::lookupZones, apiCacheInvalidationIntervalInMinutes);
         availableRoomsCache = createCache(this::lookupRooms, apiCacheInvalidationIntervalInMinutes);
     }
@@ -528,6 +528,20 @@ public final class HueApiImpl implements HueApi {
                                 .filter(Objects::nonNull)
                                 .max(Integer::compareTo)
                                 .orElse(null);
+    }
+
+    @Override
+    public void onModification(String type, String id) {
+        log.trace("Detected modification '{}' '{}'", type, id);
+        // todo: maybe switch to different caching logic so we can invalidate individual entries instead of the full cache
+        switch (type) {
+            case "light" -> availableLightsCache.invalidateAll();
+            case "grouped_light" -> availableGroupedLightsCache.invalidateAll();
+            case "scene" -> availableScenesCache.invalidateAll();
+            case "device" -> availableDevicesCache.invalidateAll();
+            case "zone" -> availableZonesCache.invalidateAll();
+            case "room" -> availableRoomsCache.invalidateAll();
+        }
     }
 
     private interface DataListContainer<T> {

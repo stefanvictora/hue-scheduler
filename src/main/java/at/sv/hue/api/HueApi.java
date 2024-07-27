@@ -2,7 +2,7 @@ package at.sv.hue.api;
 
 import java.util.List;
 
-public interface HueApi {
+public interface HueApi extends ResourceModificationEventListener {
     /**
      * @throws BridgeConnectionFailure     if the bridge could not be reached
      * @throws BridgeAuthenticationFailure if the bridge rejected the request due to an unauthorized username

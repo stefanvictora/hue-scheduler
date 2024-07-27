@@ -152,7 +152,7 @@ public final class HueScheduler implements Runnable {
     int eventStreamReadTimeoutInMinutes;
     @Option(
             names = "--api-cache-invalidation-interval", paramLabel = "<interval>",
-            defaultValue = "${env:API_CACHE_INVALIDATION_INTERVAL:-15}",
+            defaultValue = "${env:API_CACHE_INVALIDATION_INTERVAL:-30}",
             description = "The interval in which the api cache for groups and lights should be invalidated. " +
                           "Default: ${DEFAULT-VALUE} minutes."
     )
@@ -266,7 +266,7 @@ public final class HueScheduler implements Runnable {
         RateLimiter rateLimiter = RateLimiter.create(requestsPerSecond);
         api = new HueApiImpl(new HttpResourceProviderImpl(httpsClient), apiHost, rateLimiter, apiCacheInvalidationIntervalInMinutes);
         sceneEventListener = new SceneEventListenerImpl(api, sceneSyncName, Ticker.systemTicker(), sceneActivationIgnoreWindowInSeconds);
-        new HueEventStreamReader(apiHost, accessToken, httpsClient, new HueEventHandler(lightEventListener, sceneEventListener),
+        new HueEventStreamReader(apiHost, accessToken, httpsClient, new HueEventHandler(lightEventListener, sceneEventListener, api),
                 eventStreamReadTimeoutInMinutes).start();
     }
 
@@ -841,6 +841,7 @@ public final class HueScheduler implements Runnable {
     }
 
     private void scheduleApiCacheClear() {
+        // todo: remove when all api clients support event based cache invalidation
         stateScheduler.scheduleAtFixedRate(
                 api::clearCaches, apiCacheInvalidationIntervalInMinutes, apiCacheInvalidationIntervalInMinutes, TimeUnit.MINUTES);
         stateScheduler.scheduleAtFixedRate(

@@ -467,6 +467,11 @@ public class HassApiImpl implements HueApi {
         }
     }
 
+    @Override
+    public void onModification(String type, String id) {
+        // todo
+    }
+
     @Data
     private static final class ChangeState {
         String entity_id;
