@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 
@@ -3405,12 +3406,14 @@ class HueSchedulerTest {
     }
 
     @Test
-    void parse_effect_unsupportedValue_exception() {
+    void parse_effect_unsupportedValue_exception_listsValidValues() {
         mockLightCapabilities("/lights/1", LightCapabilities.builder()
-                                                            .effects(List.of("effect"))
+                                                            .effects(List.of("effect1", "effect2"))
                                                             .build());
 
-        assertThrows(InvalidPropertyValue.class, () -> addStateNow("1", "effect:INVALID"));
+        assertThatThrownBy(() -> addStateNow("1", "effect:INVALID"))
+                .isInstanceOf(InvalidPropertyValue.class)
+                .hasMessage("Unsupported value for effect property: 'INVALID'. Supported effects: [effect1, effect2]");
     }
 
     @Test

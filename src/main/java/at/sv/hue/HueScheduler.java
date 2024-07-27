@@ -463,7 +463,8 @@ public final class HueScheduler implements Runnable {
                 syncScene(snapshot);
             }
             try {
-                if (wasNotJustTurnedOn(snapshot) && (lightHasBeenManuallyOverriddenBefore(snapshot) || lightIsOffAndDoesNotTurnOn(snapshot))) {
+                if (wasNotJustTurnedOn(snapshot) &&
+                    (lightHasBeenManuallyOverriddenBefore(snapshot) || lightIsOffAndDoesNotTurnOn(snapshot))) {
                     if (shouldRetryOnPowerOn(snapshot)) {
                         LOG.info("Off or manually overridden: Skip update and retry when back online");
                         retryWhenBackOn(state);

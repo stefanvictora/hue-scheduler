@@ -19,6 +19,7 @@ import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
 import java.util.Arrays;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Set;
 import java.util.function.BiFunction;
 
@@ -142,14 +143,16 @@ final class ScheduledState {
         if (groupState) {
             throw new InvalidPropertyValue("Effects are not supported by groups.");
         }
-        if (capabilities.getEffects() == null) {
+        List<String> supportedEffects = capabilities.getEffects();
+        if (supportedEffects == null) {
             throw new InvalidPropertyValue("Light does not support any effects.");
         }
         if (effect.equals("none")) {
             return effect;
         }
-        if (!capabilities.getEffects().contains(effect)) {
-            throw new InvalidPropertyValue("Unsupported value for effect property: '" + effect + "'");
+        if (!supportedEffects.contains(effect)) {
+            throw new InvalidPropertyValue("Unsupported value for effect property: '" + effect + "'." +
+                                           " Supported effects: " + supportedEffects);
         }
         return effect;
     }
