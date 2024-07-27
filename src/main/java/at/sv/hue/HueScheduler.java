@@ -462,17 +462,17 @@ public final class HueScheduler implements Runnable {
             if (shouldSyncScene(snapshot)) {
                 syncScene(snapshot);
             }
-            if (wasNotJustTurnedOn(snapshot) && (lightHasBeenManuallyOverriddenBefore(snapshot) || lightIsOffAndDoesNotTurnOn(snapshot))) {
-                if (shouldRetryOnPowerOn(snapshot)) {
-                    LOG.info("Off or manually overridden: Skip update and retry when back online");
-                    retryWhenBackOn(state);
-                } else {
-                    LOG.info("Off or manually overridden: Skip state for this day.");
-                    reschedule(state);
-                }
-                return;
-            }
             try {
+                if (wasNotJustTurnedOn(snapshot) && (lightHasBeenManuallyOverriddenBefore(snapshot) || lightIsOffAndDoesNotTurnOn(snapshot))) {
+                    if (shouldRetryOnPowerOn(snapshot)) {
+                        LOG.info("Off or manually overridden: Skip update and retry when back online");
+                        retryWhenBackOn(state);
+                    } else {
+                        LOG.info("Off or manually overridden: Skip state for this day.");
+                        reschedule(state);
+                    }
+                    return;
+                }
                 if (shouldTrackUserModification(snapshot) &&
                     (turnedOnThroughScene(snapshot) || stateHasBeenManuallyOverriddenSinceLastSeen(snapshot))) {
                     LOG.info("Manually overridden or scene turn-on: Pause updates until turned off and on again");
@@ -513,8 +513,14 @@ public final class HueScheduler implements Runnable {
 
     private void syncScene(ScheduledStateSnapshot state) {
         Interpolation interpolation = getInterpolatedPutCallIfNeeded(state);
-        syncScene(state.getId(), getScenePutCall(state, interpolation));
-        if (interpolation != null) {
+        try {
+            syncScene(state.getId(), getScenePutCall(state, interpolation));
+            if (interpolation != null) {
+                scheduleNextSceneSync(state);
+            }
+        } catch (Exception e) {
+            LOG.error("Scene sync failed: '{}'. Retry in {}min", e.getLocalizedMessage(),
+                    sceneSyncInterpolationIntervalInMinutes);
             scheduleNextSceneSync(state);
         }
     }

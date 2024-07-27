@@ -4188,7 +4188,7 @@ class HueSchedulerTest {
         ScheduledRunnable scheduledRunnable = startWithDefaultState();
 
         mockPutStateThrowable(new ApiFailure("Invalid response"));
-        setCurrentTimeToAndRun(scheduledRunnable); // failes but retries
+        setCurrentTimeToAndRun(scheduledRunnable); // fails but retries
 
         ScheduledRunnable retryState = ensureConnectionFailureRetryState();
 
@@ -5446,6 +5446,35 @@ class HueSchedulerTest {
     }
 
     @Test
+    void run_execution_lightOffCheck_connectionFailure_retries() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, "00:00", "bri:" + DEFAULT_BRIGHTNESS);
+        addState(1, "01:00", "bri:" + (DEFAULT_BRIGHTNESS + 10));
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(2);
+        ScheduledRunnable firstState = scheduledRunnables.get(0);
+        ScheduledRunnable secondState = scheduledRunnables.get(1);
+
+        // simulate light off call to fail
+        when(mockedHueApi.isLightOff("/lights/1")).thenThrow(new BridgeConnectionFailure("Connection error"));
+
+        advanceTimeAndRunAndAssertPutCalls(firstState); // no put call
+
+        // creates retry state
+        ScheduledRunnable retryState = ensureConnectionFailureRetryState();
+
+        // reset mock and retry -> now successful
+        resetMockedApi();
+        mockIsLightOff("/lights/1", false);
+
+        advanceTimeAndRunAndAssertPutCalls(retryState,
+                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS)
+        );
+
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusHours(1)); // next day
+    }
+
+    @Test
     void sceneTurnedOn_containsLightThatHaveSchedules_insideSceneIgnoreWindow_doesNotApplySchedules() {
         enableUserModificationTracking();
         addKnownLightIdsWithDefaultCapabilities(2);
@@ -5536,7 +5565,7 @@ class HueSchedulerTest {
         setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS));
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(1),
                 expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 10) // also second state is correctly applied
-        ); 
+        );
 
         ensureScheduledStates(
                 expectedRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)) // next day
@@ -5853,6 +5882,67 @@ class HueSchedulerTest {
     // todo: test already ended of sync call for long durations aka split calls; the end calculation is not bound to the snapshot yet
 
     @Test
+    void sceneSync_apiThrowsError_doesNotSkipSchedule_retriesSync() {
+        enableSceneSync();
+
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 5, 6);
+        addState("g1", now, "bri:100");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1))
+        );
+
+        // Let scene sync fail -> schedules a retry
+        mockSceneSyncFailure("/groups/1");
+
+        // Schedule updates group normally
+        advanceTimeAndRunAndAssertPutCalls(runnables.getFirst(),
+                expectedGroupPutCall(1).bri(100)
+        );
+
+        List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(
+                expectedRunnable(now.plusMinutes(sceneSyncInterpolationInterval), now.plusDays(1)), // sync retry
+                expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
+        );
+        ScheduledRunnable retrySync = followUpRunnables.getFirst();
+
+        resetMockedApi();
+
+        setCurrentTimeTo(retrySync);
+        retrySync.run();
+
+        assertSceneUpdate("/groups/1", expectedGroupPutCall(1).bri(100));
+    }
+
+    @Test
+    void sceneSync_apiThrowsError_interpolate_noAdditionalRetry() {
+        enableSceneSync();
+
+        mockDefaultGroupCapabilities(2);
+        mockGroupLightsForId(2, 5, 6);
+        addState("g2", now, "bri:100");
+        addState("g2", now.plusMinutes(10), "bri:150", "interpolate:true");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1)),
+                expectedRunnable(now.plusDays(1), now.plusDays(1))
+        );
+
+        mockSceneSyncFailure("/groups/2");
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.getFirst(),
+                expectedGroupPutCall(2).bri(100),
+                expectedGroupPutCall(2).bri(150).transitionTime(tr("10min"))
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusMinutes(1), now.plusDays(1)), // scene sync schedule; no additional retry
+                expectedRunnable(initialNow.plusDays(1), initialNow.plusDays(2)) // next day
+        );
+    }
+
+    @Test
     void sceneSync_lightState_ignored() {
         enableSceneSync();
 
@@ -5958,6 +6048,10 @@ class HueSchedulerTest {
 
     private void assertSceneUpdate(String groupId, PutCall.PutCallBuilder expectedPutCall) {
         verify(mockedHueApi).createOrUpdateScene(groupId, expectedPutCall.build(), sceneSyncName);
+    }
+
+    private void mockSceneSyncFailure(String groupId) {
+        doThrow(ApiFailure.class).when(mockedHueApi).createOrUpdateScene(eq(groupId), any(), eq(sceneSyncName));
     }
 
     @RequiredArgsConstructor

@@ -8,7 +8,6 @@ import at.sv.hue.api.GroupNotFoundException;
 import at.sv.hue.api.HttpResourceProvider;
 import at.sv.hue.api.HueApi;
 import at.sv.hue.api.Identifier;
-import at.sv.hue.api.InvalidConnectionException;
 import at.sv.hue.api.LightCapabilities;
 import at.sv.hue.api.LightNotFoundException;
 import at.sv.hue.api.LightState;
@@ -274,7 +273,7 @@ public final class HueApiImpl implements HueApi {
         Light groupedLight = getAndAssertGroupedLightExists(groupedLightId);
         Group group = getAndAssertGroupExists(groupedLight.getOwner());
         Scene scene = getScene(group, sceneSyncName);
-        Action action = getActionForScene(putCall);
+        Action action = getSceneAction(putCall);
 
         // todo: we need to make sure that the lights support the action passed to it -> we can't set color to CT only lights
         //  the API call will actually fail
@@ -293,7 +292,7 @@ public final class HueApiImpl implements HueApi {
         }
     }
 
-    private Action getActionForScene(PutCall putCall) {
+    private Action getSceneAction(PutCall putCall) {
         Action action = getAction(putCall);
         action.setOn(new On(true));
         return action;

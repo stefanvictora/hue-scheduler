@@ -75,7 +75,6 @@ public interface HueApi {
     List<String> getGroupLights(String groupId);
 
     /**
-     *
      * @return the name of the scene with the given ID. Null if scene not found.
      * @throws ApiFailure if the api call failed
      */

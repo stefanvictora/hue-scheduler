@@ -10,7 +10,6 @@ import at.sv.hue.api.GroupNotFoundException;
 import at.sv.hue.api.HttpResourceProvider;
 import at.sv.hue.api.HueApi;
 import at.sv.hue.api.Identifier;
-import at.sv.hue.api.InvalidConnectionException;
 import at.sv.hue.api.LightCapabilities;
 import at.sv.hue.api.LightNotFoundException;
 import at.sv.hue.api.LightState;
