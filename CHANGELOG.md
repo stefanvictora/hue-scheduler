@@ -13,6 +13,7 @@
 
 ### Changed
 - Fully switched to Hue APIv2
+- Improved error handling for lookups.
 
 ### Removed
 - Due to Hue APIv2 limitations, effects can't be applied to groups anymore.

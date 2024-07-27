@@ -92,6 +92,36 @@ class ScheduledStateTest {
     }
 
     @Test
+    void lightStateDiffers_ct_differentColorTemperature_belowThreshold_false() {
+        ScheduledState scheduledState = scheduledState().ct(200)
+                                                        .capabilities(defaultCapabilities)
+                                                        .build();
+        LightState lightState = LightState.builder()
+                                          .on(true)
+                                          .colorTemperature(204)
+                                          .colormode(ColorMode.CT)
+                                          .lightCapabilities(COLOR_TEMPERATURE_LIGHT)
+                                          .build();
+
+        assertLightStateDiffers(scheduledState, lightState, false);
+    }
+
+    @Test
+    void lightStateDiffers_ct_differentColorTemperature_aboveThreshold_false() {
+        ScheduledState scheduledState = scheduledState().ct(200)
+                                                        .capabilities(defaultCapabilities)
+                                                        .build();
+        LightState lightState = LightState.builder()
+                                          .on(true)
+                                          .colorTemperature(205)
+                                          .colormode(ColorMode.CT)
+                                          .lightCapabilities(COLOR_TEMPERATURE_LIGHT)
+                                          .build();
+
+        assertLightStateDiffers(scheduledState, lightState, true);
+    }
+
+    @Test
     void lightStateDiffers_ct_sameColorTemperature_differentBrightness_true() {
         ScheduledState scheduledState = scheduledState().ct(200)
                                                         .brightness(1)
