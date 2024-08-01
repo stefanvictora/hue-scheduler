@@ -19,6 +19,7 @@ public class ScheduledStateSnapshot {
     @Getter
     private final ZonedDateTime definedStart;
     private ZonedDateTime cachedStart;
+    private ZonedDateTime cachedEnd;
     @Setter
     @Getter
     private ScheduledStateSnapshot previousState;
@@ -38,8 +39,14 @@ public class ScheduledStateSnapshot {
         return cachedStart;
     }
 
+    /**
+     * Warning: the end time for a snapshot needs to be initially fetched once before rescheduling the underlying state
+     */
     public ZonedDateTime getEnd() {
-        return scheduledState.getEnd(); // todo: this seems not right; as it will change and not be a snapshot
+        if (cachedEnd == null) {
+            cachedEnd = scheduledState.getEnd();
+        }
+        return cachedEnd;
     }
 
     public boolean hasTransitionBefore() {
