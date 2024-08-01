@@ -483,12 +483,8 @@ public final class HueScheduler implements Runnable {
                 }
                 putAdditionalInterpolatedStateIfNeeded(snapshot);
                 putState(snapshot);
-            } catch (BridgeConnectionFailure e) {
-                LOG.warn("Api not reachable, retrying in {}s.", bridgeFailureRetryDelayInSeconds);
-                retry(state, getMs(bridgeFailureRetryDelayInSeconds));
-                return;
-            } catch (ApiFailure e) {
-                LOG.error("Api call failed: '{}'. Retrying in {}s.", e.getLocalizedMessage(), bridgeFailureRetryDelayInSeconds);
+            } catch (BridgeConnectionFailure | ApiFailure e) {
+                logException(e);
                 retry(state, getMs(bridgeFailureRetryDelayInSeconds));
                 return;
             }
@@ -806,6 +802,14 @@ public final class HueScheduler implements Runnable {
 
     private boolean shouldEnsureGap(ScheduledStateSnapshot nextState) {
         return !disableUserModificationTracking && !nextState.isForced() && !nextState.isNullState();
+    }
+
+    private void logException(RuntimeException e) {
+        if (e instanceof BridgeConnectionFailure) {
+            LOG.warn("Api not reachable, retrying in {}s.", bridgeFailureRetryDelayInSeconds);
+        } else {
+            LOG.error("Api call failed: '{}'. Retrying in {}s.", e.getLocalizedMessage(), bridgeFailureRetryDelayInSeconds);
+        }
     }
 
     private void retry(ScheduledState state, long delayInMs) {
