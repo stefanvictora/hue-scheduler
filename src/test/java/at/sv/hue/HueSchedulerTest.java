@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import org.mockito.Mockito;
@@ -2959,6 +2960,22 @@ class HueSchedulerTest {
         ensureRunnable(initialNow.plusDays(1).minusMinutes(10), initialNow.plusDays(2).minusMinutes(40));
     }
 
+    @Disabled
+    @Test
+    void parse_transitionTimeBefore_multipleStates_usesFullPictureForInterpolation() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now, "ct:200");
+        addState(1, now.plusMinutes(10), "bri:200");
+        addState(1, now.plusMinutes(20), "ct:250", "tr-before:5min");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusMinutes(15)),
+                expectedRunnable(now.plusMinutes(15), now.plusDays(1))
+        );
+
+    }
+
     @Test
     void parse_weekdayScheduling_todayIsMonday_stateOnlyOnMonday_normallyScheduled() {
         addKnownLightIdsWithDefaultCapabilities(1);
@@ -5892,7 +5909,145 @@ class HueSchedulerTest {
         syncRunnable2.run(); // already ended, no additional sync
     }
 
-    // todo: test already ended of sync call for long durations aka split calls; the end calculation is not bound to the snapshot yet
+    @Test
+    void sceneSync_sceneUpdateConsidersFullPicture_usesMissingPropertiesFromPreviousStates_alsoForLightOn() {
+        enableSceneSync();
+
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 5, 6);
+        addState("g1", now, "bri:100", "ct:500");
+        addState("g1", now.plusMinutes(10), "bri:150");
+        addState("g1", now.plusMinutes(20), "x:0.5", "y:0.6");
+        addState("g1", now.plusMinutes(30), "x:0.8", "y:0.9");
+        addState("g1", now.plusMinutes(40), "bri:200");
+        addState("g1", now.plusMinutes(50), "hue:65535", "sat:254");
+        addState("g1", now.plusMinutes(60), "hue:50000", "sat:100");
+        addState("g1", now.plusMinutes(70), "bri:250");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusMinutes(20)),
+                expectedRunnable(now.plusMinutes(20), now.plusMinutes(30)),
+                expectedRunnable(now.plusMinutes(30), now.plusMinutes(40)),
+                expectedRunnable(now.plusMinutes(40), now.plusMinutes(50)),
+                expectedRunnable(now.plusMinutes(50), now.plusMinutes(60)),
+                expectedRunnable(now.plusMinutes(60), now.plusMinutes(70)),
+                expectedRunnable(now.plusMinutes(70), now.plusDays(1))
+        );
+
+        // state 1
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.getFirst(),
+                expectedGroupPutCall(1).bri(100).ct(500)
+        );
+
+        assertSceneUpdate("/groups/1", expectedGroupPutCall(1).bri(100).ct(500));
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
+        );
+
+        ScheduledRunnable lightOn1 = simulateLightOnEvent("/groups/1",
+                expectedPowerOnEnd(initialNow.plusMinutes(10))
+        ).getFirst();
+
+        advanceTimeAndRunAndAssertPutCalls(lightOn1,
+                expectedGroupPutCall(1).bri(100).ct(500)
+        );
+
+        // state 2
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.get(1),
+                expectedGroupPutCall(1).bri(150) // only bri
+        );
+
+        assertSceneUpdate("/groups/1", expectedGroupPutCall(1).bri(150).ct(500)); // with additional ct from previous state
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(1).plusMinutes(20)) // next day
+        );
+
+        ScheduledRunnable lightOn2 = simulateLightOnEvent("/groups/1",
+                expectedPowerOnEnd(initialNow.plusMinutes(10)), // already ended
+                expectedPowerOnEnd(initialNow.plusMinutes(20))
+        ).get(1);
+
+        advanceTimeAndRunAndAssertPutCalls(lightOn2,
+                expectedGroupPutCall(1).bri(150).ct(500) // light on also uses full picture
+        );
+
+        // state 3
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.get(2),
+                expectedGroupPutCall(1).x(0.5).y(0.6) // only xy
+        );
+
+        assertSceneUpdate("/groups/1", expectedGroupPutCall(1).bri(150).x(0.5).y(0.6)); // with additional bri but ignored ct from previous state
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusDays(1).plusMinutes(20), initialNow.plusDays(1).plusMinutes(30)) // next day
+        );
+
+        // state 4
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.get(3),
+                expectedGroupPutCall(1).x(0.8).y(0.9) // only xy
+        );
+
+        assertSceneUpdate("/groups/1", expectedGroupPutCall(1).bri(150).x(0.8).y(0.9));
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusDays(1).plusMinutes(30), initialNow.plusDays(1).plusMinutes(40)) // next day
+        );
+
+        // state 5
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.get(4),
+                expectedGroupPutCall(1).bri(200) // only bri
+        );
+
+        assertSceneUpdate("/groups/1", expectedGroupPutCall(1).bri(200).x(0.8).y(0.9)); // with additional xy from previous state
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusDays(1).plusMinutes(40), initialNow.plusDays(1).plusMinutes(50)) // next day
+        );
+
+        // state 6
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.get(5),
+                expectedGroupPutCall(1).hue(65535).sat(254) // only hue/sat
+        );
+
+        assertSceneUpdate("/groups/1", expectedGroupPutCall(1).bri(200).hue(65535).sat(254)); // ignores xy from previous state
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusDays(1).plusMinutes(50), initialNow.plusDays(1).plusMinutes(60)) // next day
+        );
+
+        // state 7
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.get(6),
+                expectedGroupPutCall(1).hue(50000).sat(100) // only hue/sat
+        );
+
+        assertSceneUpdate("/groups/1", expectedGroupPutCall(1).bri(200).hue(50000).sat(100)); // ignores hue sat from previous state
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusDays(1).plusMinutes(60), initialNow.plusDays(1).plusMinutes(70)) // next day
+        );
+
+        // state 8
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.get(7),
+                expectedGroupPutCall(1).bri(250) // only bri
+        );
+
+        assertSceneUpdate("/groups/1", expectedGroupPutCall(1).bri(250).hue(50000).sat(100)); // with additional hue/sat from previous state
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusDays(1).plusMinutes(70), initialNow.plusDays(2)) // next day
+        );
+    }
 
     @Test
     void sceneSync_apiThrowsError_doesNotSkipSchedule_retriesSync() {

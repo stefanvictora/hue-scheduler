@@ -289,8 +289,8 @@ final class ScheduledState {
     }
 
     private boolean hasNoOverlappingProperties(ScheduledStateSnapshot previousState) {
-        PutCall previousPutCall = previousState.getPutCall(null);
-        return StateInterpolator.hasNoOverlappingProperties(previousPutCall, getPutCall(null));
+        PutCall previousPutCall = previousState.getPutCall(null); // todo: refactor to use full picture
+        return StateInterpolator.hasNoOverlappingProperties(previousPutCall, getPutCall(null, lastDefinedStart));
     }
 
     private int getTimeUntilPreviousState(ZonedDateTime previousStateDefinedStart, ZonedDateTime definedStart) {
@@ -452,10 +452,6 @@ final class ScheduledState {
 
     public boolean isForced() {
         return force == Boolean.TRUE;
-    }
-
-    public PutCall getPutCall(ZonedDateTime now) {
-        return getPutCall(now, lastDefinedStart);
     }
 
     public PutCall getPutCall(ZonedDateTime now, ZonedDateTime definedStart) {

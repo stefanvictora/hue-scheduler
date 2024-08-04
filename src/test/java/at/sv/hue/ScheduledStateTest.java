@@ -909,7 +909,8 @@ class ScheduledStateTest {
     }
 
     private static void assertLightStateDiffers(ScheduledState scheduledState, LightState lightState, boolean expected) {
-        scheduledState.setLastPutCall(scheduledState.getPutCall(ZonedDateTime.now())); // fake last execution
+        ZonedDateTime now = ZonedDateTime.now();
+        scheduledState.setLastPutCall(scheduledState.getPutCall(now, now)); // fake last execution
         assertThat(scheduledState.lightStateDiffers(lightState)).isEqualTo(expected);
     }
 }
