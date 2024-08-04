@@ -1,6 +1,7 @@
 package at.sv.hue.api.hue;
 
 import okhttp3.OkHttpClient;
+import okhttp3.Request;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
@@ -15,12 +16,19 @@ public class HueHttpsClientFactory {
 
     private static final String HUE_BRIDGE_CERTIFICATE = "/hue-bridge-certificate.pem";
 
-    public static OkHttpClient createHttpsClient(String bridgeIp) throws Exception {
+    public static OkHttpClient createHttpsClient(String bridgeIp, String accessToken) throws Exception {
         X509TrustManager trustManager = createTrustManager();
         SSLContext sslContext = createSSLContext(trustManager);
         return new OkHttpClient.Builder()
                 .sslSocketFactory(sslContext.getSocketFactory(), trustManager)
                 .hostnameVerifier((hostname, session) -> hostname.equals(bridgeIp))
+                .addInterceptor(chain -> {
+                    Request request = chain.request();
+                    Request modifiedRequest = request.newBuilder()
+                                                     .header("hue-application-key", accessToken)
+                                                     .build();
+                    return chain.proceed(modifiedRequest);
+                })
                 .build();
     }
 

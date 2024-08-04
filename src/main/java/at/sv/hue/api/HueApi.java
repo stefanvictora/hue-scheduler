@@ -2,13 +2,41 @@ package at.sv.hue.api;
 
 import java.util.List;
 
-public interface HueApi {
+public interface HueApi extends ResourceModificationEventListener {
     /**
      * @throws BridgeConnectionFailure     if the bridge could not be reached
      * @throws BridgeAuthenticationFailure if the bridge rejected the request due to an unauthorized username
      * @throws ApiFailure                  if another api error occurs
      */
     void assertConnection();
+
+    /**
+     * @param id the id of the light. For Hue this is the id_v1.
+     * @return the identifier of the light, containing id and name
+     * @throws LightNotFoundException if no light with given id was found
+     * @throws ApiFailure             if the api call failed
+     */
+    Identifier getLightIdentifier(String id);
+
+    /**
+     * @param id the id of the light. For Hue this is the id_v1.
+     * @return the identifier of the light, containing id and name
+     * @throws GroupNotFoundException if no group with given id was found
+     * @throws ApiFailure             if the api call failed
+     */
+    Identifier getGroupIdentifier(String id);
+
+    /**
+     * @throws ResourceNotFoundException if no light with given name was found
+     * @throws ApiFailure                if the api call failed
+     */
+    Identifier getLightIdentifierByName(String name);
+
+    /**
+     * @throws GroupNotFoundException if no group with given name was found
+     * @throws ApiFailure             if the api call failed
+     */
+    Identifier getGroupIdentifierByName(String name);
 
     /**
      * @return the up-to-date light state for the light of the given id. Not null.
@@ -47,6 +75,12 @@ public interface HueApi {
     List<String> getGroupLights(String groupId);
 
     /**
+     * @return the name of the scene with the given ID. Null if scene not found.
+     * @throws ApiFailure if the api call failed
+     */
+    String getSceneName(String sceneId);
+
+    /**
      * @return the lights and group id related to the given scene. If not found, empty list. Not null.
      * @throws ApiFailure if the api call failed
      */
@@ -58,31 +92,7 @@ public interface HueApi {
     List<String> getAssignedGroups(String lightId);
 
     /**
-     * @throws GroupNotFoundException if no group with given name was found
-     * @throws ApiFailure             if the api call failed
-     */
-    String getGroupId(String name);
-
-    /**
-     * @throws GroupNotFoundException if no group with given id was found
-     * @throws ApiFailure             if the api call failed
-     */
-    String getGroupName(String groupId);
-
-    /**
-     * @throws LightNotFoundException if no light with given name was found
-     * @throws ApiFailure             if the api call failed
-     */
-    String getLightId(String name);
-
-    /**
-     * @throws LightNotFoundException if no light with given id was found
-     * @throws ApiFailure             if the api call failed
-     */
-    String getLightName(String id);
-
-    /**
-     * @return the light capabilities, or {@link LightCapabilities#NO_CAPABILITIES} if no capabilities were found. Not null.
+     * @return the light capabilities. Not null.
      * @throws LightNotFoundException if no light with given id was found
      * @throws ApiFailure             if the api call failed
      */
@@ -99,6 +109,17 @@ public interface HueApi {
      * @throws ApiFailure             if the api call failed
      */
     LightCapabilities getGroupCapabilities(String id);
+
+    /**
+     * Creates or updates a existing scene with the given name for the given group id.
+     *
+     * @param groupId       the id of the group. For Hue this is the groupedLightId
+     * @param putCall       the desired state of lights for the scene
+     * @param sceneSyncName the name of the scene to create or update
+     * @throws GroupNotFoundException if no group with given id was found
+     * @throws ApiFailure             if the api call failed
+     */
+    void createOrUpdateScene(String groupId, PutCall putCall, String sceneSyncName);
 
     /**
      * Clears caches for both the /lights and /groups resources, so that up-to-date information is fetched next time

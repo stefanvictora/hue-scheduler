@@ -66,7 +66,11 @@ public class LightStateComparator {
         if (currentState.getColorTemperature() == null) {
             return true;
         }
-        return getAdjustedLastCt() != currentState.getColorTemperature();
+        return colorTemperatureIsNotSimilar();
+    }
+
+    private boolean colorTemperatureIsNotSimilar() {
+        return Math.abs(getAdjustedLastCt() - currentState.getColorTemperature()) >= 5;
     }
 
     private int getAdjustedLastCt() {

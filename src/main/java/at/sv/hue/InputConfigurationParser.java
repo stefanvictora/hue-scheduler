@@ -3,6 +3,7 @@ package at.sv.hue;
 import at.sv.hue.api.GroupNotFoundException;
 import at.sv.hue.api.HueApi;
 import at.sv.hue.api.LightCapabilities;
+import at.sv.hue.api.Identifier;
 import at.sv.hue.api.hass.HassSupportedEntityType;
 import at.sv.hue.color.RGBToXYConverter;
 import at.sv.hue.time.StartTimeProvider;
@@ -41,38 +42,33 @@ public final class InputConfigurationParser {
             throw new InvalidConfigurationLine("Invalid configuration line format '" + Arrays.toString(parts) + "': at least id and start time have to be set." +
                                                " Make sure to use either tabs or at least two spaces to separate the different configuration parts.");
         ArrayList<ScheduledState> states = new ArrayList<>();
-        for (String idPart : parts[0].split(",")) {
-            idPart = idPart.trim();
-            String id;
+        for (String reference : parts[0].split(",")) {
+            reference = reference.trim();
             boolean groupState;
-            String name = "";
-            if (idPart.matches("g\\d+")) {
-                id = "/groups/" + idPart.substring(1);
-                name = api.getGroupName(id);
+            Identifier identifier;
+            if (reference.matches("g\\d+")) {
+                identifier = api.getGroupIdentifier("/groups/" + reference.substring(1));
                 groupState = true;
-            } else if (idPart.matches("\\d+")) {
-                id = "/lights/" + idPart;
-                name = api.getLightName(id);
+            } else if (reference.matches("\\d+")) {
+                identifier = api.getLightIdentifier("/lights/" + reference);
                 groupState = false;
-            } else if (HassSupportedEntityType.isSupportedEntityType(idPart)) {
-                id = idPart;
-                name = api.getLightName(id);
+            } else if (HassSupportedEntityType.isSupportedEntityType(reference)) {
+                identifier = api.getLightIdentifier(reference);
                 groupState = false;
             } else {
-                name = idPart;
                 try {
-                    id = api.getGroupId(name);
+                    identifier = api.getGroupIdentifierByName(reference);
                     groupState = true;
                 } catch (GroupNotFoundException e) {
-                    id = api.getLightId(name);
+                    identifier = api.getLightIdentifierByName(reference);
                     groupState = false;
                 }
             }
             LightCapabilities capabilities;
             if (groupState) {
-                capabilities = api.getGroupCapabilities(id);
+                capabilities = api.getGroupCapabilities(identifier.id());
             } else {
-                capabilities = api.getLightCapabilities(id);
+                capabilities = api.getLightCapabilities(identifier.id());
             }
             Integer bri = null;
             Integer ct = null;
@@ -169,7 +165,7 @@ public final class InputConfigurationParser {
                 }
             }
             String start = parts[1];
-            states.add(new ScheduledState(name, id, start, bri, ct, x, y, hue, sat, effect, on, transitionTimeBefore,
+            states.add(new ScheduledState(identifier, start, bri, ct, x, y, hue, sat, effect, on, transitionTimeBefore,
                     transitionTime, dayOfWeeks, startTimeProvider, capabilities, minTrBeforeGapInMinutes, force,
                     interpolate, groupState, false));
         }

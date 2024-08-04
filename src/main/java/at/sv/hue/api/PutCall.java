@@ -45,6 +45,10 @@ public final class PutCall {
         return on == Boolean.TRUE;
     }
 
+    public boolean hasNonDefaultTransitionTime() {
+        return transitionTime != null && transitionTime != 4;
+    }
+
     @Override
     public String toString() {
         return "PutCall {" +
