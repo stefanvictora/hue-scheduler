@@ -367,11 +367,12 @@ public final class HueScheduler implements Runnable {
     private void scheduleInitialStartup(List<ScheduledState> states, ZonedDateTime now) {
         MDC.put("context", "init");
         ZonedDateTime yesterday = now.minusDays(1);
-        states.forEach(state -> state.setPreviousStateLookup(this::getPreviousState));
-        calculateAndSetEndTimes(states, yesterday);
-        states.stream()
-              .sorted(Comparator.comparing(state -> state.getDefinedStart(yesterday)))
-              .forEach(state -> initialSchedule(state, now));
+        states.forEach(state -> state.setPreviousStateLookup(this::getPreviousState)); // todo: remove
+        List<ScheduledStateSnapshot> snapshots = states.stream().map(state -> state.getSnapshot(yesterday)).toList();
+        calculateAndSetEndTimes(snapshots, states);
+        snapshots.stream()
+              .sorted(Comparator.comparing(ScheduledStateSnapshot::getDefinedStart))
+              .forEach(snapshot -> initialSchedule(snapshot, now));
     }
 
     private ScheduledStateSnapshot getPreviousState(ScheduledState currentState, ZonedDateTime dateTime) {
@@ -404,12 +405,15 @@ public final class HueScheduler implements Runnable {
                 .collect(Collectors.toList());
     }
 
-    private void calculateAndSetEndTimes(List<ScheduledState> states, ZonedDateTime now) {
-        states.forEach(state -> calculateAndSetEndTime(state, states, state.getDefinedStart(now)));
+    private void calculateAndSetEndTimes(List<ScheduledStateSnapshot> snapshots, List<ScheduledState> states) {
+        snapshots.forEach(snapshot -> {
+            ScheduledStateSnapshot nextState = getNextState(states, snapshot.getDefinedStart());
+            calculateAndSetEndTime(snapshot, nextState);
+        });
     }
 
-    private void calculateAndSetEndTime(ScheduledState state, List<ScheduledState> states, ZonedDateTime definedStart) {
-        new EndTimeAdjuster(state, getNextState(states, definedStart), definedStart).calculateAndSetEndTime();
+    private void calculateAndSetEndTime(ScheduledStateSnapshot snapshot, ScheduledStateSnapshot nextState) {
+        new EndTimeAdjuster(snapshot, nextState).calculateAndSetEndTime();
     }
 
     private ScheduledStateSnapshot getNextState(List<ScheduledState> states, ZonedDateTime definedStart) {
@@ -429,36 +433,32 @@ public final class HueScheduler implements Runnable {
                      .collect(Collectors.toList());
     }
 
-    private void initialSchedule(ScheduledState state, ZonedDateTime now) {
+    private void initialSchedule(ScheduledStateSnapshot snapshot, ZonedDateTime now) {
         ZonedDateTime yesterday = now.minusDays(1);
-        if (state.endsBefore(now)) {
-            state.updateLastStart(yesterday);
-            reschedule(state); // no cross-over state, reschedule normally today
-        } else if (doesNotStartOn(state, yesterday)) {
-            state.updateLastStart(now);
-            schedule(state, state.getDelayUntilStart(now)); // state was already scheduled at a future time, reuse calculated start time
+        if (snapshot.endsBefore(now)) {
+            reschedule(snapshot); // no cross-over state, reschedule normally today
+        } else if (doesNotStartOn(snapshot, yesterday)) {
+            schedule(snapshot, snapshot.getDelayUntilStart(now)); // state was already scheduled at a future time, reuse calculated start time
         } else {
-            state.updateLastStart(yesterday);
-            schedule(state, 0); // schedule cross-over states, i.e., states already starting yesterday immediately
+            schedule(snapshot, 0); // schedule cross-over states, i.e., states already starting yesterday immediately
         }
     }
 
-    private boolean doesNotStartOn(ScheduledState state, ZonedDateTime dateTime) {
-        return !state.isScheduledOn(DayOfWeek.from(dateTime));
+    private boolean doesNotStartOn(ScheduledStateSnapshot snapshot, ZonedDateTime dateTime) {
+        return !snapshot.isScheduledOn(DayOfWeek.from(dateTime));
     }
 
-    private void schedule(ScheduledState state, long delayInMs) {
-        if (state.isNullState()) return;
-        LOG.debug("Schedule: {} in {}", state, Duration.ofMillis(delayInMs).withNanos(0));
+    private void schedule(ScheduledStateSnapshot snapshot, long delayInMs) {
+        if (snapshot.isNullState()) return;
+        LOG.debug("Schedule: {} in {}", snapshot, Duration.ofMillis(delayInMs).withNanos(0));
         stateScheduler.schedule(() -> {
-            MDC.put("context", state.getContextName());
-            if (state.endsBefore(currentTime.get())) {
-                LOG.debug("Already ended: {}", state);
-                reschedule(state);
+            MDC.put("context", snapshot.getContextName());
+            if (snapshot.endsBefore(currentTime.get())) {
+                LOG.debug("Already ended: {}", snapshot);
+                reschedule(snapshot);
                 return;
             }
-            LOG.info("Set: {}", state);
-            ScheduledStateSnapshot snapshot = state.getSnapshot(state.getLastDefinedStart());
+            LOG.info("Set: {}", snapshot);
             if (shouldSyncScene(snapshot)) {
                 syncScene(snapshot);
             }
@@ -467,10 +467,10 @@ public final class HueScheduler implements Runnable {
                     (lightHasBeenManuallyOverriddenBefore(snapshot) || lightIsOffAndDoesNotTurnOn(snapshot))) {
                     if (shouldRetryOnPowerOn(snapshot)) {
                         LOG.info("Off or manually overridden: Skip update and retry when back online");
-                        retryWhenBackOn(state);
+                        retryWhenBackOn(snapshot);
                     } else {
                         LOG.info("Off or manually overridden: Skip state for this day.");
-                        reschedule(state);
+                        reschedule(snapshot);
                     }
                     return;
                 }
@@ -478,14 +478,14 @@ public final class HueScheduler implements Runnable {
                     (turnedOnThroughScene(snapshot) || stateHasBeenManuallyOverriddenSinceLastSeen(snapshot))) {
                     LOG.info("Manually overridden or scene turn-on: Pause updates until turned off and on again");
                     manualOverrideTracker.onManuallyOverridden(snapshot.getId());
-                    retryWhenBackOn(state);
+                    retryWhenBackOn(snapshot);
                     return;
                 }
                 putAdditionalInterpolatedStateIfNeeded(snapshot);
                 putState(snapshot);
             } catch (BridgeConnectionFailure | ApiFailure e) {
                 logException(e);
-                retry(state, getMs(bridgeFailureRetryDelayInSeconds));
+                retry(snapshot, getMs(bridgeFailureRetryDelayInSeconds));
                 return;
             }
             snapshot.recordLastSeen(currentTime.get());
@@ -496,8 +496,8 @@ public final class HueScheduler implements Runnable {
             if (shouldRetryOnPowerOn(snapshot)) {
                 retryWhenBackOn(createPowerOnCopy(snapshot));
             }
-            reschedule(state);
-        }, currentTime.get().plus(delayInMs, ChronoUnit.MILLIS), state.getEnd());
+            reschedule(snapshot);
+        }, currentTime.get().plus(delayInMs, ChronoUnit.MILLIS), snapshot.getEnd());
     }
 
     private boolean shouldSyncScene(ScheduledStateSnapshot state) {
@@ -711,26 +711,26 @@ public final class HueScheduler implements Runnable {
         }
     }
 
-    private void reschedule(ScheduledState state) {
-        if (state.isTemporary()) return;
+    private void reschedule(ScheduledStateSnapshot snapshot) {
+        if (snapshot.isTemporary()) return;
         ZonedDateTime now = currentTime.get();
-        ZonedDateTime nextDefinedStart = getNextDefinedStart(state, now);
-        state.updateLastStart(nextDefinedStart);
-        calculateAndSetEndTime(state, getLightStatesForId(state.getId()), nextDefinedStart);
-        schedule(state, state.getDelayUntilStart(now));
+        ZonedDateTime nextDefinedStart = getNextDefinedStart(snapshot, now);
+        ScheduledStateSnapshot nextSnapshot = snapshot.getScheduledState().getSnapshot(nextDefinedStart);
+        calculateAndSetEndTime(nextSnapshot, getNextState(getLightStatesForId(snapshot.getId()), nextDefinedStart));
+        schedule(nextSnapshot, nextSnapshot.getDelayUntilStart(now));
     }
 
-    private ZonedDateTime getNextDefinedStart(ScheduledState state, ZonedDateTime now) {
-        ZonedDateTime nextDefinedStart = state.getNextDefinedStart(now);
-        if (shouldScheduleNextDay(state, nextDefinedStart, now)) {
-            return state.getNextDefinedStart(now.plusDays(1));
+    private ZonedDateTime getNextDefinedStart(ScheduledStateSnapshot currentSnapshot, ZonedDateTime now) {
+        ZonedDateTime nextDefinedStart = currentSnapshot.getNextDefinedStart(now);
+        if (shouldScheduleNextDay(currentSnapshot, nextDefinedStart, now)) {
+            return currentSnapshot.getNextDefinedStart(now.plusDays(1));
         } else {
             return nextDefinedStart;
         }
     }
 
-    private boolean shouldScheduleNextDay(ScheduledState state, ZonedDateTime nextDefinedStart, ZonedDateTime now) {
-        ScheduledStateSnapshot nextState = getNextState(getLightStatesForId(state.getId()), nextDefinedStart);
+    private boolean shouldScheduleNextDay(ScheduledStateSnapshot currentSnapshot, ZonedDateTime nextDefinedStart, ZonedDateTime now) {
+        ScheduledStateSnapshot nextState = getNextState(getLightStatesForId(currentSnapshot.getId()), nextDefinedStart);
         return nextState.getStart().isBefore(now) || nextState.getStart().isEqual(now);
     }
 
@@ -751,7 +751,11 @@ public final class HueScheduler implements Runnable {
             }
             performPutApiCall(state, interpolatedSplitPutCall);
             if (!state.isRetryAfterPowerOnState()) { // schedule follow-up split
-                schedule(ScheduledState.createTemporaryCopy(state.getScheduledState()), state.getNextInterpolationSplitDelayInMs(now));
+                // todo: maybe clean up a bit
+                ScheduledState temporaryCopy = ScheduledState.createTemporaryCopy(state.getScheduledState());
+                ScheduledStateSnapshot nextSplitSnapshot = temporaryCopy.getSnapshot(state.getDefinedStart());
+                nextSplitSnapshot.setEnd(state.getEnd());
+                schedule(nextSplitSnapshot, state.getNextInterpolationSplitDelayInMs(now));
             }
         } else {
             putState(state, getPutCallWithAdjustedTr(state, now));
@@ -841,23 +845,24 @@ public final class HueScheduler implements Runnable {
         }
     }
 
-    private void retry(ScheduledState state, long delayInMs) {
-        schedule(state, delayInMs);
+    private void retry(ScheduledStateSnapshot snapshot, long delayInMs) {
+        schedule(snapshot, delayInMs);
     }
 
-    private ScheduledState createPowerOnCopy(ScheduledStateSnapshot state) {
-        ScheduledState powerOnCopy = ScheduledState.createTemporaryCopy(state.getScheduledState(),
-                state.calculateNextPowerOnEnd(currentTime.get()));
+    private ScheduledStateSnapshot createPowerOnCopy(ScheduledStateSnapshot state) {
+        ScheduledState powerOnCopy = ScheduledState.createTemporaryCopy(state.getScheduledState());
         powerOnCopy.setRetryAfterPowerOnState(true);
-        return powerOnCopy;
+        ScheduledStateSnapshot snapshot = powerOnCopy.getSnapshot(state.getDefinedStart());
+        snapshot.setEnd(state.calculateNextPowerOnEnd(currentTime.get()));
+        return snapshot;
     }
 
     private static boolean shouldRetryOnPowerOn(ScheduledStateSnapshot state) {
         return !state.isOff() && state.hasOtherPropertiesThanOn() || state.isForced();
     }
 
-    private void retryWhenBackOn(ScheduledState state) {
-        lightEventListener.runWhenTurnedOn(state.getId(), () -> schedule(state, powerOnRescheduleDelayInMs));
+    private void retryWhenBackOn(ScheduledStateSnapshot snapshot) {
+        lightEventListener.runWhenTurnedOn(snapshot.getId(), () -> schedule(snapshot, powerOnRescheduleDelayInMs));
     }
 
     private void scheduleSolarDataInfoLog() {

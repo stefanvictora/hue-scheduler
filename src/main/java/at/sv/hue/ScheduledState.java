@@ -23,8 +23,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.function.BiFunction;
 
-final class ScheduledState {
-    private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+final class ScheduledState { // todo: a better name would be StateDefinition
     public static final int MAX_HUE_VALUE = 65535;
     public static final int MIDDLE_HUE_VALUE = 32768;
     /**
@@ -60,20 +59,13 @@ final class ScheduledState {
     private final Cache<ZonedDateTime, ScheduledStateSnapshot> snapshotCache;
     @Getter
     @Setter
-    private ZonedDateTime end;
-    @Getter
-    private ZonedDateTime lastStart;
-    @Getter
-    private ZonedDateTime lastDefinedStart;
-    @Getter
-    @Setter
     private boolean retryAfterPowerOnState;
     @Getter
     private ZonedDateTime lastSeen;
     private ScheduledState originalState;
     private PutCall lastPutCall;
     @Setter
-    private BiFunction<ScheduledState, ZonedDateTime, ScheduledStateSnapshot> previousStateLookup;
+    private BiFunction<ScheduledState, ZonedDateTime, ScheduledStateSnapshot> previousStateLookup; // todo: migrate
 
     @Builder
     public ScheduledState(Identifier identifier, String startString, Integer brightness, Integer ct, Double x, Double y,
@@ -115,21 +107,14 @@ final class ScheduledState {
     }
 
     public static ScheduledState createTemporaryCopy(ScheduledState state) {
-        return createTemporaryCopy(state, state.getEnd());
+        return createTemporaryCopy(state, state.startString);
     }
 
-    public static ScheduledState createTemporaryCopy(ScheduledState state, ZonedDateTime end) {
-        return createTemporaryCopy(state, state.startString, end);
-    }
-
-    private static ScheduledState createTemporaryCopy(ScheduledState state, String start, ZonedDateTime end) {
+    private static ScheduledState createTemporaryCopy(ScheduledState state, String start) {
         ScheduledState copy = new ScheduledState(state.identifier, start,
                 state.brightness, state.ct, state.x, state.y, state.hue, state.sat, state.effect, state.on,
                 state.transitionTimeBeforeString, state.definedTransitionTime, state.daysOfWeek, state.startTimeProvider,
                 state.capabilities, state.minTrBeforeGapInMinutes, state.force, state.interpolate, state.groupState, true);
-        copy.end = end;
-        copy.lastStart = state.lastStart;
-        copy.lastDefinedStart = state.lastDefinedStart;
         copy.lastSeen = state.lastSeen;
         copy.originalState = state.originalState;
         copy.previousStateLookup = state.previousStateLookup;
@@ -242,28 +227,7 @@ final class ScheduledState {
         return x != null || y != null || hue != null || sat != null;
     }
 
-    /**
-     * Returns the milliseconds until the state should be scheduled based on the previously calculated start, i.e.,
-     * the lastStart property.
-     *
-     * @param now the current time
-     * @return the delay in ms until this state should be scheduled, not negative.
-     * Returning 0 if it should be directly scheduled.
-     */
-    public long getDelayUntilStart(ZonedDateTime now) {
-        return getDelayUntilStart(now, lastStart);
-    }
-
-    private long getDelayUntilStart(ZonedDateTime now, ZonedDateTime start) {
-        Duration between = Duration.between(now, start);
-        if (between.isNegative()) {
-            return 0;
-        } else {
-            return between.toMillis();
-        }
-    }
-
-    public ZonedDateTime getStart(ZonedDateTime dateTime) {
+    public ZonedDateTime getStart(ZonedDateTime dateTime) { // todo: migrate
         ZonedDateTime definedStart = getDefinedStart(dateTime);
         if (hasTransitionBefore()) {
             int transitionTimeBefore = getTransitionTimeBefore(dateTime, definedStart);
@@ -276,7 +240,7 @@ final class ScheduledState {
         return (transitionTimeBeforeString != null || interpolate == Boolean.TRUE);
     }
 
-    private int getTransitionTimeBefore(ZonedDateTime dateTime, ZonedDateTime definedStart) {
+    private int getTransitionTimeBefore(ZonedDateTime dateTime, ZonedDateTime definedStart) { // todo: migrate
         ScheduledStateSnapshot previousState = previousStateLookup.apply(this, dateTime);
         if (previousState == null || previousState.isNullState() || hasNoOverlappingProperties(previousState)) {
             return 0;
@@ -290,7 +254,7 @@ final class ScheduledState {
 
     private boolean hasNoOverlappingProperties(ScheduledStateSnapshot previousState) {
         PutCall previousPutCall = previousState.getPutCall(null); // todo: refactor to use full picture
-        return StateInterpolator.hasNoOverlappingProperties(previousPutCall, getPutCall(null, lastDefinedStart));
+        return StateInterpolator.hasNoOverlappingProperties(previousPutCall, getPutCall(null, null));
     }
 
     private int getTimeUntilPreviousState(ZonedDateTime previousStateDefinedStart, ZonedDateTime definedStart) {
@@ -315,6 +279,9 @@ final class ScheduledState {
         return (int) duration.toMillis();
     }
 
+    /**
+     * Returns the snapshot for the given dateTime. The snapshot is cached for 3 days.
+     */
     public ScheduledStateSnapshot getSnapshot(ZonedDateTime dateTime) {
         return snapshotCache.get(getDefinedStart(dateTime),
                 definedStart -> new ScheduledStateSnapshot(this, definedStart));
@@ -340,10 +307,9 @@ final class ScheduledState {
      * Returns the next defined start after the last one, starting from the given dateTime.
      * We loop over getDefinedStart with increased days until we find the first start that is after the last one.
      */
-    public ZonedDateTime getNextDefinedStart(ZonedDateTime dateTime) {
-        ZonedDateTime last = lastDefinedStart;
+    public ZonedDateTime getNextDefinedStart(ZonedDateTime dateTime, ZonedDateTime currentDefinedStart) {
         ZonedDateTime next = getDefinedStart(dateTime);
-        while (next.isBefore(last) || next.equals(last)) {
+        while (next.isBefore(currentDefinedStart) || next.equals(currentDefinedStart)) {
             dateTime = dateTime.plusDays(1);
             next = getDefinedStart(dateTime);
         }
@@ -395,10 +361,6 @@ final class ScheduledState {
         return minTrBeforeGapInMinutes;
     }
 
-    public boolean endsBefore(ZonedDateTime now) {
-        return now.isAfter(end);
-    }
-
     public boolean isNullState() {
         return on == null && hasNoOtherPropertiesThanOn();
     }
@@ -417,11 +379,6 @@ final class ScheduledState {
 
     public boolean isOn() {
         return on == Boolean.TRUE;
-    }
-
-    public void updateLastStart(ZonedDateTime dateTime) {
-        lastStart = getStart(dateTime);
-        lastDefinedStart = getDefinedStart(dateTime);
     }
 
     public boolean lightStateDiffers(LightState currentState) {
@@ -464,7 +421,7 @@ final class ScheduledState {
                       .sat(sat)
                       .on(on)
                       .effect(effect)
-                      .transitionTime(now != null ? getTransitionTime(now, definedStart) : null)
+                      .transitionTime(now != null && definedStart != null ? getTransitionTime(now, definedStart) : null)
                       .groupState(groupState)
                       .gamut(capabilities != null ? capabilities.getColorGamut() : null)
                       .build();
@@ -476,12 +433,13 @@ final class ScheduledState {
 
     @Override
     public String toString() {
-        return getFormattedName() + " {" +
-               "id=" + identifier.id() +
+        return getFormattedName() + " {" + getFormattedProperties() + '}';
+    }
+
+    public String getFormattedProperties() {
+        return "id=" + identifier.id() +
                (temporary && !retryAfterPowerOnState ? ", temporary" : "") +
                (retryAfterPowerOnState ? ", power-on-event" : "") +
-               ", start=" + getFormattedStart() +
-               ", end=" + getFormattedEnd() +
                getFormattedPropertyIfSet("on", on) +
                getFormattedPropertyIfSet("bri", brightness) +
                getFormattedPropertyIfSet("ct", ct) +
@@ -493,10 +451,9 @@ final class ScheduledState {
                getFormattedDaysOfWeek() +
                getFormattedTransitionTimeBefore() +
                getFormattedTransitionTimeIfSet("tr", definedTransitionTime) +
-               getFormattedPropertyIfSet("lastSeen", getFormattedTime(lastSeen)) +
+//               getFormattedPropertyIfSet("lastSeen", getFormattedTime(lastSeen)) +
                getFormattedPropertyIfSet("force", force) +
-               getFormattedPropertyIfSet("interpolate", interpolate) +
-               '}';
+               getFormattedPropertyIfSet("interpolate", interpolate);
     }
 
     public String getFormattedName() {
@@ -516,33 +473,19 @@ final class ScheduledState {
         return context;
     }
 
-    private String getFormattedStart() {
-        if (lastStart != null) {
-            return startString + " (" + getFormattedTime(lastStart) + ")";
-        }
-        return startString;
-    }
-
-    private String getFormattedTime(ZonedDateTime zonedDateTime) {
-        if (zonedDateTime == null) {
-            return null;
-        }
-        return TIME_FORMATTER.format(zonedDateTime);
-    }
-
-    private String getFormattedEnd() {
-        if (end == null) return "<ERROR: not set>";
-        return end.toLocalDateTime().toString();
+    public String getFormattedStart(ZonedDateTime definedStart) {
+        return startString + " (" + DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(definedStart) + ")";
     }
 
     private String getFormattedTransitionTimeBefore() {
         if (transitionTimeBeforeString == null) {
             return "";
         }
-        if (lastStart != null) {
-            return formatPropertyName("tr-before") + transitionTimeBeforeString +
-                   " (" + formatTransitionTimeBefore(parseTransitionTimeBefore(lastStart)) + ")";
-        }
+        // todo
+//        if (lastStart != null) {
+//            return formatPropertyName("tr-before") + transitionTimeBeforeString +
+//                   " (" + formatTransitionTimeBefore(parseTransitionTimeBefore(lastStart)) + ")";
+//        }
         return formatPropertyName("tr-before") + transitionTimeBeforeString;
     }
 

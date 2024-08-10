@@ -1,19 +1,16 @@
 package at.sv.hue;
 
 import java.time.Duration;
-import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 
 public final class EndTimeAdjuster {
 
-    private final ScheduledState state;
+    private final ScheduledStateSnapshot state;
     private final ScheduledStateSnapshot nextState;
-    private final ZonedDateTime definedStart;
 
-    public EndTimeAdjuster(ScheduledState state, ScheduledStateSnapshot nextState, ZonedDateTime definedStart) {
+    public EndTimeAdjuster(ScheduledStateSnapshot state, ScheduledStateSnapshot nextState) {
         this.state = state;
         this.nextState = nextState;
-        this.definedStart = definedStart;
     }
 
     public void calculateAndSetEndTime() {
@@ -25,7 +22,7 @@ public final class EndTimeAdjuster {
     }
 
     private boolean isTodayOrNextDay(ScheduledStateSnapshot nextState) {
-        return Duration.between(definedStart.truncatedTo(ChronoUnit.DAYS),
+        return Duration.between(state.getDefinedStart().truncatedTo(ChronoUnit.DAYS),
                 nextState.getStart().truncatedTo(ChronoUnit.DAYS)).toDays() <= 1;
     }
 
@@ -34,6 +31,6 @@ public final class EndTimeAdjuster {
     }
 
     private void setEndToEndOfDay() {
-        state.setEnd(definedStart.plusDays(1).truncatedTo(ChronoUnit.DAYS).minusSeconds(1));
+        state.setEnd(state.getDefinedStart().plusDays(1).truncatedTo(ChronoUnit.DAYS).minusSeconds(1));
     }
 }

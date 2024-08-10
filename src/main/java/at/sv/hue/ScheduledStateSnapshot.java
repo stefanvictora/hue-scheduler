@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 
+import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
@@ -18,11 +19,14 @@ public class ScheduledStateSnapshot {
     private final ScheduledState scheduledState;
     @Getter
     private final ZonedDateTime definedStart;
+
     private ZonedDateTime cachedStart;
-    private ZonedDateTime cachedEnd;
     @Setter
     @Getter
     private ScheduledStateSnapshot previousState;
+    @Setter
+    @Getter
+    private ZonedDateTime end;
 
     public String getId() {
         return scheduledState.getId();
@@ -37,16 +41,6 @@ public class ScheduledStateSnapshot {
             cachedStart = scheduledState.getStart(definedStart);
         }
         return cachedStart;
-    }
-
-    /**
-     * Warning: the end time for a snapshot needs to be initially fetched once before rescheduling the underlying state
-     */
-    public ZonedDateTime getEnd() {
-        if (cachedEnd == null) {
-            cachedEnd = scheduledState.getEnd();
-        }
-        return cachedEnd;
     }
 
     public boolean hasTransitionBefore() {
@@ -73,12 +67,20 @@ public class ScheduledStateSnapshot {
         return scheduledState.isNullState();
     }
 
+    public boolean isTemporary() {
+        return scheduledState.isTemporary();
+    }
+
     public boolean isGroupState() {
         return scheduledState.isGroupState();
     }
 
     public boolean hasOtherPropertiesThanOn() {
         return scheduledState.hasOtherPropertiesThanOn();
+    }
+
+    public ZonedDateTime getNextDefinedStart(ZonedDateTime dateTime) {
+        return scheduledState.getNextDefinedStart(dateTime, definedStart);
     }
 
     public boolean isSplitState() {
@@ -93,7 +95,7 @@ public class ScheduledStateSnapshot {
         if (isInsideSplitCallWindow(now)) {
             return getNextTransitionTimeSplitStart(now).minusSeconds(1);
         } else {
-            return getEnd();
+            return end;
         }
     }
 
@@ -142,6 +144,34 @@ public class ScheduledStateSnapshot {
         return scheduledState.isSameState(state);
     }
 
+    /**
+     * Returns the milliseconds until the state should be scheduled based on the previously calculated start.
+     *
+     * @param now the current time
+     * @return the delay in ms until this state should be scheduled, not negative.
+     * Returning 0 if it should be directly scheduled.
+     */
+    public long getDelayUntilStart(ZonedDateTime now) {
+        Duration between = Duration.between(now, getStart());
+        if (between.isNegative()) {
+            return 0;
+        } else {
+            return between.toMillis();
+        }
+    }
+
+    public boolean endsBefore(ZonedDateTime now) {
+        return now.isAfter(end);
+    }
+
+    public boolean isScheduledOn(ZonedDateTime day) {
+        return scheduledState.isScheduledOn(day);
+    }
+
+    public boolean isScheduledOn(DayOfWeek... day) {
+        return scheduledState.isScheduledOn(day);
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -156,5 +186,20 @@ public class ScheduledStateSnapshot {
         int result = scheduledState.hashCode();
         result = 31 * result + definedStart.hashCode();
         return result;
+    }
+
+    @Override
+    public String toString() {
+        return scheduledState.getFormattedName() +
+               " {" +
+               "start=" + scheduledState.getFormattedStart(definedStart) +
+               ", end=" + getFormattedEnd() +
+               ", " + scheduledState.getFormattedProperties() +
+               "}";
+    }
+
+    private String getFormattedEnd() {
+        if (end == null) return "<ERROR: not set>";
+        return end.toLocalDateTime().toString();
     }
 }
