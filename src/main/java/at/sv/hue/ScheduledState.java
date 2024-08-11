@@ -15,13 +15,12 @@ import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
-import java.util.function.BiFunction;
+import java.util.function.Function;
 
 final class ScheduledState { // todo: a better name would be StateDefinition
     public static final int MAX_HUE_VALUE = 65535;
@@ -65,7 +64,7 @@ final class ScheduledState { // todo: a better name would be StateDefinition
     private ScheduledState originalState;
     private PutCall lastPutCall;
     @Setter
-    private BiFunction<ScheduledState, ZonedDateTime, ScheduledStateSnapshot> previousStateLookup; // todo: migrate
+    private Function<ScheduledStateSnapshot, ScheduledStateSnapshot> previousStateLookup;
 
     @Builder
     public ScheduledState(Identifier identifier, String startString, Integer brightness, Integer ct, Double x, Double y,
@@ -99,7 +98,7 @@ final class ScheduledState { // todo: a better name would be StateDefinition
         this.temporary = temporary;
         originalState = this;
         retryAfterPowerOnState = false;
-        previousStateLookup = (state, dateTime) -> null;
+        previousStateLookup = (state) -> null;
         assertColorCapabilities();
         snapshotCache = Caffeine.newBuilder()
                                 .expireAfterWrite(Duration.ofDays(3))
@@ -227,51 +226,24 @@ final class ScheduledState { // todo: a better name would be StateDefinition
         return x != null || y != null || hue != null || sat != null;
     }
 
-    public ZonedDateTime getStart(ZonedDateTime dateTime) { // todo: migrate
-        ZonedDateTime definedStart = getDefinedStart(dateTime);
-        if (hasTransitionBefore()) {
-            int transitionTimeBefore = getTransitionTimeBefore(dateTime, definedStart);
-            return definedStart.minus(transitionTimeBefore, ChronoUnit.MILLIS);
-        }
-        return definedStart;
-    }
-
     public boolean hasTransitionBefore() {
-        return (transitionTimeBeforeString != null || interpolate == Boolean.TRUE);
+        return (hasTransitionTimeBeforeString() || interpolate == Boolean.TRUE);
     }
 
-    private int getTransitionTimeBefore(ZonedDateTime dateTime, ZonedDateTime definedStart) { // todo: migrate
-        ScheduledStateSnapshot previousState = previousStateLookup.apply(this, dateTime);
-        if (previousState == null || previousState.isNullState() || hasNoOverlappingProperties(previousState)) {
-            return 0;
-        }
-        if (transitionTimeBeforeString != null) {
-            return parseTransitionTimeBefore(dateTime);
-        } else {
-            return getTimeUntilPreviousState(previousState.getDefinedStart(), definedStart);
-        }
+    public boolean hasTransitionTimeBeforeString() {
+        return transitionTimeBeforeString != null;
     }
 
-    private boolean hasNoOverlappingProperties(ScheduledStateSnapshot previousState) {
-        PutCall previousPutCall = previousState.getPutCall(null); // todo: refactor to use full picture
-        return StateInterpolator.hasNoOverlappingProperties(previousPutCall, getPutCall(null, null));
-    }
-
-    private int getTimeUntilPreviousState(ZonedDateTime previousStateDefinedStart, ZonedDateTime definedStart) {
-        return (int) Duration.between(previousStateDefinedStart, definedStart).toMillis();
-    }
-
-    private int parseTransitionTimeBefore(ZonedDateTime dateTime) {
+    public int parseTransitionTimeBeforeString(ZonedDateTime definedStart) {
         try {
             return InputConfigurationParser.parseTransitionTime("tr-before", transitionTimeBeforeString) * 100;
         } catch (Exception e) {
-            return parseDateTimeBasedTransitionTime(dateTime);
+            return parseDateTimeBasedTransitionTime(definedStart);
         }
     }
 
-    private int parseDateTimeBasedTransitionTime(ZonedDateTime dateTime) {
-        ZonedDateTime transitionTimeBeforeStart = startTimeProvider.getStart(transitionTimeBeforeString, dateTime);
-        ZonedDateTime definedStart = getDefinedStart(dateTime);
+    private int parseDateTimeBasedTransitionTime(ZonedDateTime definedStart) {
+        ZonedDateTime transitionTimeBeforeStart = parseStartTime(transitionTimeBeforeString, definedStart);
         Duration duration = Duration.between(transitionTimeBeforeStart, definedStart);
         if (duration.isNegative()) {
             return 0;
@@ -284,7 +256,7 @@ final class ScheduledState { // todo: a better name would be StateDefinition
      */
     public ScheduledStateSnapshot getSnapshot(ZonedDateTime dateTime) {
         return snapshotCache.get(getDefinedStart(dateTime),
-                definedStart -> new ScheduledStateSnapshot(this, definedStart));
+                definedStart -> new ScheduledStateSnapshot(this, definedStart, previousStateLookup));
     }
 
     /**
@@ -300,7 +272,11 @@ final class ScheduledState { // todo: a better name would be StateDefinition
             day = getNextDayAfterTodayOrFirstNextWeek(today);
         }
         dateTime = dateTime.with(TemporalAdjusters.nextOrSame(day));
-        return startTimeProvider.getStart(startString, dateTime);
+        return parseStartTime(startString, dateTime);
+    }
+
+    private ZonedDateTime parseStartTime(String input, ZonedDateTime dateTime) {
+        return startTimeProvider.getStart(input, dateTime);
     }
 
     /**

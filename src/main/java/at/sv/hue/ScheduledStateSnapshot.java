@@ -10,6 +10,7 @@ import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.function.Function;
 
 import static at.sv.hue.ScheduledState.MAX_TRANSITION_TIME_MS;
 
@@ -19,11 +20,10 @@ public class ScheduledStateSnapshot {
     private final ScheduledState scheduledState;
     @Getter
     private final ZonedDateTime definedStart;
+    private final Function<ScheduledStateSnapshot, ScheduledStateSnapshot> previousStateLookup;
 
     private ZonedDateTime cachedStart;
-    @Setter
-    @Getter
-    private ScheduledStateSnapshot previousState;
+    private ScheduledStateSnapshot cachedPreviousState;
     @Setter
     @Getter
     private ZonedDateTime end;
@@ -38,9 +38,44 @@ public class ScheduledStateSnapshot {
 
     public ZonedDateTime getStart() {
         if (cachedStart == null) {
-            cachedStart = scheduledState.getStart(definedStart);
+            cachedStart = calculateStart();
         }
         return cachedStart;
+    }
+
+    private ZonedDateTime calculateStart() {
+        if (hasTransitionBefore()) {
+            int transitionTimeBefore = getTransitionTimeBefore();
+            return definedStart.minus(transitionTimeBefore, ChronoUnit.MILLIS);
+        }
+        return definedStart;
+    }
+
+    private int getTransitionTimeBefore() {
+        if (getPreviousState() == null || getPreviousState().isNullState() || hasNoOverlappingProperties()) {
+            return 0;
+        }
+        if (scheduledState.hasTransitionTimeBeforeString()) {
+            return scheduledState.parseTransitionTimeBeforeString(definedStart);
+        } else {
+            return getTimeUntilPreviousState();
+        }
+    }
+
+    private boolean hasNoOverlappingProperties() {
+        PutCall previousPutCall = getPreviousState().getPutCall(null); // todo: refactor to use full picture
+        return StateInterpolator.hasNoOverlappingProperties(previousPutCall, getPutCall(null));
+    }
+
+    private int getTimeUntilPreviousState() {
+        return (int) Duration.between(getPreviousState().getDefinedStart(), definedStart).toMillis();
+    }
+
+    public ScheduledStateSnapshot getPreviousState() {
+        if (cachedPreviousState == null) {
+            cachedPreviousState = previousStateLookup.apply(this);
+        }
+        return cachedPreviousState;
     }
 
     public boolean hasTransitionBefore() {
