@@ -19,7 +19,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import org.mockito.Mockito;
@@ -2960,7 +2959,6 @@ class HueSchedulerTest {
         ensureRunnable(initialNow.plusDays(1).minusMinutes(10), initialNow.plusDays(2).minusMinutes(40));
     }
 
-    @Disabled
     @Test
     void parse_transitionTimeBefore_multipleStates_usesFullPictureForInterpolation() {
         addKnownLightIdsWithDefaultCapabilities(1);
@@ -2974,6 +2972,23 @@ class HueSchedulerTest {
                 expectedRunnable(now.plusMinutes(15), now.plusDays(1))
         );
 
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(0),
+                expectedPutCall(1).ct(200)
+        );
+
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(10)); // next day
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(1),
+                expectedPutCall(1).bri(200)
+        );
+
+        ensureRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(1).plusMinutes(15)); // next day
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(2),
+                expectedPutCall(1).ct(250).transitionTime(tr("5min"))
+        );
+
+        ensureRunnable(initialNow.plusDays(1).plusMinutes(15), initialNow.plusDays(2)); // next day
     }
 
     @Test

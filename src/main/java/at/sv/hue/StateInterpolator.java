@@ -9,6 +9,8 @@ import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.Objects;
+import java.util.function.Function;
 
 @RequiredArgsConstructor
 public final class StateInterpolator {
@@ -73,13 +75,39 @@ public final class StateInterpolator {
     }
 
     /**
-     * Returns true if the previous and target put call don't have any common properties, which means that no interpolation
+     * Returns true if the previous and target put call don't have any differing common properties, which means that no interpolation
      * would be possible. Here we don't care about the time differences, but just the available properties of the put calls.
      */
     public static boolean hasNoOverlappingProperties(PutCall previous, PutCall target) {
-        PutCall putCall = interpolate(previous, target, BigDecimal.ONE, false);
-        putCall.setOn(null); // do not reuse on property
-        return putCall.isNullCall();
+        previous.setOn(null); // do not reuse on property
+        convertColorModeIfNeeded(previous, target);
+        removeEqualProperties(previous, target);
+        return previous.isNullCall();
+    }
+
+    private static void removeEqualProperties(PutCall putCall, PutCall target) {
+        if (isEqualOrNotAvailableAtTarget(putCall, target, PutCall::getBri)) {
+            putCall.setBri(null);
+        }
+        if (isEqualOrNotAvailableAtTarget(putCall, target, PutCall::getCt)) {
+            putCall.setCt(null);
+        }
+        if (isEqualOrNotAvailableAtTarget(putCall, target, PutCall::getHue)) {
+            putCall.setHue(null);
+        }
+        if (isEqualOrNotAvailableAtTarget(putCall, target, PutCall::getSat)) {
+            putCall.setSat(null);
+        }
+        if (isEqualOrNotAvailableAtTarget(putCall, target, PutCall::getX)) {
+            putCall.setX(null);
+        }
+        if (isEqualOrNotAvailableAtTarget(putCall, target, PutCall::getY)) {
+            putCall.setY(null);
+        }
+    }
+
+    private static boolean isEqualOrNotAvailableAtTarget(PutCall putCall, PutCall target, Function<PutCall, Object> function) {
+        return Objects.equals(function.apply(putCall), function.apply(target)) || function.apply(target) == null;
     }
 
     /**

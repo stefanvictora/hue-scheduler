@@ -376,9 +376,10 @@ public final class HueScheduler implements Runnable {
     }
 
     private ScheduledStateSnapshot lookupPreviousState(ScheduledStateSnapshot currentStateSnapshot) {
-        return lookupPreviousStatesListIgnoringSame(currentStateSnapshot).stream()
-                                                                         .findFirst()
-                                                                         .orElse(null);
+        List<ScheduledStateSnapshot> previousStates = lookupPreviousStatesListIgnoringSame(currentStateSnapshot);
+        return previousStates.stream()
+                             .findFirst()
+                             .orElse(null);
     }
 
     private List<ScheduledStateSnapshot> lookupPreviousStatesListIgnoringSame(ScheduledStateSnapshot currentStateSnapshot) {
@@ -386,12 +387,18 @@ public final class HueScheduler implements Runnable {
         ZonedDateTime theDayBefore = definedStart.minusDays(1).truncatedTo(ChronoUnit.DAYS).withEarlierOffsetAtOverlap();
         return getLightStatesForId(currentStateSnapshot.getId())
                 .stream()
+                .filter(currentStateSnapshot::isNotSameState)
                 .flatMap(state -> Stream.of(state.getSnapshot(theDayBefore), state.getSnapshot(definedStart)))
-                .sorted(Comparator.comparing(ScheduledStateSnapshot::getDefinedStart, Comparator.reverseOrder())
+                .sorted(Comparator.comparing(ScheduledStateSnapshot::getDefinedStart, Comparator.reverseOrder()) // todo: for a better solution it would be nice to sort by start instead of definedStart
                                   .thenComparing(snapshot -> snapshot.getScheduledState().hasTransitionBefore()))
                 .distinct()
-                .filter(currentStateSnapshot::isNotSameState)
-                .filter(previousStateSnapshot -> previousStateSnapshot.getDefinedStart().isBefore(currentStateSnapshot.getDefinedStart()))
+                .filter(previousStateSnapshot -> {
+                    ZonedDateTime previousDefinedStart = previousStateSnapshot.getDefinedStart();
+                    if (previousDefinedStart.isEqual(definedStart)) {
+                        return previousStateSnapshot.hasTransitionBefore(); // workaround for back to back tr-before and zero length states
+                    }
+                    return previousDefinedStart.isBefore(definedStart);
+                })
                 .collect(Collectors.toList());
     }
 
@@ -520,27 +527,8 @@ public final class HueScheduler implements Runnable {
         if (interpolation != null) {
             return interpolation.putCall();
         } else {
-            return getFullPicturePutCall(state, currentTime.get());
+            return state.getFullPicturePutCall(currentTime.get());
         }
-    }
-
-    private PutCall getFullPicturePutCall(ScheduledStateSnapshot state, ZonedDateTime now) {
-        PutCall putCall = state.getPutCall(now);
-        List<ScheduledStateSnapshot> previousStates = lookupPreviousStatesListIgnoringSame(state);
-        for (ScheduledStateSnapshot previousState : previousStates) {
-            PutCall previousPutCall = previousState.getPutCall(null);
-            if (putCall.getBri() == null) {
-                putCall.setBri(previousPutCall.getBri());
-            }
-            if (putCall.getColorMode() == ColorMode.NONE) {
-                putCall.setCt(previousPutCall.getCt());
-                putCall.setHue(previousPutCall.getHue());
-                putCall.setSat(previousPutCall.getSat());
-                putCall.setX(previousPutCall.getX());
-                putCall.setY(previousPutCall.getY());
-            }
-        }
-        return putCall;
     }
 
     private void syncScene(String id, PutCall scenePutCall) {
@@ -651,7 +639,7 @@ public final class HueScheduler implements Runnable {
             return; // skip interpolations if the previous or current state was the last state set without any power cycles
         }
         PutCall interpolatedPutCall = interpolation.putCall();
-        LOG.trace("Perform interpolation from previous state: {}", previousState.getScheduledState());
+        LOG.trace("Perform interpolation from previous state: {}", previousState);
         Integer interpolationTransitionTime = getInterpolationTransitionTime(previousState);
         interpolatedPutCall.setTransitionTime(interpolationTransitionTime);
         putState(previousState, interpolatedPutCall);
@@ -795,7 +783,7 @@ public final class HueScheduler implements Runnable {
     private PutCall getPutCallWithAdjustedTr(ScheduledStateSnapshot state, ZonedDateTime now) {
         PutCall putCall;
         if (wasJustTurnedOn(state)) {
-            putCall = getFullPicturePutCall(state, now);
+            putCall = state.getFullPicturePutCall(now);
         } else {
             putCall = state.getPutCall(now);
         }

@@ -9,6 +9,7 @@ import lombok.Setter;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.function.Function;
 
@@ -63,8 +64,8 @@ public class ScheduledStateSnapshot {
     }
 
     private boolean hasNoOverlappingProperties() {
-        PutCall previousPutCall = getPreviousState().getPutCall(null); // todo: refactor to use full picture
-        return StateInterpolator.hasNoOverlappingProperties(previousPutCall, getPutCall(null));
+        PutCall previousPutCall = getPreviousState().getFullPicturePutCall(null);
+        return StateInterpolator.hasNoOverlappingProperties(previousPutCall, getPutCallIgnoringTransition());
     }
 
     private int getTimeUntilPreviousState() {
@@ -159,6 +160,36 @@ public class ScheduledStateSnapshot {
         return scheduledState.getPutCall(now, definedStart);
     }
 
+    private PutCall getPutCallIgnoringTransition() {
+        return scheduledState.getPutCall(null, null);
+    }
+
+    public PutCall getFullPicturePutCall(ZonedDateTime now) {
+        PutCall putCall = getPutCall(now);
+        ScheduledStateSnapshot previousState = this;
+        while (true) {
+            previousState = previousState.getPreviousState();
+            if (previousState == null || isSameState(previousState)) {
+                break;
+            }
+            PutCall previousPutCall = previousState.getPutCallIgnoringTransition();
+            if (putCall.getBri() == null) {
+                putCall.setBri(previousPutCall.getBri());
+            }
+            if (putCall.getColorMode() == ColorMode.NONE) {
+                putCall.setCt(previousPutCall.getCt());
+                putCall.setHue(previousPutCall.getHue());
+                putCall.setSat(previousPutCall.getSat());
+                putCall.setX(previousPutCall.getX());
+                putCall.setY(previousPutCall.getY());
+            }
+            if (putCall.getBri() != null && putCall.getColorMode() != ColorMode.NONE) {
+                break; // no further updates needed
+            }
+        }
+        return putCall;
+    }
+
     public LightCapabilities getCapabilities() {
         return scheduledState.getCapabilities();
     }
@@ -171,12 +202,16 @@ public class ScheduledStateSnapshot {
         scheduledState.setLastSeen(lastSeen);
     }
 
-    public boolean isNotSameState(ScheduledStateSnapshot state) {
-        return scheduledState.isNotSameState(state.getScheduledState());
+    public boolean isNotSameState(ScheduledState state) {
+        return !isSameState(state);
     }
 
     public boolean isSameState(ScheduledState state) {
         return scheduledState.isSameState(state);
+    }
+
+    public boolean isSameState(ScheduledStateSnapshot state) {
+        return isSameState(state.getScheduledState());
     }
 
     /**
@@ -227,10 +262,18 @@ public class ScheduledStateSnapshot {
     public String toString() {
         return scheduledState.getFormattedName() +
                " {" +
-               "start=" + scheduledState.getFormattedStart(definedStart) +
+               "start=" + getFormattedStart() +
                ", end=" + getFormattedEnd() +
                ", " + scheduledState.getFormattedProperties() +
                "}";
+    }
+
+    private String getFormattedStart() {
+        if (cachedStart != null) {
+            return scheduledState.getStartString() + " (" + DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(cachedStart) + ")";
+        } else {
+            return scheduledState.getStartString();
+        }
     }
 
     private String getFormattedEnd() {

@@ -14,7 +14,6 @@ import lombok.Setter;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAdjusters;
 import java.util.Arrays;
 import java.util.EnumSet;
@@ -32,6 +31,7 @@ final class ScheduledState { // todo: a better name would be StateDefinition
     public static final int MAX_TRANSITION_TIME_MS = MAX_TRANSITION_TIME * 100;
 
     private final Identifier identifier;
+    @Getter
     private final String startString;
     private final Integer brightness;
     private final Integer ct;
@@ -375,10 +375,6 @@ final class ScheduledState { // todo: a better name would be StateDefinition
         }
     }
 
-    public boolean isNotSameState(ScheduledState state) {
-        return !isSameState(state);
-    }
-
     public boolean isSameState(ScheduledState state) {
         return this == state || originalState == state;
     }
@@ -409,7 +405,7 @@ final class ScheduledState { // todo: a better name would be StateDefinition
 
     @Override
     public String toString() {
-        return getFormattedName() + " {" + getFormattedProperties() + '}';
+        return getFormattedName() + " {" + "start=" + startString + ", " + getFormattedProperties() + '}';
     }
 
     public String getFormattedProperties() {
@@ -425,9 +421,8 @@ final class ScheduledState { // todo: a better name would be StateDefinition
                getFormattedPropertyIfSet("sat", sat) +
                getFormattedPropertyIfSet("effect", effect) +
                getFormattedDaysOfWeek() +
-               getFormattedTransitionTimeBefore() +
+               getFormattedPropertyIfSet("tr-before", transitionTimeBeforeString) +
                getFormattedTransitionTimeIfSet("tr", definedTransitionTime) +
-//               getFormattedPropertyIfSet("lastSeen", getFormattedTime(lastSeen)) +
                getFormattedPropertyIfSet("force", force) +
                getFormattedPropertyIfSet("interpolate", interpolate);
     }
@@ -449,19 +444,10 @@ final class ScheduledState { // todo: a better name would be StateDefinition
         return context;
     }
 
-    public String getFormattedStart(ZonedDateTime definedStart) {
-        return startString + " (" + DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(definedStart) + ")";
-    }
-
     private String getFormattedTransitionTimeBefore() {
         if (transitionTimeBeforeString == null) {
             return "";
         }
-        // todo
-//        if (lastStart != null) {
-//            return formatPropertyName("tr-before") + transitionTimeBeforeString +
-//                   " (" + formatTransitionTimeBefore(parseTransitionTimeBefore(lastStart)) + ")";
-//        }
         return formatPropertyName("tr-before") + transitionTimeBeforeString;
     }
 
@@ -486,9 +472,5 @@ final class ScheduledState { // todo: a better name would be StateDefinition
 
     private static String formatTransitionTime(Integer transitionTime) {
         return Duration.ofMillis(transitionTime * 100L).toString();
-    }
-
-    private static String formatTransitionTimeBefore(Integer transitionTime) {
-        return Duration.ofMillis(transitionTime).toString();
     }
 }
