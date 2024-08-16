@@ -27,7 +27,7 @@ public final class StateInterpolator {
         }
         PutCall interpolatedPutCall;
         if (isDirectlyAtStartOfState()) {
-            interpolatedPutCall = previousState.getPutCall(dateTime); // directly at start, just use previous put call
+            interpolatedPutCall = previousState.getFullPicturePutCall(dateTime); // directly at start, just use previous put call
         } else {
             interpolatedPutCall = interpolate();
         }
@@ -55,8 +55,8 @@ public final class StateInterpolator {
      */
     private PutCall interpolate() {
         BigDecimal interpolatedTime = getInterpolatedTime();
-        PutCall previous = previousState.getPutCall(dateTime);
-        PutCall target = state.getPutCall(dateTime);
+        PutCall previous = previousState.getFullPicturePutCall(dateTime);
+        PutCall target = state.getFullPicturePutCall(dateTime);
 
         return interpolate(previous, target, interpolatedTime, keepPreviousPropertiesForNullTargets);
     }

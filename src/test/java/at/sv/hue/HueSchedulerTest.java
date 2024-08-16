@@ -2507,7 +2507,7 @@ class HueSchedulerTest {
         );
 
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(0),
-                expectedPutCall(1).on(true)
+                expectedPutCall(1).bri(50).on(true) // full picture on initial startup
         );
 
         ensureRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(40)); // next day
@@ -2760,7 +2760,7 @@ class HueSchedulerTest {
         advanceCurrentTime(Duration.ofMinutes(30));
 
         runAndAssertPutCalls(firstState,
-                expectedPutCall(1).ct(166).x(0.4).y(0.5).transitionTime(1)
+                expectedPutCall(1).bri(50).ct(166).x(0.4).y(0.5).transitionTime(1) // full picture on intial startup
         );
 
         ScheduledRunnable firstStateNextDay = ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusHours(12));
@@ -2790,7 +2790,7 @@ class HueSchedulerTest {
         setCurrentTimeTo(now.plusMinutes(30));
 
         runAndAssertPutCalls(trBeforeRunnable,
-                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 10),
+                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 10).ct(DEFAULT_CT + 20), // full picture used
                 expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 20).ct(DEFAULT_CT + 20).transitionTime(tr("10min"))
         );
 
@@ -2960,35 +2960,93 @@ class HueSchedulerTest {
     }
 
     @Test
-    void parse_transitionTimeBefore_multipleStates_usesFullPictureForInterpolation() {
+    void parse_transitionTimeBefore_multipleStates_usesFullPictureForInterpolation_alsoOnInitialStartup() {
         addKnownLightIdsWithDefaultCapabilities(1);
         addState(1, now, "ct:200");
-        addState(1, now.plusMinutes(10), "bri:200");
-        addState(1, now.plusMinutes(20), "ct:250", "tr-before:5min");
+        addState(1, now.plusMinutes(10), "bri:200", "tr-before:5min"); // tr-before ignored, since no overlapping properties
+        addState(1, now.plusMinutes(30), "ct:250", "tr-before:10min"); // uses ct from first state for interpolation
 
         List<ScheduledRunnable> scheduledRunnables = startScheduler(
                 expectedRunnable(now, now.plusMinutes(10)),
-                expectedRunnable(now.plusMinutes(10), now.plusMinutes(15)),
-                expectedRunnable(now.plusMinutes(15), now.plusDays(1))
+                expectedRunnable(now.plusMinutes(10), now.plusMinutes(20)),
+                expectedRunnable(now.plusMinutes(20), now.plusDays(1))
         );
 
-        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(0),
-                expectedPutCall(1).ct(200)
+        // first state
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).bri(200).ct(200) // full picture on initial startup
         );
 
-        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(10)); // next day
+        ScheduledRunnable firstNextDay = ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(10)); // next day
+
+        // power on: uses full picture
+
+        List<ScheduledRunnable> firstPowerOnRunnables = simulateLightOnEvent(
+                expectedPowerOnEnd(now.plusMinutes(10))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(firstPowerOnRunnables.getFirst(),
+                expectedPutCall(1).bri(200).ct(200)
+        );
+
+        // second state
 
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(1),
-                expectedPutCall(1).bri(200)
+                expectedPutCall(1).bri(200) // no full picture anymore
         );
 
-        ensureRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(1).plusMinutes(15)); // next day
+        ensureRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(1).plusMinutes(20)); // next day
+
+        List<ScheduledRunnable> secondPowerOnRunnables = simulateLightOnEvent(
+                expectedPowerOnEnd(initialNow.plusMinutes(10)),
+                expectedPowerOnEnd(initialNow.plusMinutes(20))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(secondPowerOnRunnables.get(1),
+                expectedPutCall(1).ct(200).bri(200)
+        );
+        
+        // third state
 
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(2),
+                expectedPutCall(1).ct(250).transitionTime(tr("10min"))
+        );
+
+        ensureRunnable(initialNow.plusDays(1).plusMinutes(20), initialNow.plusDays(2)); // next day
+
+        // power-on directly at start: uses previous state
+        
+        List<ScheduledRunnable> thirdPowerOnRunnables = simulateLightOnEvent(
+                expectedPowerOnEnd(initialNow.plusMinutes(20)),
+                expectedPowerOnEnd(initialNow.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(thirdPowerOnRunnables.get(1),
+                expectedPutCall(1).ct(200).bri(200),
+                expectedPutCall(1).ct(250).transitionTime(tr("10min"))
+        );
+        
+        // power-on five minutes after: performs interpolation
+
+        advanceCurrentTime(Duration.ofMinutes(5));
+
+        List<ScheduledRunnable> fourthPowerOnRunnables = simulateLightOnEvent(
+                expectedPowerOnEnd(initialNow.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(fourthPowerOnRunnables.getFirst(),
+                expectedPutCall(1).ct(225).bri(200),
                 expectedPutCall(1).ct(250).transitionTime(tr("5min"))
         );
 
-        ensureRunnable(initialNow.plusDays(1).plusMinutes(15), initialNow.plusDays(2)); // next day
+        // first next day
+
+        advanceTimeAndRunAndAssertPutCalls(firstNextDay,
+                expectedPutCall(1).ct(200) // no full picture
+        );
+
+        ensureRunnable(initialNow.plusDays(2), initialNow.plusDays(2).plusMinutes(10)); // next day
     }
 
     @Test

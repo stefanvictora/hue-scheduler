@@ -167,7 +167,7 @@ public class ScheduledStateSnapshot {
     public PutCall getFullPicturePutCall(ZonedDateTime now) {
         PutCall putCall = getPutCall(now);
         ScheduledStateSnapshot previousState = this;
-        while (true) {
+        while (putCall.getBri() == null || putCall.getColorMode() == ColorMode.NONE) {
             previousState = previousState.getPreviousState();
             if (previousState == null || isSameState(previousState)) {
                 break;
@@ -182,9 +182,6 @@ public class ScheduledStateSnapshot {
                 putCall.setSat(previousPutCall.getSat());
                 putCall.setX(previousPutCall.getX());
                 putCall.setY(previousPutCall.getY());
-            }
-            if (putCall.getBri() != null && putCall.getColorMode() != ColorMode.NONE) {
-                break; // no further updates needed
             }
         }
         return putCall;
@@ -235,7 +232,7 @@ public class ScheduledStateSnapshot {
     }
 
     public boolean isScheduledOn(ZonedDateTime day) {
-        return scheduledState.isScheduledOn(day);
+        return isScheduledOn(DayOfWeek.from(day));
     }
 
     public boolean isScheduledOn(DayOfWeek... day) {

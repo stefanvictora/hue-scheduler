@@ -308,10 +308,6 @@ final class ScheduledState { // todo: a better name would be StateDefinition
         return daysOfWeek.stream().findFirst().get();
     }
 
-    public boolean isScheduledOn(ZonedDateTime day) {
-        return isScheduledOn(DayOfWeek.from(day));
-    }
-
     public boolean isScheduledOn(DayOfWeek... day) {
         return daysOfWeek.containsAll(Arrays.asList(day));
     }

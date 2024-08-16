@@ -478,8 +478,8 @@ public final class HueScheduler implements Runnable {
                     retryWhenBackOn(snapshot);
                     return;
                 }
-                putAdditionalInterpolatedStateIfNeeded(snapshot);
-                putState(snapshot);
+                boolean performedInterpolation = putAdditionalInterpolatedStateIfNeeded(snapshot);
+                putState(snapshot, performedInterpolation);
             } catch (BridgeConnectionFailure | ApiFailure e) {
                 logException(e);
                 retry(snapshot, getMs(bridgeFailureRetryDelayInSeconds));
@@ -627,16 +627,16 @@ public final class HueScheduler implements Runnable {
                                .orElse(null);
     }
 
-    private void putAdditionalInterpolatedStateIfNeeded(ScheduledStateSnapshot state) {
+    private boolean putAdditionalInterpolatedStateIfNeeded(ScheduledStateSnapshot state) {
         Interpolation interpolation = getInterpolatedPutCallIfNeeded(state);
         if (interpolation == null) {
-            return;
+            return false;
         }
         ScheduledStateSnapshot previousState = interpolation.previousState();
         ScheduledState lastSeenState = getLastSeenState(state.getId());
         if ((lastSeenState == previousState.getScheduledState() || state.isSameState(lastSeenState) && state.isSplitState())
             && wasNotJustTurnedOn(state)) {
-            return; // skip interpolations if the previous or current state was the last state set without any power cycles
+            return false; // skip interpolations if the previous or current state was the last state set without any power cycles
         }
         PutCall interpolatedPutCall = interpolation.putCall();
         LOG.trace("Perform interpolation from previous state: {}", previousState);
@@ -644,6 +644,7 @@ public final class HueScheduler implements Runnable {
         interpolatedPutCall.setTransitionTime(interpolationTransitionTime);
         putState(previousState, interpolatedPutCall);
         sleepIfNeeded(interpolationTransitionTime);
+        return true;
     }
 
     private Interpolation getInterpolatedPutCallIfNeeded(ScheduledStateSnapshot state) {
@@ -720,7 +721,7 @@ public final class HueScheduler implements Runnable {
         return seconds * 1000L;
     }
 
-    private void putState(ScheduledStateSnapshot state) {
+    private void putState(ScheduledStateSnapshot state, boolean performedInterpolation) {
         ZonedDateTime now = currentTime.get();
         if (state.isInsideSplitCallWindow(now)) {
             PutCall interpolatedSplitPutCall = getNextInterpolatedSplitPutCall(state);
@@ -729,14 +730,11 @@ public final class HueScheduler implements Runnable {
             }
             performPutApiCall(state, interpolatedSplitPutCall);
             if (!state.isRetryAfterPowerOnState()) { // schedule follow-up split
-                // todo: maybe clean up a bit
-                ScheduledState temporaryCopy = ScheduledState.createTemporaryCopy(state.getScheduledState());
-                ScheduledStateSnapshot nextSplitSnapshot = temporaryCopy.getSnapshot(state.getDefinedStart());
-                nextSplitSnapshot.setEnd(state.getEnd());
+                ScheduledStateSnapshot nextSplitSnapshot = createTemporaryFollowUpSplitState(state);
                 schedule(nextSplitSnapshot, state.getNextInterpolationSplitDelayInMs(now));
             }
         } else {
-            putState(state, getPutCallWithAdjustedTr(state, now));
+            putState(state, getPutCallWithAdjustedTr(state, now, performedInterpolation));
         }
     }
 
@@ -749,11 +747,18 @@ public final class HueScheduler implements Runnable {
         }
         Interpolation interpolation = getInterpolatedPutCallIfNeeded(state, nextSplitStart, false);
         if (interpolation == null) {
-            return null; // no interpolation possible
+            return null; // no interpolation possible; todo: write test or remove if not needed anymore
         }
         PutCall interpolatedSplitPutCall = interpolation.putCall;
         interpolatedSplitPutCall.setTransitionTime((int) between.toMillis() / 100);
         return interpolatedSplitPutCall;
+    }
+
+    private static ScheduledStateSnapshot createTemporaryFollowUpSplitState(ScheduledStateSnapshot state) {
+        ScheduledState temporaryCopy = ScheduledState.createTemporaryCopy(state.getScheduledState());
+        ScheduledStateSnapshot nextSplitSnapshot = temporaryCopy.getSnapshot(state.getDefinedStart());
+        nextSplitSnapshot.setEnd(state.getEnd());
+        return nextSplitSnapshot;
     }
 
     private void putState(ScheduledStateSnapshot state, PutCall putCall) {
@@ -780,9 +785,9 @@ public final class HueScheduler implements Runnable {
         api.putState(putCall);
     }
 
-    private PutCall getPutCallWithAdjustedTr(ScheduledStateSnapshot state, ZonedDateTime now) {
+    private PutCall getPutCallWithAdjustedTr(ScheduledStateSnapshot state, ZonedDateTime now, boolean performedInterpolation) {
         PutCall putCall;
-        if (wasJustTurnedOn(state)) {
+        if (shouldUseFullPicture(state, performedInterpolation)) {
             putCall = state.getFullPicturePutCall(now);
         } else {
             putCall = state.getPutCall(now);
@@ -799,6 +804,17 @@ public final class HueScheduler implements Runnable {
             putCall.setTransitionTime(getAdjustedTransitionTime(duration, requiredGap, nextState));
         }
         return putCall;
+    }
+
+    private boolean shouldUseFullPicture(ScheduledStateSnapshot state, boolean performedInterpolation) {
+        if (performedInterpolation) {
+            return false;
+        }
+        return wasJustTurnedOn(state) || isFirstTimeStateSeen(state);
+    }
+
+    private boolean isFirstTimeStateSeen(ScheduledStateSnapshot state) {
+        return getLastSeenState(state.getId()) == null;
     }
 
     private Integer getAdjustedTransitionTime(Duration duration, int requiredGap, ScheduledStateSnapshot nextState) {
