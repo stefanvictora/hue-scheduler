@@ -166,6 +166,9 @@ public class ScheduledStateSnapshot {
 
     public PutCall getFullPicturePutCall(ZonedDateTime now) {
         PutCall putCall = getPutCall(now);
+        if (putCall.getOn() == Boolean.FALSE) {
+            return putCall;
+        }
         ScheduledStateSnapshot previousState = this;
         while (putCall.getBri() == null || putCall.getColorMode() == ColorMode.NONE) {
             previousState = previousState.getPreviousState();

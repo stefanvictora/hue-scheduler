@@ -246,7 +246,7 @@ public class HassApiImpl implements HueApi {
     }
 
     @Override
-    public void createOrUpdateScene(String groupId, PutCall putCall, String sceneSyncName) {
+    public void createOrUpdateScene(String groupId, String sceneSyncName, PutCall basePutCall, List<PutCall> overriddenPutCalls) {
         // todo
     }
 
