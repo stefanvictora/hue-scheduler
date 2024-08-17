@@ -275,12 +275,12 @@ public final class HueApiImpl implements HueApi {
         if (existingScene == null) {
             Scene newScene = new Scene(sceneSyncName, group.toResourceReference(), updatedActions);
             String response = createScene(newScene);
-            log.trace("Created scene: {}", response.trim());
+            log.trace("Created scene: {}", response != null ? response.trim() : "");
             availableScenesCache.invalidateAll();
         } else if (actionsDiffer(existingScene, updatedActions)) {
             Scene updatedScene = new Scene(updatedActions);
             String response = updateScene(existingScene, updatedScene);
-            log.trace("Updated scene: {}", response.trim());
+            log.trace("Updated scene: {}", response != null ? response.trim() : "");
         } else {
             log.trace("Scene already up to date, skip sync");
         }
