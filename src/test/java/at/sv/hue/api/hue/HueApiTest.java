@@ -30,8 +30,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 class HueApiTest {
     private static final Double[][] GAMUT_A = new Double[][]{{0.704, 0.296}, {0.2151, 0.7106}, {0.138, 0.08}};
@@ -2576,30 +2575,149 @@ class HueApiTest {
                   "errors": [],
                   "data": [
                     {
-                      "id": "4c69c282-3e45-4e87-adb0-fa52e03b4620",
+                      "id": "GROUPED_LIGHT_1",
                       "owner": {
-                        "rid": "3cfd5fad-2811-430a-a099-ae692b2185f8",
+                        "rid": "ROOM_1",
                         "rtype": "room"
                       },
                       "type": "grouped_light"
                     },
                     {
-                      "id": "eeb336d9-243b-4756-8455-1c69f50efd31",
+                      "id": "GROUPED_LIGHT_2",
                       "owner": {
-                        "rid": "75ee4e3b-cacb-4b87-923b-d11d2480e8ff",
+                        "rid": "ZONE_1",
                         "rtype": "zone"
                       },
                       "type": "grouped_light"
                     }
                   ]
                 }""");
+        setGetResponse("/room", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "ROOM_1",
+                      "id_v1": "/groups/1",
+                      "children": [
+                        {
+                          "rid": "DEVICE_1",
+                          "rtype": "device"
+                        },
+                        {
+                          "rid": "DEVICE_2",
+                          "rtype": "device"
+                        }
+                      ],
+                      "services": [
+                        {
+                          "rid": "GROUPED_LIGHT_1",
+                          "rtype": "grouped_light"
+                        }
+                      ],
+                      "metadata": {
+                        "name": "Living Room",
+                        "archetype": "living_room"
+                      },
+                      "type": "room"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/zone", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "ZONE_1",
+                      "id_v1": "/groups/3",
+                      "children": [
+                        {
+                          "rid": "LIGHT_1",
+                          "rtype": "light"
+                        },
+                        {
+                          "rid": "LIGHT_2_1",
+                          "rtype": "light"
+                        }
+                      ],
+                      "services": [
+                        {
+                          "rid": "GROUPED_LIGHT_2",
+                          "rtype": "grouped_light"
+                        }
+                      ],
+                      "metadata": {
+                        "name": "Couch",
+                        "archetype": "lounge"
+                      },
+                      "type": "zone"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/device", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "DEVICE_1",
+                      "product_data": {
+                        "model_id": "LST001",
+                        "manufacturer_name": "Signify Netherlands B.V.",
+                        "product_name": "Hue lightstrip",
+                        "product_archetype": "hue_lightstrip",
+                        "certified": true,
+                        "software_version": "67.116.3",
+                        "hardware_platform_type": "100b-103"
+                      },
+                      "metadata": {
+                        "name": "Couch",
+                        "archetype": "hue_lightstrip"
+                      },
+                      "services": [
+                        {
+                          "rid": "467288fc-29b1-483b-98b0-f6faf8396dc1",
+                          "rtype": "zigbee_connectivity"
+                        },
+                        {
+                          "rid": "LIGHT_1",
+                          "rtype": "light"
+                        }
+                      ],
+                      "type": "device"
+                    },
+                    {
+                      "id": "DEVICE_2",
+                      "metadata": {
+                        "name": "Schreibtisch R",
+                        "archetype": "sultan_bulb"
+                      },
+                      "services": [
+                        {
+                          "rid": "d64efab2-f44a-45de-85c4-26f8857482f1",
+                          "rtype": "zigbee_connectivity"
+                        },
+                        {
+                          "rid": "LIGHT_2_1",
+                          "rtype": "light"
+                        },
+                        {
+                          "rid": "LIGHT_2_2",
+                          "rtype": "light"
+                        }
+                      ],
+                      "type": "device"
+                    }
+                  ]
+                }
+                """);
         setGetResponse("/scene", """
                 {
                   "errors": [],
                   "data": [
                     {
-                      "id": "4b5a905c-cc5e-48be-bc15-84da7deb5da7",
-                      "id_v1": "/scenes/CYpbjqIplpzquoRn",
+                      "id": "SCENE_1",
                       "actions": [
                         {
                           "target": {
@@ -2632,8 +2750,8 @@ class HueApiTest {
                             },
                             "color": {
                               "xy": {
-                                "x": 0.26250000000000009,
-                                "y": 0.1357000000000001
+                                "x": 0.262,
+                                "y": 0.135
                               }
                             }
                           }
@@ -2650,7 +2768,7 @@ class HueApiTest {
                         "name": "Scene_1"
                       },
                       "group": {
-                        "rid": "3cfd5fad-2811-430a-a099-ae692b2185f8",
+                        "rid": "ROOM_1",
                         "rtype": "room"
                       },
                       "speed": 0.6031746031746031,
@@ -2661,12 +2779,11 @@ class HueApiTest {
                       "type": "scene"
                     },
                     {
-                      "id": "f96f02db-9765-401c-9aa5-86d59fbdde8e",
-                      "id_v1": "/scenes/dWmQtCtTLkoJZPtD",
+                      "id": "SCENE_3",
                       "actions": [
                         {
                           "target": {
-                            "rid": "1aa6083d-3692-49e5-92f7-b926b302dd49",
+                            "rid": "LIGHT_2_1",
                             "rtype": "light"
                           },
                           "action": {
@@ -2674,11 +2791,11 @@ class HueApiTest {
                               "on": true
                             },
                             "dimming": {
-                              "brightness": 7.51
+                              "brightness": 7.0
                             },
                             "color": {
                               "xy": {
-                                "x": 0.5451999999999998,
+                                "x": 0.5451,
                                 "y": 0.2408
                               }
                             }
@@ -2686,7 +2803,7 @@ class HueApiTest {
                         },
                         {
                           "target": {
-                            "rid": "1271bf6f-be63-42fc-b18c-3ad462914d8e",
+                            "rid": "LIGHT_1",
                             "rtype": "light"
                           },
                           "action": {
@@ -2694,7 +2811,7 @@ class HueApiTest {
                               "on": true
                             },
                             "dimming": {
-                              "brightness": 44.51
+                              "brightness": 20.0
                             }
                           }
                         }
@@ -2704,7 +2821,7 @@ class HueApiTest {
                           {
                             "color": {
                               "xy": {
-                                "x": 0.5451999999999998,
+                                "x": 0.5451,
                                 "y": 0.2408
                               }
                             },
@@ -2715,8 +2832,8 @@ class HueApiTest {
                           {
                             "color": {
                               "xy": {
-                                "x": 0.2070756627169788,
-                                "y": 0.08352344251056164
+                                "x": 0.207,
+                                "y": 0.083
                               }
                             },
                             "dimming": {
@@ -2733,7 +2850,7 @@ class HueApiTest {
                         "name": "Scene_3"
                       },
                       "group": {
-                        "rid": "75ee4e3b-cacb-4b87-923b-d11d2480e8ff",
+                        "rid": "ZONE_1",
                         "rtype": "zone"
                       },
                       "speed": 0.6031746031746031,
@@ -2746,224 +2863,99 @@ class HueApiTest {
                   ]
                 }
                 """);
-        setGetResponse("/zone", """
+        setGetResponse("/light", """
                 {
                   "errors": [],
                   "data": [
                     {
-                      "id": "75ee4e3b-cacb-4b87-923b-d11d2480e8ff",
-                      "id_v1": "/groups/3",
-                      "children": [
-                        {
-                          "rid": "1271bf6f-be63-42fc-b18c-3ad462914d8e",
-                          "rtype": "light"
-                        },
-                        {
-                          "rid": "1aa6083d-3692-49e5-92f7-b926b302dd49",
-                          "rtype": "light"
-                        }
-                      ],
-                      "services": [
-                        {
-                          "rid": "eeb336d9-243b-4756-8455-1c69f50efd31",
-                          "rtype": "grouped_light"
-                        }
-                      ],
+                      "id": "LIGHT_1",
                       "metadata": {
-                        "name": "Couch",
-                        "archetype": "lounge"
+                        "name": "Color light"
                       },
-                      "type": "zone"
+                      "on": {
+                        "on": true
+                      },
+                      "dimming": {
+                        "brightness": 100.0,
+                        "min_dim_level": 2.0
+                      },
+                      "color_temperature": {
+                        "mirek": 199,
+                        "mirek_valid": true,
+                        "mirek_schema": {
+                          "mirek_minimum": 153,
+                          "mirek_maximum": 500
+                        }
+                      },
+                      "color": {
+                        "xy": {
+                          "x": 0.3448,
+                          "y": 0.3553
+                        }
+                      },
+                      "type": "light"
                     },
                     {
-                      "id": "78a2948e-b9cc-4a92-8965-09e17819d8d7",
-                      "id_v1": "/groups/83",
-                      "children": [
-                        {
-                          "rid": "1062e2b5-959e-474c-8149-9108e928f332",
-                          "rtype": "light"
-                        },
-                        {
-                          "rid": "23941817-3ebe-4012-b105-04fe4fca5f17",
-                          "rtype": "light"
-                        }
-                      ],
-                      "services": [
-                        {
-                          "rid": "8061bb6b-bb7f-4872-a2ad-fb2d81f88a2d",
-                          "rtype": "grouped_light"
-                        }
-                      ],
+                      "id": "LIGHT_2_1",
                       "metadata": {
-                        "name": "Non Color Lights",
-                        "archetype": "dining"
+                        "name": "Color light"
                       },
-                      "type": "zone"
-                    }
-                  ]
-                }
-                """);
-        setGetResponse("/room", """
-                {
-                  "errors": [],
-                  "data": [
-                    {
-                      "id": "3cfd5fad-2811-430a-a099-ae692b2185f8",
-                      "id_v1": "/groups/1",
-                      "children": [
-                        {
-                          "rid": "cf704269-6f65-47f1-8423-677b65d3f874",
-                          "rtype": "device"
-                        },
-                        {
-                          "rid": "2f279281-3e45-462c-9e89-6b2d3363d883",
-                          "rtype": "device"
+                      "on": {
+                        "on": true
+                      },
+                      "dimming": {
+                        "brightness": 100.0,
+                        "min_dim_level": 0.2
+                      },
+                      "color_temperature": {
+                        "mirek": 199,
+                        "mirek_valid": true,
+                        "mirek_schema": {
+                          "mirek_minimum": 153,
+                          "mirek_maximum": 500
                         }
-                      ],
-                      "services": [
-                        {
-                          "rid": "4c69c282-3e45-4e87-adb0-fa52e03b4620",
-                          "rtype": "grouped_light"
+                      },
+                      "color": {
+                        "xy": {
+                          "x": 0.3448,
+                          "y": 0.3553
                         }
-                      ],
-                      "metadata": {
-                        "name": "Living Room",
-                        "archetype": "living_room"
                       },
-                      "type": "room"
-                    }
-                  ]
-                }
-                """);
-        setGetResponse("/device", """
-                {
-                  "errors": [],
-                  "data": [
-                    {
-                      "id": "cf704269-6f65-47f1-8423-677b65d3f874",
-                      "id_v1": "/lights/1",
-                      "product_data": {
-                        "model_id": "LST001",
-                        "manufacturer_name": "Signify Netherlands B.V.",
-                        "product_name": "Hue lightstrip",
-                        "product_archetype": "hue_lightstrip",
-                        "certified": true,
-                        "software_version": "67.116.3",
-                        "hardware_platform_type": "100b-103"
-                      },
-                      "metadata": {
-                        "name": "Couch",
-                        "archetype": "hue_lightstrip"
-                      },
-                      "identify": {},
-                      "services": [
-                        {
-                          "rid": "467288fc-29b1-483b-98b0-f6faf8396dc1",
-                          "rtype": "zigbee_connectivity"
-                        },
-                        {
-                          "rid": "1aa6083d-3692-49e5-92f7-b926b302dd49",
-                          "rtype": "light"
-                        },
-                        {
-                          "rid": "dcefe837-140a-4842-b5d0-23f15088e50d",
-                          "rtype": "entertainment"
-                        },
-                        {
-                          "rid": "3288bac5-097b-4775-93a2-089efba4c4cb",
-                          "rtype": "device_software_update"
-                        }
-                      ],
-                      "type": "device"
+                      "type": "light"
                     },
                     {
-                      "id": "2f279281-3e45-462c-9e89-6b2d3363d883",
-                      "id_v1": "/lights/27",
-                      "product_data": {
-                        "model_id": "LCA001",
-                        "manufacturer_name": "Signify Netherlands B.V.",
-                        "product_name": "Hue color lamp",
-                        "product_archetype": "sultan_bulb",
-                        "certified": true,
-                        "software_version": "1.116.3",
-                        "hardware_platform_type": "100b-112"
-                      },
+                      "id": "LIGHT_2_2",
                       "metadata": {
-                        "name": "Schreibtisch R",
-                        "archetype": "sultan_bulb"
+                        "name": "Color light"
                       },
-                      "identify": {},
-                      "services": [
-                        {
-                          "rid": "d64efab2-f44a-45de-85c4-26f8857482f1",
-                          "rtype": "zigbee_connectivity"
-                        },
-                        {
-                          "rid": "2697622a-f39a-4f0e-b42e-651f94b4b983",
-                          "rtype": "light"
-                        },
-                        {
-                            "rid": "233ed9ec-cef7-464b-844f-190b55c041d9",
-                            "rtype": "light"
-                        },
-                        {
-                          "rid": "eaa3a531-6aee-48c0-8c0f-aaf629811e6f",
-                          "rtype": "entertainment"
-                        },
-                        {
-                          "rid": "72a25201-bb6a-48ee-9289-33bda9f8ef6e",
-                          "rtype": "taurus_7455"
-                        },
-                        {
-                          "rid": "686e224b-ec99-4b1c-9131-4e770aaa729e",
-                          "rtype": "device_software_update"
+                      "on": {
+                        "on": true
+                      },
+                      "dimming": {
+                        "brightness": 100.0,
+                        "min_dim_level": 0.2
+                      },
+                      "color_temperature": {
+                        "mirek": 199,
+                        "mirek_valid": true,
+                        "mirek_schema": {
+                          "mirek_minimum": 153,
+                          "mirek_maximum": 500
                         }
-                      ],
-                      "type": "device"
+                      },
+                      "color": {
+                        "xy": {
+                          "x": 0.3448,
+                          "y": 0.3553
+                        }
+                      },
+                      "type": "light"
                     }
                   ]
-                }
-                """);
-//        setV2GetResponse("/light", """
-//                {
-//                  "errors": [],
-//                  "data": [
-//                    {
-//                      "id": "2697622a-f39a-4f0e-b42e-651f94b4b983",
-//                      "id_v1": "/lights/27",
-//                      "owner": {
-//                        "rid": "2f279281-3e45-462c-9e89-6b2d3363d883",
-//                        "rtype": "device"
-//                      },
-//                      "metadata": {
-//                        "name": "Schreibtisch R",
-//                        "archetype": "sultan_bulb",
-//                        "function": "mixed"
-//                      },
-//                      "service_id": 0,
-//                      "on": {
-//                        "on": true
-//                      },
-//                      "dimming": {
-//                        "brightness": 100.0,
-//                        "min_dim_level": 0.20000000298023225
-//                      },
-//                      "color_temperature": {
-//                        "mirek": 199,
-//                        "mirek_valid": true,
-//                        "mirek_schema": {
-//                          "mirek_minimum": 153,
-//                          "mirek_maximum": 500
-//                        }
-//                      },
-//                      "type": "light"
-//                    }
-//                  ]
-//                }
-//                """);
+                }""");
 
-        // "Scene_3" does not yet exist for Room /groups/1 -> create it
-        createOrUpdateScene("4c69c282-3e45-4e87-adb0-fa52e03b4620",
+        // "Scene_3" does not yet exist for Room -> create it
+        createOrUpdateScene("GROUPED_LIGHT_1",
                 PutCall.builder().ct(250).bri(20).transitionTime(5).build(), "Scene_3");
 
         verifyPost("/scene", """
@@ -2972,13 +2964,13 @@ class HueApiTest {
                     "name": "Scene_3"
                   },
                   "group": {
-                    "rid": "3cfd5fad-2811-430a-a099-ae692b2185f8",
+                    "rid": "ROOM_1",
                     "rtype": "room"
                   },
                   "actions": [
                     {
                       "target": {
-                        "rid": "1aa6083d-3692-49e5-92f7-b926b302dd49",
+                        "rid": "LIGHT_1",
                         "rtype": "light"
                       },
                       "action": {
@@ -2998,7 +2990,7 @@ class HueApiTest {
                     },
                     {
                       "target": {
-                        "rid": "2697622a-f39a-4f0e-b42e-651f94b4b983",
+                        "rid": "LIGHT_2_1",
                         "rtype": "light"
                       },
                       "action": {
@@ -3018,7 +3010,7 @@ class HueApiTest {
                     },
                     {
                       "target": {
-                        "rid": "233ed9ec-cef7-464b-844f-190b55c041d9",
+                        "rid": "LIGHT_2_2",
                         "rtype": "light"
                       },
                       "action": {
@@ -3040,15 +3032,15 @@ class HueApiTest {
                 }
                 """);
 
-        // "Scene_1" already exists for Room /groups/1 -> update it
-        createOrUpdateScene("4c69c282-3e45-4e87-adb0-fa52e03b4620", PutCall.builder().hue(2000).sat(254).build(), "Scene_1");
+        // "Scene_1" already exists for Room -> update it
+        createOrUpdateScene("GROUPED_LIGHT_1", PutCall.builder().hue(2000).sat(254).build(), "Scene_1");
 
-        verifyPut("/scene/4b5a905c-cc5e-48be-bc15-84da7deb5da7", """
+        verifyPut("/scene/SCENE_1", """
                 {
                   "actions": [
                     {
                       "target": {
-                        "rid": "1aa6083d-3692-49e5-92f7-b926b302dd49",
+                        "rid": "LIGHT_1",
                         "rtype": "light"
                       },
                       "action": {
@@ -3065,7 +3057,7 @@ class HueApiTest {
                     },
                     {
                       "target": {
-                        "rid": "2697622a-f39a-4f0e-b42e-651f94b4b983",
+                        "rid": "LIGHT_2_1",
                         "rtype": "light"
                       },
                       "action": {
@@ -3082,7 +3074,7 @@ class HueApiTest {
                     },
                     {
                       "target": {
-                        "rid": "233ed9ec-cef7-464b-844f-190b55c041d9",
+                        "rid": "LIGHT_2_2",
                         "rtype": "light"
                       },
                       "action": {
@@ -3100,16 +3092,16 @@ class HueApiTest {
                   ]
                 }""");
 
-        // "Scene_3" already exists for Zone "/groups/3" -> update it
+        // "Scene_3" already exists for Zone -> update it
 
-        createOrUpdateScene("eeb336d9-243b-4756-8455-1c69f50efd31", PutCall.builder().build(), "Scene_3");
+        createOrUpdateScene("GROUPED_LIGHT_2", PutCall.builder().build(), "Scene_3");
 
-        verifyPut("/scene/f96f02db-9765-401c-9aa5-86d59fbdde8e", """
+        verifyPut("/scene/SCENE_3", """
                 {
                   "actions": [
                     {
                       "target": {
-                        "rid": "1271bf6f-be63-42fc-b18c-3ad462914d8e",
+                        "rid": "LIGHT_1",
                         "rtype": "light"
                       },
                       "action": {
@@ -3120,7 +3112,7 @@ class HueApiTest {
                     },
                     {
                       "target": {
-                        "rid": "1aa6083d-3692-49e5-92f7-b926b302dd49",
+                        "rid": "LIGHT_2_1",
                         "rtype": "light"
                       },
                       "action": {
@@ -3131,10 +3123,658 @@ class HueApiTest {
                     }
                   ]
                 }""");
-
-        // todo: add (or modify) test case so that we test multiple capabilities of lights
 
         // todo: also think about how we would gather the "full picture" of a schedule -> or how we would pass that to the call
+    }
+
+    @Test
+    void getOrCreateScene_adjustsSceneActionBasedOnLightCapability() {
+        setGetResponse("/grouped_light", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "GROUPED_LIGHT",
+                      "owner": {
+                        "rid": "ZONE",
+                        "rtype": "zone"
+                      },
+                      "type": "grouped_light"
+                    }
+                  ]
+                }""");
+        setGetResponse("/zone", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "ZONE",
+                      "children": [
+                        {
+                          "rid": "COLOR",
+                          "rtype": "light"
+                        },
+                        {
+                          "rid": "CT_ONLY",
+                          "rtype": "light"
+                        },
+                        {
+                          "rid": "BRI_ONLY",
+                          "rtype": "light"
+                        },
+                        {
+                          "rid": "ON_OFF_ONLY",
+                          "rtype": "light"
+                        }
+                      ],
+                      "services": [
+                        {
+                          "rid": "GROUPED_LIGHT",
+                          "rtype": "grouped_light"
+                        }
+                      ],
+                      "metadata": {
+                        "name": "Couch",
+                        "archetype": "lounge"
+                      },
+                      "type": "zone"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/scene", EMPTY_RESPONSE);
+        setGetResponse("/light", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "COLOR",
+                      "owner": {
+                        "rid": "2f279281-3e45-462c-9e89-6b2d3363d883",
+                        "rtype": "device"
+                      },
+                      "metadata": {
+                        "name": "Color",
+                        "archetype": "sultan_bulb",
+                        "function": "mixed"
+                      },
+                      "on": {
+                        "on": true
+                      },
+                      "dimming": {
+                        "brightness": 100.0,
+                        "min_dim_level": 0.2
+                      },
+                      "color_temperature": {
+                        "mirek": 199,
+                        "mirek_valid": true,
+                        "mirek_schema": {
+                          "mirek_minimum": 153,
+                          "mirek_maximum": 500
+                        }
+                      },
+                      "color": {
+                        "xy": {
+                          "x": 0.3448,
+                          "y": 0.3553
+                        },
+                        "gamut": {
+                          "red": {
+                            "x": 0.6915,
+                            "y": 0.3083
+                          },
+                          "green": {
+                            "x": 0.17,
+                            "y": 0.7
+                          },
+                          "blue": {
+                            "x": 0.1532,
+                            "y": 0.0475
+                          }
+                        },
+                        "gamut_type": "C"
+                      },
+                      "type": "light"
+                    },
+                    {
+                      "id": "CT_ONLY",
+                      "owner": {
+                        "rid": "2184f321-73fb-432d-afb3-33f7d2c23557",
+                        "rtype": "device"
+                      },
+                      "metadata": {
+                        "name": "CT Only",
+                        "archetype": "candle_bulb",
+                        "function": "mixed"
+                      },
+                      "on": {
+                        "on": true
+                      },
+                      "dimming": {
+                        "brightness": 100.0,
+                        "min_dim_level": 2.0
+                      },
+                      "color_temperature": {
+                        "mirek": 199,
+                        "mirek_valid": true,
+                        "mirek_schema": {
+                          "mirek_minimum": 153,
+                          "mirek_maximum": 454
+                        }
+                      },
+                      "type": "light"
+                    },
+                    {
+                      "id": "BRI_ONLY",
+                      "owner": {
+                        "rid": "645a6898-1a16-47af-aa17-7cc4c348f337",
+                        "rtype": "device"
+                      },
+                      "metadata": {
+                        "name": "Bri Only",
+                        "archetype": "sultan_bulb",
+                        "fixed_mired": 366,
+                        "function": "mixed"
+                      },
+                      "on": {
+                        "on": false
+                      },
+                      "dimming": {
+                        "brightness": 100.0,
+                        "min_dim_level": 5.0
+                      },
+                      "type": "light"
+                    },
+                    {
+                      "id": "ON_OFF_ONLY",
+                      "owner": {
+                        "rid": "0cd93bd2-8719-4fcb-83b3-f149549bd863",
+                        "rtype": "device"
+                      },
+                      "metadata": {
+                        "name": "On Off Only",
+                        "archetype": "plug",
+                        "function": "functional"
+                      },
+                      "on": {
+                        "on": false
+                      },
+                      "type": "light"
+                    }
+                  ]
+                }
+                """);
+
+        // Color and brightness (uses min mirek):
+
+        createOrUpdateScene("GROUPED_LIGHT", PutCall.builder().x(0.280).y(0.280).bri(20).build(), "SCENE");
+
+        verifyPost("/scene", """
+                {
+                  "metadata": {
+                    "name": "SCENE"
+                  },
+                  "group": {
+                    "rid": "ZONE",
+                    "rtype": "zone"
+                  },
+                  "actions": [
+                    {
+                      "target": {
+                        "rid": "COLOR",
+                        "rtype": "light"
+                      },
+                      "action": {
+                        "on": {
+                          "on": true
+                        },
+                        "dimming": {
+                          "brightness": 7.87
+                        },
+                        "color": {
+                          "xy": {
+                            "x": 0.28,
+                            "y": 0.28
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "target": {
+                        "rid": "CT_ONLY",
+                        "rtype": "light"
+                      },
+                      "action": {
+                        "on": {
+                          "on": true
+                        },
+                        "dimming": {
+                          "brightness": 7.87
+                        },
+                        "color_temperature": {
+                          "mirek": 153
+                        }
+                      }
+                    },
+                    {
+                      "target": {
+                        "rid": "BRI_ONLY",
+                        "rtype": "light"
+                      },
+                      "action": {
+                        "on": {
+                          "on": true
+                        },
+                        "dimming": {
+                          "brightness": 7.87
+                        }
+                      }
+                    },
+                    {
+                      "target": {
+                        "rid": "ON_OFF_ONLY",
+                        "rtype": "light"
+                      },
+                      "action": {
+                        "on": {
+                          "on": true
+                        }
+                      }
+                    }
+                  ]
+                }
+                """);
+
+        // CT and brightness (uses max mirek):
+
+        createOrUpdateScene("GROUPED_LIGHT", PutCall.builder().bri(254).ct(499).build(), "SCENE");
+
+        verifyPost("/scene", """
+                {
+                  "metadata": {
+                    "name": "SCENE"
+                  },
+                  "group": {
+                    "rid": "ZONE",
+                    "rtype": "zone"
+                  },
+                  "actions": [
+                    {
+                      "target": {
+                        "rid": "COLOR",
+                        "rtype": "light"
+                      },
+                      "action": {
+                        "on": {
+                          "on": true
+                        },
+                        "dimming": {
+                          "brightness": 100.0
+                        },
+                        "color_temperature": {
+                          "mirek": 499
+                        }
+                      }
+                    },
+                    {
+                      "target": {
+                        "rid": "CT_ONLY",
+                        "rtype": "light"
+                      },
+                      "action": {
+                        "on": {
+                          "on": true
+                        },
+                        "dimming": {
+                          "brightness": 100.0
+                        },
+                        "color_temperature": {
+                          "mirek": 454
+                        }
+                      }
+                    },
+                    {
+                      "target": {
+                        "rid": "BRI_ONLY",
+                        "rtype": "light"
+                      },
+                      "action": {
+                        "on": {
+                          "on": true
+                        },
+                        "dimming": {
+                          "brightness": 100.0
+                        }
+                      }
+                    },
+                    {
+                      "target": {
+                        "rid": "ON_OFF_ONLY",
+                        "rtype": "light"
+                      },
+                      "action": {
+                        "on": {
+                          "on": true
+                        }
+                      }
+                    }
+                  ]
+                }
+                """);
+
+        // HS only:
+
+        createOrUpdateScene("GROUPED_LIGHT", PutCall.builder().hue(2000).sat(254).build(), "SCENE");
+
+        verifyPost("/scene", """
+                {
+                  "metadata": {
+                    "name": "SCENE"
+                  },
+                  "group": {
+                    "rid": "ZONE",
+                    "rtype": "zone"
+                  },
+                  "actions": [
+                    {
+                      "target": {
+                        "rid": "COLOR",
+                        "rtype": "light"
+                      },
+                      "action": {
+                        "on": {
+                          "on": true
+                        },
+                        "color": {
+                          "xy": {
+                            "x": 0.623,
+                            "y": 0.3435
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "target": {
+                        "rid": "CT_ONLY",
+                        "rtype": "light"
+                      },
+                      "action": {
+                        "on": {
+                          "on": true
+                        },
+                        "color_temperature": {
+                          "mirek": 454
+                        }
+                      }
+                    },
+                    {
+                      "target": {
+                        "rid": "BRI_ONLY",
+                        "rtype": "light"
+                      },
+                      "action": {
+                        "on": {
+                          "on": true
+                        }
+                      }
+                    },
+                    {
+                      "target": {
+                        "rid": "ON_OFF_ONLY",
+                        "rtype": "light"
+                      },
+                      "action": {
+                        "on": {
+                          "on": true
+                        }
+                      }
+                    }
+                  ]
+                }
+                """);
+    }
+
+    @Test
+    void getOrCreateScene_updateExistingOne_sameState_noSceneCreationOrUpdateCallMade() {
+        setGetResponse("/grouped_light", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "GROUPED_LIGHT",
+                      "owner": {
+                        "rid": "ZONE",
+                        "rtype": "zone"
+                      },
+                      "type": "grouped_light"
+                    }
+                  ]
+                }""");
+        setGetResponse("/zone", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "ZONE",
+                      "children": [
+                        {
+                          "rid": "CT_ONLY",
+                          "rtype": "light"
+                        },
+                        {
+                          "rid": "COLOR",
+                          "rtype": "light"
+                        }
+                      ],
+                      "services": [
+                        {
+                          "rid": "GROUPED_LIGHT",
+                          "rtype": "grouped_light"
+                        }
+                      ],
+                      "metadata": {
+                        "name": "Couch",
+                        "archetype": "lounge"
+                      },
+                      "type": "zone"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/scene", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "SCENE",
+                      "actions": [
+                        {
+                          "target": {
+                            "rid": "COLOR",
+                            "rtype": "light"
+                          },
+                          "action": {
+                            "on": {
+                              "on": true
+                            },
+                            "dimming": {
+                              "brightness": 100.0
+                            },
+                            "color_temperature": {
+                              "mirek": 199
+                            }
+                          }
+                        },
+                        {
+                          "target": {
+                            "rid": "CT_ONLY",
+                            "rtype": "light"
+                          },
+                          "action": {
+                            "on": {
+                              "on": true
+                            },
+                            "dimming": {
+                              "brightness": 100.0
+                            },
+                            "color_temperature": {
+                              "mirek": 199
+                            }
+                          }
+                        }
+                      ],
+                      "metadata": {
+                        "name": "SCENE"
+                      },
+                      "group": {
+                        "rid": "ZONE",
+                        "rtype": "zone"
+                      },
+                      "speed": 0.6031746031746031,
+                      "auto_dynamic": false,
+                      "status": {
+                        "active": "inactive"
+                      },
+                      "type": "scene"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/light", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "COLOR",
+                      "owner": {
+                        "rid": "2f279281-3e45-462c-9e89-6b2d3363d883",
+                        "rtype": "device"
+                      },
+                      "metadata": {
+                        "name": "Color",
+                        "archetype": "sultan_bulb",
+                        "function": "mixed"
+                      },
+                      "on": {
+                        "on": true
+                      },
+                      "dimming": {
+                        "brightness": 100.0,
+                        "min_dim_level": 0.2
+                      },
+                      "color_temperature": {
+                        "mirek": 199,
+                        "mirek_valid": true,
+                        "mirek_schema": {
+                          "mirek_minimum": 153,
+                          "mirek_maximum": 500
+                        }
+                      },
+                      "color": {
+                        "xy": {
+                          "x": 0.3448,
+                          "y": 0.3553
+                        },
+                        "gamut": {
+                          "red": {
+                            "x": 0.6915,
+                            "y": 0.3083
+                          },
+                          "green": {
+                            "x": 0.17,
+                            "y": 0.7
+                          },
+                          "blue": {
+                            "x": 0.1532,
+                            "y": 0.0475
+                          }
+                        },
+                        "gamut_type": "C"
+                      },
+                      "type": "light"
+                    },
+                    {
+                      "id": "CT_ONLY",
+                      "owner": {
+                        "rid": "2184f321-73fb-432d-afb3-33f7d2c23557",
+                        "rtype": "device"
+                      },
+                      "metadata": {
+                        "name": "CT Only",
+                        "archetype": "candle_bulb",
+                        "function": "mixed"
+                      },
+                      "on": {
+                        "on": true
+                      },
+                      "dimming": {
+                        "brightness": 100.0,
+                        "min_dim_level": 2.0
+                      },
+                      "color_temperature": {
+                        "mirek": 199,
+                        "mirek_valid": true,
+                        "mirek_schema": {
+                          "mirek_minimum": 153,
+                          "mirek_maximum": 454
+                        }
+                      },
+                      "type": "light"
+                    }
+                  ]
+                }
+                """);
+
+        // same state -> no update
+
+        createOrUpdateScene("GROUPED_LIGHT", PutCall.builder().ct(199).bri(254).build(), "SCENE");
+
+        verify(resourceProviderMock, never()).postResource(any(), any());
+        verify(resourceProviderMock, never()).putResource(any(), any());
+
+        // change ct -> performs update
+
+        createOrUpdateScene("GROUPED_LIGHT", PutCall.builder().ct(300).bri(254).build(), "SCENE");
+        
+        verifyPut("/scene/SCENE", """
+                {
+                  "actions": [
+                    {
+                      "target": {
+                        "rid": "CT_ONLY",
+                        "rtype": "light"
+                      },
+                      "action": {
+                        "on": {
+                          "on": true
+                        },
+                        "dimming": {
+                          "brightness": 100.0
+                        },
+                        "color_temperature": {
+                          "mirek": 300
+                        }
+                      }
+                    },
+                    {
+                      "target": {
+                        "rid": "COLOR",
+                        "rtype": "light"
+                      },
+                      "action": {
+                        "on": {
+                          "on": true
+                        },
+                        "dimming": {
+                          "brightness": 100.0
+                        },
+                        "color_temperature": {
+                          "mirek": 300
+                        }
+                      }
+                    }
+                  ]
+                }""");
     }
 
     private boolean isLightOff(String lightId) {

@@ -35,6 +35,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -262,37 +263,65 @@ public final class HueApiImpl implements HueApi {
                                 .build();
     }
 
-    // todo: actually we need to get the "full picture" as put call, not just what the state is right now
-    //  meaning if the previous state defined a brightness, but this state does not. THe full picture would include the previous brightness
+    // todo: we should also already consider the case for different put calls for different lights.
 
     @Override
     public void createOrUpdateScene(String groupedLightId, PutCall putCall, String sceneSyncName) {
         rateLimiter.acquire(10);
-        log.trace("Sync scene: {}", putCall);
-
         Light groupedLight = getAndAssertGroupedLightExists(groupedLightId);
         Group group = getAndAssertGroupExists(groupedLight.getOwner());
-        Scene scene = getScene(group, sceneSyncName);
-        Action action = getSceneAction(putCall);
-
-        // todo: we need to make sure that the lights support the action passed to it -> we can't set color to CT only lights
-        //  the API call will actually fail
-        // todo: we should also already consider the case for different put calls for different lights.
-        List<SceneAction> sceneActions = getContainedLights(group).stream()
-                                                                  .map(resource -> new SceneAction(resource, action))
-                                                                  .toList();
-        if (scene == null) {
-            Scene newScene = new Scene(sceneSyncName, group.toResourceReference(), sceneActions);
-            String response = resourceProvider.postResource(createUrl("/scene"), getBody(newScene));
+        Scene existingScene = getScene(group, sceneSyncName);
+        List<SceneAction> updatedActions = createSceneActions(group, putCall);
+        if (existingScene == null) {
+            Scene newScene = new Scene(sceneSyncName, group.toResourceReference(), updatedActions);
+            String response = createScene(newScene);
+            log.trace("Created scene: {}", response.trim());
             availableScenesCache.invalidateAll();
+        } else if (actionsDiffer(existingScene, updatedActions)) {
+            Scene updatedScene = new Scene(updatedActions);
+            String response = updateScene(existingScene, updatedScene);
+            log.trace("Updated scene: {}", response.trim());
         } else {
-            // todo: we could check if the actions actually differ from the current scene actions -> and only then update
-            Scene updatedScene = new Scene(sceneActions);
-            String response = resourceProvider.putResource(createUrl("/scene/" + scene.getId()), getBody(updatedScene));
+            log.trace("Scene already up to date, skip sync");
         }
     }
 
-    private Action getSceneAction(PutCall putCall) {
+    private List<SceneAction> createSceneActions(Group group, PutCall putCall) {
+        return getContainedLights(group).stream()
+                                        .map(resource -> createSceneAction(putCall, resource))
+                                        .toList();
+    }
+
+    private SceneAction createSceneAction(PutCall putCall, ResourceReference resource) {
+        PutCall updatedPutCall = createPutCallBasedOnCapabilities(putCall, resource.getRid());
+        return new SceneAction(resource, getActionForScene(updatedPutCall));
+    }
+
+    private PutCall createPutCallBasedOnCapabilities(PutCall putCall, String lightId) {
+        PutCall.PutCallBuilder putCallBuilder = putCall.toBuilder();
+        LightCapabilities capabilities = getLightCapabilities(lightId);
+        if (!capabilities.isBrightnessSupported()) {
+            putCallBuilder.bri(null);
+        }
+        if (!capabilities.isCtSupported()) {
+            putCallBuilder.ct(null);
+        }
+        if (!capabilities.isColorSupported() && !capabilities.isCtSupported()) {
+            putCallBuilder.x(null).y(null).hue(null).sat(null);
+        }
+        PutCall updatedPutCall = putCallBuilder.build();
+        if (!capabilities.isColorSupported() && capabilities.isCtSupported()) {
+            ColorModeConverter.convertIfNeeded(updatedPutCall, ColorMode.CT);
+        }
+        if (updatedPutCall.getCt() != null) {
+            Integer ctMin = capabilities.getCtMin();
+            Integer ctMax = capabilities.getCtMax();
+            updatedPutCall.setCt(Math.min(Math.max(updatedPutCall.getCt(), ctMin), ctMax));
+        }
+        return updatedPutCall;
+    }
+
+    private Action getActionForScene(PutCall putCall) {
         Action action = getAction(putCall);
         action.setOn(new On(true));
         return action;
@@ -340,6 +369,19 @@ public final class HueApiImpl implements HueApi {
             return "no_effect";
         }
         return effect;
+    }
+
+    private static boolean actionsDiffer(Scene scene, List<SceneAction> updatedActions) {
+        List<SceneAction> currentActions = scene.getActions();
+        return !new HashSet<>(currentActions).containsAll(updatedActions);
+    }
+
+    private String createScene(Scene newScene) {
+        return resourceProvider.postResource(createUrl("/scene"), getBody(newScene));
+    }
+
+    private String updateScene(Scene scene, Scene updatedScene) {
+        return resourceProvider.putResource(createUrl("/scene/" + scene.getId()), getBody(updatedScene));
     }
 
     private List<String> getContainedLightIds(Group group) {
@@ -494,7 +536,6 @@ public final class HueApiImpl implements HueApi {
 
     @Override
     public void clearCaches() {
-        // todo: maybe use this mechanism when we detect changes to groups or scenes from outside via the event stream
     }
 
     private static Double[][] getMaxGamut(List<LightCapabilities> lightCapabilities) {
@@ -532,7 +573,6 @@ public final class HueApiImpl implements HueApi {
 
     @Override
     public void onModification(String type, String id) {
-        log.trace("Detected modification '{}' '{}'", type, id);
         // todo: maybe switch to different caching logic so we can invalidate individual entries instead of the full cache
         switch (type) {
             case "light" -> availableLightsCache.invalidateAll();
