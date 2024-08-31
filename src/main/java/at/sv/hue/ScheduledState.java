@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
 
-final class ScheduledState { // todo: a better name would be StateDefinition
+public final class ScheduledState { // todo: a better name would be StateDefinition
     public static final int MAX_HUE_VALUE = 65535;
     public static final int MIDDLE_HUE_VALUE = 32768;
     /**

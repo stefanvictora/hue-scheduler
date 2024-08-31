@@ -49,12 +49,12 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -513,10 +513,9 @@ public final class HueScheduler implements Runnable {
 
     private void syncScene(ScheduledStateSnapshot state) {
         try {
-            List<SceneSyncPutCall> overriddenPutCalls = lookupOverriddenPutCalls(state);
             SceneSyncPutCall basePutCall = getSceneSyncPutCall(state);
-            syncScene(state.getId(), basePutCall.putCall(), overriddenPutCalls.stream().map(SceneSyncPutCall::putCall).toList());
-            boolean performedInterpolation = basePutCall.performedInterpolation() || anyInterpolationPerformed(overriddenPutCalls);
+            syncScene(state.getId(), basePutCall.putCall(), lookupOverriddenPutCalls(state));
+            boolean performedInterpolation = basePutCall.performedInterpolation();
             if (performedInterpolation) {
                 scheduleNextSceneSync(state);
             }
@@ -527,54 +526,60 @@ public final class HueScheduler implements Runnable {
         }
     }
 
-    private List<SceneSyncPutCall> lookupOverriddenPutCalls(ScheduledStateSnapshot state) {
+    private List<PutCall> lookupOverriddenPutCalls(ScheduledStateSnapshot state) {
         List<String> groupLights = api.getGroupLights(state.getId());
 
-        List<SceneSyncPutCall> overriddenPutCallsFromOtherLights = lookupOverriddenPutCallsFromOtherLights(groupLights);
-        List<SceneSyncPutCall> overriddenPutCallsFromOtherGroups = lookupOverriddenPutCallsFromOtherGroups(groupLights, state.getId());
+        Map<String, PutCall> overriddenPutCalls = lookupOverriddenPutCallsFromOtherGroups(groupLights, state.getId());
+        lookupOverriddenPutCallsFromOtherLights(groupLights).forEach(putCall -> overriddenPutCalls.put(putCall.getId(), putCall));
 
-        ArrayList<SceneSyncPutCall> combinedList = new ArrayList<>(overriddenPutCallsFromOtherLights);
-        combinedList.addAll(overriddenPutCallsFromOtherGroups);
-        return combinedList;
+        return new ArrayList<>(overriddenPutCalls.values());
     }
 
-    private List<SceneSyncPutCall> lookupOverriddenPutCallsFromOtherLights(List<String> groupLights) {
-        return groupLights.stream()
-                          .map(this::getLightStatesForId)
-                          .filter(Objects::nonNull)
-                          .map(this::getCurrentActivePutCall)
-                          .filter(Objects::nonNull)
-                          .toList();
-    }
-
-    private List<SceneSyncPutCall> lookupOverriddenPutCallsFromOtherGroups(List<String> groupLights, String currentGroupId) {
+    private Map<String, PutCall> lookupOverriddenPutCallsFromOtherGroups(List<String> groupLights, String currentGroupId) {
         return groupLights.stream()
                           .map(groupLight -> api.getAssignedGroups(groupLight))
                           .flatMap(Collection::stream)
                           .distinct()
                           .filter(groupId -> !groupId.equals(currentGroupId))
-                          .filter(groupId -> api.getGroupLights(groupId).size() < groupLights.size())
+                          .map(groupId -> new GroupInfo(groupId, api.getGroupLights(groupId)))
+                          .filter(groupInfo -> groupInfo.groupLights.size() < groupLights.size())
+                          .sorted(Comparator.comparingInt((GroupInfo groupInfo) -> groupInfo.groupLights.size()).reversed())
+                          .map(GroupInfo::groupId)
                           .map(this::getLightStatesForId)
                           .filter(Objects::nonNull)
                           .map(this::getCurrentActivePutCall)
                           .filter(Objects::nonNull)
-                          .flatMap(currentGroupPutCall -> createOverriddenLightPutCalls(currentGroupPutCall, groupLights))
-                          .toList();
+                          .flatMap(currentActivePutCall -> createOverriddenLightPutCalls(currentActivePutCall, groupLights))
+                          .collect(Collectors.toMap(PutCall::getId, putCall -> putCall, (existing, replacement) -> replacement, LinkedHashMap::new));
     }
 
-    private SceneSyncPutCall getCurrentActivePutCall(List<ScheduledState> lightStatesForId) {
+    public record GroupInfo(String groupId, List<String> groupLights) {
+
+    }
+
+    private PutCall getCurrentActivePutCall(List<ScheduledState> lightStatesForId) {
         ZonedDateTime now = currentTime.get();
         return lightStatesForId.stream()
                                .map(state -> state.getSnapshot(now))
                                .filter(snapshot -> isCurrentActivePutCall(snapshot, now))
                                .findFirst()
                                .map(this::getSceneSyncPutCall)
+                               .map(SceneSyncPutCall::putCall)
                                .orElse(null);
     }
 
     private static boolean isCurrentActivePutCall(ScheduledStateSnapshot snapshot, ZonedDateTime now) {
         return (snapshot.getStart().isBefore(now) || snapshot.getStart().isEqual(now)) &&
                snapshot.getEnd() != null && snapshot.getEnd().isAfter(now);  // todo: write test for case when end == null -> i.e. a state that was in the past today during startup
+    }
+
+    private List<PutCall> lookupOverriddenPutCallsFromOtherLights(List<String> groupLights) {
+        return groupLights.stream()
+                          .map(this::getLightStatesForId)
+                          .filter(Objects::nonNull)
+                          .map(this::getCurrentActivePutCall)
+                          .filter(Objects::nonNull)
+                          .toList();
     }
 
     private SceneSyncPutCall getSceneSyncPutCall(ScheduledStateSnapshot state) {
@@ -586,15 +591,14 @@ public final class HueScheduler implements Runnable {
         }
     }
 
-    private record SceneSyncPutCall(PutCall putCall, boolean performedInterpolation) {
+    public record SceneSyncPutCall(PutCall putCall, boolean performedInterpolation) {
 
     }
 
-    private Stream<SceneSyncPutCall> createOverriddenLightPutCalls(SceneSyncPutCall otherGroupPutCall, List<String> groupLights) {
-        return getOverlappingLightIds(otherGroupPutCall.putCall.getId(), groupLights)
+    private Stream<PutCall> createOverriddenLightPutCalls(PutCall otherGroupPutCall, List<String> groupLights) {
+        return getOverlappingLightIds(otherGroupPutCall.getId(), groupLights)
                 .stream()
-                .map(lightId -> convertToLightPutCall(otherGroupPutCall.putCall, lightId))
-                .map(lightPutCall -> new SceneSyncPutCall(lightPutCall, otherGroupPutCall.performedInterpolation()));
+                .map(lightId -> convertToLightPutCall(otherGroupPutCall, lightId));
     }
 
     private List<String> getOverlappingLightIds(String otherGroupId, List<String> groupLights) {
@@ -606,13 +610,6 @@ public final class HueScheduler implements Runnable {
 
     private static PutCall convertToLightPutCall(PutCall putCall, String lightId) {
         return putCall.toBuilder().id(lightId).groupState(false).build();
-    }
-
-    private static boolean anyInterpolationPerformed(List<SceneSyncPutCall> overriddenPutCalls) {
-        return overriddenPutCalls
-                .stream()
-                .map(SceneSyncPutCall::performedInterpolation)
-                .anyMatch(Predicate.isEqual(true));
     }
 
     private void syncScene(String id, PutCall scenePutCall, List<PutCall> overriddenPutCalls) {

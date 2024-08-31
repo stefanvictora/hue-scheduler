@@ -6198,75 +6198,89 @@ class HueSchedulerTest {
     }
 
     @Test
-    void sceneSync_considersOtherOverlappingSchedules_otherGroups_onlyConsidersGroupsSmallerInSize_buildsFullPicture() {
+    void sceneSync_considersOtherOverlappingSchedules_otherGroups_andIndividualLights_onlyConsidersGroupsSmallerInSize_buildsFullPicture() {
         enableSceneSync();
 
         mockDefaultGroupCapabilities(1);
         mockDefaultGroupCapabilities(2);
+        mockDefaultGroupCapabilities(3);
         mockGroupLightsForId(1, 5, 6, 7, 8);
-        mockGroupLightsForId(2, 5, 6, 9);
+        mockGroupLightsForId(2, 5, 6, 7);
         mockGroupLightsForId(3, 5);
         mockAssignedGroups(5, 1, 2, 3);
         mockAssignedGroups(6, 1, 2);
         mockAssignedGroups(7, 1);
         mockAssignedGroups(8, 1);
         mockAssignedGroups(9, 2);
+        addKnownLightIdsWithDefaultCapabilities(7);
         addState("g1", now, "bri:100");
-        addState("g2", now, "bri:200");
-        addState("g1", now.plusMinutes(10), "bri:150");
+        addState("g2", now, "bri:120");
+        addState("g3", now, "bri:130");
+        addState(7, now, "ct:300");
+        addState("g1", now.plusMinutes(10), "bri:111");
         addState("g2", now.plusMinutes(10), "on:false");
+        addState("g3", now.plusMinutes(10), "bri:133");
+        addState(7, now.plusMinutes(10), "ct:400");
 
         List<ScheduledRunnable> scheduledRunnables = startScheduler(
                 expectedRunnable(now, now.plusMinutes(10)),
                 expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1)),
                 expectedRunnable(now.plusMinutes(10), now.plusDays(1)),
                 expectedRunnable(now.plusMinutes(10), now.plusDays(1))
         );
 
-        // g2 bri:200 -> other groups: 1, 3; only 3 is smaller; has no schedules
+        // g2 bri:120 -> other groups: 1, 3; only 3 and 7 as individual are smaller
 
-        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(0),
-                expectedGroupPutCall(2).bri(200)
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(2),
+                expectedGroupPutCall(2).bri(120)
         );
 
-        assertSceneUpdate("/groups/2", expectedGroupPutCall(2).bri(200));
+        assertSceneUpdate("/groups/2",
+                expectedGroupPutCall(2).bri(120), expectedPutCall(5).bri(130), expectedPutCall(7).ct(300)
+        );
 
         ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(10)); // next day
 
-        // g1 bri:100 -> other groups: 2, 3; both are smaller; 3 has no schedules; uses overlapping 5 and 6 from 2
+        // g1 bri:100 -> other groups: 2, 3; both are smaller; uses overlapping 5 from 3, 6 from 2, 7 from individual
 
-        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(1),
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(3),
                 expectedGroupPutCall(1).bri(100)
         );
 
         assertSceneUpdate("/groups/1", expectedGroupPutCall(1).bri(100),
-                expectedPutCall(5).bri(200), expectedPutCall(6).bri(200));
+                expectedPutCall(5).bri(130), expectedPutCall(6).bri(120), expectedPutCall(7).ct(300));
 
         ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(10)); // next day
 
         // g2 on:false; second state
 
-        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(2),
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(6),
                 expectedGroupPutCall(2).on(false)
         );
 
-        assertSceneUpdate("/groups/2", expectedGroupPutCall(2).on(false));
+        assertSceneUpdate("/groups/2",
+                expectedGroupPutCall(2).on(false), expectedPutCall(5).bri(133), expectedPutCall(7).ct(400)
+        );
 
         ensureRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)); // next day
 
-        // g1 bri:150; second state
+        // g1 bri:111; second state
 
-        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(3),
-                expectedGroupPutCall(1).bri(150)
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(7),
+                expectedGroupPutCall(1).bri(111)
         );
 
-        assertSceneUpdate("/groups/1", expectedGroupPutCall(1).bri(150),
-                expectedPutCall(5).on(false), expectedPutCall(6).on(false));
+        assertSceneUpdate("/groups/1", expectedGroupPutCall(1).bri(111),
+                expectedPutCall(5).bri(133), expectedPutCall(6).on(false), expectedPutCall(7).ct(400));
 
         ensureRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)); // next day
     }
 
-    // todo: test with overridden put call that has an interpolation -> should also trigger the regular scene sync
+    // todo: test with overridden put call that has an interpolation -> should also trigger the regular scene sync -> actually, no
 
     // todo: test with gaps or with day scheduling, meaning we want to test cases where state definitions exists, but not for the current time
 
