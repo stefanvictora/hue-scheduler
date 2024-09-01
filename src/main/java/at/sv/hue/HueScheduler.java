@@ -449,7 +449,8 @@ public final class HueScheduler implements Runnable {
 
     private void schedule(ScheduledStateSnapshot snapshot, long delayInMs) {
         if (snapshot.isNullState()) return;
-        LOG.debug("Schedule: {} in {}", snapshot, Duration.ofMillis(delayInMs).withNanos(0));
+        long overlappingDelayInMs = getPotentialOverlappingDelayInMs(snapshot);
+        LOG.debug("Schedule: {} in {}", snapshot, Duration.ofMillis(delayInMs + overlappingDelayInMs).withNanos(0));
         stateScheduler.schedule(() -> {
             MDC.put("context", snapshot.getContextName());
             if (snapshot.endsBefore(currentTime.get())) {
@@ -496,7 +497,27 @@ public final class HueScheduler implements Runnable {
                 retryWhenBackOn(createPowerOnCopy(snapshot));
             }
             reschedule(snapshot);
-        }, currentTime.get().plus(delayInMs, ChronoUnit.MILLIS), snapshot.getEnd());
+        }, currentTime.get().plus(delayInMs + overlappingDelayInMs, ChronoUnit.MILLIS), snapshot.getEnd());
+    }
+
+    private long getPotentialOverlappingDelayInMs(ScheduledStateSnapshot snapshot) {
+        return Duration.ofSeconds(getNumberOfBiggerOverlappingGroups(snapshot)).toMillis();
+    }
+
+    private long getNumberOfBiggerOverlappingGroups(ScheduledStateSnapshot state) {
+        List<String> lights;
+        if (state.isGroupState()) {
+            lights = getGroupLights(state);
+        } else {
+            lights = List.of(state.getId());
+        }
+        return lights.stream()
+                     .map(groupLight -> api.getAssignedGroups(groupLight))
+                     .flatMap(Collection::stream)
+                     .distinct()
+                     .filter(groupId -> getLightStatesForId(groupId) != null)
+                     .filter(groupId -> api.getGroupLights(groupId).size() > lights.size())
+                     .count();
     }
 
     private boolean shouldSyncScene(ScheduledStateSnapshot state) {
@@ -543,6 +564,7 @@ public final class HueScheduler implements Runnable {
                           .filter(groupId -> !groupId.equals(currentGroupId))
                           .map(groupId -> new GroupInfo(groupId, api.getGroupLights(groupId)))
                           .filter(groupInfo -> groupInfo.groupLights.size() < groupLights.size())
+                          // larger groups first, so that smaller groups can override the larger ones
                           .sorted(Comparator.comparingInt((GroupInfo groupInfo) -> groupInfo.groupLights.size()).reversed())
                           .map(GroupInfo::groupId)
                           .map(this::getLightStatesForId)

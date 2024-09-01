@@ -4624,29 +4624,29 @@ class HueSchedulerTest {
         addState(10, now, "bri:" + (DEFAULT_BRIGHTNESS - 20));
 
         List<ScheduledRunnable> runnables = startScheduler(
-                expectedRunnable(now, now.plusDays(1)),
-                expectedRunnable(now, now.plusDays(1)),
                 expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusSeconds(1), now.plusDays(1)),
+                expectedRunnable(now.plusSeconds(1), now.plusDays(1)),
                 expectedRunnable(now.plusMinutes(10), now.plusDays(1))
         );
 
         advanceTimeAndRunAndAssertPutCalls(runnables.get(0),
-                expectedPutCall(10).bri(DEFAULT_BRIGHTNESS - 20)
+                expectedGroupPutCall(1).bri(DEFAULT_BRIGHTNESS)
         );
 
         advanceTimeAndRunAndAssertPutCalls(runnables.get(1),
-                expectedPutCall(9).bri(DEFAULT_BRIGHTNESS - 10)
+                expectedPutCall(10).bri(DEFAULT_BRIGHTNESS - 20)
         );
 
         advanceTimeAndRunAndAssertPutCalls(runnables.get(2),
-                expectedGroupPutCall(1).bri(DEFAULT_BRIGHTNESS)
+                expectedPutCall(9).bri(DEFAULT_BRIGHTNESS - 10)
         );
 
         // next day runnables
         ensureScheduledStates(
-                expectedRunnable(now.plusDays(1), now.plusDays(2)),
-                expectedRunnable(now.plusDays(1), now.plusDays(2)),
-                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10))
+                expectedRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(10)),
+                expectedRunnable(initialNow.plusDays(1).plusSeconds(1), initialNow.plusDays(2)),
+                expectedRunnable(initialNow.plusDays(1).plusSeconds(1), initialNow.plusDays(2))
         );
 
         setGroupStateResponses(1,
@@ -4676,25 +4676,25 @@ class HueSchedulerTest {
         addState(9, now, "bri:" + DEFAULT_BRIGHTNESS); // same property
 
         List<ScheduledRunnable> runnables = startScheduler(
-                expectedRunnable(now, now.plusDays(1)),
                 expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusSeconds(1), now.plusDays(1)),
                 expectedRunnable(now.plusMinutes(10), now.plusDays(1))
         );
 
-        // individual light: same as group
+        // group
         advanceTimeAndRunAndAssertPutCalls(runnables.get(0),
-                expectedPutCall(9).bri(DEFAULT_BRIGHTNESS)
+                expectedGroupPutCall(1).bri(DEFAULT_BRIGHTNESS)
         );
 
-        // group
+        // individual light: same as group
         advanceTimeAndRunAndAssertPutCalls(runnables.get(1),
-                expectedGroupPutCall(1).bri(DEFAULT_BRIGHTNESS)
+                expectedPutCall(9).bri(DEFAULT_BRIGHTNESS)
         );
 
         // next day runnables
         ensureScheduledStates(
-                expectedRunnable(now.plusDays(1), now.plusDays(2)),
-                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10))
+                expectedRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(10)),
+                expectedRunnable(initialNow.plusDays(1).plusSeconds(1), initialNow.plusDays(2))
         );
 
         // next group call -> detects override
@@ -4717,25 +4717,25 @@ class HueSchedulerTest {
         addState(9, now, "bri:" + DEFAULT_BRIGHTNESS); // same property
 
         List<ScheduledRunnable> runnables = startScheduler(
-                expectedRunnable(now, now.plusDays(1)),
                 expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusSeconds(1), now.plusDays(1)),
                 expectedRunnable(now.plusMinutes(10), now.plusDays(1))
         );
 
-        // individual light: same as group
+        // group
         advanceTimeAndRunAndAssertPutCalls(runnables.get(0),
-                expectedPutCall(9).bri(DEFAULT_BRIGHTNESS)
+                expectedGroupPutCall(1).bri(DEFAULT_BRIGHTNESS)
         );
 
-        // group
+        // individual light: same as group
         advanceTimeAndRunAndAssertPutCalls(runnables.get(1),
-                expectedGroupPutCall(1).bri(DEFAULT_BRIGHTNESS)
+                expectedPutCall(9).bri(DEFAULT_BRIGHTNESS)
         );
 
         // next day runnables
         ensureScheduledStates(
-                expectedRunnable(now.plusDays(1), now.plusDays(2)),
-                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10))
+                expectedRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(10)),
+                expectedRunnable(initialNow.plusDays(1).plusSeconds(1), initialNow.plusDays(2))
         );
 
         // next group call -> detects override
@@ -6128,7 +6128,7 @@ class HueSchedulerTest {
         ensureScheduledStates(
                 expectedRunnable(initialNow.plusDays(1).plusMinutes(70), initialNow.plusDays(1).plusMinutes(80)) // next day
         );
-        
+
         // state 9
 
         advanceTimeAndRunAndAssertPutCalls(runnables.get(8),
@@ -6142,7 +6142,7 @@ class HueSchedulerTest {
         );
 
         // state 10
-        
+
         advanceTimeAndRunAndAssertPutCalls(runnables.get(9),
                 expectedGroupPutCall(1).ct(200) // only ct
         );
@@ -6171,14 +6171,14 @@ class HueSchedulerTest {
 
         List<ScheduledRunnable> scheduledRunnables = startScheduler(
                 expectedRunnable(now, now.plusMinutes(20)),
-                expectedRunnable(now, now.plusMinutes(20)),
-                expectedRunnable(now, now.plusMinutes(20)),
+                expectedRunnable(now.plusSeconds(1), now.plusMinutes(20)),
+                expectedRunnable(now.plusSeconds(1), now.plusMinutes(20)),
                 expectedRunnable(now.plusMinutes(20), now.plusDays(1)),
-                expectedRunnable(now.plusMinutes(20), now.plusDays(1)),
-                expectedRunnable(now.plusMinutes(20), now.plusDays(1))
+                expectedRunnable(now.plusSeconds(1).plusMinutes(20), now.plusDays(1)),
+                expectedRunnable(now.plusSeconds(1).plusMinutes(20), now.plusDays(1))
         );
 
-        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(2),
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(0),
                 expectedGroupPutCall(1).bri(100).ct(500)
         );
 
@@ -6187,7 +6187,7 @@ class HueSchedulerTest {
 
         ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(20)); // next day
 
-        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(5),
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(3),
                 expectedGroupPutCall(1).bri(150).ct(500)
         );
 
@@ -6209,9 +6209,8 @@ class HueSchedulerTest {
         mockGroupLightsForId(3, 5);
         mockAssignedGroups(5, 1, 2, 3);
         mockAssignedGroups(6, 1, 2);
-        mockAssignedGroups(7, 1);
+        mockAssignedGroups(7, 1, 2);
         mockAssignedGroups(8, 1);
-        mockAssignedGroups(9, 2);
         addKnownLightIdsWithDefaultCapabilities(7);
         addState("g1", now, "bri:100");
         addState("g2", now, "bri:120");
@@ -6223,31 +6222,19 @@ class HueSchedulerTest {
         addState(7, now.plusMinutes(10), "ct:400");
 
         List<ScheduledRunnable> scheduledRunnables = startScheduler(
-                expectedRunnable(now, now.plusMinutes(10)),
-                expectedRunnable(now, now.plusMinutes(10)),
-                expectedRunnable(now, now.plusMinutes(10)),
-                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now, now.plusMinutes(10)), // g1
+                expectedRunnable(now.plusSeconds(1), now.plusMinutes(10)), // g2
+                expectedRunnable(now.plusSeconds(2), now.plusMinutes(10)), // g3
+                expectedRunnable(now.plusSeconds(2), now.plusMinutes(10)), // 7
                 expectedRunnable(now.plusMinutes(10), now.plusDays(1)),
-                expectedRunnable(now.plusMinutes(10), now.plusDays(1)),
-                expectedRunnable(now.plusMinutes(10), now.plusDays(1)),
-                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+                expectedRunnable(now.plusMinutes(10).plusSeconds(1), now.plusDays(1)),
+                expectedRunnable(now.plusMinutes(10).plusSeconds(2), now.plusDays(1)),
+                expectedRunnable(now.plusMinutes(10).plusSeconds(2), now.plusDays(1))
         );
-
-        // g2 bri:120 -> other groups: 1, 3; only 3 and 7 as individual are smaller
-
-        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(2),
-                expectedGroupPutCall(2).bri(120)
-        );
-
-        assertSceneUpdate("/groups/2",
-                expectedGroupPutCall(2).bri(120), expectedPutCall(5).bri(130), expectedPutCall(7).ct(300)
-        );
-
-        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(10)); // next day
 
         // g1 bri:100 -> other groups: 2, 3; both are smaller; uses overlapping 5 from 3, 6 from 2, 7 from individual
 
-        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(3),
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(0),
                 expectedGroupPutCall(1).bri(100)
         );
 
@@ -6256,21 +6243,21 @@ class HueSchedulerTest {
 
         ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(10)); // next day
 
-        // g2 on:false; second state
+        // g2 bri:120 -> other groups: 1, 3; only 3 and 7 as individual are smaller
 
-        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(6),
-                expectedGroupPutCall(2).on(false)
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(1),
+                expectedGroupPutCall(2).bri(120)
         );
 
         assertSceneUpdate("/groups/2",
-                expectedGroupPutCall(2).on(false), expectedPutCall(5).bri(133), expectedPutCall(7).ct(400)
+                expectedGroupPutCall(2).bri(120), expectedPutCall(5).bri(130), expectedPutCall(7).ct(300)
         );
 
-        ensureRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)); // next day
+        ensureRunnable(initialNow.plusDays(1).plusSeconds(1), initialNow.plusDays(1).plusMinutes(10)); // next day
 
         // g1 bri:111; second state
 
-        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(7),
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(4),
                 expectedGroupPutCall(1).bri(111)
         );
 
@@ -6278,6 +6265,52 @@ class HueSchedulerTest {
                 expectedPutCall(5).bri(133), expectedPutCall(6).on(false), expectedPutCall(7).ct(400));
 
         ensureRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)); // next day
+
+        // g2 on:false; second state
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(5),
+                expectedGroupPutCall(2).on(false)
+        );
+
+        assertSceneUpdate("/groups/2",
+                expectedGroupPutCall(2).on(false), expectedPutCall(5).bri(133), expectedPutCall(7).ct(400)
+        );
+
+        ensureRunnable(initialNow.plusDays(1).plusSeconds(1).plusMinutes(10), initialNow.plusDays(2)); // next day
+    }
+
+    @Test
+    void scheduling_overlappingGroups_ofDifferentSize_automaticallyOffsetsStatesBasedOnTheNumberOfBiggerGroups() {
+        mockDefaultGroupCapabilities(1);
+        mockDefaultGroupCapabilities(2);
+        mockDefaultGroupCapabilities(3);
+        mockGroupLightsForId(1, 5, 6, 7);
+        mockGroupLightsForId(2, 5, 6);
+        mockGroupLightsForId(3, 5, 6); // has no states, ignored in offset calculation
+        mockAssignedGroups(5, 1, 2, 3);
+        mockAssignedGroups(6, 1, 2, 3);
+        mockAssignedGroups(7, 1);
+        addKnownLightIdsWithDefaultCapabilities(6);
+        addKnownLightIdsWithDefaultCapabilities(7);
+        addState("g1", now, "bri:100");
+        addState("g2", now, "bri:120");
+        addState(6, now, "bri:130");
+        addState(7, now, "bri:140");
+        addState("g1", now.plusMinutes(10), "bri:200");
+        addState("g2", now.plusMinutes(10), "bri:220");
+        addState(6, now.plusMinutes(10), "bri:230");
+        addState(7, now.plusMinutes(10), "bri:240");
+
+        startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)), // g1
+                expectedRunnable(now.plusSeconds(1), now.plusMinutes(10)), // g2
+                expectedRunnable(now.plusSeconds(1), now.plusMinutes(10)), // 7
+                expectedRunnable(now.plusSeconds(2), now.plusMinutes(10)), // 6
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1)),
+                expectedRunnable(now.plusMinutes(10).plusSeconds(1), now.plusDays(1)),
+                expectedRunnable(now.plusMinutes(10).plusSeconds(1), now.plusDays(1)),
+                expectedRunnable(now.plusMinutes(10).plusSeconds(2), now.plusDays(1))
+        );
     }
 
     // todo: test with overridden put call that has an interpolation -> should also trigger the regular scene sync -> actually, no
