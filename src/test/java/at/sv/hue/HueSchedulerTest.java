@@ -67,6 +67,7 @@ class HueSchedulerTest {
     private boolean disableUserModificationTracking;
     private HueApi mockedHueApi;
     private InOrder orderVerifier;
+    private InOrder sceneSyncOrderVerifier;
     private int expectedPutCalls;
     private String defaultInterpolationTransitionTimeInMs;
     private int minTrGap = 2; // in minutes
@@ -453,6 +454,7 @@ class HueSchedulerTest {
     void setUp() {
         mockedHueApi = mock(HueApi.class);
         orderVerifier = inOrder(mockedHueApi);
+        sceneSyncOrderVerifier = inOrder(mockedHueApi);
         expectedPutCalls = 0;
         expectedSceneUpdates = 0;
         setCurrentAndInitialTimeTo(ZonedDateTime.of(2021, 1, 1, 0, 0, 0,
@@ -6252,6 +6254,8 @@ class HueSchedulerTest {
         assertSceneUpdate("/groups/2",
                 expectedGroupPutCall(2).bri(120), expectedPutCall(5).bri(130), expectedPutCall(7).ct(300)
         );
+        assertSceneUpdate("/groups/1", expectedGroupPutCall(1).bri(100),
+                expectedPutCall(5).bri(130), expectedPutCall(6).bri(120), expectedPutCall(7).ct(300));
 
         ensureRunnable(initialNow.plusDays(1).plusSeconds(1), initialNow.plusDays(1).plusMinutes(10)); // next day
 
@@ -6275,8 +6279,59 @@ class HueSchedulerTest {
         assertSceneUpdate("/groups/2",
                 expectedGroupPutCall(2).on(false), expectedPutCall(5).bri(133), expectedPutCall(7).ct(400)
         );
+        assertSceneUpdate("/groups/1", expectedGroupPutCall(1).bri(111),
+                expectedPutCall(5).bri(133), expectedPutCall(6).on(false), expectedPutCall(7).ct(400));
 
         ensureRunnable(initialNow.plusDays(1).plusSeconds(1).plusMinutes(10), initialNow.plusDays(2)); // next day
+    }
+
+    @Test
+    void sceneSync_createsIntermediateParentScenes() {
+        enableSceneSync();
+
+        mockDefaultGroupCapabilities(2);
+        mockDefaultGroupCapabilities(4);
+        mockGroupLightsForId(1, 5, 6, 7, 8);
+        mockGroupLightsForId(2, 5, 6, 7);
+        mockGroupLightsForId(3, 5, 6);
+        mockGroupLightsForId(4, 5);
+        mockAssignedGroups(5, 1, 2, 3, 4);
+        mockAssignedGroups(6, 1, 2, 3);
+        mockAssignedGroups(7, 1, 2);
+        mockAssignedGroups(8, 1);
+        addState("g2", now, "bri:120");
+        addState("g4", now, "bri:130");
+        addState("g2", now.plusMinutes(10), "bri:220");
+        addState("g4", now.plusMinutes(10), "bri:240");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusSeconds(1), now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1)),
+                expectedRunnable(now.plusSeconds(1).plusMinutes(10), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.getFirst(),
+                expectedGroupPutCall(2).bri(120)
+        );
+
+        assertSceneUpdate("/groups/2", expectedGroupPutCall(2).bri(120), expectedPutCall(5).bri(130));
+        assertSceneUpdate("/groups/1", expectedPutCall("/groups/1").on(false),
+                expectedPutCall(5).bri(130), expectedPutCall(6).bri(120), expectedPutCall(7).bri(120));
+
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(10)); // next day
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.get(1),
+                expectedGroupPutCall(4).bri(130)
+        );
+
+        assertSceneUpdate("/groups/4", expectedGroupPutCall(4).bri(130));
+        assertSceneUpdate("/groups/1", expectedPutCall("/groups/1").on(false),
+                expectedPutCall(5).bri(130), expectedPutCall(6).bri(120), expectedPutCall(7).bri(120));
+        assertSceneUpdate("/groups/2", expectedGroupPutCall(2).bri(120), expectedPutCall(5).bri(130));
+        assertSceneUpdate("/groups/3", expectedPutCall("/groups/3").on(false), expectedPutCall(5).bri(130));
+
+        ensureRunnable(initialNow.plusSeconds(1).plusDays(1), initialNow.plusDays(1).plusMinutes(10)); // next day
     }
 
     @Test
@@ -6483,7 +6538,7 @@ class HueSchedulerTest {
                                    PutCall.PutCallBuilder... expectedOverriddenPutCalls) {
         expectedSceneUpdates++;
         List<PutCall> overriddenPutCalls = Arrays.stream(expectedOverriddenPutCalls).map(PutCall.PutCallBuilder::build).toList();
-        verify(mockedHueApi).createOrUpdateScene(groupId, sceneSyncName, expectedPutCall.build(), overriddenPutCalls);
+        sceneSyncOrderVerifier.verify(mockedHueApi, calls(1)).createOrUpdateScene(groupId, sceneSyncName, expectedPutCall.build(), overriddenPutCalls);
     }
 
     private void mockSceneSyncFailure(String groupId) {
