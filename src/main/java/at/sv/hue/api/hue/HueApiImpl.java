@@ -264,9 +264,8 @@ public final class HueApiImpl implements HueApi {
     }
 
     @Override
-    public void createOrUpdateScene(String groupedLightId, String sceneSyncName, PutCall basePutCall,
+    public synchronized void createOrUpdateScene(String groupedLightId, String sceneSyncName, PutCall basePutCall,
                                     List<PutCall> overriddenPutCalls) {
-        rateLimiter.acquire(10);
         Light groupedLight = getAndAssertGroupedLightExists(groupedLightId);
         Group group = getAndAssertGroupExists(groupedLight.getOwner());
         Scene existingScene = getScene(group, sceneSyncName);
@@ -385,10 +384,12 @@ public final class HueApiImpl implements HueApi {
     }
 
     private String createScene(Scene newScene) {
+        rateLimiter.acquire(10);
         return resourceProvider.postResource(createUrl("/scene"), getBody(newScene));
     }
 
     private String updateScene(Scene scene, Scene updatedScene) {
+        rateLimiter.acquire(10);
         return resourceProvider.putResource(createUrl("/scene/" + scene.getId()), getBody(updatedScene));
     }
 
