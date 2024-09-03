@@ -443,7 +443,7 @@ class HueSchedulerTest {
     }
 
     private void assertAllSceneUpdatesAsserted() {
-        verify(mockedHueApi, times(expectedSceneUpdates)).createOrUpdateScene(any(), any(), any(), any());
+        verify(mockedHueApi, times(expectedSceneUpdates)).createOrUpdateScene(any(), any(), any());
     }
 
     private int tr(String tr) {
@@ -5909,7 +5909,7 @@ class HueSchedulerTest {
         enableSceneSync();
 
         mockDefaultGroupCapabilities(1);
-        mockGroupLightsForId(1, 5, 6);
+        mockGroupLightsForId(1, 6);
         addState("g1", now, "bri:100");
         addState("g1", now.plusMinutes(10), "bri:150");
 
@@ -5922,7 +5922,7 @@ class HueSchedulerTest {
                 expectedGroupPutCall(1).bri(100)
         );
 
-        assertSceneUpdate("/groups/1", expectedGroupPutCall(1).bri(100));
+        assertSceneUpdate("/groups/1", expectedPutCall(6).bri(100));
 
         ensureScheduledStates(
                 expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
@@ -5932,7 +5932,7 @@ class HueSchedulerTest {
         advanceTimeAndRunAndAssertPutCalls(runnables.get(1)); // no put call
 
         // still updates scene
-        assertSceneUpdate("/groups/1", expectedGroupPutCall(1).bri(150));
+        assertSceneUpdate("/groups/1", expectedPutCall(6).bri(150));
     }
 
     @Test
@@ -5940,7 +5940,7 @@ class HueSchedulerTest {
         enableSceneSync();
 
         mockDefaultGroupCapabilities(2);
-        mockGroupLightsForId(2, 5, 6);
+        mockGroupLightsForId(2, 5);
         addState("g2", now, "bri:100");
         addState("g2", now.plusMinutes(10), "bri:150", "interpolate:true");
         addState("g2", now.plusMinutes(20), "bri:200");
@@ -5956,7 +5956,7 @@ class HueSchedulerTest {
                 expectedGroupPutCall(2).bri(150).transitionTime(tr("10min"))
         );
 
-        assertSceneUpdate("/groups/2", expectedGroupPutCall(2).bri(100));
+        assertSceneUpdate("/groups/2", expectedPutCall(5).bri(100));
 
         List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(
                 expectedRunnable(now.plusMinutes(1), now.plusMinutes(20)), // scene sync schedule
@@ -5966,7 +5966,7 @@ class HueSchedulerTest {
         advanceCurrentTime(Duration.ofMinutes(sceneSyncInterpolationInterval));
         followUpRunnables.getFirst().run();
 
-        assertSceneUpdate("/groups/2", expectedGroupPutCall(2).bri(105));
+        assertSceneUpdate("/groups/2", expectedPutCall(5).bri(105));
 
         ScheduledRunnable syncRunnable2 = ensureRunnable(now.plusMinutes(sceneSyncInterpolationInterval),
                 initialNow.plusMinutes(20)); // next sync, correct end
@@ -5993,7 +5993,7 @@ class HueSchedulerTest {
         enableSceneSync();
 
         mockDefaultGroupCapabilities(1);
-        mockGroupLightsForId(1, 5, 6);
+        mockGroupLightsForId(1, 6);
         addState("g1", now, "bri:100", "ct:500");
         addState("g1", now.plusMinutes(10), "bri:150");
         addState("g1", now.plusMinutes(20), "x:0.5", "y:0.6");
@@ -6024,7 +6024,7 @@ class HueSchedulerTest {
                 expectedGroupPutCall(1).bri(100).ct(500)
         );
 
-        assertSceneUpdate("/groups/1", expectedGroupPutCall(1).bri(100).ct(500));
+        assertSceneUpdate("/groups/1", expectedPutCall(6).bri(100).ct(500));
 
         ensureScheduledStates(
                 expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
@@ -6044,7 +6044,7 @@ class HueSchedulerTest {
                 expectedGroupPutCall(1).bri(150) // only bri
         );
 
-        assertSceneUpdate("/groups/1", expectedGroupPutCall(1).bri(150).ct(500)); // with additional ct from previous state
+        assertSceneUpdate("/groups/1", expectedPutCall(6).bri(150).ct(500)); // with additional ct from previous state
 
         ensureScheduledStates(
                 expectedRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(1).plusMinutes(20)) // next day
@@ -6065,7 +6065,7 @@ class HueSchedulerTest {
                 expectedGroupPutCall(1).x(0.5).y(0.6) // only xy
         );
 
-        assertSceneUpdate("/groups/1", expectedGroupPutCall(1).bri(150).x(0.5).y(0.6)); // with additional bri but ignored ct from previous state
+        assertSceneUpdate("/groups/1", expectedPutCall(6).bri(150).x(0.5).y(0.6)); // with additional bri but ignored ct from previous state
 
         ensureScheduledStates(
                 expectedRunnable(initialNow.plusDays(1).plusMinutes(20), initialNow.plusDays(1).plusMinutes(30)) // next day
@@ -6077,7 +6077,7 @@ class HueSchedulerTest {
                 expectedGroupPutCall(1).x(0.8).y(0.9) // only xy
         );
 
-        assertSceneUpdate("/groups/1", expectedGroupPutCall(1).bri(150).x(0.8).y(0.9));
+        assertSceneUpdate("/groups/1", expectedPutCall(6).bri(150).x(0.8).y(0.9));
 
         ensureScheduledStates(
                 expectedRunnable(initialNow.plusDays(1).plusMinutes(30), initialNow.plusDays(1).plusMinutes(40)) // next day
@@ -6089,7 +6089,7 @@ class HueSchedulerTest {
                 expectedGroupPutCall(1).bri(200) // only bri
         );
 
-        assertSceneUpdate("/groups/1", expectedGroupPutCall(1).bri(200).x(0.8).y(0.9)); // with additional xy from previous state
+        assertSceneUpdate("/groups/1", expectedPutCall(6).bri(200).x(0.8).y(0.9)); // with additional xy from previous state
 
         ensureScheduledStates(
                 expectedRunnable(initialNow.plusDays(1).plusMinutes(40), initialNow.plusDays(1).plusMinutes(50)) // next day
@@ -6101,7 +6101,7 @@ class HueSchedulerTest {
                 expectedGroupPutCall(1).hue(65535).sat(254) // only hue/sat
         );
 
-        assertSceneUpdate("/groups/1", expectedGroupPutCall(1).bri(200).hue(65535).sat(254)); // ignores xy from previous state
+        assertSceneUpdate("/groups/1", expectedPutCall(6).bri(200).hue(65535).sat(254)); // ignores xy from previous state
 
         ensureScheduledStates(
                 expectedRunnable(initialNow.plusDays(1).plusMinutes(50), initialNow.plusDays(1).plusMinutes(60)) // next day
@@ -6113,7 +6113,7 @@ class HueSchedulerTest {
                 expectedGroupPutCall(1).hue(50000).sat(100) // only hue/sat
         );
 
-        assertSceneUpdate("/groups/1", expectedGroupPutCall(1).bri(200).hue(50000).sat(100)); // ignores hue sat from previous state
+        assertSceneUpdate("/groups/1", expectedPutCall(6).bri(200).hue(50000).sat(100)); // ignores hue sat from previous state
 
         ensureScheduledStates(
                 expectedRunnable(initialNow.plusDays(1).plusMinutes(60), initialNow.plusDays(1).plusMinutes(70)) // next day
@@ -6125,7 +6125,7 @@ class HueSchedulerTest {
                 expectedGroupPutCall(1).bri(250) // only bri
         );
 
-        assertSceneUpdate("/groups/1", expectedGroupPutCall(1).bri(250).hue(50000).sat(100)); // with additional hue/sat from previous state
+        assertSceneUpdate("/groups/1", expectedPutCall(6).bri(250).hue(50000).sat(100)); // with additional hue/sat from previous state
 
         ensureScheduledStates(
                 expectedRunnable(initialNow.plusDays(1).plusMinutes(70), initialNow.plusDays(1).plusMinutes(80)) // next day
@@ -6137,7 +6137,7 @@ class HueSchedulerTest {
                 expectedGroupPutCall(1).on(false) // only on
         );
 
-        assertSceneUpdate("/groups/1", expectedGroupPutCall(1).on(false)); // does not use any other properties
+        assertSceneUpdate("/groups/1", expectedPutCall(6).on(false)); // does not use any other properties
 
         ensureScheduledStates(
                 expectedRunnable(initialNow.plusDays(1).plusMinutes(80), initialNow.plusDays(1).plusMinutes(90)) // next day
@@ -6149,7 +6149,7 @@ class HueSchedulerTest {
                 expectedGroupPutCall(1).ct(200) // only ct
         );
 
-        assertSceneUpdate("/groups/1", expectedGroupPutCall(1).ct(200).bri(250)); // skips "off"
+        assertSceneUpdate("/groups/1", expectedPutCall(6).ct(200).bri(250)); // skips "off"
 
         ensureScheduledStates(
                 expectedRunnable(initialNow.plusDays(1).plusMinutes(90), initialNow.plusDays(2)) // next day
@@ -6184,8 +6184,8 @@ class HueSchedulerTest {
                 expectedGroupPutCall(1).bri(100).ct(500)
         );
 
-        assertSceneUpdate("/groups/1", expectedGroupPutCall(1).bri(100).ct(500),
-                expectedPutCall(5).bri(200), expectedPutCall(6).x(0.5).y(0.5));
+        assertSceneUpdate("/groups/1",
+                expectedPutCall(5).bri(200), expectedPutCall(6).x(0.5).y(0.5), expectedPutCall(7).bri(100).ct(500));
 
         ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(20)); // next day
 
@@ -6193,8 +6193,8 @@ class HueSchedulerTest {
                 expectedGroupPutCall(1).bri(150).ct(500)
         );
 
-        assertSceneUpdate("/groups/1", expectedGroupPutCall(1).bri(150).ct(500),
-                expectedPutCall(5).bri(250), expectedPutCall(6).x(0.8).y(0.8));
+        assertSceneUpdate("/groups/1",
+                expectedPutCall(5).bri(250), expectedPutCall(6).x(0.8).y(0.8), expectedPutCall(7).bri(150).ct(500));
 
         ensureRunnable(initialNow.plusDays(1).plusMinutes(20), initialNow.plusDays(2)); // next day
     }
@@ -6240,8 +6240,11 @@ class HueSchedulerTest {
                 expectedGroupPutCall(1).bri(100)
         );
 
-        assertSceneUpdate("/groups/1", expectedGroupPutCall(1).bri(100),
+        assertSceneUpdate("/groups/1",
+                expectedPutCall(5).bri(130), expectedPutCall(6).bri(120), expectedPutCall(7).ct(300), expectedPutCall(8).bri(100));
+        assertSceneUpdate("/groups/2",
                 expectedPutCall(5).bri(130), expectedPutCall(6).bri(120), expectedPutCall(7).ct(300));
+        assertSceneUpdate("/groups/3", expectedPutCall(5).bri(130));
 
         ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(10)); // next day
 
@@ -6251,11 +6254,11 @@ class HueSchedulerTest {
                 expectedGroupPutCall(2).bri(120)
         );
 
+        assertSceneUpdate("/groups/1",
+                expectedPutCall(5).bri(130), expectedPutCall(6).bri(120), expectedPutCall(7).ct(300), expectedPutCall(8).bri(100));
         assertSceneUpdate("/groups/2",
-                expectedGroupPutCall(2).bri(120), expectedPutCall(5).bri(130), expectedPutCall(7).ct(300)
-        );
-        assertSceneUpdate("/groups/1", expectedGroupPutCall(1).bri(100),
                 expectedPutCall(5).bri(130), expectedPutCall(6).bri(120), expectedPutCall(7).ct(300));
+        assertSceneUpdate("/groups/3", expectedPutCall(5).bri(130));
 
         ensureRunnable(initialNow.plusDays(1).plusSeconds(1), initialNow.plusDays(1).plusMinutes(10)); // next day
 
@@ -6265,8 +6268,11 @@ class HueSchedulerTest {
                 expectedGroupPutCall(1).bri(111)
         );
 
-        assertSceneUpdate("/groups/1", expectedGroupPutCall(1).bri(111),
+        assertSceneUpdate("/groups/1",
+                expectedPutCall(5).bri(133), expectedPutCall(6).on(false), expectedPutCall(7).ct(400), expectedPutCall(8).bri(111));
+        assertSceneUpdate("/groups/2",
                 expectedPutCall(5).bri(133), expectedPutCall(6).on(false), expectedPutCall(7).ct(400));
+        assertSceneUpdate("/groups/3", expectedPutCall(5).bri(133));
 
         ensureRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)); // next day
 
@@ -6276,31 +6282,101 @@ class HueSchedulerTest {
                 expectedGroupPutCall(2).on(false)
         );
 
+        assertSceneUpdate("/groups/1",
+                expectedPutCall(5).bri(133), expectedPutCall(6).on(false), expectedPutCall(7).ct(400), expectedPutCall(8).bri(111));
         assertSceneUpdate("/groups/2",
-                expectedGroupPutCall(2).on(false), expectedPutCall(5).bri(133), expectedPutCall(7).ct(400)
-        );
-        assertSceneUpdate("/groups/1", expectedGroupPutCall(1).bri(111),
                 expectedPutCall(5).bri(133), expectedPutCall(6).on(false), expectedPutCall(7).ct(400));
+        assertSceneUpdate("/groups/3", expectedPutCall(5).bri(133));
 
         ensureRunnable(initialNow.plusDays(1).plusSeconds(1).plusMinutes(10), initialNow.plusDays(2)); // next day
     }
 
     @Test
-    void sceneSync_createsIntermediateParentScenes() {
+    void sceneSync_childGroupsHaveNoSchedule_createsScenes() {
+        enableSceneSync();
+
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 5, 6, 7);
+        mockGroupLightsForId(2, 5, 6);
+        mockAssignedGroups(5, 1, 2);
+        mockAssignedGroups(6, 1, 2);
+        mockAssignedGroups(7, 1);
+        addState("g1", now, "bri:110");
+        addState("g1", now.plusMinutes(10), "bri:210");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.getFirst(),
+                expectedGroupPutCall(1).bri(110)
+        );
+
+        assertSceneUpdate("/groups/1",
+                expectedPutCall(5).bri(110), expectedPutCall(6).bri(110), expectedPutCall(7).bri(110));
+        assertSceneUpdate("/groups/2",
+                expectedPutCall(5).bri(110), expectedPutCall(6).bri(110));
+
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(10)); // next day
+    }
+
+    @Test
+    void sceneSync_parentGroupsHaveNoSchedule_createsIntermediateScenes() {
+        enableSceneSync();
+
+        mockDefaultGroupCapabilities(3);
+        mockGroupLightsForId(1, 5, 6, 7);
+        mockGroupLightsForId(2, 5, 6);
+        mockGroupLightsForId(3, 5);
+        mockAssignedGroups(5, 1, 2, 3);
+        mockAssignedGroups(6, 1, 2);
+        mockAssignedGroups(7, 1);
+        addState("g3", now, "bri:130");
+        addState("g3", now.plusMinutes(10), "bri:230");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.getFirst(),
+                expectedGroupPutCall(3).bri(130)
+        );
+
+        assertSceneUpdate("/groups/1", expectedPutCall(5).bri(130));
+        assertSceneUpdate("/groups/2", expectedPutCall(5).bri(130));
+        assertSceneUpdate("/groups/3", expectedPutCall(5).bri(130));
+
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(10)); // next day
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.get(1),
+                expectedGroupPutCall(3).bri(230)
+        );
+
+        assertSceneUpdate("/groups/1", expectedPutCall(5).bri(230));
+        assertSceneUpdate("/groups/2", expectedPutCall(5).bri(230));
+        assertSceneUpdate("/groups/3", expectedPutCall(5).bri(230));
+
+        ensureRunnable(initialNow.plusMinutes(10).plusDays(1), initialNow.plusDays(2)); // next day
+    }
+
+    @Test
+    void sceneSync_multipleSchedules_createsIntermediateParentScenes_parentScenesWithNoScheduleAlsoUseBiggerGroupsForFullPicture() {
         enableSceneSync();
 
         mockDefaultGroupCapabilities(2);
         mockDefaultGroupCapabilities(4);
-        mockGroupLightsForId(1, 5, 6, 7, 8);
+        mockGroupLightsForId(1, 5, 6, 7, 8); // uses 5 from g4, 6 and 7 from g2
         mockGroupLightsForId(2, 5, 6, 7);
-        mockGroupLightsForId(3, 5, 6);
+        mockGroupLightsForId(3, 5, 6); // uses 5 from g4 and 6 from g2 (!)
         mockGroupLightsForId(4, 5);
         mockAssignedGroups(5, 1, 2, 3, 4);
         mockAssignedGroups(6, 1, 2, 3);
         mockAssignedGroups(7, 1, 2);
         mockAssignedGroups(8, 1);
         addState("g2", now, "bri:120");
-        addState("g4", now, "bri:130");
+        addState("g4", now, "bri:140");
         addState("g2", now.plusMinutes(10), "bri:220");
         addState("g4", now.plusMinutes(10), "bri:240");
 
@@ -6311,27 +6387,113 @@ class HueSchedulerTest {
                 expectedRunnable(now.plusSeconds(1).plusMinutes(10), now.plusDays(1))
         );
 
+        // g2: update for g1 uses both g2 and g4, while defaulting to off
+
         advanceTimeAndRunAndAssertPutCalls(runnables.getFirst(),
                 expectedGroupPutCall(2).bri(120)
         );
 
-        assertSceneUpdate("/groups/2", expectedGroupPutCall(2).bri(120), expectedPutCall(5).bri(130));
-        assertSceneUpdate("/groups/1", expectedPutCall("/groups/1").on(false),
-                expectedPutCall(5).bri(130), expectedPutCall(6).bri(120), expectedPutCall(7).bri(120));
+        assertSceneUpdate("/groups/1",
+                expectedPutCall(5).bri(140), expectedPutCall(6).bri(120), expectedPutCall(7).bri(120));
+        assertSceneUpdate("/groups/2",
+                expectedPutCall(5).bri(140), expectedPutCall(6).bri(120), expectedPutCall(7).bri(120));
+        assertSceneUpdate("/groups/3",
+                expectedPutCall(5).bri(140), expectedPutCall(6).bri(120));
+        assertSceneUpdate("/groups/4", expectedPutCall(5).bri(140));
 
         ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(10)); // next day
 
+        // g4: update for g3 (no explicit schedule) also uses bigger parent g2 (with schedule)
+
         advanceTimeAndRunAndAssertPutCalls(runnables.get(1),
-                expectedGroupPutCall(4).bri(130)
+                expectedGroupPutCall(4).bri(140)
         );
 
-        assertSceneUpdate("/groups/4", expectedGroupPutCall(4).bri(130));
-        assertSceneUpdate("/groups/1", expectedPutCall("/groups/1").on(false),
-                expectedPutCall(5).bri(130), expectedPutCall(6).bri(120), expectedPutCall(7).bri(120));
-        assertSceneUpdate("/groups/2", expectedGroupPutCall(2).bri(120), expectedPutCall(5).bri(130));
-        assertSceneUpdate("/groups/3", expectedPutCall("/groups/3").on(false), expectedPutCall(5).bri(130));
+        assertSceneUpdate("/groups/1",
+                expectedPutCall(5).bri(140), expectedPutCall(6).bri(120), expectedPutCall(7).bri(120));
+        assertSceneUpdate("/groups/2",
+                expectedPutCall(5).bri(140), expectedPutCall(6).bri(120), expectedPutCall(7).bri(120));
+        assertSceneUpdate("/groups/3",
+                expectedPutCall(5).bri(140), expectedPutCall(6).bri(120));
+        assertSceneUpdate("/groups/4", expectedPutCall(5).bri(140));
 
         ensureRunnable(initialNow.plusSeconds(1).plusDays(1), initialNow.plusDays(1).plusMinutes(10)); // next day
+    }
+
+    @Test
+    void sceneSync_multipleSchedules_doesNotUseParentIfExplicitScheduleDefined() {
+        enableSceneSync();
+
+        mockDefaultGroupCapabilities(1);
+        mockDefaultGroupCapabilities(2);
+        mockDefaultGroupCapabilities(3);
+        mockGroupLightsForId(1, 5, 6, 7, 8);
+        mockGroupLightsForId(2, 5, 6, 7);
+        mockGroupLightsForId(3, 5, 6);
+        mockAssignedGroups(5, 1, 2, 3);
+        mockAssignedGroups(6, 1, 2, 3);
+        mockAssignedGroups(7, 1, 2);
+        mockAssignedGroups(8, 1);
+        addState("g1", now, "bri:110");
+        addState("g2", now, "bri:120");
+        addState("g3", now, "bri:130");
+        addState("g1", now.plusMinutes(10), "bri:210");
+        addState("g2", now.plusMinutes(10), "bri:220");
+        addState("g3", now.plusMinutes(10), "bri:230");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusSeconds(1), now.plusMinutes(10)),
+                expectedRunnable(now.plusSeconds(2), now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1)),
+                expectedRunnable(now.plusSeconds(1).plusMinutes(10), now.plusDays(1)),
+                expectedRunnable(now.plusSeconds(2).plusMinutes(10), now.plusDays(1))
+        );
+
+        // g1
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.getFirst(),
+                expectedGroupPutCall(1).bri(110)
+        );
+
+        assertSceneUpdate("/groups/1",
+                expectedPutCall(5).bri(130), expectedPutCall(6).bri(130), expectedPutCall(7).bri(120), expectedPutCall(8).bri(110));
+        assertSceneUpdate("/groups/2",
+                expectedPutCall(5).bri(130), expectedPutCall(6).bri(130), expectedPutCall(7).bri(120));
+        assertSceneUpdate("/groups/3",
+                expectedPutCall(5).bri(130), expectedPutCall(6).bri(130));
+
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(10)); // next day
+
+        // g2
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.get(1),
+                expectedGroupPutCall(2).bri(120)
+        );
+
+        assertSceneUpdate("/groups/1",
+                expectedPutCall(5).bri(130), expectedPutCall(6).bri(130), expectedPutCall(7).bri(120), expectedPutCall(8).bri(110));
+        assertSceneUpdate("/groups/2",
+                expectedPutCall(5).bri(130), expectedPutCall(6).bri(130), expectedPutCall(7).bri(120));
+        assertSceneUpdate("/groups/3",
+                expectedPutCall(5).bri(130), expectedPutCall(6).bri(130));
+
+        ensureRunnable(initialNow.plusDays(1).plusSeconds(1), initialNow.plusDays(1).plusMinutes(10)); // next day
+
+        // g3
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.get(2),
+                expectedGroupPutCall(3).bri(130)
+        );
+
+        assertSceneUpdate("/groups/1",
+                expectedPutCall(5).bri(130), expectedPutCall(6).bri(130), expectedPutCall(7).bri(120), expectedPutCall(8).bri(110));
+        assertSceneUpdate("/groups/2",
+                expectedPutCall(5).bri(130), expectedPutCall(6).bri(130), expectedPutCall(7).bri(120));
+        assertSceneUpdate("/groups/3",
+                expectedPutCall(5).bri(130), expectedPutCall(6).bri(130));
+
+        ensureRunnable(initialNow.plusDays(1).plusSeconds(2), initialNow.plusDays(1).plusMinutes(10)); // next day
     }
 
     @Test
@@ -6372,12 +6534,16 @@ class HueSchedulerTest {
 
     // todo: test with gaps or with day scheduling, meaning we want to test cases where state definitions exists, but not for the current time
 
+    // todo: test scene sync with null states; it seems it computes the full picture
+
+    // todo: test full picture with on:false -> it should not add other properties
+
     @Test
     void sceneSync_apiThrowsError_doesNotSkipSchedule_retriesSync() {
         enableSceneSync();
 
         mockDefaultGroupCapabilities(1);
-        mockGroupLightsForId(1, 5, 6);
+        mockGroupLightsForId(1, 5);
         addState("g1", now, "bri:100");
 
         List<ScheduledRunnable> runnables = startScheduler(
@@ -6399,11 +6565,12 @@ class HueSchedulerTest {
         ScheduledRunnable retrySync = followUpRunnables.getFirst();
 
         resetMockedApi();
+        mockGroupLightsForId(1, 5);
 
         setCurrentTimeTo(retrySync);
         retrySync.run();
 
-        assertSceneUpdate("/groups/1", expectedGroupPutCall(1).bri(100));
+        assertSceneUpdate("/groups/1", expectedPutCall(5).bri(100));
     }
 
     @Test
@@ -6534,15 +6701,14 @@ class HueSchedulerTest {
         return expectedRunnable(now, endExclusive);
     }
 
-    private void assertSceneUpdate(String groupId, PutCall.PutCallBuilder expectedPutCall,
-                                   PutCall.PutCallBuilder... expectedOverriddenPutCalls) {
+    private void assertSceneUpdate(String groupId, PutCall.PutCallBuilder... expectedPutCalls) {
         expectedSceneUpdates++;
-        List<PutCall> overriddenPutCalls = Arrays.stream(expectedOverriddenPutCalls).map(PutCall.PutCallBuilder::build).toList();
-        sceneSyncOrderVerifier.verify(mockedHueApi, calls(1)).createOrUpdateScene(groupId, sceneSyncName, expectedPutCall.build(), overriddenPutCalls);
+        List<PutCall> putCalls = Arrays.stream(expectedPutCalls).map(PutCall.PutCallBuilder::build).toList();
+        sceneSyncOrderVerifier.verify(mockedHueApi, calls(1)).createOrUpdateScene(groupId, sceneSyncName, putCalls);
     }
 
     private void mockSceneSyncFailure(String groupId) {
-        doThrow(ApiFailure.class).when(mockedHueApi).createOrUpdateScene(eq(groupId), eq(sceneSyncName), any(), any());
+        doThrow(ApiFailure.class).when(mockedHueApi).createOrUpdateScene(eq(groupId), eq(sceneSyncName), any());
     }
 
     @RequiredArgsConstructor

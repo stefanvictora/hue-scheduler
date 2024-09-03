@@ -2566,8 +2566,7 @@ class HueApiTest {
         setGetResponse("/grouped_light", EMPTY_RESPONSE);
 
         assertThrows(GroupNotFoundException.class,
-                () -> api.createOrUpdateScene("UNKNOWN_GROUPED_LIGHT_ID", "SCENE NAME",
-                        PutCall.builder().build(), List.of()));
+                () -> api.createOrUpdateScene("UNKNOWN_GROUPED_LIGHT_ID", "SCENE NAME", List.of()));
     }
 
     @Test
@@ -2958,7 +2957,11 @@ class HueApiTest {
 
         // "Scene_3" does not yet exist for Room -> create it
         createOrUpdateScene("GROUPED_LIGHT_1",
-                "Scene_3", PutCall.builder().ct(250).bri(20).transitionTime(5));
+                "Scene_3",
+                PutCall.builder().id("LIGHT_1").ct(250).bri(20).transitionTime(5),
+                PutCall.builder().id("LIGHT_2_1").bri(20).transitionTime(2),
+                PutCall.builder().id("LIGHT_2_2").ct(250)
+        );
 
         verifyPost("/scene", """
                 {
@@ -3002,11 +3005,8 @@ class HueApiTest {
                         "dimming": {
                           "brightness": 7.87
                         },
-                        "color_temperature": {
-                          "mirek": 250
-                        },
                         "dynamics": {
-                          "duration": 500
+                          "duration": 200
                         }
                       }
                     },
@@ -3019,14 +3019,8 @@ class HueApiTest {
                         "on": {
                           "on": true
                         },
-                        "dimming": {
-                          "brightness": 7.87
-                        },
                         "color_temperature": {
                           "mirek": 250
-                        },
-                        "dynamics": {
-                          "duration": 500
                         }
                       }
                     }
@@ -3034,8 +3028,11 @@ class HueApiTest {
                 }
                 """);
 
-        // "Scene_1" already exists for Room -> update it
-        createOrUpdateScene("GROUPED_LIGHT_1", "Scene_1", PutCall.builder().hue(2000).sat(254));
+        // "Scene_1" already exists for Room -> update it; missing light treated as off
+        createOrUpdateScene("GROUPED_LIGHT_1", "Scene_1",
+                PutCall.builder().id("LIGHT_1").hue(2000).sat(254),
+                PutCall.builder().id("LIGHT_2_1").hue(2000).sat(254)
+        );
 
         verifyPut("/scene/SCENE_1", """
                 {
@@ -3081,13 +3078,7 @@ class HueApiTest {
                       },
                       "action": {
                         "on": {
-                          "on": true
-                        },
-                        "color": {
-                          "xy": {
-                            "x": 0.623,
-                            "y": 0.3435
-                          }
+                          "on": false
                         }
                       }
                     }
@@ -3096,7 +3087,10 @@ class HueApiTest {
 
         // "Scene_3" already exists for Zone -> update it
 
-        createOrUpdateScene("GROUPED_LIGHT_2", "Scene_3", PutCall.builder());
+        createOrUpdateScene("GROUPED_LIGHT_2", "Scene_3",
+                PutCall.builder().id("LIGHT_1"),
+                PutCall.builder().id("LIGHT_2_1")
+        );
 
         verifyPut("/scene/SCENE_3", """
                 {
@@ -3307,7 +3301,12 @@ class HueApiTest {
 
         // Color and brightness (uses min mirek):
 
-        createOrUpdateScene("GROUPED_LIGHT", "SCENE", PutCall.builder().x(0.280).y(0.280).bri(20));
+        createOrUpdateScene("GROUPED_LIGHT", "SCENE",
+                PutCall.builder().id("COLOR").x(0.280).y(0.280).bri(20),
+                PutCall.builder().id("CT_ONLY").x(0.280).y(0.280).bri(20),
+                PutCall.builder().id("BRI_ONLY").x(0.280).y(0.280).bri(20),
+                PutCall.builder().id("ON_OFF_ONLY").x(0.280).y(0.280).bri(20)
+        );
 
         verifyPost("/scene", """
                 {
@@ -3387,7 +3386,12 @@ class HueApiTest {
 
         // CT and brightness (uses max mirek):
 
-        createOrUpdateScene("GROUPED_LIGHT", "SCENE", PutCall.builder().bri(254).ct(499));
+        createOrUpdateScene("GROUPED_LIGHT", "SCENE",
+                PutCall.builder().id("COLOR").bri(254).ct(499),
+                PutCall.builder().id("CT_ONLY").bri(254).ct(499),
+                PutCall.builder().id("BRI_ONLY").bri(254).ct(499),
+                PutCall.builder().id("ON_OFF_ONLY").bri(254).ct(499)
+        );
 
         verifyPost("/scene", """
                 {
@@ -3464,7 +3468,12 @@ class HueApiTest {
 
         // HS only:
 
-        createOrUpdateScene("GROUPED_LIGHT", "SCENE", PutCall.builder().hue(2000).sat(254));
+        createOrUpdateScene("GROUPED_LIGHT", "SCENE",
+                PutCall.builder().id("COLOR").hue(2000).sat(254),
+                PutCall.builder().id("CT_ONLY").hue(2000).sat(254),
+                PutCall.builder().id("BRI_ONLY").hue(2000).sat(254),
+                PutCall.builder().id("ON_OFF_ONLY").hue(2000).sat(254)
+        );
 
         verifyPost("/scene", """
                 {
@@ -3727,15 +3736,21 @@ class HueApiTest {
 
         // same state -> no update
 
-        createOrUpdateScene("GROUPED_LIGHT", "SCENE", PutCall.builder().ct(199).bri(254));
+        createOrUpdateScene("GROUPED_LIGHT", "SCENE",
+                PutCall.builder().id("CT_ONLY").ct(199).bri(254),
+                PutCall.builder().id("COLOR").ct(199).bri(254)
+        );
 
         verify(resourceProviderMock, never()).postResource(any(), any());
         verify(resourceProviderMock, never()).putResource(any(), any());
 
         // change ct -> performs update
 
-        createOrUpdateScene("GROUPED_LIGHT", "SCENE", PutCall.builder().ct(300).bri(254));
-        
+        createOrUpdateScene("GROUPED_LIGHT", "SCENE",
+                PutCall.builder().id("CT_ONLY").ct(300).bri(254),
+                PutCall.builder().id("COLOR").ct(300).bri(254)
+        );
+
         verifyPut("/scene/SCENE", """
                 {
                   "actions": [
@@ -3777,9 +3792,11 @@ class HueApiTest {
                 }""");
 
         // overrides single light -> performs update
-        
-        createOrUpdateScene("GROUPED_LIGHT", "SCENE", PutCall.builder().ct(199).bri(254),
-                PutCall.builder().id("CT_ONLY").on(false).transitionTime(10).ct(200)); // ignores other properties for off states
+
+        createOrUpdateScene("GROUPED_LIGHT", "SCENE",
+                PutCall.builder().id("CT_ONLY").on(false).transitionTime(10).ct(200), // ignores other properties for off states
+                PutCall.builder().id("COLOR").ct(199).bri(254)
+        );
 
         verifyPut("/scene/SCENE", """
                 {
@@ -3897,9 +3914,9 @@ class HueApiTest {
         assertThat(identifier).isEqualTo(new Identifier(id, name));
     }
 
-    private void createOrUpdateScene(String groupedLightId, String sceneSyncName, PutCall.PutCallBuilder basePutCallBuilder,
+    private void createOrUpdateScene(String groupedLightId, String sceneSyncName,
                                      PutCall.PutCallBuilder... overriddenPutCallBuilders) {
-        api.createOrUpdateScene(groupedLightId, sceneSyncName, basePutCallBuilder.build(),
+        api.createOrUpdateScene(groupedLightId, sceneSyncName,
                 Stream.of(overriddenPutCallBuilders).map(PutCall.PutCallBuilder::build).toList());
     }
 }

@@ -113,14 +113,13 @@ public interface HueApi extends ResourceModificationEventListener {
     /**
      * Creates or updates a existing scene with the given name for the given group id.
      *
-     * @param groupId            the id of the group. For Hue this is the groupedLightId
-     * @param sceneSyncName      the name of the scene to create or update
-     * @param basePutCall        the desired state of lights for the scene
-     * @param overriddenPutCalls additional put calls overriding certain lights in the scene
+     * @param groupId       the id of the group. For Hue this is the groupedLightId
+     * @param sceneSyncName the name of the scene to create or update
+     * @param putCalls      put calls for lights in the scene. If a light is missing, it is considered off for the scene
      * @throws GroupNotFoundException if no group with given id was found
      * @throws ApiFailure             if the api call failed
      */
-    void createOrUpdateScene(String groupId, String sceneSyncName, PutCall basePutCall, List<PutCall> overriddenPutCalls);
+    void createOrUpdateScene(String groupId, String sceneSyncName, List<PutCall> putCalls);
 
     /**
      * Clears caches for both the /lights and /groups resources, so that up-to-date information is fetched next time

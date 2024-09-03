@@ -264,12 +264,11 @@ public final class HueApiImpl implements HueApi {
     }
 
     @Override
-    public synchronized void createOrUpdateScene(String groupedLightId, String sceneSyncName, PutCall basePutCall,
-                                    List<PutCall> overriddenPutCalls) {
+    public synchronized void createOrUpdateScene(String groupedLightId, String sceneSyncName, List<PutCall> putCalls) {
         Light groupedLight = getAndAssertGroupedLightExists(groupedLightId);
         Group group = getAndAssertGroupExists(groupedLight.getOwner());
         Scene existingScene = getScene(group, sceneSyncName);
-        List<SceneAction> actions = createSceneActions(group, basePutCall, overriddenPutCalls);
+        List<SceneAction> actions = createSceneActions(group, putCalls);
         if (existingScene == null) {
             Scene newScene = new Scene(sceneSyncName, group.toResourceReference(), actions);
             String response = createScene(newScene);
@@ -284,13 +283,17 @@ public final class HueApiImpl implements HueApi {
         }
     }
 
-    private List<SceneAction> createSceneActions(Group group, PutCall basePutCall, List<PutCall> overriddenPutCalls) {
-        Map<String, PutCall> putCallMap = overriddenPutCalls.stream()
-                                                            .collect(Collectors.toMap(PutCall::getId, Function.identity()));
+    private List<SceneAction> createSceneActions(Group group, List<PutCall> putCalls) {
+        Map<String, PutCall> putCallMap = putCalls.stream()
+                                                  .collect(Collectors.toMap(PutCall::getId, Function.identity()));
         return getContainedLights(group)
                 .stream()
-                .map(resource -> createSceneAction(putCallMap.getOrDefault(resource.getRid(), basePutCall), resource))
+                .map(resource -> createSceneAction(putCallMap.getOrDefault(resource.getRid(), getDefaultPutCall(resource)), resource))
                 .toList();
+    }
+
+    private static PutCall getDefaultPutCall(ResourceReference resource) {
+        return PutCall.builder().id(resource.getRid()).on(false).build();
     }
 
     private SceneAction createSceneAction(PutCall putCall, ResourceReference resource) {
