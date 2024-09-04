@@ -359,23 +359,25 @@ public final class HueScheduler implements Runnable {
     public void start() {
         ZonedDateTime now = currentTime.get();
         scheduleSolarDataInfoLog();
-        lightStates.forEach((id, states) -> scheduleInitialStartup(states, now));
+        lightStates.values().stream()
+                   .flatMap(states -> setupInitialStartup(states, now).stream())
+                   .sorted(Comparator.comparing(ScheduledStateSnapshot::getId)
+                                     .thenComparing(ScheduledStateSnapshot::getDefinedStart))
+                   .forEach(snapshot -> initialSchedule(snapshot, now));
         scheduleApiCacheClear();
     }
 
     /**
-     * Schedule the given states. To correctly schedule cross-over states, i.e., states that already started yesterday,
+     * Prepare the given states. To correctly schedule cross-over states, i.e., states that already started yesterday,
      * we initially calculate all end times using yesterday, and reschedule them if needed afterward.
      */
-    private void scheduleInitialStartup(List<ScheduledState> states, ZonedDateTime now) {
+    private List<ScheduledStateSnapshot> setupInitialStartup(List<ScheduledState> states, ZonedDateTime now) {
         MDC.put("context", "init");
         ZonedDateTime yesterday = now.minusDays(1);
         states.forEach(state -> state.setPreviousStateLookup(this::lookupPreviousState));
         List<ScheduledStateSnapshot> snapshots = states.stream().map(state -> state.getSnapshot(yesterday)).toList();
         calculateAndSetEndTimes(snapshots, states);
-        snapshots.stream()
-                 .sorted(Comparator.comparing(ScheduledStateSnapshot::getDefinedStart))
-                 .forEach(snapshot -> initialSchedule(snapshot, now));
+        return snapshots;
     }
 
     private ScheduledStateSnapshot lookupPreviousState(ScheduledStateSnapshot currentStateSnapshot) {
@@ -531,7 +533,7 @@ public final class HueScheduler implements Runnable {
     private void syncScene(ScheduledStateSnapshot state) {
         try {
             getOverlappingGroups(state)
-                    .forEach(groupInfo -> syncScene(groupInfo.groupId, lookupScenePutCalls(groupInfo.groupId)));
+                    .forEach(groupInfo -> syncScene(groupInfo.groupId, lookupScenePutCalls(groupInfo.groupLights)));
             if (performsInterpolation(state)) {
                 scheduleNextSceneSync(state);
             }
@@ -569,9 +571,7 @@ public final class HueScheduler implements Runnable {
 
     }
 
-    private List<PutCall> lookupScenePutCalls(String groupId) {
-        List<String> groupLights = api.getGroupLights(groupId);
-
+    private List<PutCall> lookupScenePutCalls(List<String> groupLights) {
         Map<String, PutCall> putCalls = lookupPutCallsFromGroups(groupLights);
         lookupOverriddenPutCallsFromLights(groupLights).forEach(putCall -> putCalls.put(putCall.getId(), putCall));
 
