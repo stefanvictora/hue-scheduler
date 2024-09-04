@@ -29,6 +29,7 @@ import java.time.Duration;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
 import java.util.Arrays;
@@ -44,6 +45,7 @@ import static org.mockito.Mockito.*;
 @Slf4j
 class HueSchedulerTest {
 
+    private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss ");
     private static final int ID = 1;
     private static final int DEFAULT_BRIGHTNESS = 50;
     private static final int DEFAULT_CT = 400; // very warm. [153-500]
@@ -91,13 +93,16 @@ class HueSchedulerTest {
         }
         if (!newTime.equals(now)) {
             MDC.put("context", "test");
-            log.info("New time: {} [+{}] ({})", newTime, Duration.between(now, newTime), DayOfWeek.from(newTime));
+            MDC.put("time", TIME_FORMATTER.format(newTime));
+            log.info("Advanced time: +{} ({})", Duration.between(now, newTime), DayOfWeek.from(newTime));
         }
         now = newTime;
     }
 
     private void setCurrentAndInitialTimeTo(ZonedDateTime dateTime) {
         initialNow = now = dateTime;
+        MDC.put("context", "test");
+        MDC.put("time", TIME_FORMATTER.format(dateTime));
         log.info("Initial time: {} ({})", now, DayOfWeek.from(now));
     }
 
@@ -5989,6 +5994,86 @@ class HueSchedulerTest {
     }
 
     @Test
+    void sceneSync_usesFullPicture_singleGroup_withNullState_stopsFullPictureCalculation() {
+        enableSceneSync();
+
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 7);
+        addState("g1", now, "bri:100");
+        addState("g1", now.plusMinutes(10)); // stops full picture propagation
+        addState("g1", now.plusMinutes(20), "ct:500");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(20), now.plusDays(1))
+        );
+
+        // first state: uses full picture
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.getFirst(),
+                expectedGroupPutCall(1).bri(100).ct(500) // only because of initial run
+        );
+
+        assertSceneUpdate("/groups/1", expectedPutCall(7).bri(100).ct(500));
+
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(10)); // next day
+
+        // second state: stops at null state
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.get(1),
+                expectedGroupPutCall(1).ct(500)
+        );
+
+        assertSceneUpdate("/groups/1", expectedPutCall(7).ct(500));
+
+        ensureRunnable(initialNow.plusDays(1).plusMinutes(20), initialNow.plusDays(2)); // next day
+    }
+
+    @Test
+    void sceneSync_usesFullPicture_multipleOverlappingGroups_withNullStateOnSmallerGroup_notInterpretedAsOverride_usesStateFromBiggerGroup() {
+        enableSceneSync();
+
+        mockDefaultGroupCapabilities(1);
+        mockDefaultGroupCapabilities(2);
+        mockGroupLightsForId(1, 7, 8);
+        mockGroupLightsForId(2, 7);
+        mockAssignedGroups(7, 1, 2);
+        mockAssignedGroups(8, 1);
+        addState("g1", now, "bri:110");
+        addState("g2", now, "bri:120");
+        addState("g1", now.plusMinutes(10), "bri:210");
+        addState("g2", now.plusMinutes(10)); // null state, not scheduled but used during full picture to stop propagation
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)), // g1 first state
+                expectedRunnable(now.plusSeconds(1), now.plusMinutes(10)), // g2
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1)) // g1 second state
+        );
+
+        // g1 first state
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.getFirst(),
+                expectedGroupPutCall(1).bri(110)
+        );
+
+        assertSceneUpdate("/groups/1", expectedPutCall(7).bri(120), expectedPutCall(8).bri(110));
+        assertSceneUpdate("/groups/2", expectedPutCall(7).bri(120));
+
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(10)); // next day
+
+        // g1 second state
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.get(2),
+                expectedGroupPutCall(1).bri(210)
+        );
+
+        assertSceneUpdate("/groups/1", expectedPutCall(7).bri(210), expectedPutCall(8).bri(210)); // no overrides from g2
+        assertSceneUpdate("/groups/2", expectedPutCall(7).bri(210)); // takes state from bigger group g1; does not use full picture
+
+        ensureRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)); // next day
+    }
+
+    @Test
     void sceneSync_sceneUpdateConsidersFullPicture_usesMissingPropertiesFromPreviousStates_alsoForLightOn() {
         enableSceneSync();
 
@@ -6533,10 +6618,6 @@ class HueSchedulerTest {
     // todo: test with overridden put call that has an interpolation -> should also trigger the regular scene sync -> actually, no
 
     // todo: test with gaps or with day scheduling, meaning we want to test cases where state definitions exists, but not for the current time
-
-    // todo: test scene sync with null states; it seems it computes the full picture
-
-    // todo: test full picture with on:false -> it should not add other properties
 
     @Test
     void sceneSync_apiThrowsError_doesNotSkipSchedule_retriesSync() {

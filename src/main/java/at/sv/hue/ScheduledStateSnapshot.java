@@ -165,6 +165,9 @@ public class ScheduledStateSnapshot {
     }
 
     public PutCall getFullPicturePutCall(ZonedDateTime now) {
+        if (isNullState()) {
+            return null;
+        }
         PutCall putCall = getPutCall(now);
         if (putCall.getOn() == Boolean.FALSE) {
             return putCall;
@@ -172,7 +175,7 @@ public class ScheduledStateSnapshot {
         ScheduledStateSnapshot previousState = this;
         while (putCall.getBri() == null || putCall.getColorMode() == ColorMode.NONE) {
             previousState = previousState.getPreviousState();
-            if (previousState == null || isSameState(previousState)) {
+            if (previousState == null || isSameState(previousState) || previousState.isNullState()) {
                 break;
             }
             PutCall previousPutCall = previousState.getPutCallIgnoringTransition();
