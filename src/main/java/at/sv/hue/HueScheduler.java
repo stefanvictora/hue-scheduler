@@ -517,7 +517,7 @@ public final class HueScheduler implements Runnable {
     }
 
     private boolean shouldSyncScene(ScheduledStateSnapshot state) {
-        return state.isGroupState() && enableSceneSync && wasNotJustTurnedOn(state); // todo: wasJustTurnedOn is not working if we have gaps in the schedule
+        return enableSceneSync && wasNotJustTurnedOn(state); // todo: wasJustTurnedOn is not working if we have gaps in the schedule
     }
 
     private boolean wasNotJustTurnedOn(ScheduledStateSnapshot state) {

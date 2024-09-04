@@ -6447,6 +6447,36 @@ class HueSchedulerTest {
     }
 
     @Test
+    void sceneSync_individualLights_withOverlappingParentGroups_haveNoSchedule_createsIntermediateScenes() {
+        enableSceneSync();
+
+        mockDefaultGroupCapabilities(1);
+        mockDefaultGroupCapabilities(2);
+        mockGroupLightsForId(1, 5, 6, 7);
+        mockGroupLightsForId(2, 5, 6);
+        mockAssignedGroups(5, 1, 2);
+        mockAssignedGroups(6, 1, 2);
+        mockAssignedGroups(7, 1);
+        mockDefaultLightCapabilities(5);
+        addState("5", now, "bri:110");
+        addState("5", now.plusMinutes(10), "bri:120");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.getFirst(),
+                expectedPutCall(5).bri(110)
+        );
+
+        assertSceneUpdate("/groups/1", expectedPutCall(5).bri(110));
+        assertSceneUpdate("/groups/2", expectedPutCall(5).bri(110));
+
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(10)); // next day
+    }
+
+    @Test
     void sceneSync_multipleSchedules_createsIntermediateParentScenes_parentScenesWithNoScheduleAlsoUseBiggerGroupsForFullPicture() {
         enableSceneSync();
 
