@@ -1,23 +1,24 @@
 package at.sv.hue;
 
 import java.time.Duration;
+import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 
-public final class EndTimeAdjuster {
+public final class EndTimeCalculator {
 
     private final ScheduledStateSnapshot state;
     private final ScheduledStateSnapshot nextState;
 
-    public EndTimeAdjuster(ScheduledStateSnapshot state, ScheduledStateSnapshot nextState) {
+    public EndTimeCalculator(ScheduledStateSnapshot state, ScheduledStateSnapshot nextState) {
         this.state = state;
         this.nextState = nextState;
     }
 
-    public void calculateAndSetEndTime() {
+    public ZonedDateTime calculateAndGetEndTime() {
         if (state.isScheduledOn(nextState.getStart()) && isTodayOrNextDay(nextState)) {
-            setEndToStartOfNextState(nextState);
+            return getEndAsStartOfNextState();
         } else {
-            setEndToEndOfDay();
+            return getEndAsEndOfDay();
         }
     }
 
@@ -26,11 +27,11 @@ public final class EndTimeAdjuster {
                 nextState.getStart().truncatedTo(ChronoUnit.DAYS)).toDays() <= 1;
     }
 
-    private void setEndToStartOfNextState(ScheduledStateSnapshot nextState) {
-        state.setEnd(nextState.getStart().minusSeconds(1));
+    private ZonedDateTime getEndAsStartOfNextState() {
+        return nextState.getStart().minusSeconds(1);
     }
 
-    private void setEndToEndOfDay() {
-        state.setEnd(state.getDefinedStart().plusDays(1).truncatedTo(ChronoUnit.DAYS).minusSeconds(1));
+    private ZonedDateTime getEndAsEndOfDay() {
+        return state.getDefinedStart().plusDays(1).truncatedTo(ChronoUnit.DAYS).minusSeconds(1);
     }
 }

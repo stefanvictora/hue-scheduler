@@ -19,6 +19,7 @@ import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 
 public final class ScheduledState { // todo: a better name would be StateDefinition
@@ -65,6 +66,8 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
     private PutCall lastPutCall;
     @Setter
     private Function<ScheduledStateSnapshot, ScheduledStateSnapshot> previousStateLookup;
+    @Setter
+    private BiFunction<ScheduledStateSnapshot, ZonedDateTime, ScheduledStateSnapshot> nextStateLookup;
 
     @Builder
     public ScheduledState(Identifier identifier, String startString, Integer brightness, Integer ct, Double x, Double y,
@@ -99,6 +102,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
         originalState = this;
         retryAfterPowerOnState = false;
         previousStateLookup = (state) -> null;
+        nextStateLookup = (state, dateTime) -> null;
         assertColorCapabilities();
         snapshotCache = Caffeine.newBuilder()
                                 .expireAfterWrite(Duration.ofDays(3))
@@ -117,6 +121,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
         copy.lastSeen = state.lastSeen;
         copy.originalState = state.originalState;
         copy.previousStateLookup = state.previousStateLookup;
+        copy.nextStateLookup = state.nextStateLookup; // todo: test?
         return copy;
     }
 
@@ -256,7 +261,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
      */
     public ScheduledStateSnapshot getSnapshot(ZonedDateTime dateTime) {
         return snapshotCache.get(getDefinedStart(dateTime),
-                definedStart -> new ScheduledStateSnapshot(this, definedStart, previousStateLookup));
+                definedStart -> new ScheduledStateSnapshot(this, definedStart, previousStateLookup, nextStateLookup));
     }
 
     /**
@@ -277,19 +282,6 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
 
     private ZonedDateTime parseStartTime(String input, ZonedDateTime dateTime) {
         return startTimeProvider.getStart(input, dateTime);
-    }
-
-    /**
-     * Returns the next defined start after the last one, starting from the given dateTime.
-     * We loop over getDefinedStart with increased days until we find the first start that is after the last one.
-     */
-    public ZonedDateTime getNextDefinedStart(ZonedDateTime dateTime, ZonedDateTime currentDefinedStart) {
-        ZonedDateTime next = getDefinedStart(dateTime);
-        while (next.isBefore(currentDefinedStart) || next.equals(currentDefinedStart)) {
-            dateTime = dateTime.plusDays(1);
-            next = getDefinedStart(dateTime);
-        }
-        return next;
     }
 
     private DayOfWeek getNextDayAfterTodayOrFirstNextWeek(DayOfWeek today) {

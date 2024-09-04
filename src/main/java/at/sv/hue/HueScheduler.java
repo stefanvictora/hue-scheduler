@@ -374,10 +374,11 @@ public final class HueScheduler implements Runnable {
     private List<ScheduledStateSnapshot> setupInitialStartup(List<ScheduledState> states, ZonedDateTime now) {
         MDC.put("context", "init");
         ZonedDateTime yesterday = now.minusDays(1);
-        states.forEach(state -> state.setPreviousStateLookup(this::lookupPreviousState));
-        List<ScheduledStateSnapshot> snapshots = states.stream().map(state -> state.getSnapshot(yesterday)).toList();
-        calculateAndSetEndTimes(snapshots, states);
-        return snapshots;
+        states.forEach(state -> {
+            state.setPreviousStateLookup(this::lookupPreviousState);
+            state.setNextStateLookup(this::lookupNextState);
+        });
+        return states.stream().map(state -> state.getSnapshot(yesterday)).toList();
     }
 
     private ScheduledStateSnapshot lookupPreviousState(ScheduledStateSnapshot currentStateSnapshot) {
@@ -390,7 +391,7 @@ public final class HueScheduler implements Runnable {
     private List<ScheduledStateSnapshot> lookupPreviousStatesListIgnoringSame(ScheduledStateSnapshot currentStateSnapshot) {
         ZonedDateTime definedStart = currentStateSnapshot.getDefinedStart();
         ZonedDateTime theDayBefore = definedStart.minusDays(1).truncatedTo(ChronoUnit.DAYS).withEarlierOffsetAtOverlap();
-        return getLightStatesForId(currentStateSnapshot.getId())
+        return getLightStatesForId(currentStateSnapshot)
                 .stream()
                 .filter(currentStateSnapshot::isNotSameState)
                 .flatMap(state -> Stream.of(state.getSnapshot(theDayBefore), state.getSnapshot(definedStart)))
@@ -407,15 +408,8 @@ public final class HueScheduler implements Runnable {
                 .collect(Collectors.toList());
     }
 
-    private void calculateAndSetEndTimes(List<ScheduledStateSnapshot> snapshots, List<ScheduledState> states) {
-        snapshots.forEach(snapshot -> {
-            ScheduledStateSnapshot nextState = lookupNextState(states, snapshot.getDefinedStart());
-            calculateAndSetEndTime(snapshot, nextState);
-        });
-    }
-
-    private void calculateAndSetEndTime(ScheduledStateSnapshot snapshot, ScheduledStateSnapshot nextState) {
-        new EndTimeAdjuster(snapshot, nextState).calculateAndSetEndTime();
+    private ScheduledStateSnapshot lookupNextState(ScheduledStateSnapshot currentStateSnapshot, ZonedDateTime definedStart) {
+        return lookupNextState(getLightStatesForId(currentStateSnapshot), definedStart);
     }
 
     private ScheduledStateSnapshot lookupNextState(List<ScheduledState> states, ZonedDateTime definedStart) {
@@ -720,7 +714,7 @@ public final class HueScheduler implements Runnable {
         return allSeenGroupStatesDiffer(lightState);
     }
 
-    private boolean allSeenGroupStatesDiffer(LightState lightState) {
+    private boolean allSeenGroupStatesDiffer(LightState lightState) { // todo: I think this does not work well with our new overlapping groups logik
         return api.getAssignedGroups(lightState.getId())
                   .stream()
                   .map(this::getLastSeenState)
@@ -805,24 +799,12 @@ public final class HueScheduler implements Runnable {
     private void reschedule(ScheduledStateSnapshot snapshot) {
         if (snapshot.isTemporary()) return;
         ZonedDateTime now = currentTime.get();
-        ZonedDateTime nextDefinedStart = getNextDefinedStart(snapshot, now);
-        ScheduledStateSnapshot nextSnapshot = snapshot.getScheduledState().getSnapshot(nextDefinedStart);
-        calculateAndSetEndTime(nextSnapshot, lookupNextState(getLightStatesForId(snapshot.getId()), nextDefinedStart));
+        ScheduledStateSnapshot nextSnapshot = snapshot.getNextDaySnapshot(now);
         schedule(nextSnapshot, nextSnapshot.getDelayUntilStart(now));
     }
 
-    private ZonedDateTime getNextDefinedStart(ScheduledStateSnapshot currentSnapshot, ZonedDateTime now) {
-        ZonedDateTime nextDefinedStart = currentSnapshot.getNextDefinedStart(now);
-        if (shouldScheduleNextDay(currentSnapshot, nextDefinedStart, now)) {
-            return currentSnapshot.getNextDefinedStart(now.plusDays(1));
-        } else {
-            return nextDefinedStart;
-        }
-    }
-
-    private boolean shouldScheduleNextDay(ScheduledStateSnapshot currentSnapshot, ZonedDateTime nextDefinedStart, ZonedDateTime now) {
-        ScheduledStateSnapshot nextState = lookupNextState(getLightStatesForId(currentSnapshot.getId()), nextDefinedStart);
-        return nextState.getStart().isBefore(now) || nextState.getStart().isEqual(now);
+    private List<ScheduledState> getLightStatesForId(ScheduledStateSnapshot snapshot) {
+        return getLightStatesForId(snapshot.getId());
     }
 
     private List<ScheduledState> getLightStatesForId(String id) {
@@ -869,7 +851,7 @@ public final class HueScheduler implements Runnable {
     private static ScheduledStateSnapshot createTemporaryFollowUpSplitState(ScheduledStateSnapshot state) {
         ScheduledState temporaryCopy = ScheduledState.createTemporaryCopy(state.getScheduledState());
         ScheduledStateSnapshot nextSplitSnapshot = temporaryCopy.getSnapshot(state.getDefinedStart());
-        nextSplitSnapshot.setEnd(state.getEnd());
+        nextSplitSnapshot.overwriteEnd(state.getEnd());
         return nextSplitSnapshot;
     }
 
@@ -903,7 +885,7 @@ public final class HueScheduler implements Runnable {
         if (putCall.getTransitionTime() == null) {
             return putCall;
         }
-        ScheduledStateSnapshot nextState = lookupNextState(getLightStatesForId(state.getId()), state.getDefinedStart());
+        ScheduledStateSnapshot nextState = state.getNextState();
         Duration duration = Duration.between(now, nextState.getStart()).abs();
         Duration tr = Duration.ofMillis(putCall.getTransitionTime() * 100);
         long differenceInMinutes = duration.minus(tr).toMinutes();
@@ -955,7 +937,7 @@ public final class HueScheduler implements Runnable {
         ScheduledState powerOnCopy = ScheduledState.createTemporaryCopy(state.getScheduledState());
         powerOnCopy.setRetryAfterPowerOnState(true);
         ScheduledStateSnapshot snapshot = powerOnCopy.getSnapshot(state.getDefinedStart());
-        snapshot.setEnd(state.calculateNextPowerOnEnd(currentTime.get()));
+        snapshot.overwriteEnd(state.calculateNextPowerOnEnd(currentTime.get()));
         return snapshot;
     }
 

@@ -4,13 +4,13 @@ import at.sv.hue.api.LightCapabilities;
 import at.sv.hue.api.PutCall;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import lombok.Setter;
 
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 
 import static at.sv.hue.ScheduledState.MAX_TRANSITION_TIME_MS;
@@ -22,12 +22,12 @@ public class ScheduledStateSnapshot {
     @Getter
     private final ZonedDateTime definedStart;
     private final Function<ScheduledStateSnapshot, ScheduledStateSnapshot> previousStateLookup;
+    private final BiFunction<ScheduledStateSnapshot, ZonedDateTime, ScheduledStateSnapshot> nextStateLookup;
 
     private ZonedDateTime cachedStart;
+    private ZonedDateTime cachedEnd;
     private ScheduledStateSnapshot cachedPreviousState;
-    @Setter
-    @Getter
-    private ZonedDateTime end;
+    private ScheduledStateSnapshot cachedNextState;
 
     public String getId() {
         return scheduledState.getId();
@@ -37,7 +37,7 @@ public class ScheduledStateSnapshot {
         return scheduledState.getContextName();
     }
 
-    public ZonedDateTime getStart() {
+    public synchronized ZonedDateTime getStart() {
         if (cachedStart == null) {
             cachedStart = calculateStart();
         }
@@ -72,11 +72,33 @@ public class ScheduledStateSnapshot {
         return (int) Duration.between(getPreviousState().getDefinedStart(), definedStart).toMillis();
     }
 
-    public ScheduledStateSnapshot getPreviousState() {
+    public synchronized ScheduledStateSnapshot getPreviousState() {
         if (cachedPreviousState == null) {
             cachedPreviousState = previousStateLookup.apply(this);
         }
         return cachedPreviousState;
+    }
+
+    public synchronized ZonedDateTime getEnd() {
+        if (cachedEnd == null) {
+            cachedEnd = calculateEnd();
+        }
+        return cachedEnd;
+    }
+
+    private ZonedDateTime calculateEnd() {
+        return new EndTimeCalculator(this, getNextState()).calculateAndGetEndTime();
+    }
+
+    public synchronized ScheduledStateSnapshot getNextState() {
+        if (cachedNextState == null) {
+            cachedNextState = nextStateLookup.apply(this, definedStart);
+        }
+        return cachedNextState;
+    }
+
+    public synchronized void overwriteEnd(ZonedDateTime newEnd) {
+        cachedEnd = newEnd;
     }
 
     public boolean hasTransitionBefore() {
@@ -115,8 +137,35 @@ public class ScheduledStateSnapshot {
         return scheduledState.hasOtherPropertiesThanOn();
     }
 
-    public ZonedDateTime getNextDefinedStart(ZonedDateTime dateTime) {
-        return scheduledState.getNextDefinedStart(dateTime, definedStart);
+    public ScheduledStateSnapshot getNextDaySnapshot(ZonedDateTime now) {
+        return scheduledState.getSnapshot(getNextDefinedStart(now));
+    }
+
+    private ZonedDateTime getNextDefinedStart(ZonedDateTime now) {
+        ZonedDateTime nextDefinedStart = calculateNextDefinedStart(now);
+        if (shouldScheduleNextDay(nextDefinedStart, now)) {
+            return calculateNextDefinedStart(now.plusDays(1));
+        } else {
+            return nextDefinedStart;
+        }
+    }
+
+    /**
+     * Returns the next defined start after the last one, starting from the given dateTime.
+     * We loop over getDefinedStart with increased days until we find the first start that is after the last one.
+     */
+    private ZonedDateTime calculateNextDefinedStart(ZonedDateTime dateTime) {
+        ZonedDateTime next = scheduledState.getDefinedStart(dateTime);
+        while (next.isBefore(definedStart) || next.equals(definedStart)) {
+            dateTime = dateTime.plusDays(1);
+            next = scheduledState.getDefinedStart(dateTime);
+        }
+        return next;
+    }
+
+    private boolean shouldScheduleNextDay(ZonedDateTime nextDefinedStart, ZonedDateTime now) {
+        ScheduledStateSnapshot nextState = nextStateLookup.apply(this, nextDefinedStart);
+        return nextState.getStart().isBefore(now) || nextState.getStart().isEqual(now);
     }
 
     public boolean isSplitState() {
@@ -131,7 +180,7 @@ public class ScheduledStateSnapshot {
         if (isInsideSplitCallWindow(now)) {
             return getNextTransitionTimeSplitStart(now).minusSeconds(1);
         } else {
-            return end;
+            return getEnd();
         }
     }
 
@@ -234,7 +283,7 @@ public class ScheduledStateSnapshot {
     }
 
     public boolean endsBefore(ZonedDateTime now) {
-        return now.isAfter(end);
+        return now.isAfter(getEnd());
     }
 
     public boolean isScheduledOn(ZonedDateTime day) {
@@ -280,7 +329,6 @@ public class ScheduledStateSnapshot {
     }
 
     private String getFormattedEnd() {
-        if (end == null) return "<ERROR: not set>";
-        return end.toLocalDateTime().toString();
+        return getEnd().toLocalDateTime().toString();
     }
 }
