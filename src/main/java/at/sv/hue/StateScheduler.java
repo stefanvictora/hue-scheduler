@@ -6,5 +6,5 @@ import java.util.concurrent.TimeUnit;
 public interface StateScheduler {
     void schedule(Runnable runnable, ZonedDateTime start, ZonedDateTime end);
 
-    void scheduleAtFixedRate(Runnable command, long initialDelay, long period, TimeUnit unit);
+    void scheduleAtFixedRate(Runnable runnable, long initialDelay, long period, TimeUnit unit);
 }
