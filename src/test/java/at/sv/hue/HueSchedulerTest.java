@@ -5658,21 +5658,24 @@ class HueSchedulerTest {
                 expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
         );
 
-        // simulate synced scene activated
+        // simulate synced scene activated: automatically triggers light on event
         simulateSyncedSceneActivated("/scenes/123456ABC", "/lights/1", "/lights/2");
+
+        ScheduledRunnable powerOnRunnable = ensureScheduledStates(expectedPowerOnEnd(initialNow.plusMinutes(10))).getFirst();
+
+        // additional light on event; no additional runnable created
+        simulateLightOnEvent("/groups/1");
 
         // wait a bit, but still inside ignore window
         advanceCurrentTime(Duration.ofSeconds(4));
 
-        ScheduledRunnable powerOnRunnable = simulateLightOnEvent("/lights/1",
-                expectedPowerOnEnd(initialNow.plusMinutes(10))
-        ).getFirst();
-
         // modify current light state
         setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS - 10));
-        advanceTimeAndRunAndAssertPutCalls(powerOnRunnable,
+        runAndAssertPutCalls(powerOnRunnable,
                 expectedPutCall(1).bri(DEFAULT_BRIGHTNESS) // still applied, as just turned on and synced scene is ignored
         );
+
+        // second state
 
         setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS));
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(1),
@@ -5710,6 +5713,9 @@ class HueSchedulerTest {
         // simulate scene activated
         simulateSceneActivated("/scenes/123456ABC", "/lights/1", "/lights/2");
         setLightStateResponse(2, expectedState().brightness(DEFAULT_BRIGHTNESS - 10));
+
+        // since its a non synced scene, no direct light on event
+        ensureScheduledStates();
 
         ScheduledRunnable powerOnRunnable = simulateLightOnEvent("/groups/1",
                 expectedPowerOnEnd(now.plusMinutes(10))
