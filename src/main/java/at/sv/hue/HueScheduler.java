@@ -465,7 +465,7 @@ public final class HueScheduler implements Runnable {
             }
             MDC.put("context", snapshot.getContextName());
             try {
-                if (wasNotJustTurnedOn(snapshot) &&
+                if (wasNotJustTurnedOn(snapshot) &&     // todo: wasJustTurnedOn is not working if we have gaps in the schedule
                     (lightHasBeenManuallyOverriddenBefore(snapshot) || lightIsOffAndDoesNotTurnOn(snapshot))) {
                     if (shouldRetryOnPowerOn(snapshot)) {
                         LOG.info("Off or manually overridden: Skip update and retry when back online");
@@ -503,7 +503,11 @@ public final class HueScheduler implements Runnable {
     }
 
     private long getPotentialOverlappingDelayInMs(ScheduledStateSnapshot snapshot) {
-        return Duration.ofSeconds(getNumberOfBiggerOverlappingGroupStates(snapshot)).toMillis();
+        try {
+            return Duration.ofSeconds(getNumberOfBiggerOverlappingGroupStates(snapshot)).toMillis();
+        } catch (Exception e) {
+            return 0;
+        }
     }
 
     private long getNumberOfBiggerOverlappingGroupStates(ScheduledStateSnapshot state) {
@@ -516,7 +520,7 @@ public final class HueScheduler implements Runnable {
     }
 
     private boolean shouldSyncScene(ScheduledStateSnapshot state) {
-        return enableSceneSync && wasNotJustTurnedOn(state); // todo: wasJustTurnedOn is not working if we have gaps in the schedule
+        return enableSceneSync && !state.isTemporary();
     }
 
     private boolean wasNotJustTurnedOn(ScheduledStateSnapshot state) {

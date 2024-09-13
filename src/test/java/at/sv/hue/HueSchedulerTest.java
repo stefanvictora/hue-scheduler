@@ -5948,6 +5948,76 @@ class HueSchedulerTest {
     }
 
     @Test
+    void sceneSync_groupState_noSyncOnPowerOn() {
+        enableSceneSync();
+
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 6);
+        addState("g1", now, "bri:100");
+        addState("g1", now.plusMinutes(10), "bri:150");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.getFirst(),
+                expectedGroupPutCall(1).bri(100)
+        );
+
+        assertSceneUpdate("/groups/1", expectedPutCall(6).bri(100));
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
+        );
+
+        // Power on -> no scene sync
+
+        ScheduledRunnable powerOnRunnable = simulateLightOnEvent("/groups/1", expectedPowerOnEnd(now.plusMinutes(10))).getFirst();
+
+        advanceTimeAndRunAndAssertPutCalls(powerOnRunnable,
+                expectedGroupPutCall(1).bri(100)
+        );
+    }
+
+    @Test
+    void sceneSync_longTransition_usesSplitCall_splitCallDoesNotTriggerSceneSync() {
+        enableSceneSync();
+
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 5);
+        addState("g1", now, "bri:100");
+        addState("g1", now.plusHours(2), "bri:200", "interpolate:true");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1)),
+                expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.getFirst(),
+                expectedGroupPutCall(1).bri(100),
+                expectedGroupPutCall(1).bri(182).transitionTime(tr("1h38min"))
+        );
+
+        assertSceneUpdate("/groups/1", expectedPutCall(5).bri(100));
+
+        List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(
+                expectedRunnable(now.plusMinutes(1), now.plusDays(1)), // scene sync schedule
+                expectedRunnable(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), now.plusDays(1)), // split call
+                expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
+        );
+
+        // Run split call -> triggers no scene sync
+
+        ScheduledRunnable splitCall = followUpRunnables.get(1);
+        advanceTimeAndRunAndAssertPutCalls(splitCall,
+                expectedGroupPutCall(1).bri(200).transitionTime(tr("20min"))
+        );
+
+        // performs no additional scene sync
+    }
+
+    @Test
     void sceneSync_groupState_createsAndUpdatesScene_interpolation_updatesSceneWithInterpolatedState_schedulesAdditionalSceneSync() {
         enableSceneSync();
 
@@ -6692,6 +6762,32 @@ class HueSchedulerTest {
                 expectedRunnable(now.plusMinutes(10).plusSeconds(1), now.plusDays(1)),
                 expectedRunnable(now.plusMinutes(10).plusSeconds(1), now.plusDays(1)),
                 expectedRunnable(now.plusMinutes(10).plusSeconds(2), now.plusDays(1))
+        );
+    }
+
+    @Test
+    void scheduling_overlappingGroups_wouldUseOffset_apiCallFails_usesFallbackValueOfZero() {
+        mockDefaultGroupCapabilities(1);
+        mockDefaultGroupCapabilities(2);
+        mockGroupLightsForId(1, 5, 6, 7);
+        mockGroupLightsForId(2, 5, 6);
+        mockAssignedGroups(5, 1, 2);
+        mockAssignedGroups(6, 1, 2);
+        mockAssignedGroups(7, 1);
+        addKnownLightIdsWithDefaultCapabilities(6);
+        addKnownLightIdsWithDefaultCapabilities(7);
+        addState("g1", now, "bri:100");
+        addState("g2", now, "bri:120");
+        addState("g1", now.plusMinutes(10), "bri:200");
+        addState("g2", now.plusMinutes(10), "bri:220");
+
+        when(mockedHueApi.getAssignedGroups("/lights/6")).thenThrow(new ApiFailure("Failure"));
+
+        startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)), // g1
+                expectedRunnable(now, now.plusMinutes(10)), // g2
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
         );
     }
 
