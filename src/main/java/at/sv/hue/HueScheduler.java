@@ -953,6 +953,7 @@ public final class HueScheduler implements Runnable {
     }
 
     private void retryWhenBackOn(ScheduledStateSnapshot snapshot) {
+        LOG.trace("Created power-on runnable: {}", snapshot);
         lightEventListener.runWhenTurnedOn(snapshot.getId(), () -> schedule(snapshot, powerOnRescheduleDelayInMs));
     }
 

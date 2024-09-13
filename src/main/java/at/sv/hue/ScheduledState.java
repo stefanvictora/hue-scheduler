@@ -399,7 +399,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
     public String getFormattedProperties() {
         return "id=" + identifier.id() +
                (temporary && !retryAfterPowerOnState ? ", temporary" : "") +
-               (retryAfterPowerOnState ? ", power-on-event" : "") +
+               (retryAfterPowerOnState ? ", power-on-state" : "") +
                getFormattedPropertyIfSet("on", on) +
                getFormattedPropertyIfSet("bri", brightness) +
                getFormattedPropertyIfSet("ct", ct) +
