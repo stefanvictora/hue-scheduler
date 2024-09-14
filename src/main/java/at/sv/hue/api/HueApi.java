@@ -87,6 +87,12 @@ public interface HueApi extends ResourceModificationEventListener {
     List<String> getAffectedIdsByScene(String sceneId);
 
     /**
+     * @return the lights and group id related to the given device. If not found, empty list. Not null.
+     * @throws ApiFailure if the api call failed
+     */
+    List<String> getAffectedIdsByDevice(String deviceId);
+
+    /**
      * @return a list of group ids the light is assigned to, not null
      */
     List<String> getAssignedGroups(String lightId);

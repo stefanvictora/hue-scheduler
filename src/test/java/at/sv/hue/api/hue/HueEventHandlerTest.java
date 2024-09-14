@@ -95,7 +95,7 @@ class HueEventHandlerTest {
     }
 
     @Test
-    void onMessage_zigbeeConnectionEstablishedEvent_triggersLightOn_setsPhysicalFlag() throws Exception {
+    void onMessage_zigbeeConnectionEstablishedEvent_triggersPhysicalOn_usesDeviceId() throws Exception {
         handler.onMessage("", new MessageEvent("""
                 [
                   {
@@ -117,7 +117,7 @@ class HueEventHandlerTest {
                   }
                 ]"""));
 
-        verify(lightEventListener).onLightOn("60b2bafa-53f4-4062-9f58-253be813b349", true);
+        verify(lightEventListener).onPhysicalOn("f36455ed-7b92-4e5a-97ba-73d804ab03da");
     }
 
     @Test
@@ -209,7 +209,7 @@ class HueEventHandlerTest {
                   }
                 ]"""));
 
-        verify(lightEventListener).onLightOn("d37eb9c4-d7eb-42ee-9a13-fa9148f8d403", false);
+        verify(lightEventListener).onLightOn("d37eb9c4-d7eb-42ee-9a13-fa9148f8d403");
     }
 
     @Test
@@ -280,7 +280,7 @@ class HueEventHandlerTest {
                   }
                 ]"""));
 
-        verify(lightEventListener).onLightOn("560cd8f7-c498-4358-8dba-19734b4173f7", false);
+        verify(lightEventListener).onLightOn("560cd8f7-c498-4358-8dba-19734b4173f7");
     }
 
     @Test
@@ -397,7 +397,7 @@ class HueEventHandlerTest {
                 ]"""));
 
         verify(lightEventListener).onLightOff("d37eb9c4-d7eb-42ee-9a13-fa9148f8d403");
-        verify(lightEventListener).onLightOn("db1d8ea4-d55d-47bd-b741-aa9d6ac0f0e7", false);
+        verify(lightEventListener).onLightOn("db1d8ea4-d55d-47bd-b741-aa9d6ac0f0e7");
         verifyNoMoreInteractions(lightEventListener);
         verifyNoInteractions(resourceModificationEventListener);
     }
@@ -456,7 +456,7 @@ class HueEventHandlerTest {
         verifyResourceModification("grouped_light", "e4cfe0a4-4630-48fa-a357-750dfb7debe1");
         verifyResourceModification("zone", "a2f6a14c-9dd6-4d01-a31d-5a5f2e1d1b11");
 
-        verify(lightEventListener).onLightOn("e4cfe0a4-4630-48fa-a357-750dfb7debe1", false);
+        verify(lightEventListener).onLightOn("e4cfe0a4-4630-48fa-a357-750dfb7debe1");
 
         verifyNoMoreInteractions(resourceModificationEventListener);
         verifyNoMoreInteractions(lightEventListener);

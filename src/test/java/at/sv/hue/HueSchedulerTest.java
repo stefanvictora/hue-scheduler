@@ -413,7 +413,7 @@ class HueSchedulerTest {
     }
 
     private void simulateLightOnEvent(String id) {
-        scheduler.getHueEventListener().onLightOn(id, false);
+        scheduler.getHueEventListener().onLightOn(id);
     }
 
     private ScheduledRunnable simulateLightOnEventExpectingSingleScheduledState() {
@@ -4986,22 +4986,20 @@ class HueSchedulerTest {
     @Test
     void run_execution_twoGroups_manualOverride_bothRescheduledWhenContainedLightIsTurnedOnPhysically() {
         enableUserModificationTracking();
-        int groupId1 = 5;
-        int groupId2 = 6;
-        int lightId = 77;
-        mockDefaultGroupCapabilities(groupId1);
-        mockDefaultGroupCapabilities(groupId2);
-        mockDefaultLightCapabilities(lightId);
-        mockGroupLightsForId(5, lightId);
-        mockGroupLightsForId(6, lightId);
-        mockAssignedGroups(lightId, Arrays.asList(groupId1, groupId2)); // light is part of two groups
+        mockDefaultLightCapabilities(1);
+        mockDefaultGroupCapabilities(5);
+        mockDefaultGroupCapabilities(6);
+        mockGroupLightsForId(5, 1);
+        mockGroupLightsForId(6, 1);
+        mockAssignedGroups(1, 5, 6); // light is part of two groups
+        when(mockedHueApi.getAffectedIdsByDevice("/device/10")).thenReturn(List.of("/lights/1", "/groups/5", "/groups/6"));
 
-        addState("g" + groupId1, now, "bri:" + DEFAULT_BRIGHTNESS);
-        addState("g" + groupId2, now, "bri:" + DEFAULT_BRIGHTNESS);
-        addState(lightId, now, "ct:" + DEFAULT_CT);
-        manualOverrideTracker.onManuallyOverridden("/groups/" + groupId1);
-        manualOverrideTracker.onManuallyOverridden("/groups/" + groupId2);
-        manualOverrideTracker.onManuallyOverridden("/lights/" + lightId);
+        addState(1, now, "ct:" + DEFAULT_CT);
+        addState("g5", now, "bri:" + DEFAULT_BRIGHTNESS);
+        addState("g6", now, "bri:" + DEFAULT_BRIGHTNESS);
+        manualOverrideTracker.onManuallyOverridden("/lights/1");
+        manualOverrideTracker.onManuallyOverridden("/groups/5");
+        manualOverrideTracker.onManuallyOverridden("/groups/6");
 
         List<ScheduledRunnable> scheduledRunnables = startScheduler(3);
 
@@ -5011,7 +5009,7 @@ class HueSchedulerTest {
 
         ensureScheduledStates(0);
 
-        scheduler.getHueEventListener().onLightOn("/lights/" + lightId, true);
+        scheduler.getHueEventListener().onPhysicalOn("/device/10");
 
         ensureScheduledStates(3); // individual light, as well as contained groups are rescheduled
     }

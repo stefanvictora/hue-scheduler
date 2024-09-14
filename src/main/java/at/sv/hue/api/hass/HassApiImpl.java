@@ -199,6 +199,16 @@ public class HassApiImpl implements HueApi {
     }
 
     @Override
+    public List<String> getAffectedIdsByDevice(String deviceId) {
+        List<String> assignedGroups = getAssignedGroups(deviceId);
+
+        List<String> affectedIds = new ArrayList<>(assignedGroups);
+        affectedIds.add(deviceId);
+
+        return affectedIds;
+    }
+
+    @Override
     public List<String> getAssignedGroups(String lightId) {
         String lightName = getLightIdentifier(lightId).name();
         return getOrLookupStates().values()

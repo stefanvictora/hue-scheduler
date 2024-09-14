@@ -136,7 +136,7 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verify(lightEventListener).onLightOn("light.schreibtisch_r", false);
+        verify(lightEventListener).onLightOn("light.schreibtisch_r");
     }
 
     @Test
@@ -237,7 +237,7 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verify(lightEventListener).onLightOn("light.schreibtisch_r", true);
+        verify(lightEventListener).onPhysicalOn("light.schreibtisch_r");
     }
 
     @Test

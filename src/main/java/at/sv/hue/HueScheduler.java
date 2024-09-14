@@ -185,7 +185,7 @@ public final class HueScheduler implements Runnable {
     public HueScheduler() {
         lightStates = new HashMap<>();
         manualOverrideTracker = new ManualOverrideTrackerImpl();
-        lightEventListener = new LightEventListenerImpl(manualOverrideTracker, lightId -> api.getAssignedGroups(lightId));
+        lightEventListener = new LightEventListenerImpl(manualOverrideTracker, deviceId -> api.getAffectedIdsByDevice(deviceId));
     }
 
     public HueScheduler(HueApi api, StateScheduler stateScheduler,

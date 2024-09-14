@@ -43,6 +43,7 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Slf4j
 public final class HueApiImpl implements HueApi {
@@ -233,6 +234,21 @@ public final class HueApiImpl implements HueApi {
         String groupedLightId = getAndAssertGroupExists(scene.getGroup()).getGroupedLightId();
         resourceIds.add(groupedLightId);
         return resourceIds;
+    }
+
+    @Override
+    public List<String> getAffectedIdsByDevice(String deviceId) {
+        Device device = getAvailableDevices().get(deviceId);
+        if (device == null) {
+            return List.of();
+        }
+        return Stream.concat(device.getLightIds(), getAssignedGroups(device)).toList();
+    }
+
+    private Stream<String> getAssignedGroups(Device device) {
+        return device.getLightIds()
+                     .map(this::getAssignedGroups)
+                     .flatMap(Collection::stream);
     }
 
     @Override

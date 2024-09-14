@@ -38,9 +38,9 @@ public final class HassEventHandler {
 
     private void handleStateChangedEvent(String entityId, State oldState, State newState) {
         if (oldState.isOff() && newState.isOn()) {
-            eventListener.onLightOn(entityId, false);
+            eventListener.onLightOn(entityId);
         } else if (oldState.isUnavailable() && newState.isOn()) {
-            eventListener.onLightOn(entityId, true);
+            eventListener.onPhysicalOn(entityId);
         } else if (oldState.isOn() && (newState.isOff() || newState.isUnavailable())) {
             eventListener.onLightOff(entityId);
         } else if (newState.isScene() && !newState.isUnavailable()) {

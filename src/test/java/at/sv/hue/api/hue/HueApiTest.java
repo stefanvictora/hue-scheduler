@@ -1052,6 +1052,95 @@ class HueApiTest {
     }
 
     @Test
+    void getAffectedIdsByDevice_returnsLightIdsOfDevice_andTheirContainedGroups() {
+        setGetResponse("/device", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "DEVICE",
+                      "metadata": {
+                        "name": "Schreibtisch R",
+                        "archetype": "sultan_bulb"
+                      },
+                      "services": [
+                        {
+                          "rid": "d64efab2-f44a-45de-85c4-26f8857482f1",
+                          "rtype": "zigbee_connectivity"
+                        },
+                        {
+                          "rid": "LIGHT_1_1",
+                          "rtype": "light"
+                        },
+                        {
+                          "rid": "LIGHT_1_2",
+                          "rtype": "light"
+                        }
+                      ],
+                      "type": "device"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/room", EMPTY_RESPONSE);
+        setGetResponse("/zone", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "ZONE_1",
+                      "children": [
+                        {
+                          "rid": "LIGHT_1_1",
+                          "rtype": "light"
+                        },
+                        {
+                          "rid": "IGNORED_LIGHT",
+                          "rtype": "light"
+                        }
+                      ],
+                      "services": [
+                        {
+                          "rid": "GROUPED_LIGHT_1",
+                          "rtype": "grouped_light"
+                        }
+                      ],
+                      "metadata": {
+                        "name": "Couch",
+                        "archetype": "lounge"
+                      },
+                      "type": "zone"
+                    },
+                    {
+                      "id": "ZONE_2",
+                      "children": [
+                        {
+                          "rid": "LIGHT_1_2",
+                          "rtype": "light"
+                        }
+                      ],
+                      "services": [
+                        {
+                          "rid": "GROUPED_LIGHT_2",
+                          "rtype": "grouped_light"
+                        }
+                      ],
+                      "metadata": {
+                        "name": "Couch",
+                        "archetype": "lounge"
+                      },
+                      "type": "zone"
+                    }
+                  ]
+                }
+                """);
+
+        assertThat(api.getAffectedIdsByDevice("UNKNOWN")).isEmpty();
+        assertThat(api.getAffectedIdsByDevice("DEVICE")).containsExactly("LIGHT_1_1", "LIGHT_1_2", "GROUPED_LIGHT_1",
+                "GROUPED_LIGHT_2");
+    }
+
+    @Test
     void getAssignedGroups_givenLightId_returnsGroupedLightIds() {
         setGetResponse("/room", EMPTY_RESPONSE);
         setGetResponse("/zone", """

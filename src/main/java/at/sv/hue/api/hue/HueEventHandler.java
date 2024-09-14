@@ -56,7 +56,11 @@ public final class HueEventHandler implements BackgroundEventHandler {
                 } else if (hueEvent.isLightOrGroup() && hueEvent.isOnEvent()) {
                     MDC.put("context", "events");
                     log.trace("On event: {}", hueEvent);
-                    lightEventListener.onLightOn(hueEvent.getId(), hueEvent.isPhysical());
+                    if (hueEvent.isPhysical()) {
+                        lightEventListener.onPhysicalOn(hueEvent.getOwner().getRid());
+                    } else {
+                        lightEventListener.onLightOn(hueEvent.getId());
+                    }
                 } else if (hueEvent.isScene() && hueEvent.isSceneActivated()) {
                     sceneEventListener.onSceneActivated(hueEvent.getId());
                 }

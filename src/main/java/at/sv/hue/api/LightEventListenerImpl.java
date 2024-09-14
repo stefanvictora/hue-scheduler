@@ -13,12 +13,12 @@ public class LightEventListenerImpl implements LightEventListener {
 
     private final ManualOverrideTracker manualOverrideTracker;
     private final ConcurrentHashMap<String, List<Runnable>> onStateWaitingList;
-    private final Function<String, List<String>> lightToGroupAssignmentLookup;
+    private final Function<String, List<String>> affectedIdsByDeviceLookup;
 
     public LightEventListenerImpl(ManualOverrideTracker manualOverrideTracker,
-                                  Function<String, List<String>> lightToGroupAssignmentLookup) {
+                                  Function<String, List<String>> affectedIdsByDeviceLookup) {
         this.manualOverrideTracker = manualOverrideTracker;
-        this.lightToGroupAssignmentLookup = lightToGroupAssignmentLookup;
+        this.affectedIdsByDeviceLookup = affectedIdsByDeviceLookup;
         onStateWaitingList = new ConcurrentHashMap<>();
     }
 
@@ -28,13 +28,7 @@ public class LightEventListenerImpl implements LightEventListener {
     }
 
     @Override
-    public void onLightOn(String id, boolean physical) {
-        if (physical) { // only lights can be turned on physically
-            MDC.put("context", "on-event " + id);
-            // if light has been physically turned on, we additionally signal to each group the light is assigned
-            lightToGroupAssignmentLookup.apply(id)
-                                        .forEach(groupId -> onLightOn(groupId, false));
-        }
+    public void onLightOn(String id) {
         MDC.put("context", "on-event " + id);
         manualOverrideTracker.onLightTurnedOn(id);
         List<Runnable> waitingList = onStateWaitingList.remove(id);
@@ -44,6 +38,13 @@ public class LightEventListenerImpl implements LightEventListener {
         } else {
             log.trace("No waiting states.");
         }
+    }
+
+    @Override
+    public void onPhysicalOn(String deviceId) {
+        MDC.put("context", "on-event (physical)" + deviceId);
+        affectedIdsByDeviceLookup.apply(deviceId)
+                                 .forEach(this::onLightOn);
     }
 
     @Override
