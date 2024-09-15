@@ -45,18 +45,12 @@ import java.time.Duration;
 import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 @Command(name = "HueScheduler", version = "0.12.0", mixinStandardHelpOptions = true, sortOptions = false)
 public final class HueScheduler implements Runnable {
@@ -215,7 +209,7 @@ public final class HueScheduler implements Runnable {
         this.sceneSyncName = sceneSyncName;
         this.sceneSyncInterpolationIntervalInMinutes = sceneSyncInterpolationIntervalInMinutes;
         apiCacheInvalidationIntervalInMinutes = 15;
-        stateRegistry = new ScheduledStateRegistry(currentTime);
+        stateRegistry = new ScheduledStateRegistry(currentTime, api);
     }
 
     private Integer parseInterpolationTransitionTime(String interpolationTransitionTimeString) {
@@ -262,7 +256,7 @@ public final class HueScheduler implements Runnable {
                 sceneActivationIgnoreWindowInSeconds, lightEventListener);
         new HassEventStreamReader(HassApiUtils.getHassWebsocketOrigin(apiHost), accessToken, httpClient,
                 new HassEventHandler(lightEventListener, sceneEventListener)).start();
-        stateRegistry = new ScheduledStateRegistry(currentTime);
+        stateRegistry = new ScheduledStateRegistry(currentTime, api);
     }
 
     private void setupHueApi() {
@@ -273,7 +267,7 @@ public final class HueScheduler implements Runnable {
                 sceneActivationIgnoreWindowInSeconds, lightEventListener);
         new HueEventStreamReader(apiHost, accessToken, httpsClient, new HueEventHandler(lightEventListener, sceneEventListener, api),
                 eventStreamReadTimeoutInMinutes).start();
-        stateRegistry = new ScheduledStateRegistry(currentTime);
+        stateRegistry = new ScheduledStateRegistry(currentTime, api);
     }
 
     private void createAndStart() {
@@ -378,8 +372,8 @@ public final class HueScheduler implements Runnable {
         MDC.put("context", "init");
         ZonedDateTime yesterday = now.minusDays(1);
         states.forEach(state -> {
-            state.setPreviousStateLookup(stateRegistry::lookupPreviousState);
-            state.setNextStateLookup(stateRegistry::lookupNextState);
+            state.setPreviousStateLookup(stateRegistry::getPreviousState);
+            state.setNextStateLookup(stateRegistry::getNextStateAfter);
         });
         return states.stream().map(state -> state.getSnapshot(yesterday)).toList();
     }
@@ -456,20 +450,10 @@ public final class HueScheduler implements Runnable {
 
     private long getPotentialOverlappingDelayInMs(ScheduledStateSnapshot snapshot) {
         try {
-            return Duration.ofSeconds(getNumberOfBiggerOverlappingGroupStates(snapshot)).toMillis();
+            return Duration.ofSeconds(stateRegistry.countOverlappingGroupStatesWithMoreLights(snapshot)).toMillis();
         } catch (Exception e) {
             return 0;
         }
-    }
-
-    private long getNumberOfBiggerOverlappingGroupStates(ScheduledStateSnapshot state) {
-        List<String> groupLights = getGroupLights(state);
-        return getOverlappingGroups(groupLights)
-                .stream()
-                .filter(groupInfo -> groupInfo.groupLights.size() > groupLights.size())
-                .map(GroupInfo::groupId)
-                .filter(stateRegistry::hasStatesForId)
-                .count();
     }
 
     private boolean shouldSyncScene(ScheduledStateSnapshot state) {
@@ -486,8 +470,8 @@ public final class HueScheduler implements Runnable {
 
     private void syncScene(ScheduledStateSnapshot state) {
         try {
-            getOverlappingGroups(state)
-                    .forEach(groupInfo -> syncScene(groupInfo.groupId, lookupScenePutCalls(groupInfo.groupLights)));
+            stateRegistry.getAssignedGroups(state)
+                         .forEach(groupInfo -> syncScene(groupInfo.groupId(), stateRegistry.getPutCalls(groupInfo.groupLights())));
             if (state.performsInterpolation(currentTime.get())) {
                 scheduleNextSceneSync(state);
             }
@@ -496,66 +480,6 @@ public final class HueScheduler implements Runnable {
                     sceneSyncInterpolationIntervalInMinutes);
             scheduleNextSceneSync(state);
         }
-    }
-
-    private List<GroupInfo> getOverlappingGroups(ScheduledStateSnapshot state) {
-        return getOverlappingGroups(getGroupLights(state));
-    }
-
-    private List<String> getGroupLights(ScheduledStateSnapshot state) {
-        if (state.isGroupState()) {
-            return api.getGroupLights(state.getId());
-        } else {
-            return List.of(state.getId());
-        }
-    }
-
-    private List<GroupInfo> getOverlappingGroups(List<String> lights) {
-        return lights.stream()
-                     .map(groupLight -> api.getAssignedGroups(groupLight))
-                     .flatMap(Collection::stream)
-                     .distinct()
-                     .map(groupId -> new GroupInfo(groupId, api.getGroupLights(groupId)))
-                     // larger groups first, so that smaller groups can override the larger ones
-                     .sorted(Comparator.comparingInt((GroupInfo groupInfo) -> groupInfo.groupLights.size()).reversed())
-                     .toList();
-    }
-
-    public record GroupInfo(String groupId, List<String> groupLights) {
-
-    }
-
-    private List<PutCall> lookupScenePutCalls(List<String> groupLights) {
-        Map<String, PutCall> putCalls = lookupPutCallsFromGroups(groupLights);
-        stateRegistry.getCurrentActivePutCalls(groupLights).forEach(putCall -> putCalls.put(putCall.getId(), putCall));
-
-        return new ArrayList<>(putCalls.values());
-    }
-
-    private Map<String, PutCall> lookupPutCallsFromGroups(List<String> groupLights) {
-        return getOverlappingGroups(groupLights)
-                .stream()
-                .map(GroupInfo::groupId)
-                .flatMap(groupId -> stateRegistry.getCurrentActivePutCall(groupId).stream())
-                .flatMap(currentActivePutCall -> createOverriddenLightPutCalls(currentActivePutCall, groupLights))
-                .collect(Collectors.toMap(PutCall::getId, putCall -> putCall, (existing, replacement) -> replacement, LinkedHashMap::new));
-    }
-
-    private Stream<PutCall> createOverriddenLightPutCalls(PutCall otherGroupPutCall, List<String> groupLights) {
-        return getOverlappingLightIds(otherGroupPutCall.getId(), groupLights)
-                .stream()
-                .map(lightId -> convertToLightPutCall(otherGroupPutCall, lightId));
-    }
-
-    private List<String> getOverlappingLightIds(String otherGroupId, List<String> groupLights) {
-        List<String> otherGroupLights = api.getGroupLights(otherGroupId);
-        List<String> overlappingLights = new ArrayList<>(groupLights);
-        overlappingLights.retainAll(otherGroupLights);
-        return overlappingLights;
-    }
-
-    private static PutCall convertToLightPutCall(PutCall putCall, String lightId) {
-        return putCall.toBuilder().id(lightId).groupState(false).build();
     }
 
     private void syncScene(String groupId, List<PutCall> putCalls) {
