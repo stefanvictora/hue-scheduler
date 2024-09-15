@@ -101,6 +101,10 @@ public class ScheduledStateSnapshot {
         cachedEnd = newEnd;
     }
 
+    public boolean isCurrentlyActive(ZonedDateTime now) {
+        return (getStart().isBefore(now) || getStart().isEqual(now)) && getEnd() != null && getEnd().isAfter(now);
+    }
+
     public boolean hasTransitionBefore() {
         return scheduledState.hasTransitionBefore();
     }
@@ -189,7 +193,7 @@ public class ScheduledStateSnapshot {
         return Duration.between(now, nextSplitStart).toMillis();
     }
 
-    public ZonedDateTime getNextTransitionTimeSplitStart(ZonedDateTime now) {
+    private ZonedDateTime getNextTransitionTimeSplitStart(ZonedDateTime now) {
         ZonedDateTime splitStart = getStart().plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS);
         while (splitStart.isBefore(now) || splitStart.isEqual(now)) {
             splitStart = splitStart.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS);
@@ -211,6 +215,15 @@ public class ScheduledStateSnapshot {
 
     private PutCall getPutCallIgnoringTransition() {
         return scheduledState.getPutCall(null, null);
+    }
+
+    public PutCall getInterpolatedFullPicturePutCall(ZonedDateTime now) {
+        PutCall putCall = getInterpolatedPutCallIfNeeded(now);
+        if (putCall != null) {
+            return putCall;
+        } else {
+            return getFullPicturePutCall(now);
+        }
     }
 
     public PutCall getFullPicturePutCall(ZonedDateTime now) {
@@ -240,6 +253,40 @@ public class ScheduledStateSnapshot {
             }
         }
         return putCall;
+    }
+
+    public PutCall getInterpolatedPutCallIfNeeded(ZonedDateTime now) {
+        return getInterpolatedPutCallIfNeeded(now, true);
+    }
+
+    public PutCall getNextInterpolatedSplitPutCall(ZonedDateTime now) {
+        ZonedDateTime nextSplitStart = getNextTransitionTimeSplitStart(now).minusMinutes(getRequiredGap()); // add buffer;
+        Duration between = Duration.between(now, nextSplitStart);
+        if (between.isZero() || between.isNegative()) {
+            return null; // we are inside the required gap, skip split call;
+        }
+        PutCall interpolatedSplitPutCall = getInterpolatedPutCallIfNeeded(nextSplitStart, false);
+        if (interpolatedSplitPutCall == null) {
+            return null; // no interpolation possible; todo: write test or remove if not needed anymore
+        }
+        interpolatedSplitPutCall.setTransitionTime((int) between.toMillis() / 100);
+        return interpolatedSplitPutCall;
+    }
+
+    private PutCall getInterpolatedPutCallIfNeeded(ZonedDateTime dateTime, boolean keepPreviousPropertiesForNullTargets) {
+        if (!hasTransitionBefore()) {
+            return null;
+        }
+        ScheduledStateSnapshot previousState = getPreviousState();
+        if (previousState == null) {
+            return null;
+        }
+        return new StateInterpolator(this, previousState, dateTime, keepPreviousPropertiesForNullTargets)
+                .getInterpolatedPutCall();
+    }
+
+    public boolean performsInterpolation(ZonedDateTime now) {
+        return getInterpolatedPutCallIfNeeded(now) != null;
     }
 
     public LightCapabilities getCapabilities() {
