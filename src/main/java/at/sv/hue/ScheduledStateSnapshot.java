@@ -24,10 +24,10 @@ public class ScheduledStateSnapshot {
     private final Function<ScheduledStateSnapshot, ScheduledStateSnapshot> previousStateLookup;
     private final BiFunction<ScheduledStateSnapshot, ZonedDateTime, ScheduledStateSnapshot> nextStateLookup;
 
-    private ZonedDateTime cachedStart;
-    private ZonedDateTime cachedEnd;
-    private ScheduledStateSnapshot cachedPreviousState;
-    private ScheduledStateSnapshot cachedNextState;
+    private volatile ZonedDateTime cachedStart;
+    private volatile ZonedDateTime cachedEnd;
+    private volatile ScheduledStateSnapshot cachedPreviousState;
+    private volatile ScheduledStateSnapshot cachedNextState;
 
     public String getId() {
         return scheduledState.getId();
@@ -37,9 +37,13 @@ public class ScheduledStateSnapshot {
         return scheduledState.getContextName();
     }
 
-    public synchronized ZonedDateTime getStart() {
+    public ZonedDateTime getStart() {
         if (cachedStart == null) {
-            cachedStart = calculateStart();
+            synchronized (this) {
+                if (cachedStart == null) {
+                    cachedStart = calculateStart();
+                }
+            }
         }
         return cachedStart;
     }
@@ -72,16 +76,24 @@ public class ScheduledStateSnapshot {
         return (int) Duration.between(getPreviousState().getDefinedStart(), definedStart).toMillis();
     }
 
-    public synchronized ScheduledStateSnapshot getPreviousState() {
+    public ScheduledStateSnapshot getPreviousState() {
         if (cachedPreviousState == null) {
-            cachedPreviousState = previousStateLookup.apply(this);
+            synchronized (this) {
+                if (cachedPreviousState == null) {
+                    cachedPreviousState = previousStateLookup.apply(this);
+                }
+            }
         }
         return cachedPreviousState;
     }
 
-    public synchronized ZonedDateTime getEnd() {
+    public ZonedDateTime getEnd() {
         if (cachedEnd == null) {
-            cachedEnd = calculateEnd();
+            synchronized (this) {
+                if (cachedEnd == null) {
+                    cachedEnd = calculateEnd();
+                }
+            }
         }
         return cachedEnd;
     }
@@ -90,14 +102,18 @@ public class ScheduledStateSnapshot {
         return new EndTimeCalculator(this, getNextState()).calculateAndGetEndTime();
     }
 
-    public synchronized ScheduledStateSnapshot getNextState() {
+    public ScheduledStateSnapshot getNextState() {
         if (cachedNextState == null) {
-            cachedNextState = nextStateLookup.apply(this, definedStart);
+            synchronized (this) {
+                if (cachedNextState == null) {
+                    cachedNextState = nextStateLookup.apply(this, definedStart);
+                }
+            }
         }
         return cachedNextState;
     }
 
-    public synchronized void overwriteEnd(ZonedDateTime newEnd) {
+    public void overwriteEnd(ZonedDateTime newEnd) {
         cachedEnd = newEnd;
     }
 
