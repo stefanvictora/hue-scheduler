@@ -175,6 +175,7 @@ public final class HueScheduler implements Runnable {
     private ScheduledStateRegistry stateRegistry;
 
     public HueScheduler() {
+        currentTime = ZonedDateTime::now;
         manualOverrideTracker = new ManualOverrideTrackerImpl();
         lightEventListener = new LightEventListenerImpl(manualOverrideTracker, deviceId -> api.getAffectedIdsByDevice(deviceId));
     }
@@ -273,7 +274,6 @@ public final class HueScheduler implements Runnable {
     private void createAndStart() {
         startTimeProvider = createStartTimeProvider(latitude, longitude, elevation);
         stateScheduler = createStateScheduler();
-        currentTime = ZonedDateTime::now;
         defaultInterpolationTransitionTime = parseInterpolationTransitionTime(defaultInterpolationTransitionTimeString);
         assertInputIsReadable();
         assertConnectionAndStart();
