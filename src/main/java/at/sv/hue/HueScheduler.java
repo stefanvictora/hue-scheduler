@@ -109,11 +109,11 @@ public final class HueScheduler implements Runnable {
             description = "The name of the synced scene. Related to '--enable-scene-sync'." +
                           " Default: ${DEFAULT-VALUE}")
     String sceneSyncName;
-    @Option(names = "--scene-sync-interpolation-interval",
-            defaultValue = "${env:SCENE_SYNC_INTERPOLATION_INTERVAL:-2}",
+    @Option(names = "--scene-sync-interval",
+            defaultValue = "${env:SCENE_SYNC_INTERVAL:-2}",
             description = "The interval for syncing interpolated states to scenes in minutes. Related to '--enable-scene-sync'." +
                           " Default: ${DEFAULT-VALUE}")
-    int sceneSyncInterpolationIntervalInMinutes;
+    int sceneSyncIntervalInMinutes;
     @Option(names = "--interpolate-all",
             defaultValue = "${env:INTERPOLATE_ALL:-false}",
             description = "Globally sets 'interpolate:true' for all states, unless explicitly set otherwise." +
@@ -186,7 +186,7 @@ public final class HueScheduler implements Runnable {
                         boolean disableUserModificationTracking, String defaultInterpolationTransitionTimeString,
                         int powerOnRescheduleDelayInMs, int bridgeFailureRetryDelayInSeconds,
                         int minTrBeforeGapInMinutes, int sceneActivationIgnoreWindowInSeconds, boolean interpolateAll,
-                        boolean enableSceneSync, String sceneSyncName, int sceneSyncInterpolationIntervalInMinutes) {
+                        boolean enableSceneSync, String sceneSyncName, int sceneSyncIntervalInMinutes) {
         this();
         this.api = api;
         ZonedDateTime initialTime = currentTime.get();
@@ -208,7 +208,7 @@ public final class HueScheduler implements Runnable {
         this.interpolateAll = interpolateAll;
         this.enableSceneSync = enableSceneSync;
         this.sceneSyncName = sceneSyncName;
-        this.sceneSyncInterpolationIntervalInMinutes = sceneSyncInterpolationIntervalInMinutes;
+        this.sceneSyncIntervalInMinutes = sceneSyncIntervalInMinutes;
         apiCacheInvalidationIntervalInMinutes = 15;
         stateRegistry = new ScheduledStateRegistry(currentTime, api);
     }
@@ -476,8 +476,7 @@ public final class HueScheduler implements Runnable {
                 scheduleNextSceneSync(state);
             }
         } catch (Exception e) {
-            LOG.error("Scene sync failed: '{}'. Retry in {}min", e.getLocalizedMessage(),
-                    sceneSyncInterpolationIntervalInMinutes);
+            LOG.error("Scene sync failed: '{}'. Retry in {}min", e.getLocalizedMessage(), sceneSyncIntervalInMinutes);
             scheduleNextSceneSync(state);
         }
     }
@@ -495,7 +494,7 @@ public final class HueScheduler implements Runnable {
                 return;
             }
             syncScene(stateSnapshot);
-        }, currentTime.get().plusMinutes(sceneSyncInterpolationIntervalInMinutes), end);
+        }, currentTime.get().plusMinutes(sceneSyncIntervalInMinutes), end);
     }
 
     private boolean lightHasBeenManuallyOverriddenBefore(ScheduledStateSnapshot state) {
