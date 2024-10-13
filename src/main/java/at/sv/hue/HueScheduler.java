@@ -643,17 +643,17 @@ public final class HueScheduler implements Runnable {
     }
 
     private void putState(ScheduledStateSnapshot state, PutCall putCall) {
-//        if (state.isGroupState() && controlGroupLightsIndividually) { // todo: rework this to use the new scene putCall logic
-//            for (String id : getGroupLights(state)) {
-//                try {
-//                    performPutApiCall(state, convertToLightPutCall(putCall, id));
-//                } catch (ApiFailure e) {
-//                    LOG.trace("Unsupported api call for light id {}: {}", id, e.getLocalizedMessage());
-//                }
-//            }
-//        } else {
-        performPutApiCall(state, putCall);
-//        }
+        if (state.isGroupState() && controlGroupLightsIndividually) {
+            for (PutCall call : stateRegistry.getPutCalls(state)) {
+                try {
+                    performPutApiCall(state, call);
+                } catch (ApiFailure e) {
+                    LOG.trace("Unsupported api call for light id {}: {}", call.getId(), e.getLocalizedMessage());
+                }
+            }
+        } else {
+            performPutApiCall(state, putCall);
+        }
     }
 
     private void performPutApiCall(ScheduledStateSnapshot state, PutCall putCall) {

@@ -19,7 +19,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import org.mockito.Mockito;
@@ -4090,7 +4089,6 @@ class HueSchedulerTest {
         ensureRunnable(initialNow.plusDays(1));
     }
 
-    @Disabled // todo: refactoring currently WIP
     @Test
     void run_execution_groupState_controlIndividuallyFlagSet_multipleSinglePutCalls() {
         controlGroupLightsIndividually = true;

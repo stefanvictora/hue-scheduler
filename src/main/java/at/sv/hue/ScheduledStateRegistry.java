@@ -119,6 +119,13 @@ public class ScheduledStateRegistry {
     }
 
     /**
+     * @see #getPutCalls(List)
+     */
+    public List<PutCall> getPutCalls(ScheduledStateSnapshot state) {
+        return getPutCalls(getGroupLights(state));
+    }
+
+    /**
      * Retrieves a list of active PutCalls for the specified group lights. Multiple overlapping state definitions are
      * resolved the following way: From biggest to smallest group the light is assigned to, then individual light
      * definition.
