@@ -154,7 +154,7 @@ To run Hue Scheduler manually, follow these steps:
 
 ### Does Hue Scheduler work with motion sensors and smart switches?
 
-Yes, starting with version **0.12.0** and Scene Sync enabled (``--enable-scene-sync``), Hue Scheduler creates a synced scene (default name: `HueScheduler`, see ``--scene-sync-name``) that always matches the scheduled state of a room or zone. This ensures your lights turn on in the desired state instantly, even when triggered by motion sensors or smart switches. Simply select the synced scene in your motion sensor or smart switch configuration.
+Yes, starting with version **0.12.0** and Scene Sync enabled (``--enable-scene-sync``), Hue Scheduler creates a synced scene (default name: `HueScheduler`) that always matches the scheduled state of a room or zone. This ensures your lights turn on in the desired state instantly, even when triggered by motion sensors or smart switches. Simply select the synced scene in your motion sensor or smart switch configuration.
 
 ### Why is there a short delay when physically turning lights on and the scheduler taking over?
 
