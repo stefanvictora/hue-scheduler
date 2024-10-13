@@ -295,8 +295,6 @@ public final class HueApiImpl implements HueApi {
             String response = updateScene(existingScene, updatedScene);
             log.trace("Updated scene: {}", response != null ? response.trim() : "");
             availableScenesCache.invalidateAll();
-        } else {
-            log.trace("Scene already up to date, skip sync");
         }
     }
 

@@ -29,13 +29,17 @@ public class HttpResourceProviderImpl implements HttpResourceProvider {
 
     @Override
     public String putResource(URL url, String body) {
-        log.trace("Put: {}: {}", url, body);
+        log.trace("Put: {}: {}", url, getTruncatedBody(body));
         return performCall(putRequest(url, body));
+    }
+
+    private static String getTruncatedBody(String body) {
+        return body.length() > 100 ? body.substring(0, 100) + "..." : body;
     }
 
     @Override
     public String postResource(URL url, String body) {
-        log.trace("Post: {}: {}", url, body);
+        log.trace("Post: {}: {}", url, getTruncatedBody(body));
         return performCall(postRequest(url, body));
     }
 

@@ -35,8 +35,6 @@ public class LightEventListenerImpl implements LightEventListener {
         if (waitingList != null) {
             log.debug("Reschedule {} waiting states.", waitingList.size());
             waitingList.forEach(Runnable::run);
-        } else {
-            log.trace("No waiting states.");
         }
     }
 

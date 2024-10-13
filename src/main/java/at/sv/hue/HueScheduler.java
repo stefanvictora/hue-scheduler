@@ -495,7 +495,6 @@ public final class HueScheduler implements Runnable {
     }
 
     private void syncScene(String groupId, List<PutCall> putCalls) {
-        LOG.trace("Sync scene: {}. {}", groupId, putCalls);
         api.createOrUpdateScene(groupId, sceneSyncName, putCalls);
     }
 
