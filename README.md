@@ -10,7 +10,7 @@
 
 ## Introduction
 
-**New in Version 0.10.0**: **Full support for the Home Assistant REST API** :partying_face: Control even more devices in your home with Hue Scheduler.
+**New in Version 0.12.0**: **Sync schedules to scenes**, enabling your lights to turn on in the desired state instantly (opt-in via ``--enable-scene-sync``; Hue Bridge required).
 
 Hue Scheduler goes beyond tools like Adaptive Lighting by providing extended control over brightness, color temperature, color, power state, and custom interpolations between solar and absolute times. Specifically designed to work with dumb wall switches, it adjusts light states as soon as they're reachable, ensuring consistent results even when lights have been physically turned off.
 
@@ -100,7 +100,7 @@ To get started with Docker, follow these steps:
    services:
      hue-scheduler:
        container_name: hue-scheduler
-       image: stefanvictora/hue-scheduler:0.11
+       image: stefanvictora/hue-scheduler:0.12
        environment:
          - API_HOST=
          - ACCESS_TOKEN=
@@ -125,7 +125,8 @@ To get started with Docker, follow these steps:
     - `TZ`: Your time zone.
     - `SOURCE`: Path to the [configuration file](docs/light_configuration.md) containing the light schedules.
     
-    For additional configuration options, see the [list of advanced command line options](docs/advanced_command_line_options.md).
+    For additional configuration options, see the [list of advanced command line options](docs/advanced_command_line_options.md). 
+    Starting with version 0.12.0, you can enable scene sync by setting `ENABLE_SCENE_SYNC=true`, among other options.
   
 3. **Run Docker Compose commands:**
 
@@ -151,6 +152,10 @@ To run Hue Scheduler manually, follow these steps:
 
 ## FAQ
 
+### Does Hue Scheduler work with motion sensors and smart switches?
+
+Yes, starting with version **0.12.0** and Scene Sync enabled (``--enable-scene-sync``), Hue Scheduler creates a synced scene (default name: `HueScheduler`, see ``--scene-sync-name``) that always matches the scheduled state of a room or zone. This ensures your lights turn on in the desired state instantly, even when triggered by motion sensors or smart switches. Simply select the synced scene in your motion sensor or smart switch configuration.
+
 ### Why is there a short delay when physically turning lights on and the scheduler taking over?
 
 This is a known limitation of the Hue Bridge. There is typically a delay of around 3–4 seconds until physically turned on lights are detected as available again. In contrast, lights turned on via smart switches or an app are detected almost instantly.
@@ -169,10 +174,6 @@ Both Adaptive Lighting and Hue Scheduler aim to automate the state of your light
 
 Hue Scheduler does not access the Internet unless you explicitly connect to a cloud-hosted Home Assistant instance. You can see exactly which REST requests Hue Scheduler sends to your devices by setting the `-Dlog.level=TRACE` JVM parameter or `log.level=TRACE` environment variable. See [Advanced Command Line Options](docs/advanced_command_line_options.md). The dynamic solar times are calculated locally using the [shred/commons-suncalc](https://github.com/shred/commons-suncalc) library, with no location data ever leaving your device.
 
-### Does Hue Scheduler work with motion sensors?
-
-Yes, but you should probably use a third-party app like iConnectHue to configure your motion sensor to only adjust the brightness of your lights, not the color or color temperature. Otherwise, the color or color temperature of your lights would switch between the sensor set values and the ones scheduled by Hue Scheduler, causing some flicker every time the sensor is activated.
-
 ## Roadmap
 
 - [x] **Detect manual overrides** -- set light state only if it has not been manually changed since its previously scheduled state
@@ -181,11 +182,13 @@ Yes, but you should probably use a third-party app like iConnectHue to configure
 - [x] **Advanced state interpolations** -- easily create full-day state interpolations without explicitly using `tr-before`
 - [x] **Docker support** -- provide a prebuilt docker images for easier setup
 - [x] **Home Assistant API support** -- allow controlling lights via the Home Assistant API
+- [x] **Support for Hue APIv2 effects** -- support for more effects
+- [x] **Scene Sync** -- create synced scenes that always match the scheduled state of a room or zone
+- [ ] **Define schedules via scenes** -- create and update your schedules without restarting Hue Scheduler
 - [ ] **Conditional states** -- set light state only if the given conditions are satisfied
 - [ ] **Date-based scheduling** -- schedule state only during a specific date range
 - [ ] **Support for gradients** -- support setting gradients to supported lights
 - [ ] **Support for scenes** -- support scheduling scenes for groups
-- [ ] **Support for Hue APIv2 effects** -- support for more effects
 - [ ] **Min/Max for sunrise/sunset** -- ensure that a dynamic start time is not active before or past a certain time
 - [ ] **GUI for configuring and updating light schedules** -- via a web interface
 - [ ] **Home Assistant Addon support** -- package Hue Scheduler as an easy to install Home Assistant addon

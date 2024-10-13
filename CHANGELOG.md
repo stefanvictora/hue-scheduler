@@ -1,24 +1,30 @@
 # Changelog
-
-## [Unreleased]
+   
+## [0.12.0] - 2024-10-13
 
 ### Added
-- **Scene Sync Feature**: Hue Scheduler can now sync the state to scenes
-  - Those synced scenes allow turning on lights always in their correct state via smart switched and motion sensors
-  - This feature has to be enabled via the new ``--enable-scene-sync`` command line flag or ``ENABLE_SCENE_SYNC=true`` environment variable (default: `false`).
-  - Added additional `--scene-sync-name` (default: `HueScheduler`) and `--scene-sync-interpolation-interval` (default `2` minutes) properties to fine-tune this feature. See [Advanced Command Line Options](docs/advanced_command_line_options.md).
-- **APIv2 Effects**: Now all supported Hue APIv2 light effects can be scheduled.
-  - Include e.g. `candle`, `fire`, `prism`, `sparkle`, `opal`, `glisten`.
-  - The exact supported values depend on the light model and is verified during startup.
+- **Scene Sync Feature**: Hue Scheduler can now sync states to scenes.
+  - This allows smart switches and motion sensors to always activate lights in the correct state.
+  - Enable this optional feature using the ``--enable-scene-sync`` command line flag or by setting ``ENABLE_SCENE_SYNC=true`` as an environment variable (default: `false`).
+  - Additional configurable properties:
+    - `--scene-sync-name`: Name for the synced scenes (default: `HueScheduler`)
+    - `--scene-sync-interval`: Interval for scene synchronization in minutes (default: `2`)
+  - Note: Currently, this feature works only when connected to a Hue bridge.
+
+- **APIv2 Light Effects**: Support added for scheduling all Hue APIv2 light effects.
+  - Includes effects such as `candle`, `fire`, `prism`, `sparkle`, `opal`, `glisten`, etc.
+  - Supported effects depend on the light model and are verified during startup.
 
 ### Changed
-- Fully switched to Hue APIv2
-- Improved error handling for lookups.
+- Fully migrated to Hue APIv2.
+- Enhanced error handling for API lookups.
+- Improved comparison of CT values using a threshold.
+- Enhanced state interpolation for scenarios where schedules modify only certain properties.
 
 ### Removed
-- Due to Hue APIv2 limitations, effects can't be applied to groups anymore.
-  - `colorloop` and `multip_colorloop` effects are not supported anymore. For single lights use `prism` instead.
-  - Removed `--multi-color-adjustment-delay` configuration parameter.
+- **Group Effects**: Applying effects to groups is no longer supported due to Hue APIv2 limitations.
+    - The `colorloop` and `multi_colorloop` effects are no longer available. Use the `prism` effect for individual lights instead.
+    - The `--multi-color-adjustment-delay` configuration parameter has been removed.
 
 ## [0.11.0] - 2024-06-29
 

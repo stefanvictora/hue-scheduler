@@ -3,7 +3,7 @@
 The following advanced command line options are available.
 
 > [!NOTE]
-> You can set all command line options also via environment variables. E.g. instead of `--interpolate-all` you can also set `INTERPOLATE_ALL=true` as an environment variable.
+> You can set all command line options also via environment variables. E.g., instead of `--interpolate-all` you can also set `INTERPOLATE_ALL=true` as an environment variable.
 
 ### `--interpolate-all`
 
@@ -18,20 +18,27 @@ Flag to globally disable tracking of user modifications of lights. Per default H
 **Default**: false
 
 ### `--enable-scene-sync`
+                           
+*New in 0.12.0*
 
-Enable the creating of Hue scenes that always match the state of a scheduled room or zone.
+Enables the creation of Hue scenes that always match the state of a scheduled room or zone.
+Currently only available when connected to a Hue bridge.
 
 **Default**: false
 
 ### `--scene-sync-name`
 
-The name of the synced scene. Related to `--enable-scene-sync`'`.
+*New in 0.12.0*
+
+Specifies the name of the synced scene. Used with --enable-scene-sync.
 
 **Default**: `HueScheduler`
 
-### `--scene-sync-interpolation-interval`
+### `--scene-sync-interval`
 
-The interval for syncing interpolated states to scenes in minutes. Related to `--enable-scene-sync`.
+*New in 0.12.0*
+
+Sets the interval (in minutes) for syncing interpolated states to scenes. Used with --enable-scene-sync.
 
 **Default**: `2` minutes
 
@@ -39,7 +46,7 @@ The interval for syncing interpolated states to scenes in minutes. Related to `-
 
 Only relevant and active if user modification tracking is not disabled (see `--disable-user-modification-tracking`).
 Defines the delay in seconds during which turn-on events for affected lights and groups are ignored
-after a scene activation has been detected. This prevents Hue Scheduler from taking over after lights or groups have
+after scene activation has been detected. This prevents Hue Scheduler from taking over after lights or groups have
 been turned on via a scene.
 
 **Default**: `5` seconds
@@ -66,7 +73,7 @@ Desk  07:00  bri:100%  tr-before:20min
 
 ### `--min-tr-before-gap`
 
-Only relevant and active if user modification tracking is not disabled (see `--disable-user-modification-tracking`). When using transitions, this defines the minimum gap between multiple back-to-back states in minutes. This is needed as otherwise the hue bridge may not yet recognize the target value of the transition and may incorrectly mark the light as manually overridden.
+Only relevant and active if user modification tracking is not disabled (see `--disable-user-modification-tracking`). When using transitions, this defines the minimum gap between multiple back-to-back states in minutes. This is necessary as otherwise the hue bridge may not yet recognize the target value of the transition and may incorrectly mark the light as manually overridden.
 This gap is ensured by automatically shortening transitions between back-to-back states.
 
 If Hue Scheduler still detects manual overrides between back-to-back states using transitions, try increasing the default value.
@@ -91,7 +98,7 @@ To still benefit from the ease-of-use of groups, while improving overall system 
 
 *Experimental*
 
-Toggle if Hue Scheduler should control lights found in a group individually instead of using broadcast messages. This might improve performance but is not recommended any more, as it may impact manual modification tracking.
+Toggle if Hue Scheduler should control lights found in a group individually instead of using broadcast messages. This might improve performance but is not recommended anymore, as it may impact manual modification tracking.
 
 Note: Hue Scheduler does not validate in such cases if all the lights inside the group support the given command. Furthermore, this option might not be suitable for groups with mixed capabilities, i.e. setting color for a group that also contains a color temperature only light. In such cases, the unsupported light is not updated.
 
