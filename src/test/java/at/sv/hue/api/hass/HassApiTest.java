@@ -1,9 +1,11 @@
 package at.sv.hue.api.hass;
 
+import at.sv.hue.ColorMode;
 import at.sv.hue.api.Capability;
 import at.sv.hue.api.EmptyGroupException;
 import at.sv.hue.api.GroupNotFoundException;
 import at.sv.hue.api.HttpResourceProvider;
+import at.sv.hue.api.Identifier;
 import at.sv.hue.api.LightCapabilities;
 import at.sv.hue.api.LightNotFoundException;
 import at.sv.hue.api.LightState;
@@ -41,8 +43,8 @@ public class HassApiTest {
     void getLightIdOrName_notFound_exception() {
         setGetResponse("/states", "[]");
 
-        assertThatThrownBy(() -> api.getLightId("UNKNOWN NAME")).isInstanceOf(LightNotFoundException.class);
-        assertThatThrownBy(() -> api.getLightName("light.unknown")).isInstanceOf(LightNotFoundException.class);
+        assertThatThrownBy(() -> api.getLightIdentifierByName("UNKNOWN NAME")).isInstanceOf(LightNotFoundException.class);
+        assertThatThrownBy(() -> api.getLightIdentifier("light.unknown")).isInstanceOf(LightNotFoundException.class);
     }
 
     @Test
@@ -210,41 +212,35 @@ public class HassApiTest {
                 ]
                 """);
 
-        assertThat(api.getLightName("light.schreibtisch_r")).isEqualTo("Schreibtisch R");
-        assertThat(api.getLightName("light.flur")).isEqualTo("Flur");
-        assertThat(api.getGroupName("light.flur")).isEqualTo("Flur");
+        assertThat(api.getLightIdentifier("light.schreibtisch_r")).isEqualTo(new Identifier("light.schreibtisch_r", "Schreibtisch R"));
+        assertThat(api.getLightIdentifier("light.flur")).isEqualTo(new Identifier("light.flur", "Flur"));
+        assertThat(api.getGroupIdentifier("light.flur")).isEqualTo(new Identifier("light.flur", "Flur"));
 
-        assertThat(api.getLightId("Schreibtisch R")).isEqualTo("light.schreibtisch_r");
-        assertThat(api.getGroupId("Flur")).isEqualTo("light.flur");
+        assertThat(api.getLightIdentifierByName("Schreibtisch R")).isEqualTo(new Identifier("light.schreibtisch_r", "Schreibtisch R"));
+        assertThat(api.getGroupIdentifierByName("Flur")).isEqualTo(new Identifier("light.flur", "Flur"));
 
-        api.clearCaches();
-
-        assertThat(api.getLightName("light.schreibtisch_r")).isEqualTo("Schreibtisch R");
-        assertThat(api.getLightId("Schreibtisch R")).isEqualTo("light.schreibtisch_r");
+        api.clearCaches(); // todo: migrate to caffein caches
 
         assertThat(api.getLightCapabilities("light.schreibtisch_r")).isEqualTo(LightCapabilities.builder()
                                                                                                 .ctMin(153)
                                                                                                 .ctMax(500)
+                                                                                                .effects(List.of("candle", "fire"))
                                                                                                 .capabilities(EnumSet.of(Capability.COLOR,
                                                                                                         Capability.COLOR_TEMPERATURE, Capability.BRIGHTNESS,
                                                                                                         Capability.ON_OFF))
                                                                                                 .build());
 
-        // Unsupported state types
-        assertThatThrownBy(() -> api.getLightName("zone.home")).isInstanceOf(UnsupportedStateException.class);
-        assertThatThrownBy(() -> api.getLightName("person.stefans_home")).isInstanceOf(UnsupportedStateException.class);
-
         // Not found states
-        assertThatThrownBy(() -> api.getLightName("light.unknown_light")).isInstanceOf(LightNotFoundException.class);
-        assertThatThrownBy(() -> api.getGroupName("light.unknown_group")).isInstanceOf(LightNotFoundException.class);
-        assertThatThrownBy(() -> api.getLightId("UNKNOWN LIGHT")).isInstanceOf(LightNotFoundException.class);
-        assertThatThrownBy(() -> api.getGroupId("UNKNOWN GROUP")).isInstanceOf(LightNotFoundException.class);
+        assertThatThrownBy(() -> api.getLightIdentifier("light.unknown_light")).isInstanceOf(LightNotFoundException.class);
+        assertThatThrownBy(() -> api.getGroupIdentifier("light.unknown_group")).isInstanceOf(LightNotFoundException.class);
+        assertThatThrownBy(() -> api.getLightIdentifierByName("UNKNOWN LIGHT")).isInstanceOf(LightNotFoundException.class);
+        assertThatThrownBy(() -> api.getGroupIdentifierByName("UNKNOWN GROUP")).isInstanceOf(LightNotFoundException.class);
 
         // Non unique names
-        assertThatThrownBy(() -> api.getLightId("On Off")).isInstanceOf(NonUniqueNameException.class);
+        assertThatThrownBy(() -> api.getLightIdentifierByName("On Off")).isInstanceOf(NonUniqueNameException.class);
 
         // Not a group
-        assertThatThrownBy(() -> api.getGroupId("Schreibtisch R")).isInstanceOf(GroupNotFoundException.class);
+        assertThatThrownBy(() -> api.getGroupIdentifierByName("Schreibtisch R")).isInstanceOf(GroupNotFoundException.class);
     }
 
     @Test
@@ -260,7 +256,7 @@ public class HassApiTest {
                     "max_mireds": 500,
                     "effect_list": [
                       "None",
-                      "candle",
+                      "CANDLE",
                       "fire",
                       "unknown"
                     ],
@@ -303,17 +299,18 @@ public class HassApiTest {
         LightCapabilities lightCapabilities = LightCapabilities.builder()
                                                                .ctMin(153)
                                                                .ctMax(500)
+                                                               .effects(List.of("candle", "fire"))
                                                                .capabilities(EnumSet.of(Capability.COLOR,
                                                                        Capability.COLOR_TEMPERATURE, Capability.BRIGHTNESS,
                                                                        Capability.ON_OFF))
                                                                .build();
         assertThat(lightState).isEqualTo(LightState.builder()
+                                                   .id("light.schreibtisch_r")
                                                    .on(true)
-                                                   .reachable(true)
                                                    .x(0.6024)
                                                    .y(0.3433)
                                                    .effect("none")
-                                                   .colormode("xy")
+                                                   .colormode(ColorMode.XY)
                                                    .brightness(127)
                                                    .lightCapabilities(lightCapabilities)
                                                    .build());
@@ -375,17 +372,18 @@ public class HassApiTest {
         LightState lightState = getLightState("light.schreibtisch_r");
 
         assertThat(lightState).isEqualTo(LightState.builder()
+                                                   .id("light.schreibtisch_r")
                                                    .on(true)
-                                                   .reachable(true)
                                                    .colorTemperature(161)
                                                    .x(0.334)
                                                    .y(0.336)
                                                    .effect("none")
-                                                   .colormode("ct")
+                                                   .colormode(ColorMode.CT)
                                                    .brightness(38) // converted to hue range
                                                    .lightCapabilities(LightCapabilities.builder()
                                                                                        .ctMin(153)
                                                                                        .ctMax(500)
+                                                                                       .effects(List.of("candle", "fire"))
                                                                                        .capabilities(EnumSet.of(Capability.COLOR,
                                                                                                Capability.COLOR_TEMPERATURE, Capability.BRIGHTNESS,
                                                                                                Capability.ON_OFF))
@@ -446,17 +444,18 @@ public class HassApiTest {
         LightState lightState = getLightState("light.ct_only");
 
         assertThat(lightState).isEqualTo(LightState.builder()
+                                                   .id("light.ct_only")
                                                    .on(true)
-                                                   .reachable(true)
                                                    .colorTemperature(366)
                                                    .x(0.524)
                                                    .y(0.387)
                                                    .effect("none")
-                                                   .colormode("ct")
+                                                   .colormode(ColorMode.CT)
                                                    .brightness(233) // converted to hue range
                                                    .lightCapabilities(LightCapabilities.builder()
                                                                                        .ctMin(153)
                                                                                        .ctMax(454)
+                                                                                       .effects(List.of("candle"))
                                                                                        .capabilities(EnumSet.of(Capability.COLOR_TEMPERATURE,
                                                                                                Capability.BRIGHTNESS,
                                                                                                Capability.ON_OFF))
@@ -506,11 +505,11 @@ public class HassApiTest {
         LightState lightState = getLightState("light.xy_only");
 
         assertThat(lightState).isEqualTo(LightState.builder()
+                                                   .id("light.xy_only")
                                                    .on(true)
-                                                   .reachable(true)
                                                    .x(0.6311)
                                                    .y(0.3325)
-                                                   .colormode("xy")
+                                                   .colormode(ColorMode.XY)
                                                    .brightness(136)
                                                    .lightCapabilities(LightCapabilities.builder()
                                                                                        .capabilities(EnumSet.of(Capability.COLOR,
@@ -556,11 +555,12 @@ public class HassApiTest {
         LightState lightState = getLightState("light.ceiling");
 
         assertThat(lightState).isEqualTo(LightState.builder()
+                                                   .id("light.ceiling")
                                                    .on(false)
-                                                   .reachable(false)
                                                    .lightCapabilities(LightCapabilities.builder()
                                                                                        .ctMin(153)
                                                                                        .ctMax(500)
+                                                                                       .effects(List.of("candle", "fire"))
                                                                                        .capabilities(EnumSet.of(Capability.COLOR,
                                                                                                Capability.COLOR_TEMPERATURE, Capability.BRIGHTNESS,
                                                                                                Capability.ON_OFF))
@@ -603,11 +603,12 @@ public class HassApiTest {
         LightState lightState = getLightState("light.off");
 
         assertThat(lightState).isEqualTo(LightState.builder()
+                                                   .id("light.off")
                                                    .on(false)
-                                                   .reachable(true)
                                                    .lightCapabilities(LightCapabilities.builder()
                                                                                        .ctMin(153)
                                                                                        .ctMax(454)
+                                                                                       .effects(List.of("candle"))
                                                                                        .capabilities(EnumSet.of(Capability.COLOR_TEMPERATURE,
                                                                                                Capability.BRIGHTNESS,
                                                                                                Capability.ON_OFF))
@@ -642,8 +643,8 @@ public class HassApiTest {
         LightState lightState = getLightState("light.on_off");
 
         assertThat(lightState).isEqualTo(LightState.builder()
+                                                   .id("light.on_off")
                                                    .on(true)
-                                                   .reachable(true)
                                                    .lightCapabilities(LightCapabilities.builder()
                                                                                        .capabilities(EnumSet.of(Capability.ON_OFF))
                                                                                        .build())
@@ -674,8 +675,8 @@ public class HassApiTest {
         LightState lightState = getLightState("switch.switch_demo");
 
         assertThat(lightState).isEqualTo(LightState.builder()
+                                                   .id("switch.switch_demo")
                                                    .on(true)
-                                                   .reachable(true)
                                                    .lightCapabilities(LightCapabilities.builder()
                                                                                        .capabilities(EnumSet.of(Capability.ON_OFF))
                                                                                        .build())
@@ -706,8 +707,8 @@ public class HassApiTest {
         LightState lightState = getLightState("input_boolean.test_toggle");
 
         assertThat(lightState).isEqualTo(LightState.builder()
+                                                   .id("input_boolean.test_toggle")
                                                    .on(true)
-                                                   .reachable(true)
                                                    .lightCapabilities(LightCapabilities.builder()
                                                                                        .capabilities(EnumSet.of(Capability.ON_OFF))
                                                                                        .build())
@@ -737,8 +738,8 @@ public class HassApiTest {
         LightState lightState = getLightState("light.on_off");
 
         assertThat(lightState).isEqualTo(LightState.builder()
+                                                   .id("light.on_off")
                                                    .on(false)
-                                                   .reachable(false)
                                                    .lightCapabilities(LightCapabilities.builder()
                                                                                        .capabilities(EnumSet.of(Capability.ON_OFF))
                                                                                        .build())
@@ -779,11 +780,12 @@ public class HassApiTest {
         LightState lightState = getLightState("light.brightness");
 
         assertThat(lightState).isEqualTo(LightState.builder()
+                                                   .id("light.brightness")
                                                    .on(true)
-                                                   .reachable(true)
                                                    .brightness(254) // adjusted to max value for hue
                                                    .effect("none")
                                                    .lightCapabilities(LightCapabilities.builder()
+                                                                                       .effects(List.of("candle"))
                                                                                        .capabilities(EnumSet.of(Capability.BRIGHTNESS,
                                                                                                Capability.ON_OFF))
                                                                                        .build())
@@ -824,11 +826,12 @@ public class HassApiTest {
         LightState lightState = getLightState("light.brightness");
 
         assertThat(lightState).isEqualTo(LightState.builder()
+                                                   .id("light.brightness")
                                                    .on(true)
-                                                   .reachable(true)
                                                    .brightness(1) // adjusted to min value for hue
                                                    .effect("none")
                                                    .lightCapabilities(LightCapabilities.builder()
+                                                                                       .effects(List.of("candle"))
                                                                                        .capabilities(EnumSet.of(Capability.BRIGHTNESS,
                                                                                                Capability.ON_OFF))
                                                                                        .build())
@@ -869,11 +872,12 @@ public class HassApiTest {
         LightState lightState = getLightState("light.brightness");
 
         assertThat(lightState).isEqualTo(LightState.builder()
+                                                   .id("light.brightness")
                                                    .on(true)
-                                                   .reachable(true)
                                                    .brightness(199) // adjusted correctly
                                                    .effect("none")
                                                    .lightCapabilities(LightCapabilities.builder()
+                                                                                       .effects(List.of("candle"))
                                                                                        .capabilities(EnumSet.of(Capability.BRIGHTNESS,
                                                                                                Capability.ON_OFF))
                                                                                        .build())
@@ -1582,9 +1586,9 @@ public class HassApiTest {
 
         assertThat(groupStates).containsExactly(
                 LightState.builder()
+                          .id("light.schreibtisch_l")
                           .on(true)
-                          .reachable(true)
-                          .colormode("ct")
+                          .colormode(ColorMode.CT)
                           .effect("none")
                           .brightness(127)
                           .colorTemperature(334)
@@ -1593,13 +1597,14 @@ public class HassApiTest {
                           .lightCapabilities(LightCapabilities.builder()
                                                               .ctMin(153)
                                                               .ctMax(500)
+                                                              .effects(List.of("candle", "fire"))
                                                               .capabilities(EnumSet.allOf(Capability.class))
                                                               .build())
                           .build(),
                 LightState.builder()
+                          .id("light.schreibtisch_r")
                           .on(true)
-                          .reachable(true)
-                          .colormode("ct")
+                          .colormode(ColorMode.CT)
                           .effect("none")
                           .brightness(245)
                           .colorTemperature(336)
@@ -1608,6 +1613,7 @@ public class HassApiTest {
                           .lightCapabilities(LightCapabilities.builder()
                                                               .ctMin(153)
                                                               .ctMax(500)
+                                                              .effects(List.of("candle", "fire"))
                                                               .capabilities(EnumSet.allOf(Capability.class))
                                                               .build())
                           .build()
@@ -1840,7 +1846,139 @@ public class HassApiTest {
     }
 
     @Test
-    void getAffectedIdsByScene_returnsIds() {
+    void getAffectedIdsByDevice_returnsGivenId_andContainedGroups() {
+        setGetResponse("/states", """
+                [
+                    {
+                      "entity_id": "light.couch_group",
+                      "state": "on",
+                      "attributes": {
+                        "supported_color_modes": [
+                          "xy"
+                        ],
+                        "color_mode": "xy",
+                        "brightness": 255,
+                        "hs_color": [
+                          12.464,
+                          81.176
+                        ],
+                        "rgb_color": [
+                          255,
+                          91,
+                          48
+                        ],
+                        "xy_color": [
+                          0.6408,
+                          0.3284
+                        ],
+                        "is_hue_group": true,
+                        "hue_scenes": [
+                          "Gedimmt",
+                          "Nachtlicht",
+                          "Hell",
+                          "Frühlingsblüten",
+                          "Sonnenuntergang Savanne",
+                          "Tropendämmerung",
+                          "Nordlichter"
+                        ],
+                        "hue_type": "zone",
+                        "lights": [
+                          "Couch Light"
+                        ],
+                        "dynamics": false,
+                        "icon": "mdi:lightbulb-group",
+                        "friendly_name": "Couch",
+                        "supported_features": 40
+                      },
+                      "last_changed": "2023-09-24T14:06:34.783862+00:00",
+                      "last_updated": "2023-09-24T14:06:34.783862+00:00",
+                      "context": {
+                        "id": "123456789",
+                        "parent_id": null,
+                        "user_id": null
+                      }
+                    },
+                    {
+                      "entity_id": "light.couch_group2",
+                      "state": "on",
+                      "attributes": {
+                        "min_color_temp_kelvin": 2000,
+                        "max_color_temp_kelvin": 6535,
+                        "min_mireds": 153,
+                        "max_mireds": 500,
+                        "effect_list": [
+                          "None",
+                          "candle",
+                          "fire",
+                          "unknown"
+                        ],
+                        "supported_color_modes": [
+                          "brightness",
+                          "color_temp",
+                          "xy"
+                        ],
+                        "color_mode": "brightness",
+                        "brightness": 255,
+                        "effect": "None",
+                        "entity_id": [
+                          "light.couch_light"
+                        ],
+                        "icon": "mdi:lightbulb-group",
+                        "friendly_name": "Couch",
+                        "supported_features": 44
+                      },
+                      "last_changed": "2023-09-24T14:06:35.260070+00:00",
+                      "last_updated": "2023-09-24T14:20:00.208887+00:00",
+                      "context": {
+                        "id": "123456789",
+                        "parent_id": null,
+                        "user_id": null
+                      }
+                    },
+                    {
+                      "entity_id": "light.couch_light",
+                      "state": "on",
+                      "attributes": {
+                        "supported_color_modes": [
+                          "xy"
+                        ],
+                        "color_mode": "xy",
+                        "brightness": 245,
+                        "hs_color": [
+                          12.464,
+                          81.176
+                        ],
+                        "rgb_color": [
+                          255,
+                          91,
+                          48
+                        ],
+                        "xy_color": [
+                          0.6408,
+                          0.3284
+                        ],
+                        "mode": "normal",
+                        "dynamics": "none",
+                        "friendly_name": "Couch Light",
+                        "supported_features": 40
+                      },
+                      "last_changed": "2023-09-24T14:50:55.040229+00:00",
+                      "last_updated": "2023-09-24T16:13:00.757488+00:00",
+                      "context": {
+                        "id": "01HB3ZECEN2DN594VKX5RFRQ5P",
+                        "parent_id": null,
+                        "user_id": null
+                      }
+                    }
+                  ]
+                """);
+        
+        assertThat(api.getAffectedIdsByDevice("light.couch_light")).containsExactlyInAnyOrder("light.couch_light",
+                "light.couch_group", "light.couch_group2");
+    }
+
+    @Test
+    void getAffectedIdsByScene_getSceneName_returnsIds_andName() {
         setGetResponse("/states", """
                 [
                   {
@@ -1991,6 +2129,10 @@ public class HassApiTest {
         assertThat(api.getAffectedIdsByScene("scene.hue_scene")).containsExactly("light.wohnzimmer", "light.1", "light.3");
         assertThat(api.getAffectedIdsByScene("scene.hue_scene_broken1")).isEmpty();
         assertThat(api.getAffectedIdsByScene("scene.hue_scene_broken2")).isEmpty();
+
+        assertThat(api.getSceneName("scene.test_scene")).isEqualTo("Test Scene");
+        assertThat(api.getSceneName("scene.hue_scene")).isEqualTo("Wohnzimmer Miami");
+        assertThat(api.getSceneName("scene.unknown")).isNull();
     }
 
     @Test
@@ -2059,7 +2201,7 @@ public class HassApiTest {
         putState(PutCall.builder()
                         .id("light.id")
                         .bri(1)
-                        .effect("colorloop"));
+                        .effect("prism"));
 
         verify(http).postResource(getUrl("/services/light/turn_on"),
                 "{\"entity_id\":\"light.id\",\"brightness\":1,\"effect\":\"prism\"}");
@@ -2179,11 +2321,13 @@ public class HassApiTest {
     @Test
     void unsupportedType_exception() {
         assertThatThrownBy(() -> getLightState("sensor.sun_next_setting")).isInstanceOf(UnsupportedStateException.class);
+        assertThatThrownBy(() -> getLightState("zone.home")).isInstanceOf(UnsupportedStateException.class);
+        assertThatThrownBy(() -> getLightState("person.stefans_home")).isInstanceOf(UnsupportedStateException.class);
         assertThatThrownBy(() -> api.getGroupStates("sensor.sun_next_setting")).isInstanceOf(UnsupportedStateException.class);
         assertThatThrownBy(() -> api.getGroupLights("sensor.sun_next_setting")).isInstanceOf(UnsupportedStateException.class);
         assertThatThrownBy(() -> api.getAssignedGroups("sensor.sun_next_setting")).isInstanceOf(UnsupportedStateException.class);
-        assertThatThrownBy(() -> api.getLightName("sensor.sun_next_setting")).isInstanceOf(UnsupportedStateException.class);
-        assertThatThrownBy(() -> api.getGroupName("sensor.sun_next_setting")).isInstanceOf(UnsupportedStateException.class);
+        assertThatThrownBy(() -> api.getLightIdentifier("sensor.sun_next_setting")).isInstanceOf(UnsupportedStateException.class);
+        assertThatThrownBy(() -> api.getGroupIdentifier("sensor.sun_next_setting")).isInstanceOf(UnsupportedStateException.class);
         assertThatThrownBy(() -> api.getLightCapabilities("sensor.sun_next_setting")).isInstanceOf(UnsupportedStateException.class);
         assertThatThrownBy(() -> api.getGroupCapabilities("sensor.sun_next_setting")).isInstanceOf(UnsupportedStateException.class);
         assertThatThrownBy(() -> api.isLightOff("sensor.sun_next_setting")).isInstanceOf(UnsupportedStateException.class);

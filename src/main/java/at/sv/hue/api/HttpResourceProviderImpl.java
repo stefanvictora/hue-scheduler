@@ -24,34 +24,23 @@ public class HttpResourceProviderImpl implements HttpResourceProvider {
     @Override
     public String getResource(URL url) {
         log.trace("Get: {}", url);
-        try (Response response = callHttpClient(getRequest(url))) {
-            assertSuccessful(response);
-            return getBody(response);
-        } catch (IOException e) {
-            throw new BridgeConnectionFailure("Failed to GET '" + url + "'", e);
-        }
+        return performCall(getRequest(url));
     }
 
     @Override
     public String putResource(URL url, String body) {
-        log.trace("Put: {}: {}", url, body);
-        try (Response response = callHttpClient(putRequest(url, body))) {
-            assertSuccessful(response);
-            return getBody(response);
-        } catch (IOException e) {
-            throw new BridgeConnectionFailure("Failed to PUT '" + url + "'", e);
-        }
+        log.trace("Put: {}: {}", url, getTruncatedBody(body));
+        return performCall(putRequest(url, body));
+    }
+
+    private static String getTruncatedBody(String body) {
+        return body.length() > 100 ? body.substring(0, 100) + "..." : body;
     }
 
     @Override
     public String postResource(URL url, String body) {
-        log.trace("Post: {}: {}", url, body);
-        try (Response response = callHttpClient(postRequest(url, body))) {
-            assertSuccessful(response);
-            return getBody(response);
-        } catch (IOException e) {
-            throw new BridgeConnectionFailure("Failed to POST '" + url + "'", e);
-        }
+        log.trace("Post: {}: {}", url, getTruncatedBody(body));
+        return performCall(postRequest(url, body));
     }
 
     private static Request getRequest(URL url) {
@@ -76,16 +65,35 @@ public class HttpResourceProviderImpl implements HttpResourceProvider {
                 .build();
     }
 
+    private String performCall(Request request) {
+        try (Response response = callHttpClient(request)) {
+            assertSuccessful(response);
+            return getBody(response);
+        } catch (IOException e) {
+            log.error("Failed '{}'", request, e);
+            throw new BridgeConnectionFailure("Failed '" + request + "'", e);
+        }
+    }
+
     private Response callHttpClient(Request request) throws IOException {
         return httpClient.newCall(request).execute();
     }
 
     private static void assertSuccessful(Response response) throws IOException {
-        if (response.code() == 401) {
+        if (response.code() == 401 || response.code() == 403) {
             throw new BridgeAuthenticationFailure();
         }
+        if (response.code() == 404) {
+            throw new ResourceNotFoundException("Resource not found: " + getBody(response));
+        }
+        if (response.code() == 429) {
+            throw new ApiFailure("Rate limit exceeded: " + getBody(response));
+        }
+        if (response.code() >= 500) {
+            throw new ApiFailure("Server error: " + getBody(response));
+        }
         if (!response.isSuccessful()) {
-            throw new IOException("Unexpected return code " + response);
+            throw new IOException("Unexpected return code " + response + ". " + getBody(response));
         }
     }
 

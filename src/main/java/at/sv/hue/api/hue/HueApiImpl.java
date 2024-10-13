@@ -1,18 +1,19 @@
 package at.sv.hue.api.hue;
 
+import at.sv.hue.ColorMode;
 import at.sv.hue.api.ApiFailure;
-import at.sv.hue.api.BridgeAuthenticationFailure;
 import at.sv.hue.api.Capability;
 import at.sv.hue.api.EmptyGroupException;
 import at.sv.hue.api.GroupNotFoundException;
 import at.sv.hue.api.HttpResourceProvider;
 import at.sv.hue.api.HueApi;
-import at.sv.hue.api.InvalidConnectionException;
+import at.sv.hue.api.Identifier;
 import at.sv.hue.api.LightCapabilities;
 import at.sv.hue.api.LightNotFoundException;
 import at.sv.hue.api.LightState;
 import at.sv.hue.api.PutCall;
 import at.sv.hue.api.RateLimiter;
+import at.sv.hue.color.ColorModeConverter;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -21,7 +22,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.LoadingCache;
 import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -29,44 +33,47 @@ import java.net.URL;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
+@Slf4j
 public final class HueApiImpl implements HueApi {
 
     private final HttpResourceProvider resourceProvider;
     private final ObjectMapper mapper;
     private final String baseApi;
-    private final Object lightMapLock = new Object();
-    private final Object groupMapLock = new Object();
     private final RateLimiter rateLimiter;
-    private Map<String, Light> availableLights;
-    private boolean availableLightsInvalidated;
-    private Map<String, Group> availableGroups;
-    private boolean availableGroupsInvalidated;
-    private Map<String, String> lightNameToIdMap;
-    private boolean lightNameToIdMapInvalidated;
-    private Map<String, String> groupNameToIdMap;
-    private boolean groupNameToIdMapInvalidated;
+    private final LoadingCache<String, Map<String, Light>> availableLightsCache;
+    private final LoadingCache<String, Map<String, Device>> availableDevicesCache;
+    private final LoadingCache<String, Map<String, Light>> availableGroupedLightsCache;
     private final LoadingCache<String, Map<String, Scene>> availableScenesCache;
+    private final LoadingCache<String, Map<String, Group>> availableZonesCache;
+    private final LoadingCache<String, Map<String, Group>> availableRoomsCache;
 
-    public HueApiImpl(HttpResourceProvider resourceProvider, String host, String accessToken, RateLimiter rateLimiter) {
+    public HueApiImpl(HttpResourceProvider resourceProvider, String host, RateLimiter rateLimiter,
+                      int apiCacheInvalidationIntervalInMinutes) {
         this.resourceProvider = resourceProvider;
         mapper = new ObjectMapper();
         mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
         assertNotHttpSchemeProvided(host);
-        baseApi = "https://" + host + "/api/" + accessToken;
+        baseApi = "https://" + host + "/clip/v2/resource";
         this.rateLimiter = rateLimiter;
-        availableScenesCache = Caffeine.newBuilder()
-                                       .expireAfterWrite(Duration.ofMinutes(5))
-                                       .build(key -> lookupScenes());
+        availableLightsCache = createCache(this::lookupLights, apiCacheInvalidationIntervalInMinutes);
+        availableDevicesCache = createCache(this::lookupDevices, apiCacheInvalidationIntervalInMinutes);
+        availableGroupedLightsCache = createCache(this::lookupGroupedLights, apiCacheInvalidationIntervalInMinutes);
+        availableScenesCache = createCache(this::lookupScenes, apiCacheInvalidationIntervalInMinutes);
+        availableZonesCache = createCache(this::lookupZones, apiCacheInvalidationIntervalInMinutes);
+        availableRoomsCache = createCache(this::lookupRooms, apiCacheInvalidationIntervalInMinutes);
     }
 
     private static void assertNotHttpSchemeProvided(String host) {
@@ -75,88 +82,80 @@ public final class HueApiImpl implements HueApi {
         }
     }
 
-    @Override
-    public LightState getLightState(String id) {
-        String response = getResourceAndAssertNoErrors(createUrl(id));
-        try {
-            Light light = mapper.readValue(response, Light.class);
-            return createLightState(light);
-        } catch (JsonProcessingException | NullPointerException e) {
-            throw new ApiFailure("Failed to parse light state response '" + response + "' for id " + id + ": " + e.getLocalizedMessage());
-        }
-    }
-
-    private LightState createLightState(Light light) {
-        State state = light.state;
-        return new LightState(
-                state.bri, state.ct, getX(state.xy), getY(state.xy), state.effect, state.colormode, state.reachable, state.on,
-                createLightCapabilities(light));
+    private static <T> LoadingCache<String, Map<String, T>> createCache(Supplier<Map<String, T>> supplier,
+                                                                        int apiCacheInvalidationIntervalInMinutes) {
+        return Caffeine.newBuilder()
+                       .expireAfterWrite(Duration.ofMinutes(apiCacheInvalidationIntervalInMinutes))
+                       .build(key -> supplier.get());
     }
 
     @Override
-    public List<LightState> getGroupStates(String id) {
-        List<String> groupLights = getGroupLights(id);
+    public void assertConnection() {
+        getAvailableLights();
+    }
+
+    @Override
+    public Identifier getLightIdentifier(String idv1) {
+        return getAvailableLights().values()
+                                   .stream()
+                                   .filter(resource -> idv1.equals(resource.getId_v1()))
+                                   .findFirst()
+                                   .map(resource -> new Identifier(resource.getId(), resource.getName()))
+                                   .orElseThrow(() -> new LightNotFoundException("Could not find light with id '" + idv1 + "'"));
+    }
+
+    @Override
+    public Identifier getGroupIdentifier(String idv1) {
+        return getAvailableGroups().values()
+                                   .stream()
+                                   .filter(group -> idv1.equals(group.getId_v1()))
+                                   .findFirst()
+                                   .map(group -> new Identifier(group.getGroupedLightId(), group.getName()))
+                                   .orElseThrow(() -> new GroupNotFoundException("Could not find group with id '" + idv1 + "'"));
+
+    }
+
+    @Override
+    public Identifier getLightIdentifierByName(String name) {
+        return getAvailableLights()
+                .values()
+                .stream()
+                .filter(light -> name.equals(light.getName()))
+                .findFirst()
+                .map(light -> new Identifier(light.getId(), name))
+                .orElseThrow(() -> new LightNotFoundException("Light with name '" + name + "' was not found!"));
+    }
+
+    @Override
+    public Identifier getGroupIdentifierByName(String name) {
+        return getAvailableGroups().values()
+                                   .stream()
+                                   .filter(group -> name.equals(group.metadata.name))
+                                   .findFirst()
+                                   .map(group -> new Identifier(group.getGroupedLightId(), name))
+                                   .orElseThrow(() -> new GroupNotFoundException("Group with name '" + name + "' was not found!"));
+    }
+
+    @Override
+    public LightState getLightState(String lightId) {
+        return lookupLight(lightId).getLightState();
+    }
+
+    @Override
+    public List<LightState> getGroupStates(String groupedLightId) {
         Map<String, Light> currentLights = lookupLights();
-        return groupLights.stream()
-                          .map(currentLights::get)
-                          .filter(Objects::nonNull)
-                          .map(this::createLightState)
-                          .collect(Collectors.toList());
+        return getGroupLights(groupedLightId).stream()
+                                             .map(lightId -> getLightState(currentLights, lightId))
+                                             .filter(Objects::nonNull)
+                                             .collect(Collectors.toList());
     }
 
-    private String getResourceAndAssertNoErrors(URL url) {
-        return assertNoErrors(resourceProvider.getResource(url));
-    }
-
-    private String assertNoErrors(String resource) {
-        if (resource.contains("\"error\"")) {
-            throwFirstError(getErrors(resource));
+    private LightState getLightState(Map<String, Light> lights, String lightId) {
+        Light light = lights.get(lightId);
+        if (light == null) {
+            return null;
         }
-        return resource;
-    }
-
-    private List<HueApiResponse> getErrors(String resource) {
-        return parseErrors(resource).stream()
-                                    .filter(error -> error.error != null)
-                                    .collect(Collectors.toList());
-    }
-
-    private List<HueApiResponse> parseErrors(String resource) {
-        try {
-            return mapper.readValue(resource, mapper.getTypeFactory().constructCollectionType(List.class, HueApiResponse.class));
-        } catch (JsonProcessingException ignore) {
-        }
-        return Collections.emptyList();
-    }
-
-    private void throwFirstError(List<HueApiResponse> errorResponses) {
-        for (HueApiResponse errorResponse : errorResponses) {
-            String description = errorResponse.error.description;
-            switch (errorResponse.error.type) {
-                case 1:
-                    throw new BridgeAuthenticationFailure();
-                case 201:
-                    // ignore
-                    break;
-                default:
-                    throw new ApiFailure(description);
-            }
-        }
-    }
-
-    private Double getX(Double[] xy) {
-        return getXY(xy, 0);
-    }
-
-    private Double getY(Double[] xy) {
-        return getXY(xy, 1);
-    }
-
-    private Double getXY(Double[] xy, int i) {
-        if (xy != null) {
-            return xy[i];
-        }
-        return null;
+        return light.getLightState();
     }
 
     private URL createUrl(String url) {
@@ -168,53 +167,54 @@ public final class HueApiImpl implements HueApi {
     }
 
     @Override
-    public boolean isLightOff(String id) {
-        return getLightState(id).isOff();
+    public boolean isLightOff(String lightId) {
+        return getLightState(lightId).isOff();
     }
 
     @Override
-    public boolean isGroupOff(String id) {
-        String response = getResourceAndAssertNoErrors(createUrl(id));
-        try {
-            Group group = mapper.readValue(response, Group.class);
-            return Boolean.FALSE == group.state.any_on;
-        } catch (JsonProcessingException | NullPointerException e) {
-            throw new ApiFailure("Failed to parse group state response '" + response + "' for id " + id + ": " + e.getLocalizedMessage());
-        }
+    public boolean isGroupOff(String groupedLightId) {
+        return lookupGroupedLight(groupedLightId).isOff();
     }
 
     @Override
     public void putState(PutCall putCall) {
+        URL url;
         if (putCall.isGroupState()) {
             rateLimiter.acquire(10);
+            url = createUrl("/grouped_light/" + putCall.getId());
         } else {
             rateLimiter.acquire(1);
+            url = createUrl("/light/" + putCall.getId());
         }
-        assertNoPutErrors(resourceProvider.putResource(getUpdateUrl(putCall.getId(), putCall.isGroupState()),
-                getBody(new State(putCall.getBri(), putCall.getCt(), putCall.getX(), putCall.getY(), putCall.getHue(),
-                        putCall.getSat(), putCall.getEffect(), putCall.getOn(), putCall.getTransitionTime()))));
+        resourceProvider.putResource(url, getBody(getAction(putCall)));
     }
 
-    private void assertNoPutErrors(String putResource) {
-        assertNoErrors(putResource);
-    }
-
-    private String getBody(State state) {
+    private String getBody(Object object) {
         try {
-            return mapper.writeValueAsString(state);
+            return mapper.writeValueAsString(object);
         } catch (JsonProcessingException e) {
-            throw new IllegalArgumentException("Failed to create state body", e);
+            throw new IllegalArgumentException("Failed to create body", e);
         }
     }
 
     @Override
-    public List<String> getGroupLights(String groupId) {
-        Group group = getAndAssertGroupExists(groupId);
-        List<String> lights = group.getLights();
-        if (lights.isEmpty()) {
-            throw new EmptyGroupException("Group with id '" + groupId + "' has no lights to control!");
+    public List<String> getGroupLights(String groupedLightId) {
+        Light groupedLight = getAndAssertGroupedLightExists(groupedLightId);
+        Group group = getAndAssertGroupExists(groupedLight.getOwner());
+        List<String> lightIds = getContainedLightIds(group);
+        if (lightIds.isEmpty()) {
+            throw new EmptyGroupException("Group with id '" + groupedLightId + "' has no lights to control!");
         }
-        return lights;
+        return lightIds;
+    }
+
+    @Override
+    public String getSceneName(String sceneId) {
+        Scene scene = getAvailableScenes().get(sceneId);
+        if (scene == null) {
+            return null;
+        }
+        return scene.getName();
     }
 
     @Override
@@ -223,188 +223,51 @@ public final class HueApiImpl implements HueApi {
         if (scene == null) {
             return List.of();
         }
-        return scene.getAffectedIds();
+        return getAffectedIdsByScene(scene);
     }
 
-    private Map<String, Scene> getAvailableScenes() {
-        return availableScenesCache.get("allScenes");
+    private List<String> getAffectedIdsByScene(Scene scene) {
+        List<String> resourceIds = new ArrayList<>(scene.getActions().stream()
+                                                        .map(SceneAction::getTarget)
+                                                        .map(ResourceReference::getRid)
+                                                        .toList());
+        String groupedLightId = getAndAssertGroupExists(scene.getGroup()).getGroupedLightId();
+        resourceIds.add(groupedLightId);
+        return resourceIds;
     }
 
-    private Map<String, Scene> lookupScenes() {
-        String response = getResourceAndAssertNoErrors(getScenesUrl());
-        try {
-            return addKeyPrefix(mapper.readValue(response, new TypeReference<>() {
-            }), "/scenes/");
-        } catch (JsonProcessingException e) {
-            throw new ApiFailure("Failed to parse lights response '" + response + "': " + e.getLocalizedMessage());
+    @Override
+    public List<String> getAffectedIdsByDevice(String deviceId) {
+        Device device = getAvailableDevices().get(deviceId);
+        if (device == null) {
+            return List.of();
         }
+        return Stream.concat(device.getLightIds(), getAssignedGroups(device)).toList();
     }
 
-    private URL getScenesUrl() {
-        return createUrl("/scenes");
+    private Stream<String> getAssignedGroups(Device device) {
+        return device.getLightIds()
+                     .map(this::getAssignedGroups)
+                     .flatMap(Collection::stream);
     }
 
     @Override
     public List<String> getAssignedGroups(String lightId) {
-        return getOrLookupGroups().entrySet()
-                                  .stream()
-                                  .filter(entry -> entry.getValue().getLights().contains(lightId))
-                                  .map(Map.Entry::getKey)
-                                  .collect(Collectors.toList());
-    }
-
-    private Map<String, Group> getOrLookupGroups() {
-        synchronized (groupMapLock) {
-            if (availableGroups == null || availableGroupsInvalidated) {
-                availableGroups = lookupGroups();
-                availableGroupsInvalidated = false;
-            }
-        }
-        return availableGroups;
-    }
-
-    private Map<String, Group> lookupGroups() {
-        String response = getResourceAndAssertNoErrors(getGroupsUrl());
-        try {
-            return addKeyPrefix(mapper.readValue(response, new TypeReference<>() {
-            }), "/groups/");
-        } catch (JsonProcessingException e) {
-            throw new ApiFailure("Failed to parse groups response '" + response + "': " + e.getLocalizedMessage());
-        }
-    }
-
-    private static <V> Map<String, V> addKeyPrefix(Map<String, V> map, String prefix) {
-        return map.entrySet()
-                  .stream()
-                  .collect(Collectors.toMap(entry -> prefix + entry.getKey(), Map.Entry::getValue));
-    }
-
-    private URL getGroupsUrl() {
-        return createUrl("/groups");
+        return getAvailableGroups().values()
+                                   .stream()
+                                   .filter(group -> getContainedLightIds(group).contains(lightId))
+                                   .map(Group::getGroupedLightId)
+                                   .collect(Collectors.toList());
     }
 
     @Override
-    public String getGroupId(String name) {
-        String groupId = getOrLookupGroupNameToIdMap().get(name);
-        if (groupId == null) {
-            throw new GroupNotFoundException("Group with name '" + name + "' was not found!");
-        }
-        return groupId;
-    }
-
-    private Map<String, String> getOrLookupGroupNameToIdMap() {
-        synchronized (groupMapLock) {
-            if (groupNameToIdMap == null || groupNameToIdMapInvalidated) {
-                groupNameToIdMap = new HashMap<>();
-                getOrLookupGroups().forEach((id, group) -> groupNameToIdMap.put(group.name, id));
-                groupNameToIdMapInvalidated = false;
-            }
-        }
-        return groupNameToIdMap;
+    public LightCapabilities getLightCapabilities(String lightId) {
+        return getAndAssertLightExists(lightId).getCapabilities();
     }
 
     @Override
-    public String getGroupName(String groupId) {
-        return getAndAssertGroupExists(groupId).name;
-    }
-
-    private Group getAndAssertGroupExists(String groupId) {
-        Group group = getOrLookupGroups().get(groupId);
-        if (group == null) {
-            throw new GroupNotFoundException("Group with id '" + groupId + "' not found!");
-        }
-        return group;
-    }
-
-    @Override
-    public String getLightId(String name) {
-        String lightId = getOrLookupLightNameToIdMap().get(name);
-        if (lightId == null) {
-            throw new LightNotFoundException("Light with name '" + name + "' was not found!");
-        }
-        return lightId;
-    }
-
-    private Map<String, String> getOrLookupLightNameToIdMap() {
-        synchronized (lightMapLock) {
-            if (lightNameToIdMap == null || lightNameToIdMapInvalidated) {
-                lightNameToIdMap = new HashMap<>();
-                getOrLookupLights().forEach((id, light) -> lightNameToIdMap.put(light.name, id));
-                lightNameToIdMapInvalidated = false;
-            }
-        }
-        return lightNameToIdMap;
-    }
-
-    private Map<String, Light> getOrLookupLights() {
-        synchronized (lightMapLock) {
-            if (availableLights == null || availableLightsInvalidated) {
-                availableLights = lookupLights();
-                availableLightsInvalidated = false;
-            }
-        }
-        return availableLights;
-    }
-
-    private Map<String, Light> lookupLights() {
-        String response = getResourceAndAssertNoErrors(getLightsUrl());
-        try {
-            return addKeyPrefix(mapper.readValue(response, new TypeReference<>() {
-            }), "/lights/");
-        } catch (JsonProcessingException e) {
-            throw new ApiFailure("Failed to parse lights response '" + response + "': " + e.getLocalizedMessage());
-        }
-    }
-
-    @Override
-    public String getLightName(String id) {
-        Light light = getAndAssertLightExists(id);
-        return light.name;
-    }
-
-    private Light getAndAssertLightExists(String id) {
-        Light light = getOrLookupLights().get(id);
-        if (light == null) {
-            throw new LightNotFoundException("Light with id '" + id + "' not found!");
-        }
-        return light;
-    }
-
-    @Override
-    public LightCapabilities getLightCapabilities(String id) {
-        Light light = getAndAssertLightExists(id);
-        return createLightCapabilities(light);
-    }
-
-    private LightCapabilities createLightCapabilities(Light light) {
-        return new LightCapabilities(
-                getGamutTypeOrNull(light.capabilities), getColorGamutOrNull(light.capabilities),
-                getMinCtOrNull(light.capabilities), getMaxCtOrNull(light.capabilities), getCapabilities(light.type));
-    }
-
-    private static String getGamutTypeOrNull(Capabilities capabilities) {
-        if (capabilities == null || capabilities.control == null) return null;
-        return capabilities.control.colorgamuttype;
-    }
-
-    private static Double[][] getColorGamutOrNull(Capabilities capabilities) {
-        if (capabilities == null || capabilities.control == null) return null;
-        return capabilities.control.colorgamut;
-    }
-
-    private Integer getMinCtOrNull(Capabilities capabilities) {
-        if (capabilities == null || capabilities.control.ct == null) return null;
-        return capabilities.control.ct.min;
-    }
-
-    private Integer getMaxCtOrNull(Capabilities capabilities) {
-        if (capabilities == null || capabilities.control.ct == null) return null;
-        return capabilities.control.ct.max;
-    }
-
-    @Override
-    public LightCapabilities getGroupCapabilities(String id) {
-        List<LightCapabilities> lightCapabilities = getGroupLights(id)
+    public LightCapabilities getGroupCapabilities(String groupedLightId) {
+        List<LightCapabilities> lightCapabilities = getGroupLights(groupedLightId)
                 .stream()
                 .map(this::getLightCapabilities)
                 .collect(Collectors.toList());
@@ -417,15 +280,289 @@ public final class HueApiImpl implements HueApi {
     }
 
     @Override
+    public synchronized void createOrUpdateScene(String groupedLightId, String sceneSyncName, List<PutCall> putCalls) {
+        Light groupedLight = getAndAssertGroupedLightExists(groupedLightId);
+        Group group = getAndAssertGroupExists(groupedLight.getOwner());
+        Scene existingScene = getScene(group, sceneSyncName);
+        List<SceneAction> actions = createSceneActions(group, putCalls);
+        if (existingScene == null) {
+            Scene newScene = new Scene(sceneSyncName, group.toResourceReference(), actions);
+            String response = createScene(newScene);
+            log.trace("Created scene: {}", response != null ? response.trim() : "");
+            availableScenesCache.invalidateAll();
+        } else if (actionsDiffer(existingScene, actions)) {
+            Scene updatedScene = new Scene(actions);
+            String response = updateScene(existingScene, updatedScene);
+            log.trace("Updated scene: {}", response != null ? response.trim() : "");
+            availableScenesCache.invalidateAll();
+        }
+    }
+
+    private List<SceneAction> createSceneActions(Group group, List<PutCall> putCalls) {
+        Map<String, PutCall> putCallMap = putCalls.stream()
+                                                  .collect(Collectors.toMap(PutCall::getId, Function.identity()));
+        return getContainedLights(group)
+                .stream()
+                .map(resource -> createSceneAction(putCallMap.getOrDefault(resource.getRid(), getDefaultPutCall(resource)), resource))
+                .toList();
+    }
+
+    private static PutCall getDefaultPutCall(ResourceReference resource) {
+        return PutCall.builder().id(resource.getRid()).on(false).build();
+    }
+
+    private SceneAction createSceneAction(PutCall putCall, ResourceReference resource) {
+        PutCall updatedPutCall = createPutCallBasedOnCapabilities(putCall, resource.getRid());
+        return new SceneAction(resource, getActionForScene(updatedPutCall));
+    }
+
+    private PutCall createPutCallBasedOnCapabilities(PutCall putCall, String lightId) {
+        PutCall.PutCallBuilder putCallBuilder = putCall.toBuilder();
+        LightCapabilities capabilities = getLightCapabilities(lightId);
+        if (!capabilities.isBrightnessSupported()) {
+            putCallBuilder.bri(null);
+        }
+        if (!capabilities.isCtSupported()) {
+            putCallBuilder.ct(null);
+        }
+        if (!capabilities.isColorSupported() && !capabilities.isCtSupported()) {
+            putCallBuilder.x(null).y(null).hue(null).sat(null);
+        }
+        PutCall updatedPutCall = putCallBuilder.build();
+        if (!capabilities.isColorSupported() && capabilities.isCtSupported()) {
+            ColorModeConverter.convertIfNeeded(updatedPutCall, ColorMode.CT);
+        }
+        if (updatedPutCall.getCt() != null) {
+            Integer ctMin = capabilities.getCtMin();
+            Integer ctMax = capabilities.getCtMax();
+            updatedPutCall.setCt(Math.min(Math.max(updatedPutCall.getCt(), ctMin), ctMax));
+        }
+        return updatedPutCall;
+    }
+
+    private Action getActionForScene(PutCall putCall) {
+        Action action = getAction(putCall);
+        if (action.getOn() == null) {
+            action.setOn(new On(true));
+        }
+        return action;
+    }
+
+    private Action getAction(PutCall putCall) {
+        Action.ActionBuilder actionBuilder = Action.builder();
+        Boolean on = putCall.getOn();
+        if (on != null) {
+            actionBuilder.on(new On(on));
+        }
+        if (putCall.hasNonDefaultTransitionTime()) {
+            actionBuilder.dynamics(new Action.Dynamics(putCall.getTransitionTime() * 100));
+        }
+        if (on == Boolean.FALSE) {
+            return actionBuilder.build(); // no further properties needed
+        }
+        if (putCall.getColorMode() == ColorMode.HS) {
+            ColorModeConverter.convertIfNeeded(putCall, ColorMode.XY);
+        }
+        if (putCall.getColorMode() == ColorMode.CT) {
+            actionBuilder.color_temperature(new ColorTemperature(putCall.getCt()));
+        }
+        if (putCall.getColorMode() == ColorMode.XY) {
+            actionBuilder.color(new Color(new XY(putCall.getX(), putCall.getY())));
+        }
+        if (putCall.getBri() != null) {
+            double dimming = BigDecimal.valueOf(putCall.getBri())
+                                       .multiply(BigDecimal.valueOf(100))
+                                       .divide(BigDecimal.valueOf(254), 2, RoundingMode.HALF_UP)
+                                       .doubleValue();
+            actionBuilder.dimming(new Dimming(dimming));
+        }
+        String effect = getEffectWithNoneConverted(putCall);
+        if (effect != null) {
+            actionBuilder.effects(new Action.Effects(effect));
+            actionBuilder.color_temperature(null);
+            actionBuilder.color(null);
+        }
+        return actionBuilder.build();
+    }
+
+    private static String getEffectWithNoneConverted(PutCall putCall) {
+        String effect = putCall.getEffect();
+        if (effect == null) {
+            return null;
+        }
+        if ("none".equals(effect)) {
+            return "no_effect";
+        }
+        return effect;
+    }
+
+    private static boolean actionsDiffer(Scene scene, List<SceneAction> actions) {
+        List<SceneAction> currentActions = scene.getActions();
+        return !new HashSet<>(currentActions).containsAll(actions);
+    }
+
+    private String createScene(Scene newScene) {
+        rateLimiter.acquire(10);
+        return resourceProvider.postResource(createUrl("/scene"), getBody(newScene));
+    }
+
+    private String updateScene(Scene scene, Scene updatedScene) {
+        rateLimiter.acquire(10);
+        return resourceProvider.putResource(createUrl("/scene/" + scene.getId()), getBody(updatedScene));
+    }
+
+    private List<String> getContainedLightIds(Group group) {
+        return getContainedLights(group).stream()
+                                        .map(ResourceReference::getRid)
+                                        .toList();
+    }
+
+    private List<ResourceReference> getContainedLights(Group group) {
+        List<ResourceReference> containedLights = new ArrayList<>();
+        for (ResourceReference resourceReference : group.getChildren()) {
+            if (resourceReference.isLight()) {
+                containedLights.add(resourceReference);
+            } else if (resourceReference.isDevice()) {
+                Device device = getAvailableDevices().get(resourceReference.getRid());
+                containedLights.addAll(device.getLightResources());
+            }
+        }
+        return containedLights;
+    }
+
+    private Light getAndAssertLightExists(String lightId) {
+        Light light = getAvailableLights().get(lightId);
+        if (light == null) {
+            throw new LightNotFoundException("Light with id '" + lightId + "' was not found!");
+        }
+        return light;
+    }
+
+    private Light getAndAssertGroupedLightExists(String groupedLightId) {
+        Light light = getAvailableGroupedLights().get(groupedLightId);
+        if (light == null) {
+            throw new GroupNotFoundException("GroupedLight with id '" + groupedLightId + "' was not found!");
+        }
+        return light;
+    }
+
+    private Group getAndAssertGroupExists(ResourceReference resourceReference) {
+        if (resourceReference.isRoom()) {
+            return getAndAssertRoomExists(resourceReference.getRid());
+        } else {
+            return getAndAssertZoneExists(resourceReference.getRid());
+        }
+    }
+
+    private Group getAndAssertRoomExists(String groupId) {
+        Group group = getAvailableRooms().get(groupId);
+        if (group == null) {
+            throw new GroupNotFoundException("Room with id '" + groupId + "' was not found!");
+        }
+        return group;
+    }
+
+    private Group getAndAssertZoneExists(String groupId) {
+        Group group = getAvailableZones().get(groupId);
+        if (group == null) {
+            throw new GroupNotFoundException("Zone with id '" + groupId + "' was not found!");
+        }
+        return group;
+    }
+
+    private Scene getScene(Group group, String name) {
+        return getAvailableScenes().values()
+                                   .stream()
+                                   .filter(scene -> scene.isPartOf(group) && name.equals(scene.metadata.name))
+                                   .findFirst()
+                                   .orElse(null);
+    }
+
+    private Map<String, Light> getAvailableLights() {
+        return availableLightsCache.get("allLights");
+    }
+
+    private Map<String, Light> getAvailableGroupedLights() {
+        return availableGroupedLightsCache.get("allGroupedLights");
+    }
+
+    private Map<String, Group> getAvailableGroups() {
+        Map<String, Group> rooms = getAvailableRooms();
+        Map<String, Group> zones = getAvailableZones();
+        HashMap<String, Group> result = new HashMap<>(rooms);
+        result.putAll(zones);
+        return result;
+    }
+
+    private Map<String, Scene> getAvailableScenes() {
+        return availableScenesCache.get("allScenes");
+    }
+
+    private Map<String, Device> getAvailableDevices() {
+        return availableDevicesCache.get("allDevices");
+    }
+
+    private Map<String, Group> getAvailableZones() {
+        return availableZonesCache.get("allZones");
+    }
+
+    private Map<String, Group> getAvailableRooms() {
+        return availableRoomsCache.get("allRooms");
+    }
+
+    private Light lookupGroupedLight(String id) {
+        return lookup("/grouped_light/" + id, new TypeReference<LightResponse>() {
+        }, Light::getId).get(id);
+    }
+
+    private Map<String, Light> lookupGroupedLights() {
+        return lookup("/grouped_light", new TypeReference<LightResponse>() {
+        }, Light::getId);
+    }
+
+    private Light lookupLight(String id) {
+        return lookup("/light/" + id, new TypeReference<LightResponse>() {
+        }, Light::getId).get(id);
+    }
+
+    private Map<String, Light> lookupLights() {
+        return lookup("/light", new TypeReference<LightResponse>() {
+        }, Light::getId);
+    }
+
+    private Map<String, Scene> lookupScenes() {
+        return lookup("/scene", new TypeReference<SceneResponse>() {
+        }, Scene::getId);
+    }
+
+    private Map<String, Device> lookupDevices() {
+        return lookup("/device", new TypeReference<DeviceResponse>() {
+        }, Device::getId);
+    }
+
+    private Map<String, Group> lookupZones() {
+        return lookup("/zone", new TypeReference<GroupResponse>() {
+        }, Group::getId);
+    }
+
+    private Map<String, Group> lookupRooms() {
+        return lookup("/room", new TypeReference<GroupResponse>() {
+        }, Group::getId);
+    }
+
+    private <T, C extends DataListContainer<T>> Map<String, T> lookup(String endpoint, TypeReference<C> typeReference,
+                                                                      Function<T, String> idFunction) {
+        String response = resourceProvider.getResource(createUrl(endpoint));
+        try {
+            C container = mapper.readValue(response, typeReference);
+            return container.getData().stream().collect(Collectors.toMap(idFunction, Function.identity()));
+        } catch (Exception e) {
+            throw new ApiFailure("Failed to parse response '" + response + "': " + e.getLocalizedMessage());
+        }
+    }
+
+    @Override
     public void clearCaches() {
-        synchronized (lightMapLock) {
-            availableLightsInvalidated = true;
-            lightNameToIdMapInvalidated = true;
-        }
-        synchronized (groupMapLock) {
-            availableGroupsInvalidated = true;
-            groupNameToIdMapInvalidated = true;
-        }
     }
 
     private static Double[][] getMaxGamut(List<LightCapabilities> lightCapabilities) {
@@ -461,144 +598,40 @@ public final class HueApiImpl implements HueApi {
                                 .orElse(null);
     }
 
-    private EnumSet<Capability> getCapabilities(String type) {
-        if (type == null) {
-            return EnumSet.noneOf(Capability.class);
-        }
-        return switch (type.toLowerCase(Locale.ENGLISH)) {
-            case "extended color light" -> EnumSet.allOf(Capability.class);
-            case "color light" -> EnumSet.of(Capability.COLOR, Capability.BRIGHTNESS, Capability.ON_OFF);
-            case "color temperature light" ->
-                    EnumSet.of(Capability.COLOR_TEMPERATURE, Capability.BRIGHTNESS, Capability.ON_OFF);
-            case "dimmable light" -> EnumSet.of(Capability.BRIGHTNESS, Capability.ON_OFF);
-            case "on/off plug-in unit" -> EnumSet.of(Capability.ON_OFF);
-            default -> EnumSet.noneOf(Capability.class);
-        };
-    }
-
     @Override
-    public void assertConnection() {
-        getOrLookupLights();
-    }
-
-    private URL getLightsUrl() {
-        return createUrl("/lights");
-    }
-
-    private URL getUpdateUrl(String id, boolean groupState) {
-        if (groupState) {
-            return createUrl(id + "/action");
-        } else {
-            return createUrl(id + "/state");
+    public void onModification(String type, String id) {
+        // todo: maybe switch to different caching logic so we can invalidate individual entries instead of the full cache
+        switch (type) {
+            case "light" -> availableLightsCache.invalidateAll();
+            case "grouped_light" -> availableGroupedLightsCache.invalidateAll();
+            case "scene" -> availableScenesCache.invalidateAll();
+            case "device" -> availableDevicesCache.invalidateAll();
+            case "zone" -> availableZonesCache.invalidateAll();
+            case "room" -> availableRoomsCache.invalidateAll();
         }
     }
 
-    @Data
-    private static final class Scene {
-        String name;
-        String group;
-        private List<String> lights = new ArrayList<>();
-
-        List<String> getAffectedIds() {
-            List<String> ids = lights.stream()
-                                     .map(id -> "/lights/" + id)
-                                     .collect(Collectors.toList());
-            if (group != null) {
-                ids.add("/groups/" + group);
-            }
-            return ids;
-        }
+    private interface DataListContainer<T> {
+        List<T> getData();
     }
 
     @Data
-    private static final class Light {
-        State state;
-        String type;
-        Capabilities capabilities;
-        String name;
+    private static final class LightResponse implements DataListContainer<Light> {
+        List<Light> data;
     }
 
     @Data
-    private static final class State {
-        Integer bri;
-        Integer ct;
-        Double[] xy;
-        Integer hue;
-        Integer sat;
-        String effect;
-        String colormode;
-        Boolean on;
-        Boolean reachable;
-        Integer transitiontime;
-
-        public State() {
-        }
-
-        public State(Integer bri, Integer ct, Double x, Double y, Integer hue, Integer sat, String effect, Boolean on, Integer transitiontime) {
-            this.ct = ct;
-            this.bri = bri;
-            this.hue = hue;
-            this.sat = sat;
-            this.effect = effect;
-            this.on = on;
-            if (isNotDefaultValue(transitiontime)) {
-                this.transitiontime = transitiontime;
-            }
-            if (x != null && y != null) {
-                this.xy = new Double[]{x, y};
-            }
-        }
-
-        private boolean isNotDefaultValue(Integer transitiontime) {
-            return transitiontime != null && transitiontime != 4;
-        }
+    private static final class SceneResponse implements DataListContainer<Scene> {
+        List<Scene> data;
     }
 
     @Data
-    private static final class Capabilities {
-        Control control;
+    private static final class GroupResponse implements DataListContainer<Group> {
+        List<Group> data;
     }
 
     @Data
-    private static final class Control {
-        String colorgamuttype;
-        Double[][] colorgamut;
-        Ct ct;
-    }
-
-    @Data
-    private static final class Ct {
-        int min;
-        int max;
-    }
-
-    @Data
-    private static final class Group {
-        String name;
-        private List<String> lights = new ArrayList<>();
-        GroupState state;
-
-        List<String> getLights() {
-            return lights.stream()
-                         .map(id -> "/lights/" + id)
-                         .collect(Collectors.toList());
-        }
-    }
-
-    @Data
-    private static final class GroupState {
-        Boolean any_on;
-    }
-
-    @Data
-    private static class HueApiResponse {
-        private Error error;
-    }
-
-    @Data
-    private static class Error {
-        int type;
-        String address;
-        String description;
+    private static final class DeviceResponse implements DataListContainer<Device> {
+        List<Device> data;
     }
 }

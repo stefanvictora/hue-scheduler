@@ -13,6 +13,7 @@ final class StateAttributes {
     Integer color_temp;
     Double[] xy_color;
     String effect;
+    List<String> effect_list;
     List<String> supported_color_modes;
     Integer min_mireds;
     Integer max_mireds;

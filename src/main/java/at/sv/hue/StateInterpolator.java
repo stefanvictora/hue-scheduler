@@ -9,23 +9,25 @@ import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.Objects;
+import java.util.function.Function;
 
 @RequiredArgsConstructor
 public final class StateInterpolator {
 
-    private final ScheduledState state;
+    private final ScheduledStateSnapshot state;
     private final ScheduledStateSnapshot previousState;
     private final ZonedDateTime dateTime;
     private final boolean keepPreviousPropertiesForNullTargets;
 
     public PutCall getInterpolatedPutCall() {
-        ZonedDateTime lastDefinedStart = state.getLastDefinedStart();
-        if (lastDefinedStart.isBefore(dateTime) || lastDefinedStart.isEqual(dateTime)) {
+        ZonedDateTime definedStart = state.getDefinedStart();
+        if (definedStart.isBefore(dateTime) || definedStart.isEqual(dateTime)) {
             return null; // the state is already reached
         }
         PutCall interpolatedPutCall;
         if (isDirectlyAtStartOfState()) {
-            interpolatedPutCall = previousState.getPutCall(dateTime); // directly at start, just use previous put call
+            interpolatedPutCall = previousState.getFullPicturePutCall(dateTime); // directly at start, just use previous put call
         } else {
             interpolatedPutCall = interpolate();
         }
@@ -33,7 +35,7 @@ public final class StateInterpolator {
     }
 
     private boolean isDirectlyAtStartOfState() {
-        return state.getLastStart().truncatedTo(ChronoUnit.SECONDS)
+        return state.getStart().truncatedTo(ChronoUnit.SECONDS)
                     .isEqual(dateTime.truncatedTo(ChronoUnit.SECONDS));
     }
 
@@ -53,8 +55,8 @@ public final class StateInterpolator {
      */
     private PutCall interpolate() {
         BigDecimal interpolatedTime = getInterpolatedTime();
-        PutCall previous = previousState.getPutCall(dateTime);
-        PutCall target = state.getPutCall(dateTime);
+        PutCall previous = previousState.getFullPicturePutCall(dateTime);
+        PutCall target = state.getFullPicturePutCall(dateTime);
 
         return interpolate(previous, target, interpolatedTime, keepPreviousPropertiesForNullTargets);
     }
@@ -73,21 +75,47 @@ public final class StateInterpolator {
     }
 
     /**
-     * Returns true if the previous and target put call don't have any common properties, which means that no interpolation
+     * Returns true if the previous and target put call don't have any differing common properties, which means that no interpolation
      * would be possible. Here we don't care about the time differences, but just the available properties of the put calls.
      */
     public static boolean hasNoOverlappingProperties(PutCall previous, PutCall target) {
-        PutCall putCall = interpolate(previous, target, BigDecimal.ONE, false);
-        putCall.setOn(null); // do not reuse on property
-        return putCall.isNullCall();
+        previous.setOn(null); // do not reuse on property
+        convertColorModeIfNeeded(previous, target);
+        removeEqualProperties(previous, target);
+        return previous.isNullCall();
+    }
+
+    private static void removeEqualProperties(PutCall putCall, PutCall target) {
+        if (isEqualOrNotAvailableAtTarget(putCall, target, PutCall::getBri)) {
+            putCall.setBri(null);
+        }
+        if (isEqualOrNotAvailableAtTarget(putCall, target, PutCall::getCt)) {
+            putCall.setCt(null);
+        }
+        if (isEqualOrNotAvailableAtTarget(putCall, target, PutCall::getHue)) {
+            putCall.setHue(null);
+        }
+        if (isEqualOrNotAvailableAtTarget(putCall, target, PutCall::getSat)) {
+            putCall.setSat(null);
+        }
+        if (isEqualOrNotAvailableAtTarget(putCall, target, PutCall::getX)) {
+            putCall.setX(null);
+        }
+        if (isEqualOrNotAvailableAtTarget(putCall, target, PutCall::getY)) {
+            putCall.setY(null);
+        }
+    }
+
+    private static boolean isEqualOrNotAvailableAtTarget(PutCall putCall, PutCall target, Function<PutCall, Object> function) {
+        return Objects.equals(function.apply(putCall), function.apply(target)) || function.apply(target) == null;
     }
 
     /**
      * t = (current_time - start_time) / (end_time - start_time)
      */
     private BigDecimal getInterpolatedTime() {
-        Duration durationAfterStart = Duration.between(state.getLastStart(), dateTime);
-        Duration totalDuration = Duration.between(state.getLastStart(), state.getLastDefinedStart());
+        Duration durationAfterStart = Duration.between(state.getStart(), dateTime);
+        Duration totalDuration = Duration.between(state.getStart(), state.getDefinedStart());
         return BigDecimal.valueOf(durationAfterStart.toMillis())
                          .divide(BigDecimal.valueOf(totalDuration.toMillis()), 7, RoundingMode.HALF_UP);
     }

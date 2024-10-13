@@ -1,6 +1,7 @@
 package at.sv.hue.api.hue;
 
 import at.sv.hue.api.LightEventListener;
+import at.sv.hue.api.ResourceModificationEventListener;
 import at.sv.hue.api.SceneEventListener;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -21,11 +22,14 @@ public final class HueEventHandler implements BackgroundEventHandler {
     };
     private final LightEventListener lightEventListener;
     private final SceneEventListener sceneEventListener;
+    private final ResourceModificationEventListener resourceModificationEventListener;
     private final ObjectMapper objectMapper;
 
-    public HueEventHandler(LightEventListener lightEventListener, SceneEventListener sceneEventListener) {
+    public HueEventHandler(LightEventListener lightEventListener, SceneEventListener sceneEventListener,
+                           ResourceModificationEventListener resourceModificationEventListener) {
         this.lightEventListener = lightEventListener;
         this.sceneEventListener = sceneEventListener;
+        this.resourceModificationEventListener = resourceModificationEventListener;
         objectMapper = new ObjectMapper();
         objectMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
     }
@@ -45,17 +49,33 @@ public final class HueEventHandler implements BackgroundEventHandler {
     @Override
     public void onMessage(String event, MessageEvent messageEvent) throws Exception {
         List<HueEventContainer> hueEventContainers = objectMapper.readValue(messageEvent.getData(), typeRef);
-        hueEventContainers.stream()
-                          .flatMap(container -> container.getData().stream())
-                          .forEach(hueEvent -> {
-                              if (hueEvent.isLightOrGroup() && hueEvent.isOffEvent()) {
-                                  lightEventListener.onLightOff(hueEvent.getId_v1());
-                              } else if (hueEvent.isLightOrGroup() && hueEvent.isOnEvent()) {
-                                  lightEventListener.onLightOn(hueEvent.getId_v1(), hueEvent.isPhysical());
-                              } else if (hueEvent.isScene() && hueEvent.isSceneActivated()) {
-                                  sceneEventListener.onSceneActivated(hueEvent.getId_v1());
-                              }
-                          });
+        for (HueEventContainer container : hueEventContainers) {
+            for (HueEvent hueEvent : container.getData()) {
+                if (hueEvent.isLightOrGroup() && hueEvent.isOffEvent()) {
+                    lightEventListener.onLightOff(hueEvent.getId());
+                } else if (hueEvent.isLightOrGroup() && hueEvent.isOnEvent()) {
+                    MDC.put("context", "events");
+                    if (hueEvent.isPhysical()) {
+                        lightEventListener.onPhysicalOn(hueEvent.getOwner().getRid());
+                    } else {
+                        lightEventListener.onLightOn(hueEvent.getId());
+                    }
+                } else if (hueEvent.isScene() && hueEvent.isSceneActivated()) {
+                    sceneEventListener.onSceneActivated(hueEvent.getId());
+                }
+
+                if ("update".equals(container.type)) {
+                    if (isNotRelevantForUpdate(hueEvent.type) || hueEvent.notRelevantSceneModification()) {
+                        continue;
+                    }
+                }
+                resourceModificationEventListener.onModification(hueEvent.getType(), hueEvent.getId());
+            }
+        }
+    }
+
+    private static boolean isNotRelevantForUpdate(String type) {
+        return "light".equals(type) || "grouped_light".equals(type) || "device".equals(type);
     }
 
     @Override
@@ -82,6 +102,9 @@ public final class HueEventHandler implements BackgroundEventHandler {
         private String id_v1;
         private On on;
         private JsonNode status;
+        private JsonNode actions;
+        private JsonNode metadata;
+        private Resource owner;
         private String type;
 
         private String getStatus() {
@@ -113,7 +136,7 @@ public final class HueEventHandler implements BackgroundEventHandler {
         }
 
         public boolean isGroup() {
-            return "grouped_light".equals(type) || id_v1 != null && id_v1.startsWith("/groups/");
+            return "grouped_light".equals(type);
         }
 
         public boolean isScene() {
@@ -132,9 +155,19 @@ public final class HueEventHandler implements BackgroundEventHandler {
             return null;
         }
 
+        public boolean notRelevantSceneModification() {
+            return isScene() && actions==null && metadata==null;
+        }
+
         @Data
         private static final class On {
             private boolean on;
+        }
+
+        @Data
+        private static final class Resource {
+            String rid;
+            String rtype;
         }
     }
 }

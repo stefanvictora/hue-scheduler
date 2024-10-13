@@ -37,6 +37,79 @@ class HassEventHandlerTest {
     }
 
     @Test
+    void onMessage_stateChanged_onEvent_noPreviousState_treatedAsOff() {
+        handler.onMessage("""
+                {
+                  "id": 1,
+                  "type": "event",
+                  "event": {
+                    "event_type": "state_changed",
+                    "data": {
+                      "entity_id": "light.schreibtisch_r",
+                      "old_state": null,
+                      "new_state": {
+                        "entity_id": "light.schreibtisch_r",
+                        "state": "on",
+                        "attributes": {
+                          "min_color_temp_kelvin": 2000,
+                          "max_color_temp_kelvin": 6535,
+                          "min_mireds": 153,
+                          "max_mireds": 500,
+                          "effect_list": [
+                            "None",
+                            "candle",
+                            "fire",
+                            "unknown"
+                          ],
+                          "supported_color_modes": [
+                            "color_temp",
+                            "xy"
+                          ],
+                          "color_mode": "xy",
+                          "brightness": 47,
+                          "hs_color": [
+                            1.667,
+                            42.353
+                          ],
+                          "rgb_color": [
+                            255,
+                            150,
+                            147
+                          ],
+                          "xy_color": [
+                            0.4851,
+                            0.3198
+                          ],
+                          "effect": "None",
+                          "mode": "normal",
+                          "dynamics": "none",
+                          "friendly_name": "Schreibtisch R",
+                          "supported_features": 44
+                        },
+                        "last_changed": "2023-10-14T13:44:10.209177+00:00",
+                        "last_updated": "2023-10-14T13:44:10.209177+00:00",
+                        "context": {
+                          "id": "01HCQ6W7719HQPH8YP18XSJCAZ",
+                          "parent_id": null,
+                          "user_id": null
+                        }
+                      }
+                    },
+                    "origin": "LOCAL",
+                    "time_fired": "2023-10-14T13:44:10.209177+00:00",
+                    "context": {
+                      "id": "01HCQ6W7719HQPH8YP18XSJCAZ",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  }
+                }
+                """);
+
+        verify(lightEventListener).onLightOn("light.schreibtisch_r");
+    }
+
+    @Test
     void onMessage_stateChanged_lightOn_previouslyOff_triggersOnEvent() {
         handler.onMessage("""
                 {
@@ -136,7 +209,7 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verify(lightEventListener).onLightOn("light.schreibtisch_r", false);
+        verify(lightEventListener).onLightOn("light.schreibtisch_r");
     }
 
     @Test
@@ -237,7 +310,7 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verify(lightEventListener).onLightOn("light.schreibtisch_r", true);
+        verify(lightEventListener).onPhysicalOn("light.schreibtisch_r");
     }
 
     @Test
@@ -349,6 +422,79 @@ class HassEventHandlerTest {
                     "time_fired": "2023-10-14T13:53:00.409390+00:00",
                     "context": {
                       "id": "01HCQ7CCZSVS7V3YCNBA86H3AJ",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  }
+                }
+                """);
+
+        verifyNoEvents();
+    }
+
+    @Test
+    void onMessage_stateChanged_lightOff_noPreviousState_treatedAsOff_noEvent() {
+        handler.onMessage("""
+                {
+                  "id": 1,
+                  "type": "event",
+                  "event": {
+                    "event_type": "state_changed",
+                    "data": {
+                      "entity_id": "light.schreibtisch_r",
+                      "old_state": null,
+                      "new_state": {
+                        "entity_id": "light.schreibtisch_r",
+                        "state": "off",
+                        "attributes": {
+                          "min_color_temp_kelvin": 2000,
+                          "max_color_temp_kelvin": 6535,
+                          "min_mireds": 153,
+                          "max_mireds": 500,
+                          "effect_list": [
+                            "None",
+                            "candle",
+                            "fire",
+                            "unknown"
+                          ],
+                          "supported_color_modes": [
+                            "color_temp",
+                            "xy"
+                          ],
+                          "color_mode": "xy",
+                          "brightness": 47,
+                          "hs_color": [
+                            1.667,
+                            42.353
+                          ],
+                          "rgb_color": [
+                            255,
+                            150,
+                            147
+                          ],
+                          "xy_color": [
+                            0.4851,
+                            0.3198
+                          ],
+                          "effect": "None",
+                          "mode": "normal",
+                          "dynamics": "none",
+                          "friendly_name": "Schreibtisch R",
+                          "supported_features": 44
+                        },
+                        "last_changed": "2023-10-14T13:44:10.209177+00:00",
+                        "last_updated": "2023-10-14T13:44:10.209177+00:00",
+                        "context": {
+                          "id": "01HCQ6W7719HQPH8YP18XSJCAZ",
+                          "parent_id": null,
+                          "user_id": null
+                        }
+                      }
+                    },
+                    "origin": "LOCAL",
+                    "time_fired": "2023-10-14T13:44:10.209177+00:00",
+                    "context": {
+                      "id": "01HCQ6W7719HQPH8YP18XSJCAZ",
                       "parent_id": null,
                       "user_id": null
                     }

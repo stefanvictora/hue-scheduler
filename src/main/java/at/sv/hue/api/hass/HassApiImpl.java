@@ -1,11 +1,13 @@
 package at.sv.hue.api.hass;
 
+import at.sv.hue.ColorMode;
 import at.sv.hue.api.ApiFailure;
 import at.sv.hue.api.Capability;
 import at.sv.hue.api.EmptyGroupException;
 import at.sv.hue.api.GroupNotFoundException;
 import at.sv.hue.api.HttpResourceProvider;
 import at.sv.hue.api.HueApi;
+import at.sv.hue.api.Identifier;
 import at.sv.hue.api.LightCapabilities;
 import at.sv.hue.api.LightNotFoundException;
 import at.sv.hue.api.LightState;
@@ -63,6 +65,18 @@ public class HassApiImpl implements HueApi {
     }
 
     @Override
+    public Identifier getLightIdentifier(String id) {
+        assertSupportedStateType(id);
+        State state = getAndAssertLightExists(id);
+        return new Identifier(id, state.attributes.friendly_name);
+    }
+
+    @Override
+    public Identifier getGroupIdentifier(String id) {
+        return getLightIdentifier(id);
+    }
+
+    @Override
     public LightState getLightState(String id) {
         assertSupportedStateType(id);
         String response = httpResourceProvider.getResource(createUrl("/states/" + id));
@@ -109,7 +123,7 @@ public class HassApiImpl implements HueApi {
         changeState.setEntity_id(id);
         changeState.setBrightness(hueToHassBrightness(putCall.getBri()));
         changeState.setColor_temp(putCall.getCt());
-        changeState.setEffect(hueToHassEffect(putCall));
+        changeState.setEffect(putCall.getEffect());
         changeState.setTransition(convertToSeconds(putCall.getTransitionTime())); // todo: find out the max value of home assistant
         if (putCall.getHue() != null && putCall.getSat() != null) {
             changeState.setHs_color(getHsColor(putCall));
@@ -118,13 +132,6 @@ public class HassApiImpl implements HueApi {
         }
 
         httpResourceProvider.postResource(getUpdateUrl(putCall), getBody(changeState));
-    }
-
-    private static String hueToHassEffect(PutCall putCall) {
-        if ("colorloop".equals(putCall.getEffect())) {
-            return "prism";
-        }
-        return putCall.getEffect();
     }
 
     private Integer[] getHsColor(PutCall putCall) {
@@ -161,6 +168,15 @@ public class HassApiImpl implements HueApi {
     }
 
     @Override
+    public String getSceneName(String sceneId) {
+        State scene = getOrLookupStates().get(sceneId);
+        if (scene == null) {
+            return null;
+        }
+        return scene.attributes.friendly_name;
+    }
+
+    @Override
     public List<String> getAffectedIdsByScene(String sceneId) {
         State scene = getOrLookupStates().get(sceneId);
         if (scene == null) {
@@ -173,7 +189,7 @@ public class HassApiImpl implements HueApi {
         }
         if (sceneAttributes.getGroup_name() != null) { // Hue scene
             try {
-                String groupId = getGroupId(sceneAttributes.getGroup_name());
+                String groupId = getGroupIdentifierByName(sceneAttributes.getGroup_name()).id();
                 affectedIds.add(groupId);
                 affectedIds.addAll(getGroupLights(groupId));
             } catch (Exception ignore) {
@@ -183,8 +199,18 @@ public class HassApiImpl implements HueApi {
     }
 
     @Override
+    public List<String> getAffectedIdsByDevice(String deviceId) {
+        List<String> assignedGroups = getAssignedGroups(deviceId);
+
+        List<String> affectedIds = new ArrayList<>(assignedGroups);
+        affectedIds.add(deviceId);
+
+        return affectedIds;
+    }
+
+    @Override
     public List<String> getAssignedGroups(String lightId) {
-        String lightName = getLightName(lightId);
+        String lightName = getLightIdentifier(lightId).name();
         return getOrLookupStates().values()
                                   .stream()
                                   .filter(HassApiImpl::isGroupState)
@@ -194,22 +220,18 @@ public class HassApiImpl implements HueApi {
     }
 
     @Override
-    public String getGroupId(String name) {
+    public Identifier getGroupIdentifierByName(String name) {
         State state = lookupStateByName(name);
         if (isNoGroupState(state)) {
             throw new GroupNotFoundException("No group with name '" + name + "' found");
         }
-        return state.entity_id;
+        return new Identifier(state.entity_id, name);
     }
 
     @Override
-    public String getGroupName(String groupId) {
-        return getLightName(groupId);
-    }
-
-    @Override
-    public String getLightId(String name) {
-        return lookupStateByName(name).entity_id;
+    public Identifier getLightIdentifierByName(String name) {
+        State state = lookupStateByName(name);
+        return new Identifier(state.entity_id, name);
     }
 
     private State lookupStateByName(String name) {
@@ -222,12 +244,6 @@ public class HassApiImpl implements HueApi {
     }
 
     @Override
-    public String getLightName(String id) {
-        assertSupportedStateType(id);
-        return getAndAssertLightExists(id).attributes.friendly_name;
-    }
-
-    @Override
     public LightCapabilities getLightCapabilities(String id) {
         assertSupportedStateType(id);
         State state = getAndAssertLightExists(id);
@@ -237,6 +253,11 @@ public class HassApiImpl implements HueApi {
     @Override
     public LightCapabilities getGroupCapabilities(String id) {
         return getLightCapabilities(id);
+    }
+
+    @Override
+    public void createOrUpdateScene(String groupId, String sceneSyncName, List<PutCall> overriddenPutCalls) {
+        // todo
     }
 
     @Override
@@ -300,9 +321,9 @@ public class HassApiImpl implements HueApi {
 
     private LightState createLightState(State state) {
         StateAttributes attributes = state.getAttributes();
-        return new LightState(hassToHueBrightness(attributes.brightness), attributes.color_temp, getXY(attributes.xy_color, 0),
+        return new LightState(state.entity_id, hassToHueBrightness(attributes.brightness), attributes.color_temp, getXY(attributes.xy_color, 0),
                 getXY(attributes.xy_color, 1),
-                getEffect(attributes.effect), getColorMode(attributes.color_mode), getReachable(state.state),
+                getEffect(attributes.effect), getColorMode(attributes.color_mode),
                 getOn(state.state), createLightCapabilities(state));
     }
 
@@ -320,20 +341,16 @@ public class HassApiImpl implements HueApi {
         return effect.toLowerCase(Locale.getDefault());
     }
 
-    private static String getColorMode(String colorMode) {
+    private static ColorMode getColorMode(String colorMode) {
         if (colorMode == null) {
             return null;
         }
         if (colorMode.equals("color_temp")) {
-            return "ct";
+            return ColorMode.CT;
         } else if (colorMode.equals("xy")) {
-            return "xy";
+            return ColorMode.XY;
         }
         return null;
-    }
-
-    private static boolean getReachable(String state) {
-        return !"unavailable".equals(state);
     }
 
     private static boolean getOn(String state) {
@@ -343,7 +360,18 @@ public class HassApiImpl implements HueApi {
     private static LightCapabilities createLightCapabilities(State state) {
         StateAttributes attributes = state.attributes;
         return new LightCapabilities(null, null, attributes.min_mireds, attributes.max_mireds,
-                getCapabilities(state));
+                getCapabilities(state), getEffects(state));
+    }
+
+    private static List<String> getEffects(State state) {
+        List<String> effectList = state.attributes.effect_list;
+        if (effectList == null) {
+            return null;
+        }
+        return effectList.stream()
+                         .map(String::toLowerCase)
+                         .filter(effect -> !"none".equals(effect) && !"unknown".equals(effect))
+                         .toList();
     }
 
     private static EnumSet<Capability> getCapabilities(State state) {
@@ -447,6 +475,11 @@ public class HassApiImpl implements HueApi {
         } catch (JsonProcessingException e) {
             throw new IllegalArgumentException("Failed to create state body", e);
         }
+    }
+
+    @Override
+    public void onModification(String type, String id) {
+        // todo
     }
 
     @Data
