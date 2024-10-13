@@ -3,23 +3,23 @@
 ## [0.12.0] - 2024-10-13
 
 ### Added
-- **Scene Sync Feature**: Hue Scheduler can now sync states to scenes.
-  - This allows smart switches and motion sensors to always activate lights in the correct state.
-  - Enable this optional feature using the ``--enable-scene-sync`` command line flag or by setting ``ENABLE_SCENE_SYNC=true`` as an environment variable (default: `false`).
-  - Additional configurable properties:
-    - `--scene-sync-name`: Name for the synced scenes (default: `HueScheduler`)
-    - `--scene-sync-interval`: Interval for scene synchronization in minutes (default: `2`)
-  - Note: Currently, this feature works only when connected to a Hue bridge.
+- **Scene Sync Feature**: Hue Scheduler can now sync states to scenes, ensuring that smart switches and motion sensors always activate lights in the correct state.
+  - To enable this feature, use the `--enable-scene-sync` command line flag or set `ENABLE_SCENE_SYNC=true` as an environment variable (default: `false`).
+  - **Additional Configurable Properties**:
+    - `--scene-sync-name`: Specifies the name for the synced scenes (default: `HueScheduler`).
+    - `--scene-sync-interval`: Defines the interval for scene synchronization in minutes (default: `2`).
+  - **Limitation**: Currently, this feature is supported only when connected to a Hue bridge.
 
-- **APIv2 Light Effects**: Support added for scheduling all Hue APIv2 light effects.
+- **APIv2 Light Effects**: Added support for scheduling all Hue APIv2 light effects.
   - Includes effects such as `candle`, `fire`, `prism`, `sparkle`, `opal`, `glisten`, etc.
-  - Supported effects depend on the light model and are verified during startup.
+  - **Note**: Supported effects vary based on the light model and are verified during startup.
 
 ### Changed
-- Fully migrated to Hue APIv2.
-- Enhanced error handling for API lookups.
-- Improved comparison of CT values using a threshold.
-- Enhanced state interpolation for scenarios where schedules modify only certain properties.
+
+- **Hue APIv2 Migration**: Fully migrated to Hue APIv2 for enhanced functionality and compatibility.
+- **Error Handling**: Improved error handling for API lookups to prevent the loss of schedules.
+- **Color Temperature Comparison**: Enhanced the comparison of color temperature (CT) values using a defined threshold for better tolerance.
+- **State Interpolation**: Improved state interpolation for scenarios where schedules modify only specific properties.
 
 ### Removed
 - **Group Effects**: Applying effects to groups is no longer supported due to Hue APIv2 limitations.
