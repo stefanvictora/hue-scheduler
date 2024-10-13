@@ -121,6 +121,11 @@ public class ScheduledStateSnapshot {
         return (getStart().isBefore(now) || getStart().isEqual(now)) && getEnd() != null && getEnd().isAfter(now);
     }
 
+    public boolean hasGapBefore() {
+        ScheduledStateSnapshot previousState = getPreviousState();
+        return previousState != null && previousState.isNullState();
+    }
+
     public boolean hasTransitionBefore() {
         return scheduledState.hasTransitionBefore();
     }

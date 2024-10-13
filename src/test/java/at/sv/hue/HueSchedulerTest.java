@@ -3831,6 +3831,37 @@ class HueSchedulerTest {
     }
 
     @Test
+    void nullState_createsGap_resetsModificationTracking_stillAppliedDespiteModification() {
+        enableUserModificationTracking();
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, "02:00", "bri:" + DEFAULT_BRIGHTNESS);
+        addState(1, "04:00");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now.plusHours(2), now.plusHours(4))
+        );
+
+        simulateLightOnEvent(); // no waiting states
+        setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS - 10)); // manual modification
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS) // still applied despite manual modification
+        );
+
+        ScheduledRunnable nextDay = ensureRunnable(initialNow.plusDays(1).plusHours(2), initialNow.plusDays(1).plusHours(4)); // next day
+
+        // next day
+
+        setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS - 15)); // manual modification
+
+        advanceTimeAndRunAndAssertPutCalls(nextDay,
+                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS) // still applied despite manual modification
+        );
+
+        ensureRunnable(initialNow.plusDays(2).plusHours(2), initialNow.plusDays(2).plusHours(4)); // next day
+    }
+
+    @Test
     void parse_useLampNameInsteadOfId_nameIsCorrectlyResolved() {
         String name = "gKitchen Lamp";
         mockLightIdForName(name, 2);
@@ -6790,8 +6821,6 @@ class HueSchedulerTest {
                 expectedRunnable(now.plusMinutes(10), now.plusDays(1))
         );
     }
-
-    // todo: test with overridden put call that has an interpolation -> should also trigger the regular scene sync -> actually, no
 
     // todo: test with gaps or with day scheduling, meaning we want to test cases where state definitions exists, but not for the current time
 

@@ -121,7 +121,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
         copy.lastSeen = state.lastSeen;
         copy.originalState = state.originalState;
         copy.previousStateLookup = state.previousStateLookup;
-        copy.nextStateLookup = state.nextStateLookup; // todo: test?
+        copy.nextStateLookup = state.nextStateLookup;
         return copy;
     }
 
