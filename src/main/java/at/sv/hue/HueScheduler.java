@@ -173,6 +173,7 @@ public final class HueScheduler implements Runnable {
     private Supplier<ZonedDateTime> currentTime;
     private SceneEventListenerImpl sceneEventListener;
     private ScheduledStateRegistry stateRegistry;
+    private int sceneSyncDelayInSeconds = 5;
 
     public HueScheduler() {
         currentTime = ZonedDateTime::now;
@@ -186,7 +187,8 @@ public final class HueScheduler implements Runnable {
                         boolean disableUserModificationTracking, String defaultInterpolationTransitionTimeString,
                         int powerOnRescheduleDelayInMs, int bridgeFailureRetryDelayInSeconds,
                         int minTrBeforeGapInMinutes, int sceneActivationIgnoreWindowInSeconds, boolean interpolateAll,
-                        boolean enableSceneSync, String sceneSyncName, int sceneSyncIntervalInMinutes) {
+                        boolean enableSceneSync, String sceneSyncName, int sceneSyncIntervalInMinutes,
+                        int sceneSyncDelayInSeconds) {
         this();
         this.api = api;
         ZonedDateTime initialTime = currentTime.get();
@@ -209,6 +211,7 @@ public final class HueScheduler implements Runnable {
         this.enableSceneSync = enableSceneSync;
         this.sceneSyncName = sceneSyncName;
         this.sceneSyncIntervalInMinutes = sceneSyncIntervalInMinutes;
+        this.sceneSyncDelayInSeconds = sceneSyncDelayInSeconds;
         apiCacheInvalidationIntervalInMinutes = 15;
         stateRegistry = new ScheduledStateRegistry(currentTime, api);
     }
@@ -406,8 +409,7 @@ public final class HueScheduler implements Runnable {
             }
             LOG.info("Set: {}", snapshot);
             if (shouldSyncScene(snapshot)) {
-                MDC.put("context", snapshot.getContextName() + " (scene sync)");
-                syncScene(snapshot);  // todo: this is getting more complex and may take a while, can we make it async?
+                scheduleAsyncSceneSync(snapshot);
             }
             MDC.put("context", snapshot.getContextName());
             try {
@@ -468,7 +470,18 @@ public final class HueScheduler implements Runnable {
         return manualOverrideTracker.wasJustTurnedOn(state.getId());
     }
 
+    private void scheduleAsyncSceneSync(ScheduledStateSnapshot state) {
+        if (sceneSyncDelayInSeconds == 0) {
+            syncScene(state);
+        } else {
+            stateScheduler.schedule(() -> {
+                syncScene(state);
+            }, currentTime.get().plusSeconds(sceneSyncDelayInSeconds), state.getEnd());
+        }
+    }
+
     private void syncScene(ScheduledStateSnapshot state) {
+        MDC.put("context", state.getContextName() + " (scene sync)");
         try {
             stateRegistry.getAssignedGroups(state)
                          .forEach(groupInfo -> syncScene(groupInfo.groupId(), stateRegistry.getPutCalls(groupInfo.groupLights())));
@@ -489,7 +502,6 @@ public final class HueScheduler implements Runnable {
     private void scheduleNextSceneSync(ScheduledStateSnapshot stateSnapshot) {
         ZonedDateTime end = stateSnapshot.getEnd();
         stateScheduler.schedule(() -> {
-            MDC.put("context", stateSnapshot.getContextName() + " (scene sync)");
             if (currentTime.get().isAfter(end)) {
                 return;
             }

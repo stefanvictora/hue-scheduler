@@ -77,6 +77,7 @@ class HueSchedulerTest {
     private boolean interpolateAll;
     private boolean enableSceneSync = false;
     private int expectedSceneUpdates;
+    private int sceneSyncDelayInSeconds;
 
     private void setCurrentTimeToAndRun(ScheduledRunnable scheduledRunnable) {
         setCurrentTimeTo(scheduledRunnable);
@@ -123,7 +124,7 @@ class HueSchedulerTest {
                 () -> now, 10.0, controlGroupLightsIndividually, disableUserModificationTracking,
                 defaultInterpolationTransitionTimeInMs, 0, connectionFailureRetryDelay,
                 minTrGap, 5, interpolateAll,
-                enableSceneSync, sceneSyncName, sceneSyncInterpolationInterval);
+                enableSceneSync, sceneSyncName, sceneSyncInterpolationInterval, sceneSyncDelayInSeconds);
         manualOverrideTracker = scheduler.getManualOverrideTracker();
     }
 
@@ -478,6 +479,7 @@ class HueSchedulerTest {
         disableUserModificationTracking = true;
         defaultInterpolationTransitionTimeInMs = null;
         interpolateAll = false;
+        sceneSyncDelayInSeconds = 0;
         create();
     }
 
@@ -5974,6 +5976,38 @@ class HueSchedulerTest {
 
         // still updates scene
         assertSceneUpdate("/groups/1", expectedPutCall(6).bri(150));
+    }
+
+    @Test
+    void sceneSync_delayGreaterThanZero_createsScheduledTaskForSync() {
+        sceneSyncDelayInSeconds = 5;
+        enableSceneSync();
+
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 6);
+        addState("g1", now, "bri:100");
+        addState("g1", now.plusMinutes(10), "bri:150");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.getFirst(),
+                expectedGroupPutCall(1).bri(100)
+        );
+
+        assertAllSceneUpdatesAsserted(); // no scene update just yet
+        
+        List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(
+                expectedRunnable(now.plusSeconds(sceneSyncDelayInSeconds), now.plusMinutes(10)), // scene sync schedule
+                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
+        );
+
+        setCurrentTimeTo(followUpRunnables.getFirst());
+        followUpRunnables.getFirst().run();
+
+        assertSceneUpdate("/groups/1", expectedPutCall(6).bri(100));
     }
 
     @Test
