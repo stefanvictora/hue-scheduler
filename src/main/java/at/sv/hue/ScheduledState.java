@@ -173,10 +173,19 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
             return ct;
         }
         if (ct > capabilities.getCtMax() || ct < capabilities.getCtMin()) {
-            throw new InvalidColorTemperatureValue("Invalid ct value '" + ct + "'. Support integer range for " + getFormattedName() + ": "
-                                                   + capabilities.getCtMin() + "-" + capabilities.getCtMax());
+            throw new InvalidColorTemperatureValue("Invalid ct value '" + ct + "'. Supported integer range for " + getFormattedName() + ": "
+                                                   + getFormattedCtRange());
         }
         return ct;
+    }
+
+    private String getFormattedCtRange() {
+        return capabilities.getCtMin() + "-" + capabilities.getCtMax() +
+               " (" + convertToKelvinCt(capabilities.getCtMin()) + "-" + convertToKelvinCt(capabilities.getCtMax()) + ")";
+    }
+
+    private Integer convertToKelvinCt(Integer mired) {
+        return 1_000_000 / mired;
     }
 
     private void assertCtSupported() {
