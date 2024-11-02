@@ -103,7 +103,7 @@ Specify properties to control the state of your lights during the given interval
 
 - ``bri``: Modifies the **brightness** of the light: [``1``-``254``] or [``1%``-``100%``]. From dim to bright.
 
-- ``ct``: Modifies the **color temperature** of the light, either in [Kelvin](https://en.wikipedia.org/wiki/Color_temperature) [``6500``-``2000``] or [Mired](https://en.wikipedia.org/wiki/Mired) [``153``-``500``], from cool to warm white. The supported range may vary for older light bulb models. Hue Scheduler checks at startup if the given color temperature is supported by the light, throwing an error if not.
+- ``ct``: Modifies the **color temperature** of the light, either in [Kelvin](https://en.wikipedia.org/wiki/Color_temperature) [``6500``-``1000``] or [Mired](https://en.wikipedia.org/wiki/Mired) [``153``-``500``], from cool to warm white. The supported range may vary for older light bulb models. Hue Scheduler checks at startup if the given color temperature is supported by the light, automatically adjusting it to the nearest valid value if not. Note: Color lights are the only ones supporting a Kelvin value lower than 2000.
 
 - ``on``: Modifies the **on state** of the light: [``true``|``false``]. Hue Scheduler does not modify a light's on state unless explicitly specified. If a light is off or unreachable, Hue Scheduler waits until the light is turned on or reachable again.
 

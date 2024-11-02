@@ -59,7 +59,7 @@ Each configuration line has three parts:
 
 - **Basic**:
     - **`bri`** (brightness): e.g., `bri:100%`
-    - **`ct`** (color temperature) [``6500``-``2000``|``153``-``500``]: e.g., `ct:6500`, `ct:153`
+    - **`ct`** (color temperature) [``6500``-``1000``|``153``-``500``]: e.g., `ct:6500`, `ct:153`
     - **`on`** (on/off state): e.g., `on:true`
     - **`days`** (specific days of the week): e.g., `days:Mo-Fr`, `days:Tu,We`
 - **Color**:

@@ -1,5 +1,13 @@
 # Changelog
-   
+
+## [0.12.1] - 2024-11-02
+
+### Fixed
+- **Scene Sync**: Fixed an issue where scene synchronization failed to handle interpolations across days, causing lights to sync as off (#16).
+
+### Added
+- **Enhanced CT Support**: Enabled support for setting 1000 Kelvin as color temperature (CT) for color lights. Removed the InvalidColorTemperatureValue error; now, if the specified CT is outside the supported range, it automatically adjusts to the nearest valid value (#15).
+
 ## [0.12.0] - 2024-10-13
 
 ### Added
