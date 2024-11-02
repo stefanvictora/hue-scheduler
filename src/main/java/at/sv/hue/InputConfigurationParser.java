@@ -2,9 +2,10 @@ package at.sv.hue;
 
 import at.sv.hue.api.GroupNotFoundException;
 import at.sv.hue.api.HueApi;
-import at.sv.hue.api.LightCapabilities;
 import at.sv.hue.api.Identifier;
+import at.sv.hue.api.LightCapabilities;
 import at.sv.hue.api.hass.HassSupportedEntityType;
+import at.sv.hue.color.CTToRGBConverter;
 import at.sv.hue.color.RGBToXYConverter;
 import at.sv.hue.time.StartTimeProvider;
 
@@ -97,8 +98,16 @@ public final class InputConfigurationParser {
                         break;
                     case "ct":
                         ct = parseInteger(value, parameter);
-                        if (ct >= 2_000) {
+                        if (ct >= 1_000) {
                             ct = convertToMiredCt(ct);
+                        }
+                        if (capabilities.isColorSupported() && ct > capabilities.getCtMax()) {
+                            int[] rgb = CTToRGBConverter.approximateRGBFromMired(ct);
+                            RGBToXYConverter.XYColor xyColor = RGBToXYConverter.rgbToXY(rgb[0], rgb[1], rgb[2],
+                                    capabilities.getColorGamut());
+                            x = xyColor.x();
+                            y = xyColor.y();
+                            ct = null;
                         }
                         break;
                     case "on":
@@ -123,7 +132,6 @@ public final class InputConfigurationParser {
                         sat = parseSaturation(value);
                         break;
                     case "color":
-                        RGBToXYConverter.XYColor xyColor;
                         int red;
                         int green;
                         int blue;
@@ -141,7 +149,8 @@ public final class InputConfigurationParser {
                             green = color.getGreen();
                             blue = color.getBlue();
                         }
-                        xyColor = RGBToXYConverter.rgbToXY(red, green, blue, capabilities.getColorGamut());
+                        RGBToXYConverter.XYColor xyColor = RGBToXYConverter.rgbToXY(red, green, blue,
+                                capabilities.getColorGamut());
                         x = xyColor.x();
                         y = xyColor.y();
                         if (bri == null) {

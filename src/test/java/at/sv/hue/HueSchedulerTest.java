@@ -3909,16 +3909,90 @@ class HueSchedulerTest {
     }
 
     @Test
-    void parse_light_invalidCtValue_tooLow_exception() {
-        assertThrows(InvalidColorTemperatureValue.class, () -> addState(1, now, null, 152));
+    void parse_light_invalidCtValue_ctOnlyLight_tooLow_usesMinValue() {
+        mockLightCapabilities(1, LightCapabilities.builder().ctMin(153).ctMax(500)
+                                                  .capabilities(EnumSet.of(Capability.COLOR_TEMPERATURE)));
+        addStateNow(1, "ct:152");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
+                expectedPutCall(ID).ct(153)
+        );
+
+        ensureRunnable(initialNow.plusDays(1));
     }
 
     @Test
-    void parse_group_invalidCtValue_tooLow_exception() {
+    void parse_invalidCtValue_ctOnlyLight_tooHigh_usesMaxValue() {
+        mockLightCapabilities(1, LightCapabilities.builder().ctMin(153).ctMax(500).capabilities(EnumSet.of(Capability.COLOR_TEMPERATURE)));
+        addStateNow(1, "ct:501");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
+                expectedPutCall(ID).ct(500)
+        );
+
+        ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
+    void parse_tooWarmCtValue_mired_lightAlsoSupportsColor_convertsToXY() {
+        mockLightCapabilities(1, LightCapabilities.builder().ctMin(153).ctMax(500).capabilities(EnumSet.of(Capability.COLOR_TEMPERATURE, Capability.COLOR)));
+        addStateNow(1, "ct:501");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
+                expectedPutCall(1).x(0.5395).y(0.4098)
+        );
+
+        ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
+    void parse_tooWarmCtValue_kelvin_lightAlsoSupportsColor_convertsToXY() {
+        mockLightCapabilities(1, LightCapabilities.builder().ctMin(153).ctMax(500).capabilities(EnumSet.of(Capability.COLOR_TEMPERATURE, Capability.COLOR)));
+        addStateNow(1, "ct:1000");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
+                expectedPutCall(1).x(0.608).y(0.3554)
+        );
+
+        ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
+    void parse_kelvin_convertsToMired_usesCTSinceInRange() {
+        mockLightCapabilities(1, LightCapabilities.builder().ctMin(153).ctMax(500).capabilities(EnumSet.of(Capability.COLOR_TEMPERATURE, Capability.COLOR)));
+        addStateNow(1, "ct:2000");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
+                expectedPutCall(1).ct(500)
+        );
+
+        ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
+    void parse_group_invalidCtValue_tooLow_usesMinValue() {
         mockGroupCapabilities(1, LightCapabilities.builder().ctMin(100).ctMax(200).capabilities(EnumSet.of(Capability.COLOR_TEMPERATURE)));
         mockGroupLightsForId(1, 2, 3);
 
-        assertThrows(InvalidColorTemperatureValue.class, () -> addState("g1", now, "ct:50"));
+        addState("g1", now, "ct:99");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
+                expectedGroupPutCall(1).ct(100)
+        );
+
+        ensureRunnable(initialNow.plusDays(1));
     }
 
     @Test
@@ -3983,11 +4057,6 @@ class HueSchedulerTest {
         startScheduler();
 
         ensureScheduledStates(1);
-    }
-
-    @Test
-    void parse_invalidCtValue_tooHigh_exception() {
-        assertThrows(InvalidColorTemperatureValue.class, () -> addState(1, now, null, 501));
     }
 
     @Test
@@ -5998,7 +6067,7 @@ class HueSchedulerTest {
         );
 
         assertAllSceneUpdatesAsserted(); // no scene update just yet
-        
+
         List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(
                 expectedRunnable(now.plusSeconds(sceneSyncDelayInSeconds), now.plusMinutes(10)), // scene sync schedule
                 expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
@@ -6803,7 +6872,7 @@ class HueSchedulerTest {
         setCurrentAndInitialTimeTo(now.withHour(13)); // 13:00
         addState(1, "12:00", "bri:100");
         addState(1, "01:00", "bri:200", "interpolate:true"); // 01:00 -> 12:00
-        
+
         List<ScheduledRunnable> runnables = startScheduler(
                 expectedRunnable(now, now.plusDays(1).minusHours(1)),
                 expectedRunnable(now.plusDays(1).minusHours(1), now.plusDays(1).minusHours(1)) // zero length

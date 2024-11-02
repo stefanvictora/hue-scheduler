@@ -172,20 +172,13 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
         if (capabilities.getCtMax() == null || capabilities.getCtMin() == null) {
             return ct;
         }
-        if (ct > capabilities.getCtMax() || ct < capabilities.getCtMin()) {
-            throw new InvalidColorTemperatureValue("Invalid ct value '" + ct + "'. Supported integer range for " + getFormattedName() + ": "
-                                                   + getFormattedCtRange());
+        if (ct > capabilities.getCtMax()) {
+            return capabilities.getCtMax();
+        }
+        if (ct < capabilities.getCtMin()) {
+            return capabilities.getCtMin();
         }
         return ct;
-    }
-
-    private String getFormattedCtRange() {
-        return capabilities.getCtMin() + "-" + capabilities.getCtMax() +
-               " (" + convertToKelvinCt(capabilities.getCtMin()) + "-" + convertToKelvinCt(capabilities.getCtMax()) + ")";
-    }
-
-    private Integer convertToKelvinCt(Integer mired) {
-        return 1_000_000 / mired;
     }
 
     private void assertCtSupported() {
