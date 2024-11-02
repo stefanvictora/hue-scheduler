@@ -161,8 +161,9 @@ public class ScheduledStateRegistry {
 
     private Optional<PutCall> findActivePutCall(List<ScheduledState> lightStatesForId) {
         ZonedDateTime now = currentTime.get();
+        ZonedDateTime theDayAfter = now.plusDays(1);
         return lightStatesForId.stream()
-                               .map(state -> state.getSnapshot(now))
+                               .flatMap(state -> Stream.of(state.getSnapshot(now), state.getSnapshot(theDayAfter)))
                                .filter(snapshot -> snapshot.isCurrentlyActive(now))
                                .findFirst()
                                .map(snapshot -> snapshot.getInterpolatedFullPicturePutCall(now));

@@ -6795,6 +6795,35 @@ class HueSchedulerTest {
     }
 
     @Test
+    void sceneSync_interpolate_withDayCrossover_correctlyFindsActivePutCall() {
+        enableSceneSync();
+
+        addKnownLightIdsWithDefaultCapabilities(1);
+        mockGroupLightsForId(5, 1);
+        setCurrentAndInitialTimeTo(now.withHour(13)); // 13:00
+        addState(1, "12:00", "bri:100");
+        addState(1, "01:00", "bri:200", "interpolate:true"); // 01:00 -> 12:00
+        
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1).minusHours(1)),
+                expectedRunnable(now.plusDays(1).minusHours(1), now.plusDays(1).minusHours(1)) // zero length
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.getFirst(),
+                expectedPutCall(1).bri(108),
+                expectedPutCall(1).bri(113).transitionTime(tr("38min"))
+        );
+
+        assertSceneUpdate("/groups/5", expectedPutCall(1).bri(108));
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusMinutes(1), now.plusDays(1).minusHours(1)), // next scene sync
+                expectedRunnable(now.plusMinutes(40), initialNow.plusDays(1).minusHours(1)), // next split call
+                expectedRunnable(initialNow.plusDays(1).minusHours(1), initialNow.plusDays(2).minusHours(1)) // next day
+        );
+    }
+
+    @Test
     void scheduling_overlappingGroups_ofDifferentSize_automaticallyOffsetsStatesBasedOnTheNumberOfBiggerGroups() {
         mockDefaultGroupCapabilities(1);
         mockDefaultGroupCapabilities(2);
