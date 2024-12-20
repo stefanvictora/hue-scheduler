@@ -38,7 +38,7 @@ public final class InputConfigurationParser {
     }
 
     public List<ScheduledState> parse(String input) {
-        String[] parts = input.split("\\t|\\s{2,}");
+        String[] parts = input.split("\\t+|\\s{2,}");
         if (parts.length < 2)
             throw new InvalidConfigurationLine("Invalid configuration line format '" + Arrays.toString(parts) + "': at least id and start time have to be set." +
                                                " Make sure to use either tabs or at least two spaces to separate the different configuration parts.");
@@ -90,6 +90,10 @@ public final class InputConfigurationParser {
             for (int i = 2; i < parts.length; i++) {
                 String part = parts[i].trim();
                 String[] typeAndValue = part.split(":", 2);
+                if (typeAndValue.length != 2) {
+                    throw new InvalidConfigurationLine("Invalid state property '" + part + "': " +
+                            "Each state property has to be in the format 'property:value'.");
+                }
                 String parameter = typeAndValue[0];
                 String value = typeAndValue[1];
                 switch (parameter) {

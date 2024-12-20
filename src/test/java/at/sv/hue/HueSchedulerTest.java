@@ -640,6 +640,23 @@ class HueSchedulerTest {
     }
 
     @Test
+    void parse_multipleTabs_parsedCorrectly() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState("1\t12:00\t\tbri:75%\t\tct:3400");
+
+        startScheduler();
+
+        ensureScheduledStates(1);
+    }
+
+    @Test
+    void parse_missingPart_throws() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+
+        assertThrows(InvalidConfigurationLine.class, () -> addState("1  12:00  bri"));
+    }
+
+    @Test
     void parse_trimsProperty() {
         addKnownLightIdsWithDefaultCapabilities(1);
         addState("1\t" + nowTimeString + "\t bri:" + DEFAULT_BRIGHTNESS + "  \tct:" + DEFAULT_CT);
