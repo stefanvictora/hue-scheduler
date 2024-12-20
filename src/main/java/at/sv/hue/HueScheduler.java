@@ -52,7 +52,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
-@Command(name = "HueScheduler", version = "0.12.1", mixinStandardHelpOptions = true, sortOptions = false)
+@Command(name = "HueScheduler", version = "0.12.2", mixinStandardHelpOptions = true, sortOptions = false)
 public final class HueScheduler implements Runnable {
 
     private static final Logger LOG = LoggerFactory.getLogger(HueScheduler.class);
@@ -165,6 +165,11 @@ public final class HueScheduler implements Runnable {
             description = "The delay in seconds during which turn-on events for affected lights and groups are ignored " +
                           "after a scene activation has been detected. Default: ${DEFAULT-VALUE} seconds.")
     int sceneActivationIgnoreWindowInSeconds;
+    @Option(names = "--insecure",
+            defaultValue = "${env:INSECURE:-false}",
+            description = "Disables certificate validation for older bridges using self-signed certificates." +
+                          " Default: ${DEFAULT-VALUE}")
+    private boolean insecure;
     private HueApi api;
     private StateScheduler stateScheduler;
     private final ManualOverrideTracker manualOverrideTracker;
@@ -284,7 +289,7 @@ public final class HueScheduler implements Runnable {
 
     private OkHttpClient createHueHttpsClient() {
         try {
-            return HueHttpsClientFactory.createHttpsClient(apiHost, accessToken);
+            return HueHttpsClientFactory.createHttpsClient(apiHost, accessToken, insecure);
         } catch (Exception e) {
             System.err.println("Failed to create https client: " + e.getLocalizedMessage());
             System.exit(1);

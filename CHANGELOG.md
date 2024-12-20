@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.12.2] - 2024-12-20
+
+### Added
+- **Allow disable SSL validation**: Added new `--insecure` Flag to disable SSL certificate validation in case your bridge still uses self-signed certificates. (#18). See [Phis Hue Developer Documentation](https://developers.meethue.com/develop/application-design-guidance/using-https/) (requires login).
+
 ## [0.12.1] - 2024-11-02
 
 ### Fixed

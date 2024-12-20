@@ -122,6 +122,14 @@ Configures the read timeout of the API v2 SSE event stream in minutes. The conne
 
 **Default**: `120` minutes
 
+### `--insecure`
+
+*New in 0.12.2*
+
+Disables SSL certificate validation for the Hue Bridge. Needed if your bridge still uses self-signed certificates instead of the one issues by Signify. See [Phis Hue Developer Documentation](https://developers.meethue.com/develop/application-design-guidance/using-https/) (requires login).
+
+**Default**: false
+
 ### `-Dlog.level`
 
 A JVM argument to configure the log level of Hue Scheduler. The following values are available:

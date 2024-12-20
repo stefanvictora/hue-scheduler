@@ -1,5 +1,6 @@
 package at.sv.hue.api.hue;
 
+import lombok.extern.slf4j.Slf4j;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 
@@ -12,12 +13,19 @@ import java.security.KeyStore;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 
+@Slf4j
 public class HueHttpsClientFactory {
 
     private static final String HUE_BRIDGE_CERTIFICATE = "/hue-bridge-certificate.pem";
 
-    public static OkHttpClient createHttpsClient(String bridgeIp, String accessToken) throws Exception {
-        X509TrustManager trustManager = createTrustManager();
+    public static OkHttpClient createHttpsClient(String bridgeIp, String accessToken, boolean insecure) throws Exception {
+        X509TrustManager trustManager;
+        if (insecure) {
+            log.warn("Disabling SSL certificate validation.");
+            trustManager = createTrustAllTrustManager();
+        } else {
+            trustManager = createTrustManager();
+        }
         SSLContext sslContext = createSSLContext(trustManager);
         return new OkHttpClient.Builder()
                 .sslSocketFactory(sslContext.getSocketFactory(), trustManager)
@@ -41,7 +49,7 @@ public class HueHttpsClientFactory {
     }
 
     private static Certificate loadCertificate() throws Exception {
-        try (InputStream certInputStream = HueEventStreamReader.class.getResourceAsStream(HUE_BRIDGE_CERTIFICATE)) {
+        try (InputStream certInputStream = HueHttpsClientFactory.class.getResourceAsStream(HUE_BRIDGE_CERTIFICATE)) {
             return CertificateFactory.getInstance("X.509").generateCertificate(certInputStream);
         }
     }
@@ -56,6 +64,23 @@ public class HueHttpsClientFactory {
         KeyStore keystore = KeyStore.getInstance("JKS");
         keystore.load(null, new char[0]);
         return keystore;
+    }
+
+    private static X509TrustManager createTrustAllTrustManager() {
+        return new X509TrustManager() {
+            @Override
+            public void checkClientTrusted(java.security.cert.X509Certificate[] chain, String authType) {
+            }
+
+            @Override
+            public void checkServerTrusted(java.security.cert.X509Certificate[] chain, String authType) {
+            }
+
+            @Override
+            public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+                return new java.security.cert.X509Certificate[]{};
+            }
+        };
     }
 
     private static SSLContext createSSLContext(X509TrustManager trustManager) throws Exception {
