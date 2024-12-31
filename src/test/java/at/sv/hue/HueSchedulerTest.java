@@ -6130,6 +6130,97 @@ class HueSchedulerTest {
     }
 
     @Test
+    void sceneSync_initiallyOff_turnedOnAfterwards_noAdditionalSyncOnPowerOnRetry() {
+        enableSceneSync();
+
+        addKnownLightIdsWithDefaultCapabilities(1);
+        mockGroupLightsForId(5, 1);
+        addState(1, now, "bri:100");
+        addState(1, "12:00", "bri:200");
+
+        mockIsLightOff(1, true);
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusHours(12)),
+                expectedRunnable(now.plusHours(12), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.getFirst()); // light is off, no put call
+
+        assertSceneUpdate("/groups/5", expectedPutCall(1).bri(100));
+
+        mockIsLightOff(1, false);
+
+        List<ScheduledRunnable> powerOnRetryRunnables = simulateLightOnEvent(
+                expectedRunnable(now, now.plusHours(12))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(powerOnRetryRunnables.getFirst(),
+                expectedPutCall(1).bri(100)
+        );
+
+        assertAllSceneUpdatesAsserted(); // no additional scene sync on power-on
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusHours(12)) // next day
+        );
+    }
+
+    @Test
+    void sceneSync_initiallyOff_interpolate_turnedOnAfterwards_noAdditionalSyncOnPowerOnRetry_doesNotAffectInterpolatedSceneSyncs() {
+        enableSceneSync();
+
+        addKnownLightIdsWithDefaultCapabilities(1);
+        mockGroupLightsForId(5, 1);
+        addState(1, now, "bri:100");
+        addState(1, now.plusMinutes(10), "bri:150", "interpolate:true");
+        addState(1, now.plusMinutes(20), "bri:200");
+
+        mockIsLightOff(1, true);
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(20)),
+                expectedRunnable(now.plusMinutes(20), now.plusDays(1)),
+                expectedRunnable(now.plusDays(1), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.getFirst()); // light is off, no put call
+
+        assertSceneUpdate("/groups/5", expectedPutCall(1).bri(100));
+
+        List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(
+                expectedRunnable(now.plusMinutes(sceneSyncInterpolationInterval), initialNow.plusMinutes(20)) // scene sync schedule
+        );
+
+        mockIsLightOff(1, false);
+
+        List<ScheduledRunnable> powerOnRetryRunnables = simulateLightOnEvent(
+                expectedRunnable(now, now.plusMinutes(20))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(powerOnRetryRunnables.getFirst(),
+                expectedPutCall(1).bri(100),
+                expectedPutCall(1).bri(150).transitionTime(tr("10min"))
+        );
+
+        assertAllSceneUpdatesAsserted(); // no additional scene sync on power-on
+
+        ensureScheduledStates(
+            expectedRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(20)) // next day
+        );
+
+        // interpolated sync call schedule is not affected and continues independently
+        advanceCurrentTime(Duration.ofMinutes(sceneSyncInterpolationInterval));
+        followUpRunnables.getFirst().run();
+
+        assertSceneUpdate("/groups/5", expectedPutCall(1).bri(105));
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusMinutes(sceneSyncInterpolationInterval), initialNow.plusMinutes(20)) // next scene sync schedule
+        );
+    }
+
+    @Test
     void sceneSync_longTransition_usesSplitCall_splitCallDoesNotTriggerSceneSync() {
         enableSceneSync();
 

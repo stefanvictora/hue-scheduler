@@ -3,7 +3,8 @@
 ## [0.12.3] - 2024-12-31
 
 ### Fixed
-- **Scene Sync**: Fixed an additional issue where scene synchronization failed for states spanning across days (#16).
+- **Scene Sync**: Resolved an issue where scene synchronization failed for states spanning multiple days (#16).
+- **Scene Sync**: Removed unnecessary scene synchronization triggered during power-on in certain cases.
 
 ## [0.12.2] - 2024-12-20
 
