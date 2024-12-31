@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.12.3] - 2024-12-31
+
+### Fixed
+- **Scene Sync**: Fixed an additional issue where scene synchronization failed for states spanning across days (#16).
+
 ## [0.12.2] - 2024-12-20
 
 ### Added

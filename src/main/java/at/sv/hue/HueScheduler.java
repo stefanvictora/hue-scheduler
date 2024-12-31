@@ -52,7 +52,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
-@Command(name = "HueScheduler", version = "0.12.2", mixinStandardHelpOptions = true, sortOptions = false)
+@Command(name = "HueScheduler", version = "0.12.3", mixinStandardHelpOptions = true, sortOptions = false)
 public final class HueScheduler implements Runnable {
 
     private static final Logger LOG = LoggerFactory.getLogger(HueScheduler.class);
@@ -449,7 +449,9 @@ public final class HueScheduler implements Runnable {
                 LOG.info("Turned off");
             }
             if (shouldRetryOnPowerOn(snapshot)) {
-                retryWhenBackOn(createPowerOnCopy(snapshot));
+                ScheduledStateSnapshot powerOnCopy = createPowerOnCopy(snapshot);
+                LOG.trace("Created power-on runnable: {}", powerOnCopy);
+                retryWhenBackOn(powerOnCopy);
             }
             reschedule(snapshot);
         }, currentTime.get().plus(delayInMs + overlappingDelayInMs, ChronoUnit.MILLIS), snapshot.getEnd());
@@ -749,7 +751,6 @@ public final class HueScheduler implements Runnable {
     }
 
     private void retryWhenBackOn(ScheduledStateSnapshot snapshot) {
-        LOG.trace("Created power-on runnable: {}", snapshot);
         lightEventListener.runWhenTurnedOn(snapshot.getId(), () -> schedule(snapshot, powerOnRescheduleDelayInMs));
     }
 
