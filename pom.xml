@@ -6,7 +6,7 @@
 
     <groupId>at.sv.hue</groupId>
     <artifactId>hue-scheduler</artifactId>
-    <version>0.12.3-SNAPSHOT</version>
+    <version>0.12.3</version>
 
     <scm>
         <connection>scm:git:git@github.com:stefanvictora/hue-scheduler.git</connection>
