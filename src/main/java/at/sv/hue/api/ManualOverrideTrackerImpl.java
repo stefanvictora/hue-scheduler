@@ -3,16 +3,16 @@ package at.sv.hue.api;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class ManualOverrideTrackerImpl implements ManualOverrideTracker {
 
     private static final TrackedState DEFAULT_STATE = new TrackedState();
 
-    private final HashMap<String, TrackedState> trackedStatesPerId;
+    private final ConcurrentHashMap<String, TrackedState> trackedStatesPerId;
 
     public ManualOverrideTrackerImpl() {
-        trackedStatesPerId = new HashMap<>();
+        trackedStatesPerId = new ConcurrentHashMap<>();
     }
 
     @Override
