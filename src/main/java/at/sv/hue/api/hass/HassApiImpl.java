@@ -153,12 +153,12 @@ public class HassApiImpl implements HueApi {
         }
 
         List<String> groupLights = new ArrayList<>();
-        if (isHueGroup(state)) {
+        if (isHassGroup(state)) {
+            groupLights.addAll(state.attributes.entity_id);
+        } else {
             groupLights.addAll(state.attributes.lights.stream()
                                                       .map(this::getNonGroupLightId)
                                                       .toList());
-        } else {
-            groupLights.addAll(state.attributes.entity_id);
         }
 
         if (groupLights.isEmpty()) {
@@ -419,10 +419,10 @@ public class HassApiImpl implements HueApi {
     }
 
     private boolean containsLightIdOrName(State state, String lightId, String lightName) {
-        if (isHueGroup(state)) {
-            return state.attributes.lights.contains(lightName);
-        } else { // isHassGroup
+        if (isHassGroup(state)) {
             return state.attributes.entity_id.contains(lightId);
+        } else { // old Hue group
+            return state.attributes.lights.contains(lightName);
         }
     }
 

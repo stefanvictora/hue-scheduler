@@ -1223,6 +1223,69 @@ public class HassApiTest {
     }
 
     @Test
+    void getGroupLights_newHueGroupsWithEntityId() {
+        setGetResponse("/states", """
+                [
+                    {
+                        "entity_id": "light.bad",
+                        "state": "off",
+                        "attributes": {
+                            "min_color_temp_kelvin": 2000,
+                            "max_color_temp_kelvin": 6535,
+                            "min_mireds": 153,
+                            "max_mireds": 500,
+                            "supported_color_modes": [
+                                "color_temp",
+                                "xy"
+                            ],
+                            "color_mode": null,
+                            "brightness": null,
+                            "color_temp_kelvin": null,
+                            "color_temp": null,
+                            "hs_color": null,
+                            "rgb_color": null,
+                            "xy_color": null,
+                            "is_hue_group": true,
+                            "hue_scenes": [
+                                "Hell",
+                                "HueScheduler",
+                                "Gedimmt",
+                                "Abend"
+                            ],
+                            "hue_type": "room",
+                            "lights": [
+                                "Bad Oben",
+                                "Bad Tür",
+                                "Bad Therme neu"
+                            ],
+                            "entity_id": [
+                                "light.bad_therme_neu",
+                                "light.bad_oben",
+                                "light.bad_tur"
+                            ],
+                            "dynamics": false,
+                            "icon": "mdi:lightbulb-group",
+                            "friendly_name": "Bad",
+                            "supported_features": 40
+                        },
+                        "last_changed": "2025-02-08T10:46:13.048207+00:00",
+                        "last_reported": "2025-02-08T10:46:13.048207+00:00",
+                        "last_updated": "2025-02-08T10:46:13.048207+00:00",
+                        "context": {
+                            "id": "01JKJJNH9RNH9HBDYGZMYGM7VY",
+                            "parent_id": null,
+                            "user_id": null
+                        }
+                    }
+                ]
+                """);
+
+        assertThat(api.getGroupLights("light.bad")).containsExactlyInAnyOrder("light.bad_therme_neu",
+            "light.bad_oben", "light.bad_tur"
+        );
+    }
+
+    @Test
     void getGroupLights_notAGroup_exception() {
         setGetResponse("/states", """
                 [
@@ -1711,6 +1774,58 @@ public class HassApiTest {
                       }
                     },
                     {
+                      "entity_id": "light.couch_group3",
+                      "state": "on",
+                      "attributes": {
+                        "supported_color_modes": [
+                          "xy"
+                        ],
+                        "color_mode": "xy",
+                        "brightness": 255,
+                        "hs_color": [
+                          12.464,
+                          81.176
+                        ],
+                        "rgb_color": [
+                          255,
+                          91,
+                          48
+                        ],
+                        "xy_color": [
+                          0.6408,
+                          0.3284
+                        ],
+                        "is_hue_group": true,
+                        "hue_scenes": [
+                          "Gedimmt",
+                          "Nachtlicht",
+                          "Hell",
+                          "Frühlingsblüten",
+                          "Sonnenuntergang Savanne",
+                          "Tropendämmerung",
+                          "Nordlichter"
+                        ],
+                        "hue_type": "zone",
+                        "lights": [
+                          "Couch Light"
+                        ],
+                        "entity_id": [
+                          "light.couch_light"
+                        ],
+                        "dynamics": false,
+                        "icon": "mdi:lightbulb-group",
+                        "friendly_name": "Couch",
+                        "supported_features": 40
+                      },
+                      "last_changed": "2023-09-24T14:06:34.783862+00:00",
+                      "last_updated": "2023-09-24T14:06:34.783862+00:00",
+                      "context": {
+                        "id": "123456789",
+                        "parent_id": null,
+                        "user_id": null
+                      }
+                    },
+                    {
                       "entity_id": "light.another_group",
                       "state": "on",
                       "attributes": {
@@ -1841,7 +1956,7 @@ public class HassApiTest {
                 """);
 
         assertThat(api.getAssignedGroups("light.couch_light")).containsExactlyInAnyOrder("light.couch_group",
-                "light.couch_group2");
+                "light.couch_group2", "light.couch_group3");
         assertThat(api.getAssignedGroups("light.another_light")).containsExactlyInAnyOrder("light.another_group");
     }
 
@@ -1972,7 +2087,7 @@ public class HassApiTest {
                     }
                   ]
                 """);
-        
+
         assertThat(api.getAffectedIdsByDevice("light.couch_light")).containsExactlyInAnyOrder("light.couch_light",
                 "light.couch_group", "light.couch_group2");
     }
