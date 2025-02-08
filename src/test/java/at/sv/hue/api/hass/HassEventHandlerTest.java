@@ -1177,6 +1177,172 @@ class HassEventHandlerTest {
     }
 
     @Test
+    void onMessage_haScene_stateChanged_eventTriggered() {
+        handler.onMessage("""
+                {
+                  "type" : "event",
+                  "event" : {
+                    "event_type" : "state_changed",
+                    "data" : {
+                      "entity_id" : "scene.huescheduler_bad",
+                      "old_state" : {
+                        "entity_id" : "scene.huescheduler_bad",
+                        "state" : "2025-02-08T18:58:41.810800+00:00",
+                        "attributes" : {
+                          "entity_id" : [ "light.bad_tur", "light.bad_therme_neu", "light.bad_oben" ],
+                          "friendly_name" : "huescheduler_bad"
+                        },
+                        "last_changed" : "2025-02-08T19:13:36.495651+00:00",
+                        "last_reported" : "2025-02-08T19:13:36.495651+00:00",
+                        "last_updated" : "2025-02-08T19:13:36.495651+00:00",
+                        "context" : {
+                          "id" : "01JKKFPK7FX2QYV1M8XVZC9BQD",
+                          "parent_id" : null,
+                          "user_id" : null
+                        }
+                      },
+                      "new_state" : {
+                        "entity_id" : "scene.huescheduler_bad",
+                        "state" : "2025-02-08T19:14:25.879647+00:00",
+                        "attributes" : {
+                          "entity_id" : [ "light.bad_tur", "light.bad_therme_neu", "light.bad_oben" ],
+                          "friendly_name" : "huescheduler_bad"
+                        },
+                        "last_changed" : "2025-02-08T19:14:25.879907+00:00",
+                        "last_reported" : "2025-02-08T19:14:25.879907+00:00",
+                        "last_updated" : "2025-02-08T19:14:25.879907+00:00",
+                        "context" : {
+                          "id" : "01JKKFR3EJS8CS87BVTPCDJMWX",
+                          "parent_id" : "01JKKFR3DBQDFT2GPA330J85XF",
+                          "user_id" : null
+                        }
+                      }
+                    },
+                    "origin" : "LOCAL",
+                    "time_fired" : "2025-02-08T19:14:25.879907+00:00",
+                    "context" : {
+                      "id" : "01JKKFR3EJS8CS87BVTPCDJMWX",
+                      "parent_id" : "01JKKFR3DBQDFT2GPA330J85XF",
+                      "user_id" : null
+                    }
+                  },
+                  "id" : 2
+                }
+                """);
+
+        verify(sceneEventListener).onSceneActivated("scene.huescheduler_bad");
+    }
+
+    @Test
+    void onMessage_hueScene_unknown_noEventTriggered() {
+        handler.onMessage("""
+                {
+                  "type" : "event",
+                  "event" : {
+                    "event_type" : "state_changed",
+                    "data" : {
+                      "entity_id" : "scene.zuhause_huescheduler_2",
+                      "old_state" : {
+                        "entity_id" : "scene.zuhause_huescheduler_2",
+                        "state" : "unknown",
+                        "attributes" : {
+                          "group_name" : "Zuhause",
+                          "group_type" : "zone",
+                          "name" : "HueScheduler",
+                          "speed" : 0.5,
+                          "brightness" : 72,
+                          "is_dynamic" : false,
+                          "friendly_name" : "Zuhause HueScheduler"
+                        },
+                        "last_changed" : "2025-02-08T18:13:18.249177+00:00",
+                        "last_reported" : "2025-02-08T19:02:45.106506+00:00",
+                        "last_updated" : "2025-02-08T19:02:45.106506+00:00",
+                        "context" : {
+                          "id" : "01JKKF2Q3JXRE6CKTEE67MGS59",
+                          "parent_id" : null,
+                          "user_id" : null
+                        }
+                      },
+                      "new_state" : {
+                        "entity_id" : "scene.zuhause_huescheduler_2",
+                        "state" : "unknown",
+                        "attributes" : {
+                          "group_name" : "Zuhause",
+                          "group_type" : "zone",
+                          "name" : "HueScheduler",
+                          "speed" : 0.5,
+                          "brightness" : 71,
+                          "is_dynamic" : false,
+                          "friendly_name" : "Zuhause HueScheduler"
+                        },
+                        "last_changed" : "2025-02-08T18:13:18.249177+00:00",
+                        "last_reported" : "2025-02-08T19:04:52.501765+00:00",
+                        "last_updated" : "2025-02-08T19:04:52.501765+00:00",
+                        "context" : {
+                          "id" : "01JKKF6KGN0VR41G3A08DW44RQ",
+                          "parent_id" : null,
+                          "user_id" : null
+                        }
+                      }
+                    },
+                    "origin" : "LOCAL",
+                    "time_fired" : "2025-02-08T19:04:52.501765+00:00",
+                    "context" : {
+                      "id" : "01JKKF6KGN0VR41G3A08DW44RQ",
+                      "parent_id" : null,
+                      "user_id" : null
+                    }
+                  },
+                  "id" : 1
+                }
+                """);
+
+        verifyNoEvents();
+    }
+
+    @Test
+    void onMessage_haScene_update_noEventTriggered() {
+        handler.onMessage("""
+                {
+                  "type" : "event",
+                  "event" : {
+                    "event_type" : "state_changed",
+                    "data" : {
+                      "entity_id" : "scene.huescheduler_bad",
+                      "old_state" : null,
+                      "new_state" : {
+                        "entity_id" : "scene.huescheduler_bad",
+                        "state" : "2025-02-08T18:58:41.810800+00:00",
+                        "attributes" : {
+                          "entity_id" : [ "light.bad_tur", "light.bad_therme_neu", "light.bad_oben" ],
+                          "friendly_name" : "huescheduler_bad"
+                        },
+                        "last_changed" : "2025-02-08T19:11:28.950183+00:00",
+                        "last_reported" : "2025-02-08T19:11:28.950183+00:00",
+                        "last_updated" : "2025-02-08T19:11:28.950183+00:00",
+                        "context" : {
+                          "id" : "01JKKFJPNP013F9BTVBGP4WW02",
+                          "parent_id" : null,
+                          "user_id" : null
+                        }
+                      }
+                    },
+                    "origin" : "LOCAL",
+                    "time_fired" : "2025-02-08T19:11:28.950183+00:00",
+                    "context" : {
+                      "id" : "01JKKFJPNP013F9BTVBGP4WW02",
+                      "parent_id" : null,
+                      "user_id" : null
+                    }
+                  },
+                  "id" : 1
+                }
+                """);
+
+        verifyNoEvents();
+    }
+
+    @Test
     void onMesssage_haScene_unavailable_noEventTriggered() {
         handler.onMessage("""
                 {
@@ -1234,6 +1400,172 @@ class HassEventHandlerTest {
                         }
                     },
                     "id": 30
+                }
+                """);
+
+        verifyNoEvents();
+    }
+
+    @Test
+    void onMessage_automation_oldUnavailable_noEvent() {
+        handler.onMessage("""
+                {
+                  "type" : "event",
+                  "event" : {
+                    "event_type" : "state_changed",
+                    "data" : {
+                      "entity_id" : "automation.test_automation",
+                      "old_state" : {
+                        "entity_id" : "automation.test_automation",
+                        "state" : "unavailable",
+                        "attributes" : {
+                          "restored" : true,
+                          "id" : "1739038096466",
+                          "friendly_name" : "Test Automation",
+                          "supported_features" : 0
+                        },
+                        "last_changed" : "2025-02-08T18:49:03.181666+00:00",
+                        "last_reported" : "2025-02-08T18:49:03.181666+00:00",
+                        "last_updated" : "2025-02-08T18:49:03.181666+00:00",
+                        "context" : {
+                          "id" : "01JKKE9MEDSH5FKH47MARXJSCB",
+                          "parent_id" : null,
+                          "user_id" : null
+                        }
+                      },
+                      "new_state" : {
+                        "entity_id" : "automation.test_automation",
+                        "state" : "on",
+                        "attributes" : {
+                          "id" : "1739038096466",
+                          "last_triggered" : "2025-02-08T18:48:51.669559+00:00",
+                          "mode" : "single",
+                          "current" : 0,
+                          "friendly_name" : "Test Automation"
+                        },
+                        "last_changed" : "2025-02-08T18:49:03.186185+00:00",
+                        "last_reported" : "2025-02-08T18:49:03.186185+00:00",
+                        "last_updated" : "2025-02-08T18:49:03.186185+00:00",
+                        "context" : {
+                          "id" : "01JKKE9MEJP5JYKS8MADHZ9DZC",
+                          "parent_id" : null,
+                          "user_id" : null
+                        }
+                      }
+                    },
+                    "origin" : "LOCAL",
+                    "time_fired" : "2025-02-08T18:49:03.186185+00:00",
+                    "context" : {
+                      "id" : "01JKKE9MEJP5JYKS8MADHZ9DZC",
+                      "parent_id" : null,
+                      "user_id" : null
+                    }
+                  },
+                  "id" : 2
+                }
+                """);
+
+        verifyNoEvents();
+    }
+
+    @Test
+    void onMessage_automation_oldOff_noEvent() {
+        handler.onMessage("""
+                {
+                  "type" : "event",
+                  "event" : {
+                    "event_type" : "state_changed",
+                    "data" : {
+                      "entity_id" : "automation.test_automation",
+                      "old_state" : {
+                        "entity_id" : "automation.test_automation",
+                        "state" : "off",
+                        "attributes" : {
+                          "restored" : true,
+                          "id" : "1739038096466",
+                          "friendly_name" : "Test Automation",
+                          "supported_features" : 0
+                        },
+                        "last_changed" : "2025-02-08T18:49:03.181666+00:00",
+                        "last_reported" : "2025-02-08T18:49:03.181666+00:00",
+                        "last_updated" : "2025-02-08T18:49:03.181666+00:00",
+                        "context" : {
+                          "id" : "01JKKE9MEDSH5FKH47MARXJSCB",
+                          "parent_id" : null,
+                          "user_id" : null
+                        }
+                      },
+                      "new_state" : {
+                        "entity_id" : "automation.test_automation",
+                        "state" : "on",
+                        "attributes" : {
+                          "id" : "1739038096466",
+                          "last_triggered" : "2025-02-08T18:48:51.669559+00:00",
+                          "mode" : "single",
+                          "current" : 0,
+                          "friendly_name" : "Test Automation"
+                        },
+                        "last_changed" : "2025-02-08T18:49:03.186185+00:00",
+                        "last_reported" : "2025-02-08T18:49:03.186185+00:00",
+                        "last_updated" : "2025-02-08T18:49:03.186185+00:00",
+                        "context" : {
+                          "id" : "01JKKE9MEJP5JYKS8MADHZ9DZC",
+                          "parent_id" : null,
+                          "user_id" : null
+                        }
+                      }
+                    },
+                    "origin" : "LOCAL",
+                    "time_fired" : "2025-02-08T18:49:03.186185+00:00",
+                    "context" : {
+                      "id" : "01JKKE9MEJP5JYKS8MADHZ9DZC",
+                      "parent_id" : null,
+                      "user_id" : null
+                    }
+                  },
+                  "id" : 2
+                }
+                """);
+
+        verifyNoEvents();
+    }
+
+    @Test
+    void onMessage_noNewState_noEvent() {
+        handler.onMessage("""
+                {
+                  "type" : "event",
+                  "event" : {
+                    "event_type" : "state_changed",
+                    "data" : {
+                      "entity_id" : "scene.huescheduler_bad",
+                      "old_state" : {
+                        "entity_id" : "scene.huescheduler_bad",
+                        "state" : "2025-02-08T18:48:51.672912+00:00",
+                        "attributes" : {
+                          "entity_id" : [ "light.bad_tur", "light.bad_therme_neu", "light.bad_oben" ],
+                          "friendly_name" : "huescheduler_bad"
+                        },
+                        "last_changed" : "2025-02-08T18:48:51.673151+00:00",
+                        "last_reported" : "2025-02-08T18:48:51.673151+00:00",
+                        "last_updated" : "2025-02-08T18:48:51.673151+00:00",
+                        "context" : {
+                          "id" : "01JKKE996MSAD4V9NWHRVTQ88P",
+                          "parent_id" : "01JKKE996KCV043A4N7SZTY34E",
+                          "user_id" : null
+                        }
+                      },
+                      "new_state" : null
+                    },
+                    "origin" : "LOCAL",
+                    "time_fired" : "2025-02-08T18:54:03.576897+00:00",
+                    "context" : {
+                      "id" : "01JKKE996MSAD4V9NWHRVTQ88P",
+                      "parent_id" : "01JKKE996KCV043A4N7SZTY34E",
+                      "user_id" : null
+                    }
+                  },
+                  "id" : 1
                 }
                 """);
 

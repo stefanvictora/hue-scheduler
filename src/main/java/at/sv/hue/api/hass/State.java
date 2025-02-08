@@ -20,6 +20,10 @@ final class State {
         return "unavailable".equals(state);
     }
 
+    boolean isUnknown() {
+        return "unknown".equals(state);
+    }
+
     public boolean isScene() {
         return entity_id.startsWith("scene.");
     }
