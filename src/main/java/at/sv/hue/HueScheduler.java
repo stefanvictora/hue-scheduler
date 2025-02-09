@@ -18,6 +18,9 @@ import at.sv.hue.api.hass.HassApiImpl;
 import at.sv.hue.api.hass.HassApiUtils;
 import at.sv.hue.api.hass.HassEventHandler;
 import at.sv.hue.api.hass.HassEventStreamReader;
+import at.sv.hue.api.hass.area.HassAreaRegistry;
+import at.sv.hue.api.hass.area.HassAreaRegistryImpl;
+import at.sv.hue.api.hass.area.HassWebSocketClientImpl;
 import at.sv.hue.api.hue.HueApiImpl;
 import at.sv.hue.api.hue.HueEventHandler;
 import at.sv.hue.api.hue.HueEventStreamReader;
@@ -198,8 +201,8 @@ public final class HueScheduler implements Runnable {
         this.api = api;
         ZonedDateTime initialTime = currentTime.get();
         this.sceneEventListener = new SceneEventListenerImpl(api,
-                sceneSyncName, () -> Duration.between(initialTime, currentTime.get()).toNanos(),
-                sceneActivationIgnoreWindowInSeconds, lightEventListener);
+                () -> Duration.between(initialTime, currentTime.get()).toNanos(),
+                sceneActivationIgnoreWindowInSeconds, sceneSyncName::equals, lightEventListener);
         this.stateScheduler = stateScheduler;
         this.startTimeProvider = startTimeProvider;
         this.currentTime = currentTime;
@@ -260,10 +263,14 @@ public final class HueScheduler implements Runnable {
                 })
                 .build();
         RateLimiter rateLimiter = RateLimiter.create(requestsPerSecond);
-        api = new HassApiImpl(apiHost, new HttpResourceProviderImpl(httpClient), rateLimiter);
-        sceneEventListener = new SceneEventListenerImpl(api, sceneSyncName, Ticker.systemTicker(),
-                sceneActivationIgnoreWindowInSeconds, lightEventListener);
-        new HassEventStreamReader(HassApiUtils.getHassWebsocketOrigin(apiHost), accessToken, httpClient,
+        String websocketOrigin = HassApiUtils.getHassWebsocketOrigin(apiHost);
+        HassAreaRegistry areaRegistry = new HassAreaRegistryImpl(
+                new HassWebSocketClientImpl(websocketOrigin, accessToken, httpClient, 5));
+        api = new HassApiImpl(apiHost, new HttpResourceProviderImpl(httpClient), areaRegistry, rateLimiter);
+        sceneEventListener = new SceneEventListenerImpl(api, Ticker.systemTicker(),
+                sceneActivationIgnoreWindowInSeconds,
+                sceneName -> HassApiUtils.matchesSceneSyncName(sceneName, sceneSyncName), lightEventListener);
+        new HassEventStreamReader(websocketOrigin, accessToken, httpClient,
                 new HassEventHandler(lightEventListener, sceneEventListener)).start();
         stateRegistry = new ScheduledStateRegistry(currentTime, api);
     }
@@ -272,8 +279,8 @@ public final class HueScheduler implements Runnable {
         OkHttpClient httpsClient = createHueHttpsClient();
         RateLimiter rateLimiter = RateLimiter.create(requestsPerSecond);
         api = new HueApiImpl(new HttpResourceProviderImpl(httpsClient), apiHost, rateLimiter, apiCacheInvalidationIntervalInMinutes);
-        sceneEventListener = new SceneEventListenerImpl(api, sceneSyncName, Ticker.systemTicker(),
-                sceneActivationIgnoreWindowInSeconds, lightEventListener);
+        sceneEventListener = new SceneEventListenerImpl(api, Ticker.systemTicker(),
+                sceneActivationIgnoreWindowInSeconds, sceneSyncName::equals, lightEventListener);
         new HueEventStreamReader(apiHost, accessToken, httpsClient, new HueEventHandler(lightEventListener, sceneEventListener, api),
                 eventStreamReadTimeoutInMinutes).start();
         stateRegistry = new ScheduledStateRegistry(currentTime, api);

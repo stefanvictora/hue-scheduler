@@ -2,9 +2,22 @@ package at.sv.hue.api.hass;
 
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Locale;
 
 public final class HassApiUtils {
     private HassApiUtils() {
+    }
+
+    public static String getNormalizedSceneSyncName(String sceneName) {
+        return normalize(sceneName);
+    }
+
+    public static boolean matchesSceneSyncName(String sceneName, String syncName) {
+        return sceneName.contains(normalize(syncName) + "_");
+    }
+
+    private static String normalize(String s) {
+        return s.toLowerCase(Locale.ROOT).replaceAll("\\W", "_");
     }
 
     /**

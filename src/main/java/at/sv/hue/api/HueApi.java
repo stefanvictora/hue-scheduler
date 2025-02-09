@@ -98,6 +98,13 @@ public interface HueApi extends ResourceModificationEventListener {
     List<String> getAssignedGroups(String lightId);
 
     /**
+     * Used for scene sync to determine which areas to additionally consider
+     *
+     * @return a list of additional areas and their contained lights
+     */
+    List<GroupInfo> getAdditionalAreas(List<String> lightIds);
+
+    /**
      * @return the light capabilities. Not null.
      * @throws LightNotFoundException if no light with given id was found
      * @throws ApiFailure             if the api call failed

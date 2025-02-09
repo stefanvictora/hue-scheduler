@@ -3,6 +3,7 @@ package at.sv.hue.api.hass;
 import at.sv.hue.ColorMode;
 import at.sv.hue.api.Capability;
 import at.sv.hue.api.EmptyGroupException;
+import at.sv.hue.api.GroupInfo;
 import at.sv.hue.api.GroupNotFoundException;
 import at.sv.hue.api.HttpResourceProvider;
 import at.sv.hue.api.Identifier;
@@ -10,6 +11,7 @@ import at.sv.hue.api.LightCapabilities;
 import at.sv.hue.api.LightNotFoundException;
 import at.sv.hue.api.LightState;
 import at.sv.hue.api.PutCall;
+import at.sv.hue.api.hass.area.HassAreaRegistry;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,6 +26,8 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -31,12 +35,16 @@ public class HassApiTest {
 
     private HassApiImpl api;
     private HttpResourceProvider http;
+    private HassAreaRegistry areaRegistry;
     private String baseUrl;
+    private URL sceneSyncUrl;
 
     @BeforeEach
     void setUp() {
         http = Mockito.mock(HttpResourceProvider.class);
+        areaRegistry = Mockito.mock(HassAreaRegistry.class);
         setupApi("http://localhost:8123");
+        sceneSyncUrl = getUrl("/services/scene/create");
     }
 
     @Test
@@ -1281,7 +1289,7 @@ public class HassApiTest {
                 """);
 
         assertThat(api.getGroupLights("light.bad")).containsExactlyInAnyOrder("light.bad_therme_neu",
-            "light.bad_oben", "light.bad_tur"
+                "light.bad_oben", "light.bad_tur"
         );
     }
 
@@ -1961,6 +1969,96 @@ public class HassApiTest {
     }
 
     @Test
+    void getAdditionalAreas_returnsDistinctAreasList_ignoresNull() {
+        GroupInfo kitchenArea = new GroupInfo("kitchen", List.of("light.kitchen_1", "light.kitchen_2", "light.kitchen_3"));
+        mockAreaForEntity("light.kitchen_1", kitchenArea);
+        mockAreaForEntity("light.kitchen_2", kitchenArea);
+        mockAreaForEntity("light.living_room", null);
+
+        List<GroupInfo> areas = api.getAdditionalAreas(List.of("light.kitchen_1", "light.kitchen_2",
+                "light.living_room", "light.unknown"));
+
+        assertThat(areas).containsExactlyInAnyOrder(kitchenArea);
+    }
+
+    @Test
+    void createOrUpdateScene_withMultipleLights_createsSceneWithAllLights_implicitlySetsOn() {
+        String groupId = "kitchen";
+        String sceneName = "HueScheduler";
+        List<PutCall> putCalls = List.of(
+                PutCall.builder()
+                       .id("light.kitchen_main")
+                       .bri(255)
+                       .ct(100)
+                       .build(),
+                PutCall.builder()
+                       .id("light.kitchen_table")
+                       .on(true)
+                       .bri(100)
+                       .x(0.497)
+                       .y(0.384)
+                       .build(),
+                PutCall.builder()
+                       .id("light.kitchen_counter")
+                       .on(false)
+                       .build()
+        );
+
+        createOrUpdateScene(groupId, sceneName, putCalls);
+
+        verify(http).postResource(sceneSyncUrl, removeSpaces("""
+                {
+                  "scene_id" : "huescheduler_kitchen",
+                  "entities" : {
+                    "light.kitchen_counter" : {
+                      "state" : "off"
+                    },
+                    "light.kitchen_table" : {
+                      "state" : "on",
+                      "brightness" : 100,
+                      "xy_color" : [ 0.497, 0.384 ]
+                    },
+                    "light.kitchen_main" : {
+                      "state" : "on",
+                      "brightness" : 256,
+                      "color_temp" : 100
+                    }
+                  }
+                }""")
+        );
+    }
+
+    @Test
+    void createOrUpdateScene_withEmptyPutCalls_createsSceneWithNoStates() {
+        String groupId = "bedroom";
+        String sceneName = "night";
+        List<PutCall> putCalls = List.of();
+
+        createOrUpdateScene(groupId, sceneName, putCalls);
+
+        verify(http).postResource(eq(sceneSyncUrl), argThat(body ->
+                body.contains("\"scene_id\":\"night_bedroom\"") &&
+                body.contains("\"entities\":{}}")
+        ));
+    }
+
+    @Test
+    void createOrUpdateScene_withSpecialCharactersInName_normalizesSceneId() {
+        String groupId = "living-room";
+        String sceneName = "Movie Time!";
+        PutCall putCall = PutCall.builder()
+                                 .id("light.living_room_main")
+                                 .on(true)
+                                 .build();
+
+        createOrUpdateScene(groupId, sceneName, List.of(putCall));
+
+        verify(http).postResource(eq(sceneSyncUrl), argThat(body ->
+                body.contains("\"scene_id\":\"movie_time__living_room\"")
+        ));
+    }
+
+    @Test
     void getAffectedIdsByDevice_returnsGivenId_andContainedGroups() {
         setGetResponse("/states", """
                 [
@@ -2537,7 +2635,7 @@ public class HassApiTest {
     }
 
     private void setupApi(String origin) {
-        api = new HassApiImpl(origin, http, permits -> {
+        api = new HassApiImpl(origin, http, areaRegistry, permits -> {
         });
         baseUrl = origin + "/api";
     }
@@ -2560,5 +2658,17 @@ public class HassApiTest {
 
     private LightState getLightState(String id) {
         return api.getLightState(id);
+    }
+
+    private void mockAreaForEntity(String entityId, GroupInfo kitchenArea) {
+        when(areaRegistry.lookupAreaForEntity(entityId)).thenReturn(kitchenArea);
+    }
+
+    private void createOrUpdateScene(String groupId, String sceneName, List<PutCall> putCalls) {
+        api.createOrUpdateScene(groupId, sceneName, putCalls);
+    }
+
+    private static String removeSpaces(@Language("JSON") String expectedBody) {
+        return expectedBody.replaceAll("\\s+|\\n", "");
     }
 }

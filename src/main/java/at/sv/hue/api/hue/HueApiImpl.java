@@ -4,6 +4,7 @@ import at.sv.hue.ColorMode;
 import at.sv.hue.api.ApiFailure;
 import at.sv.hue.api.Capability;
 import at.sv.hue.api.EmptyGroupException;
+import at.sv.hue.api.GroupInfo;
 import at.sv.hue.api.GroupNotFoundException;
 import at.sv.hue.api.HttpResourceProvider;
 import at.sv.hue.api.HueApi;
@@ -258,6 +259,11 @@ public final class HueApiImpl implements HueApi {
                                    .filter(group -> getContainedLightIds(group).contains(lightId))
                                    .map(Group::getGroupedLightId)
                                    .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<GroupInfo> getAdditionalAreas(List<String> lightIds) {
+        return List.of();
     }
 
     @Override

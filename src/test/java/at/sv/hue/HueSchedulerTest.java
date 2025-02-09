@@ -3,6 +3,7 @@ package at.sv.hue;
 import at.sv.hue.api.ApiFailure;
 import at.sv.hue.api.BridgeConnectionFailure;
 import at.sv.hue.api.Capability;
+import at.sv.hue.api.GroupInfo;
 import at.sv.hue.api.GroupNotFoundException;
 import at.sv.hue.api.HueApi;
 import at.sv.hue.api.Identifier;
@@ -7024,6 +7025,34 @@ class HueSchedulerTest {
 
         ensureScheduledStates(
                 expectedRunnable(now.plusHours(19), now.plusDays(1).plusHours(9)) // next day
+        );
+    }
+
+    @Test
+    void sceneSync_withAdditionalAreas_considersThem() {
+        enableSceneSync();
+
+        addKnownLightIdsWithDefaultCapabilities(1);
+        mockGroupLightsForId(5, 1);
+        when(mockedHueApi.getAdditionalAreas(List.of("/lights/1")))
+                .thenReturn(List.of(new GroupInfo("/groups/7", List.of("/lights/1", "/lights/3"))));
+        addState(1, "00:00", "bri:100");
+        addState(1, "12:00", "bri:200");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusHours(12)),
+                expectedRunnable(now.plusHours(12), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.getFirst(),
+                expectedPutCall(1).bri(100)
+        );
+
+        assertSceneUpdate("/groups/5", expectedPutCall(1).bri(100));
+        assertSceneUpdate("/groups/7", expectedPutCall(1).bri(100));
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(1).plusHours(12)) // next day
         );
     }
 

@@ -7,6 +7,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 class HassApiUtilsTest {
 
     @Test
+    void matchesSceneSyncName() {
+        assertThat(HassApiUtils.matchesSceneSyncName("huescheduler_", "HueScheduler")).isTrue();
+        assertThat(HassApiUtils.matchesSceneSyncName("huescheduler", "HueScheduler")).isFalse();
+        assertThat(HassApiUtils.matchesSceneSyncName("something_else", "HueScheduler")).isFalse();
+        assertThat(HassApiUtils.matchesSceneSyncName("_test__", "!Test!")).isTrue();
+    }
+
+    @Test
     void isHassConnection_null_false() {
         assertNoHassConnection(null);
     }
