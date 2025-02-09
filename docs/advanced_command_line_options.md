@@ -22,7 +22,6 @@ Flag to globally disable tracking of user modifications of lights. Per default H
 *New in 0.12.0*
 
 Enables the creation of Hue scenes that always match the state of a scheduled room or zone.
-Currently only available when connected to a Hue bridge.
 
 **Default**: false
 

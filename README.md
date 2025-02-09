@@ -10,7 +10,7 @@
 
 ## Introduction
 
-**New in Version 0.12.0**: **Sync schedules to scenes**, enabling your lights to turn on in the desired state instantly (opt-in via ``--enable-scene-sync``; Hue Bridge required).
+**New in Version 0.12.0**: **Sync schedules to scenes**, enabling your lights to turn on in the desired state instantly (opt-in via ``--enable-scene-sync``).
 
 Hue Scheduler goes beyond tools like Adaptive Lighting by providing extended control over brightness, color temperature, color, power state, and custom interpolations between solar and absolute times. Specifically designed to work with dumb wall switches, it adjusts light states as soon as they're reachable, ensuring consistent results even when lights have been physically turned off.
 
@@ -234,7 +234,7 @@ docker run --rm -e "log.level=TRACE" --name hue-scheduler ...
 ## License
 
 ```
-Copyright 2021-2024 Stefan Victora
+Copyright 2021-2025 Stefan Victora
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

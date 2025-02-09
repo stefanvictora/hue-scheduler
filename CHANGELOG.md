@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.12.4] - 2025-02-xx
+
+### Added
+- **Scene Sync Support for Home Assistant**: Implemented scene synchronization capabilities for Home Assistant integration.
+  - Enable via `--enable-scene-sync` command line flag
+  - Scenes follow the naming pattern: `scene.huescheduler_<group_or_area_name>`. Customize via `--scene-sync-name` (default: `HueScheduler`)
+  - Supports HA automations with smart switches and motion sensors for direct light state control
+  - **Known Home Assistant Limitations**:
+    - Scenes are temporary and require recreation after Home Assistant restarts (handled automatically, may require a Hue Scheduler restart to immediately recreate them)
+    - Dynamic scenes cannot be assigned to areas or given custom names beyond their entity ID
+
+
 ## [0.12.3] - 2024-12-31
 
 ### Fixed
