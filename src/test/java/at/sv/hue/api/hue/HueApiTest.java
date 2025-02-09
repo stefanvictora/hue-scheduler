@@ -3208,6 +3208,43 @@ class HueApiTest {
                     }
                   ]
                 }""");
+
+        // special case for providing effect -> remove any color attribute
+        createOrUpdateScene("GROUPED_LIGHT_2", "Scene_3",
+                PutCall.builder().id("LIGHT_1").effect("opal").x(0.123).y(0.456),
+                PutCall.builder().id("LIGHT_2_1")
+        );
+
+        verifyPut("/scene/SCENE_3", """
+                {
+                  "actions": [
+                    {
+                      "target": {
+                        "rid": "LIGHT_1",
+                        "rtype": "light"
+                      },
+                      "action": {
+                        "on": {
+                          "on": true
+                        },
+                        "effects": {
+                          "effect": "opal"
+                        }
+                      }
+                    },
+                    {
+                      "target": {
+                        "rid": "LIGHT_2_1",
+                        "rtype": "light"
+                      },
+                      "action": {
+                        "on": {
+                          "on": true
+                        }
+                      }
+                    }
+                  ]
+                }""");
     }
 
     @Test

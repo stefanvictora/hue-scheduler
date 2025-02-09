@@ -21,11 +21,7 @@ public final class LightState {
     private final boolean on;
     @Builder.Default
     private final LightCapabilities lightCapabilities = LightCapabilities.builder().build();
-
-    public boolean isColorLoopEffect() {
-        return "colorloop".equals(getEffect());
-    }
-
+    
     public boolean isColorSupported() {
         return getCapabilities().contains(Capability.COLOR);
     }
