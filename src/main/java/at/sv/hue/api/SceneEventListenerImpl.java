@@ -19,6 +19,7 @@ public final class SceneEventListenerImpl implements SceneEventListener {
     private final Predicate<String> matchesSyncedSceneName;
     private final LightEventListener lightEventListener;
     private final Cache<String, String> recentlyAffectedIds;
+    private final Cache<String, String> recentlyAffectedSyncedIds;
 
     public SceneEventListenerImpl(HueApi hueApi, Ticker ticker, int ignoreWindowInSeconds,
                                   Predicate<String> matchesSyncedSceneName,
@@ -30,6 +31,10 @@ public final class SceneEventListenerImpl implements SceneEventListener {
                                       .ticker(ticker)
                                       .expireAfterWrite(Duration.ofSeconds(ignoreWindowInSeconds))
                                       .build();
+        recentlyAffectedSyncedIds = Caffeine.newBuilder()
+                                            .ticker(ticker)
+                                            .expireAfterWrite(Duration.ofSeconds(ignoreWindowInSeconds))
+                                            .build();
     }
 
     @Override
@@ -40,6 +45,7 @@ public final class SceneEventListenerImpl implements SceneEventListener {
         List<String> affectedIdsByScene = getAffectedIdsByScene(id);
         if (matchesSyncedSceneName.test(sceneName)) {
             log.info("Synced scene activated. Re-engage scheduler.");
+            affectedIdsByScene.forEach(lightOrGroupId -> recentlyAffectedSyncedIds.put(lightOrGroupId, lightOrGroupId));
             affectedIdsByScene.forEach(lightEventListener::onLightOn);
             return;
         }
@@ -62,5 +68,10 @@ public final class SceneEventListenerImpl implements SceneEventListener {
     @Override
     public boolean wasRecentlyAffectedByAScene(String id) {
         return recentlyAffectedIds.getIfPresent(id) != null;
+    }
+
+    @Override
+    public boolean wasRecentlyAffectedBySyncedScene(String id) {
+        return recentlyAffectedSyncedIds.getIfPresent(id) != null;
     }
 }
