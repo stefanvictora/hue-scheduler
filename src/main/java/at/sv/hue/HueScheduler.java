@@ -439,20 +439,15 @@ public final class HueScheduler implements Runnable {
             try {
                 if (wasNotJustTurnedOn(snapshot) &&     // todo: wasJustTurnedOn is not working if we have gaps in the schedule
                     (lightHasBeenManuallyOverriddenBefore(snapshot) || lightIsOffAndDoesNotTurnOn(snapshot))) {
-                    if (shouldRetryOnPowerOn(snapshot)) {
-                        LOG.info("Off or manually overridden: Skip update and retry when back online");
-                        retryWhenBackOn(snapshot);
-                    } else {
-                        LOG.info("Off or manually overridden: Skip state for this day.");
-                        reschedule(snapshot);
-                    }
+                    LOG.info("Off or manually overridden: Skip update");
+                    createOnPowerOnCopyAndReschedule(snapshot);
                     return;
                 }
                 if (shouldTrackUserModification(snapshot) &&
                     (turnedOnThroughScene(snapshot) || stateHasBeenManuallyOverriddenSinceLastSeen(snapshot))) {
                     LOG.info("Manually overridden or scene turn-on: Pause updates until turned off and on again");
                     manualOverrideTracker.onManuallyOverridden(snapshot.getId());
-                    retryWhenBackOn(snapshot);
+                    createOnPowerOnCopyAndReschedule(snapshot);
                     return;
                 }
                 boolean performedInterpolation = putAdditionalInterpolatedStateIfNeeded(snapshot);
@@ -467,13 +462,25 @@ public final class HueScheduler implements Runnable {
             if (snapshot.isOff()) {
                 LOG.info("Turned off");
             }
-            if (shouldRetryOnPowerOn(snapshot)) {
-                ScheduledStateSnapshot powerOnCopy = createPowerOnCopy(snapshot);
-                LOG.trace("Created power-on runnable: {}", powerOnCopy);
-                retryWhenBackOn(powerOnCopy);
-            }
-            reschedule(snapshot);
+            createOnPowerOnCopyAndReschedule(snapshot);
         }, currentTime.get().plus(delayInMs + overlappingDelayInMs, ChronoUnit.MILLIS), snapshot.getEnd());
+    }
+
+    private void createOnPowerOnCopyAndReschedule(ScheduledStateSnapshot snapshot) {
+        if (snapshot.isRetryAfterPowerOnState()) {
+            retryWhenBackOn(snapshot);
+            return;
+        }
+        if (snapshot.isInsideSplitCallWindow(currentTime.get())) {
+            ScheduledStateSnapshot nextSplitSnapshot = createTemporaryFollowUpSplitState(snapshot);
+            schedule(nextSplitSnapshot, snapshot.getNextInterpolationSplitDelayInMs(currentTime.get()));
+        }
+        if (shouldRetryOnPowerOn(snapshot)) {
+            ScheduledStateSnapshot powerOnCopy = createPowerOnCopy(snapshot);
+            LOG.trace("Created power-on runnable: {}", powerOnCopy);
+            retryWhenBackOn(powerOnCopy);
+        }
+        reschedule(snapshot);
     }
 
     private long getPotentialOverlappingDelayInMs(ScheduledStateSnapshot snapshot) {
@@ -668,10 +675,6 @@ public final class HueScheduler implements Runnable {
                 return;
             }
             performPutApiCall(state, interpolatedSplitPutCall);
-            if (!state.isRetryAfterPowerOnState()) { // schedule follow-up split
-                ScheduledStateSnapshot nextSplitSnapshot = createTemporaryFollowUpSplitState(state);
-                schedule(nextSplitSnapshot, state.getNextInterpolationSplitDelayInMs(now));
-            }
         } else {
             putState(state, getPutCallWithAdjustedTr(state, now, performedInterpolation));
         }
