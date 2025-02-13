@@ -35,7 +35,7 @@ public class HassWebSocketClientImpl implements HassWebSocketClient {
     private final Map<Integer, CompletableFuture<String>> pendingRequests = new ConcurrentHashMap<>();
 
     private volatile WebSocket webSocket;
-    private CompletableFuture<Void> authFuture;
+    private volatile CompletableFuture<Void> authFuture;
 
     public HassWebSocketClientImpl(String origin, String accessToken, OkHttpClient client,
                                    int requestTimeoutSeconds) {
@@ -64,28 +64,33 @@ public class HassWebSocketClientImpl implements HassWebSocketClient {
         try {
             return mapper.writeValueAsString(command);
         } catch (JsonProcessingException e) {
-            throw new HassWebSocketException("Failed to serialized command", e);
+            throw new HassWebSocketException("Failed to serialize command", e);
         }
     }
 
     private String sendMessageAndWait(int id, String message) {
-        ensureConnected();
         CompletableFuture<String> future = new CompletableFuture<>();
         pendingRequests.put(id, future);
-        if (!webSocket.send(message)) {
+        WebSocket ws = getOrEstablishConnection();
+        log.trace("Sending message to WebSocket: {}", message);
+        if (!ws.send(message)) {
+            log.warn("WebSocket.send returned false; invalidating connection.");
+            invalidateConnection(ws, new HassWebSocketException("Failed to send message over WebSocket."));
             pendingRequests.remove(id);
             throw new HassWebSocketException("Failed to send message over WebSocket.");
         }
         try {
             return future.get(requestTimeoutSeconds, TimeUnit.SECONDS);
         } catch (Exception e) {
+            pendingRequests.remove(id);
             throw new HassWebSocketException("Timeout or error waiting for response", e);
         }
     }
 
-    private void ensureConnected() {
+    private WebSocket getOrEstablishConnection() {
         synchronized (connectionLock) {
             if (webSocket == null) {
+                log.trace("Creating new WebSocket connection.");
                 authFuture = new CompletableFuture<>();
                 webSocket = createNewWebSocket();
             }
@@ -93,7 +98,14 @@ public class HassWebSocketClientImpl implements HassWebSocketClient {
         try {
             authFuture.get(requestTimeoutSeconds, TimeUnit.SECONDS);
         } catch (Exception e) {
+            invalidateConnection(webSocket, e);
             throw new HassWebSocketException("Authentication timed out or failed.", e);
+        }
+        synchronized (connectionLock) {
+            if (webSocket == null) {
+                throw new HassWebSocketException("WebSocket connection lost after authentication.");
+            }
+            return webSocket;
         }
     }
 
@@ -102,9 +114,27 @@ public class HassWebSocketClientImpl implements HassWebSocketClient {
         return client.newWebSocket(request, new HassWebSocketListener());
     }
 
+    /**
+     * Centralizes connection invalidation logic.
+     */
+    private void invalidateConnection(WebSocket ws, Throwable t) {
+        synchronized (connectionLock) {
+            if (webSocket == ws) {
+                webSocket = null;
+                log.trace("Invalidated WebSocket connection due to error: {}", t.getMessage());
+                if (authFuture != null && !authFuture.isDone()) {
+                    authFuture.completeExceptionally(t);
+                }
+            }
+        }
+        pendingRequests.forEach((id, future) -> future.completeExceptionally(t));
+        pendingRequests.clear();
+    }
+
     private class HassWebSocketListener extends WebSocketListener {
         @Override
         public void onOpen(@NotNull WebSocket ws, @NotNull Response response) {
+            log.trace("WebSocket opened, sending authentication message.");
             String authMessage = String.format("{\"type\": \"auth\", \"access_token\": \"%s\"}", accessToken);
             ws.send(authMessage);
         }
@@ -116,9 +146,12 @@ public class HassWebSocketClientImpl implements HassWebSocketClient {
                 if (node.has("type")) {
                     String type = node.get("type").asText();
                     if ("auth_ok".equals(type)) {
+                        log.trace("WebSocket authentication successful.");
                         authFuture.complete(null);
                     } else if ("auth_invalid".equals(type)) {
-                        authFuture.completeExceptionally(new HassWebSocketException("Authentication failed: " + text));
+                        String errorMsg = "Authentication failed: " + text;
+                        log.error(errorMsg);
+                        authFuture.completeExceptionally(new HassWebSocketException(errorMsg));
                     }
                 }
                 if (node.has("id")) {
@@ -129,25 +162,26 @@ public class HassWebSocketClientImpl implements HassWebSocketClient {
                     }
                 }
             } catch (Exception e) {
-                log.error("Failed handle WebSocket message: '{}'", text, e);
+                log.error("Failed to handle WebSocket message: '{}'", text, e);
             }
         }
 
         @Override
         public void onFailure(@NotNull WebSocket ws, @NotNull Throwable t, @Nullable Response response) {
-            synchronized (connectionLock) {
-                webSocket = null;
-            }
-            pendingRequests.values().forEach(future -> future.completeExceptionally(t));
-            pendingRequests.clear();
+            log.error("WebSocket failure: {}", t.getMessage());
+            invalidateConnection(ws, t);
         }
 
         @Override
         public void onClosing(@NotNull WebSocket ws, int code, @NotNull String reason) {
+            log.trace("WebSocket is closing: {} - {}", code, reason);
             ws.close(code, reason);
-            synchronized (connectionLock) {
-                webSocket = null;
-            }
+            invalidateConnection(ws, new HassWebSocketException("WebSocket closing: " + reason));
+        }
+
+        @Override
+        public void onClosed(@NotNull WebSocket ws, int code, @NotNull String reason) {
+            log.trace("WebSocket closed: {} - {}", code, reason);
         }
     }
 }

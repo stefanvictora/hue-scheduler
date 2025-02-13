@@ -31,7 +31,8 @@ class HassWebSocketClientImplTest {
     void setup() {
         mockClient = mock(OkHttpClient.class);
         mockWebSocket = mock(WebSocket.class);
-        when(mockClient.newWebSocket(any(Request.class), any())).thenReturn(mockWebSocket);
+        when(mockClient.newWebSocket(any(Request.class), any(WebSocketListener.class)))
+                .thenReturn(mockWebSocket);
         messageCaptor = ArgumentCaptor.forClass(String.class);
         when(mockWebSocket.send(messageCaptor.capture())).thenReturn(true);
         requestTimeoutSeconds = 3;
@@ -71,7 +72,7 @@ class HassWebSocketClientImplTest {
     void sendCommand_timeoutOnMessage_exception() throws Exception {
         CompletableFuture<String> futureResult = asyncSendExampleCommand();
         simulateWebSocketAuthSuccess();
-        // no message response
+        // No response is simulated.
 
         assertThatThrownBy(() -> getResult(futureResult))
                 .hasMessageContaining("Timeout or error waiting for response");
@@ -116,6 +117,7 @@ class HassWebSocketClientImplTest {
         assertThatThrownBy(() -> getResult(futureResult1))
                 .hasMessageContaining("Timeout or error waiting for response");
 
+        // For a new command, the connection should be re-established.
         CompletableFuture<String> futureResult2 = asyncSendExampleCommand();
         simulateWebSocketAuthSuccess();
         simulateWebSocketResponse("{\"id\":2,\"type\":\"result\",\"success\":true}");
@@ -155,6 +157,22 @@ class HassWebSocketClientImplTest {
                 .hasMessageContaining("Timeout or error waiting for response");
     }
 
+    @Test
+    void sendCommand_multipleSimultaneousCommands() throws Exception {
+        CompletableFuture<String> future1 = asyncSendExampleCommand();
+        CompletableFuture<String> future2 = asyncSendExampleCommand();
+        CompletableFuture<String> future3 = asyncSendExampleCommand();
+        simulateWebSocketAuthSuccess();
+
+        simulateWebSocketResponse("{\"id\":2,\"type\":\"result\",\"success\":true}");
+        simulateWebSocketResponse("{\"id\":1,\"type\":\"result\",\"success\":true}");
+        simulateWebSocketResponse("{\"id\":3,\"type\":\"result\",\"success\":true}");
+
+        assertThat(getResult(future1)).isEqualTo("{\"id\":1,\"type\":\"result\",\"success\":true}");
+        assertThat(getResult(future2)).isEqualTo("{\"id\":2,\"type\":\"result\",\"success\":true}");
+        assertThat(getResult(future3)).isEqualTo("{\"id\":3,\"type\":\"result\",\"success\":true}");
+    }
+
     private CompletableFuture<String> asyncSendExampleCommand() throws Exception {
         CompletableFuture<String> future = CompletableFuture.supplyAsync(() -> {
             try {
@@ -187,7 +205,7 @@ class HassWebSocketClientImplTest {
     }
 
     private void simulateGeneralWebSocketFailure() {
-        getWebSocketListener().onFailure(mockWebSocket, new Exception(), mock(Response.class));
+        getWebSocketListener().onFailure(mockWebSocket, new RuntimeException("Simulated Error"), mock(Response.class));
     }
 
     private void simulateWebSocketClosed() {
