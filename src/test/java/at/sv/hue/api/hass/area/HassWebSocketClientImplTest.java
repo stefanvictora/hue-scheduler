@@ -155,7 +155,6 @@ class HassWebSocketClientImplTest {
                 .hasMessageContaining("Timeout or error waiting for response");
     }
 
-
     private CompletableFuture<String> asyncSendExampleCommand() throws Exception {
         CompletableFuture<String> future = CompletableFuture.supplyAsync(() -> {
             try {
@@ -164,7 +163,7 @@ class HassWebSocketClientImplTest {
                 throw new RuntimeException(e);
             }
         });
-        Thread.sleep(100);
+        Thread.sleep(200);
         return future;
     }
 
