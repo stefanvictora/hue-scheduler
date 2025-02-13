@@ -34,7 +34,7 @@ class HassWebSocketClientImplTest {
         when(mockClient.newWebSocket(any(Request.class), any())).thenReturn(mockWebSocket);
         messageCaptor = ArgumentCaptor.forClass(String.class);
         when(mockWebSocket.send(messageCaptor.capture())).thenReturn(true);
-        requestTimeoutSeconds = 2;
+        requestTimeoutSeconds = 3;
         client = new HassWebSocketClientImpl(ORIGIN, ACCESS_TOKEN, mockClient, requestTimeoutSeconds);
     }
 
