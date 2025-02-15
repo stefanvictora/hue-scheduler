@@ -68,7 +68,7 @@ class HueSchedulerTest {
     private StartTimeProviderImpl startTimeProvider;
     private boolean controlGroupLightsIndividually;
     private boolean disableUserModificationTracking;
-    private boolean disableTurnOnActivation;
+    private boolean requireSceneActivation;
     private HueApi mockedHueApi;
     private InOrder orderVerifier;
     private InOrder sceneSyncOrderVerifier;
@@ -125,7 +125,7 @@ class HueSchedulerTest {
     private void create() {
         scheduler = new HueScheduler(mockedHueApi, stateScheduler, startTimeProvider,
                 () -> now, 10.0, controlGroupLightsIndividually, disableUserModificationTracking,
-                disableTurnOnActivation, defaultInterpolationTransitionTimeInMs, 0, connectionFailureRetryDelay,
+                requireSceneActivation, defaultInterpolationTransitionTimeInMs, 0, connectionFailureRetryDelay,
                 minTrGap, sceneActivationIgnoreWindowInSeconds, interpolateAll,
                 enableSceneSync, sceneSyncName, sceneSyncInterpolationInterval, sceneSyncDelayInSeconds);
         manualOverrideTracker = scheduler.getManualOverrideTracker();
@@ -443,8 +443,8 @@ class HueSchedulerTest {
         create();
     }
 
-    private void disableTurnOnActivation() {
-        disableTurnOnActivation = true;
+    private void requireSceneActivation() {
+        requireSceneActivation = true;
         create();
     }
 
@@ -485,7 +485,7 @@ class HueSchedulerTest {
                                                .capabilities(EnumSet.allOf(Capability.class)).build();
         controlGroupLightsIndividually = false;
         disableUserModificationTracking = true;
-        disableTurnOnActivation = false;
+        requireSceneActivation = false;
         defaultInterpolationTransitionTimeInMs = null;
         interpolateAll = false;
         sceneSyncDelayInSeconds = 0;
@@ -7278,26 +7278,26 @@ class HueSchedulerTest {
     // todo: what about if the schedule contains on:true, should we then still not apply it?
 
     @Test
-    void disableTurnOnActivation_ignoresLightOnEvents_exceptForSyncedSceneActivation() {
-        disableTurnOnActivation();
+    void disableAutomaticActivation_ignoresLightOnEvents_exceptForSyncedSceneActivation() {
+        requireSceneActivation();
         addKnownLightIdsWithDefaultCapabilities(1);
         addState(1, now, "bri:100");
+        addState(1, now.plusMinutes(10), "bri:110");
 
         List<ScheduledRunnable> runnables = startScheduler(
-                expectedRunnable(now, now.plusDays(1))
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
         );
 
-        advanceTimeAndRunAndAssertPutCalls(runnables.getFirst(),
-                expectedPutCall(1).bri(100) // todo: maybe we should also prevent the initial run
-        );
+        advanceTimeAndRunAndAssertPutCalls(runnables.getFirst());
 
-        ensureScheduledStates(
-                expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
-        );
+        ScheduledRunnable firstNextDay = ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
+        ).getFirst();
 
         // case 1: turned on normally -> ignored
 
-        ScheduledRunnable powerOnRunnable = simulateLightOnEvent("/lights/1", expectedPowerOnEnd(now.plusDays(1))).getFirst();
+        ScheduledRunnable powerOnRunnable = simulateLightOnEvent("/lights/1", expectedPowerOnEnd(now.plusMinutes(10))).getFirst();
 
         advanceTimeAndRunAndAssertPutCalls(powerOnRunnable); // no update performed
 
@@ -7305,7 +7305,7 @@ class HueSchedulerTest {
 
         simulateSceneActivated("/scene/XYZ", "/lights/1");
 
-        ScheduledRunnable normalSceneRunnable = simulateLightOnEvent("/lights/1", expectedPowerOnEnd(now.plusDays(1))).getFirst();
+        ScheduledRunnable normalSceneRunnable = simulateLightOnEvent("/lights/1", expectedPowerOnEnd(now.plusMinutes(10))).getFirst();
 
         advanceTimeAndRunAndAssertPutCalls(normalSceneRunnable); // no update performed
 
@@ -7313,7 +7313,7 @@ class HueSchedulerTest {
 
         simulateSyncedSceneActivated("/scene/ABC", "/lights/1");
 
-        ScheduledRunnable syncedSceneRunnable = ensureScheduledStates(expectedPowerOnEnd(now.plusDays(1))).getFirst();
+        ScheduledRunnable syncedSceneRunnable = ensureScheduledStates(expectedPowerOnEnd(now.plusMinutes(10))).getFirst();
 
         advanceTimeAndRunAndAssertPutCalls(syncedSceneRunnable,
                 expectedPutCall(1).bri(100)
@@ -7323,13 +7323,43 @@ class HueSchedulerTest {
 
         advanceCurrentTime(Duration.ofSeconds(sceneActivationIgnoreWindowInSeconds + 1));
 
-        ScheduledRunnable powerOnRunnable2 = simulateLightOnEvent("/lights/1", expectedPowerOnEnd(initialNow.plusDays(1))).getFirst();
+        ScheduledRunnable powerOnRunnable2 = simulateLightOnEvent("/lights/1", expectedPowerOnEnd(initialNow.plusMinutes(10))).getFirst();
 
         runAndAssertPutCalls(powerOnRunnable2); // ignored again
+
+        // also ignores second state
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.get(1));
+
+        ScheduledRunnable secondNextDay = ensureScheduledStates(
+                expectedRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)) // next day
+        ).getFirst();
+
+        // synced scene turned on again -> applies second state and allows first next day to follow
+
+        simulateSyncedSceneActivated("/scene/ABC", "/lights/1");
+
+        ScheduledRunnable syncedSceneRunnable2 = ensureScheduledStates(
+                expectedPowerOnEnd(initialNow.plusMinutes(10)), // already ended
+                expectedPowerOnEnd(initialNow.plusDays(1))
+        ).get(1);
+
+        advanceTimeAndRunAndAssertPutCalls(syncedSceneRunnable2,
+                expectedPutCall(1).bri(110)
+        );
+
+        // first next day
+        
+        advanceTimeAndRunAndAssertPutCalls(firstNextDay,
+                expectedPutCall(1).bri(100)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
+        );
     }
 
-    // todo: potential issue: When we just use retryWhenBackOn, it could be that after a full day, there are no states queued anymore, so also scene sync will stop
-    //   it would probably make sense to always create a temporary copy in such situations and always reschedule
+    // todo: test with modification tracking enabled -> should correctly detect override
 
     private void simulateSceneActivated(String sceneId, String... containedLights) {
         simulateSceneWithNameActivated(sceneId, unsyncedSceneName, containedLights);

@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 @Slf4j
 public class LightEventListenerImpl implements LightEventListener {
@@ -14,11 +15,14 @@ public class LightEventListenerImpl implements LightEventListener {
     private final ManualOverrideTracker manualOverrideTracker;
     private final ConcurrentHashMap<String, List<Runnable>> onStateWaitingList;
     private final Function<String, List<String>> affectedIdsByDeviceLookup;
+    private final Predicate<String> wasRecentlyAffectedBySyncedScene;
 
     public LightEventListenerImpl(ManualOverrideTracker manualOverrideTracker,
-                                  Function<String, List<String>> affectedIdsByDeviceLookup) {
+                                  Function<String, List<String>> affectedIdsByDeviceLookup,
+                                  Predicate<String> wasRecentlyAffectedBySyncedScene) {
         this.manualOverrideTracker = manualOverrideTracker;
         this.affectedIdsByDeviceLookup = affectedIdsByDeviceLookup;
+        this.wasRecentlyAffectedBySyncedScene = wasRecentlyAffectedBySyncedScene;
         onStateWaitingList = new ConcurrentHashMap<>();
     }
 
@@ -31,6 +35,11 @@ public class LightEventListenerImpl implements LightEventListener {
     public void onLightOn(String id) {
         MDC.put("context", "on-event " + id);
         manualOverrideTracker.onLightTurnedOn(id);
+        if (wasRecentlyAffectedBySyncedScene.test(id)) {
+            manualOverrideTracker.onLightTurnedOnBySyncedScene(id);
+        } else {
+            manualOverrideTracker.onLightTurnedOnManually(id);
+        }
         List<Runnable> waitingList = onStateWaitingList.remove(id);
         if (waitingList != null) {
             log.debug("Reschedule {} waiting states.", waitingList.size());

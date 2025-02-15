@@ -43,7 +43,7 @@ public final class SceneEventListenerImpl implements SceneEventListener {
         String sceneName = hueApi.getSceneName(id);
         MDC.put("context", "scene-on-event " + sceneName);
         List<String> affectedIdsByScene = getAffectedIdsByScene(id);
-        if (matchesSyncedSceneName.test(sceneName)) {
+        if (isSyncedScene(sceneName)) {
             log.info("Synced scene activated. Re-engage scheduler.");
             affectedIdsByScene.forEach(lightOrGroupId -> recentlyAffectedSyncedIds.put(lightOrGroupId, lightOrGroupId));
             affectedIdsByScene.forEach(lightEventListener::onLightOn);
@@ -65,8 +65,12 @@ public final class SceneEventListenerImpl implements SceneEventListener {
                   .collect(Collectors.toList());
     }
 
+    private boolean isSyncedScene(String sceneName) {
+        return matchesSyncedSceneName.test(sceneName);
+    }
+
     @Override
-    public boolean wasRecentlyAffectedByAScene(String id) {
+    public boolean wasRecentlyAffectedByNormalScene(String id) {
         return recentlyAffectedIds.getIfPresent(id) != null;
     }
 

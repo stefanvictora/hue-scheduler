@@ -102,11 +102,13 @@ public final class HueScheduler implements Runnable {
             description = "Globally disable tracking of user modifications which would pause their schedules until they are turned off and on again." +
                           " Default: ${DEFAULT-VALUE}")
     boolean disableUserModificationTracking;
-    @Option(names = "--disable-turn-on-activation",
-            defaultValue = "${env:DISABLE_TURN_ON_ACTIVATION:-false}",
-            description = "Flag to disable Hue Scheduler activation when lights are turned on. Use in combination with --enable-scene-sync to trigger Hue Scheduler only manually." +
-                          " Default: ${DEFAULT-VALUE}")
-    boolean disableTurnOnActivation;
+    @Option(names = "--require-scene-activation",
+            defaultValue = "${env:REQUIRE_SCENE_ACTIVATION:-false}",
+            description = "When enabled, states will only be applied when triggered by a synced scene activation. " +
+                          "After scene activation, the current state and subsequent states will be applied until " +
+                          "lights are turned off or manually modified. Use in combination with --enable-scene-sync. " +
+                          "Default: ${DEFAULT-VALUE}")
+    boolean requireSceneActivation;
     @Option(names = "--enable-scene-sync",
             defaultValue = "${env:ENABLE_SCENE_SYNC:-false}",
             description = "Enable the creating of Hue scenes that always match the state of a scheduled room or zone." +
@@ -191,13 +193,15 @@ public final class HueScheduler implements Runnable {
     public HueScheduler() {
         currentTime = ZonedDateTime::now;
         manualOverrideTracker = new ManualOverrideTrackerImpl();
-        lightEventListener = new LightEventListenerImpl(manualOverrideTracker, deviceId -> api.getAffectedIdsByDevice(deviceId));
+        lightEventListener = new LightEventListenerImpl(manualOverrideTracker,
+                deviceId -> api.getAffectedIdsByDevice(deviceId),
+                id -> sceneEventListener.wasRecentlyAffectedBySyncedScene(id));
     }
 
     public HueScheduler(HueApi api, StateScheduler stateScheduler,
                         StartTimeProvider startTimeProvider, Supplier<ZonedDateTime> currentTime,
                         double requestsPerSecond, boolean controlGroupLightsIndividually,
-                        boolean disableUserModificationTracking, boolean disableTurnOnActivation,
+                        boolean disableUserModificationTracking, boolean requireSceneActivation,
                         String defaultInterpolationTransitionTimeString,
                         int powerOnRescheduleDelayInMs, int bridgeFailureRetryDelayInSeconds,
                         int minTrBeforeGapInMinutes, int sceneActivationIgnoreWindowInSeconds, boolean interpolateAll,
@@ -215,7 +219,7 @@ public final class HueScheduler implements Runnable {
         this.requestsPerSecond = requestsPerSecond;
         this.controlGroupLightsIndividually = controlGroupLightsIndividually;
         this.disableUserModificationTracking = disableUserModificationTracking;
-        this.disableTurnOnActivation = disableTurnOnActivation;
+        this.requireSceneActivation = requireSceneActivation;
         this.defaultInterpolationTransitionTimeString = defaultInterpolationTransitionTimeString;
         this.powerOnRescheduleDelayInMs = powerOnRescheduleDelayInMs;
         this.bridgeFailureRetryDelayInSeconds = bridgeFailureRetryDelayInSeconds;
@@ -430,9 +434,10 @@ public final class HueScheduler implements Runnable {
                 scheduleAsyncSceneSync(snapshot);
                 MDC.put("context", snapshot.getContextName());
             }
-            if (disableTurnOnActivation && wasJustTurnedOnButNotBySyncedScene(snapshot)) {
-                LOG.debug("Ignore turned on: {}", snapshot);
-                retryWhenBackOn(snapshot);
+            if (requireSceneActivation && wasNotTurnedOnBySyncedScene(snapshot)) {
+                LOG.debug("Ignore state: {}", snapshot);
+                createOnPowerOnCopyAndReschedule(snapshot);
+                // todo: should we rest the "justTurnedOnFlag?" -- also for other reschedules?
                 return;
             }
             LOG.info("Set: {}", snapshot);
@@ -444,7 +449,7 @@ public final class HueScheduler implements Runnable {
                     return;
                 }
                 if (shouldTrackUserModification(snapshot) &&
-                    (turnedOnThroughScene(snapshot) || stateHasBeenManuallyOverriddenSinceLastSeen(snapshot))) {
+                    (turnedOnThroughNormalScene(snapshot) || stateHasBeenManuallyOverriddenSinceLastSeen(snapshot))) {
                     LOG.info("Manually overridden or scene turn-on: Pause updates until turned off and on again");
                     manualOverrideTracker.onManuallyOverridden(snapshot.getId());
                     createOnPowerOnCopyAndReschedule(snapshot);
@@ -575,13 +580,12 @@ public final class HueScheduler implements Runnable {
         return !disableUserModificationTracking && !state.isForced();
     }
 
-    private boolean wasJustTurnedOnButNotBySyncedScene(ScheduledStateSnapshot snapshot) {
-        return wasJustTurnedOn(snapshot) &&
-               !sceneEventListener.wasRecentlyAffectedBySyncedScene(snapshot.getId());
+    private boolean wasNotTurnedOnBySyncedScene(ScheduledStateSnapshot snapshot) {
+        return !manualOverrideTracker.wasTurnedOnBySyncedScene(snapshot.getId());
     }
 
-    private boolean turnedOnThroughScene(ScheduledStateSnapshot state) {
-        return wasJustTurnedOn(state) && sceneEventListener.wasRecentlyAffectedByAScene(state.getId());
+    private boolean turnedOnThroughNormalScene(ScheduledStateSnapshot state) {
+        return wasJustTurnedOn(state) && sceneEventListener.wasRecentlyAffectedByNormalScene(state.getId());
     }
 
     private boolean stateHasBeenManuallyOverriddenSinceLastSeen(ScheduledStateSnapshot state) {
