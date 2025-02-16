@@ -120,7 +120,7 @@ public final class HueScheduler implements Runnable {
                           " Default: ${DEFAULT-VALUE}")
     String sceneSyncName;
     @Option(names = "--scene-sync-interval",
-            defaultValue = "${env:SCENE_SYNC_INTERVAL:-2}",
+            defaultValue = "${env:SCENE_SYNC_INTERVAL:-3}",
             description = "The interval for syncing interpolated states to scenes in minutes. Related to '--enable-scene-sync'." +
                           " Default: ${DEFAULT-VALUE}")
     int sceneSyncIntervalInMinutes;
