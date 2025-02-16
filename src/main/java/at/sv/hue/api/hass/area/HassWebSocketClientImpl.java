@@ -184,4 +184,12 @@ public class HassWebSocketClientImpl implements HassWebSocketClient {
             log.trace("WebSocket closed: {} - {}", code, reason);
         }
     }
+
+    CompletableFuture<Void> getAuthFuture() {
+        return authFuture;
+    }
+
+    WebSocket getWebSocket() {
+        return webSocket;
+    }
 }

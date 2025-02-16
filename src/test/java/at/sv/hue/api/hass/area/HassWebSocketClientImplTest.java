@@ -9,11 +9,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.*;
 
 class HassWebSocketClientImplTest {
@@ -181,16 +183,24 @@ class HassWebSocketClientImplTest {
                 throw new RuntimeException(e);
             }
         });
-        Thread.sleep(200);
+        waitForWebSocket();
         return future;
+    }
+
+    private void waitForWebSocket() {
+        await().atMost(Duration.ofSeconds(requestTimeoutSeconds))
+               .pollInterval(Duration.ofMillis(100))
+               .until(() -> client.getWebSocket() != null);
     }
 
     private void simulateWebSocketAuthSuccess() {
         simulateAuthResponse("{\"type\": \"auth_ok\"}");
+        waitForAuthDone();
     }
 
     private void simulateWebSocketAuthFailure() {
         simulateAuthResponse("{\"type\": \"auth_invalid\"}");
+        waitForAuthDone();
     }
 
     private void simulateAuthResponse(String authResponse) {
@@ -200,16 +210,33 @@ class HassWebSocketClientImplTest {
         listener.onMessage(mockWebSocket, authResponse);
     }
 
+    private void waitForAuthDone() {
+        await().atMost(Duration.ofSeconds(requestTimeoutSeconds))
+               .pollInterval(Duration.ofMillis(100))
+               .until(() -> {
+                   CompletableFuture<Void> authFuture = client.getAuthFuture();
+                   return authFuture != null && authFuture.isDone();
+               });
+    }
+
     private void simulateWebSocketResponse(String text) {
         getWebSocketListener().onMessage(mockWebSocket, text);
     }
 
     private void simulateGeneralWebSocketFailure() {
         getWebSocketListener().onFailure(mockWebSocket, new RuntimeException("Simulated Error"), mock(Response.class));
+        waitForInvalidatedWebSocket();
     }
 
     private void simulateWebSocketClosed() {
         getWebSocketListener().onClosing(mockWebSocket, 1002, "Reason");
+        waitForInvalidatedWebSocket();
+    }
+
+    private void waitForInvalidatedWebSocket() {
+        await().atMost(Duration.ofSeconds(requestTimeoutSeconds))
+               .pollInterval(Duration.ofMillis(100))
+               .until(() -> client.getWebSocket() == null && client.getAuthFuture().isDone());
     }
 
     private WebSocketListener getWebSocketListener() {
