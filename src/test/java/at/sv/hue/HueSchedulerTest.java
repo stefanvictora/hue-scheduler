@@ -5385,7 +5385,7 @@ class HueSchedulerTest {
         advanceTimeAndRunAndAssertPutCalls(secondState); // no put calls as off
 
         ensureRunnable(initialNow.plusDays(1).plusHours(1)); // for next day
-        
+
         mockIsLightOff(1, false);
 
         advanceTimeAndRunAndAssertPutCalls(thirdState); // still no put call expected, as light has been set to off
@@ -7349,7 +7349,7 @@ class HueSchedulerTest {
         );
 
         // first next day
-        
+
         advanceTimeAndRunAndAssertPutCalls(firstNextDay,
                 expectedPutCall(1).bri(100)
         );
@@ -7359,7 +7359,78 @@ class HueSchedulerTest {
         );
     }
 
-    // todo: test with modification tracking enabled -> should correctly detect override
+    @Test
+    void requireSceneActivation_withUserModificationTracking_correctlyDetectsOverrides_stopsApplying() {
+        requireSceneActivation();
+        enableUserModificationTracking();
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now, "bri:100");
+        addState(1, now.plusMinutes(10), "bri:110");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.getFirst());
+
+        ScheduledRunnable firstNextDay = ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
+        ).getFirst();
+
+        // synced scene -> applies first state, ignoring any light state
+
+        simulateSyncedSceneActivated("/scene/ABC", "/lights/1");
+
+        ScheduledRunnable syncedSceneRunnable = ensureScheduledStates(expectedPowerOnEnd(now.plusMinutes(10))).getFirst();
+
+        setLightStateResponse(1, expectedState().brightness(200)); // ignored
+        advanceTimeAndRunAndAssertPutCalls(syncedSceneRunnable,
+                expectedPutCall(1).bri(100)
+        );
+
+        // light has been modified before second state -> triggers override
+
+        setLightStateResponse(1, expectedState().brightness(120));
+        advanceTimeAndRunAndAssertPutCalls(runnables.get(1));
+
+        ScheduledRunnable secondNextDay = ensureScheduledStates(
+                expectedRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)) // next day
+        ).getFirst();
+
+        // first state next day still skipped because of override
+
+        advanceTimeAndRunAndAssertPutCalls(firstNextDay); // still overridden
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
+        );
+
+        // activate synced scene again -> applies firstNextDay state, resetting override
+
+        simulateSyncedSceneActivated("/scene/ABC", "/lights/1");
+
+        ScheduledRunnable syncedSceneRunnable2 = ensureScheduledStates(
+                expectedPowerOnEnd(initialNow.plusMinutes(10)), // already ended
+                expectedPowerOnEnd(initialNow.plusDays(1)), // already ended
+                expectedPowerOnEnd(initialNow.plusDays(1).plusMinutes(10))
+        ).get(2);
+
+        advanceTimeAndRunAndAssertPutCalls(syncedSceneRunnable2,
+                expectedPutCall(1).bri(100)
+        );
+
+        // secondNextDay applied normally
+
+        setLightStateResponse(1, expectedState().brightness(100)); // no manual override this time
+        advanceTimeAndRunAndAssertPutCalls(secondNextDay,
+                expectedPutCall(1).bri(110)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusDays(2).plusMinutes(10), initialNow.plusDays(3)) // next day
+        );
+    }
 
     private void simulateSceneActivated(String sceneId, String... containedLights) {
         simulateSceneWithNameActivated(sceneId, unsyncedSceneName, containedLights);

@@ -21,7 +21,24 @@ Flag to globally disable tracking of user modifications of lights. Per default H
                            
 *New in 0.12.0*
 
-Enables the creation of Hue scenes that always match the state of a scheduled room or zone.
+Enables the creation of scenes that always match the state of a scheduled light, room or zone.
+
+Note: Dynamically created Home Assistant scenes can't be assigned to areas or directly displayed in the dashboard. However,
+they remain accessible for use in automations. Hue Scheduler creates a scene for each group and area a scheduled entity is assigned to.
+
+**Default**: false
+
+### `--require-scene-activation`
+
+*New in 0.12.4*
+
+When enabled, states will only be applied when triggered by a synced scene activation.
+After scene activation, the current state and subsequent states will be applied until lights are turned off or manually
+modified.
+This flag is designed to work in conjunction with `--enable-scene-sync` to provide manual control over when states are activated.
+
+Example use case: If you want lights to follow a schedule only after explicitly activating a synced Hue Scheduler scene 
+(e.g., through a smart switch or Home Assistant automation), rather than automatically applying states when lights are turned on.
 
 **Default**: false
 

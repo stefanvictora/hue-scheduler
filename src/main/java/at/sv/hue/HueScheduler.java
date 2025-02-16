@@ -437,7 +437,6 @@ public final class HueScheduler implements Runnable {
             if (requireSceneActivation && wasNotTurnedOnBySyncedScene(snapshot)) {
                 LOG.debug("Ignore state: {}", snapshot);
                 createOnPowerOnCopyAndReschedule(snapshot);
-                // todo: should we rest the "justTurnedOnFlag?" -- also for other reschedules?
                 return;
             }
             LOG.info("Set: {}", snapshot);
