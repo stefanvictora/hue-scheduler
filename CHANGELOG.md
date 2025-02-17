@@ -3,14 +3,15 @@
 ## [0.12.4] - 2025-02-xx
 
 ### Added
-- **Scene Sync Support for Home Assistant**: Implemented scene synchronization for Home Assistant connections.
+- **Scene Sync Support for Home Assistant**: Implemented scene synchronization for Home Assistant.
   - Activate via `--enable-scene-sync` command line flag.
-  - Scenes are named following the pattern: `scene.<scene_sync_name>_<group_or_area_name>`. Customize this via `--scene-sync-name` flag (default: `HueScheduler`). Example: `scene.huescheduler_living_room`.
-  - Use with Home Assistant automations, smart switches or motion sensors.
-  - **Known Home Assistant Limitations**:
-    - Scenes are temporary and require recreation after Home Assistant restarts. This process is handled automatically but may require a Hue Scheduler restart for immediate recreation.
-    - Dynamically created synced scenes cannot be assigned to areas or given custom names beyond their entity ID.
-- **Manual Activation Mode**: Added the `--require-scene-activation` command line flag to schedule states only when a synced Hue Scheduler scene is activated. Subsequent states continue normally until lights are turned off or manually overridden.
+  - Scenes are named following the pattern: `scene.<scene_sync_name>_<group_or_area_name>`. Customize via `--scene-sync-name` (default: `HueScheduler`). Example: `scene.huescheduler_living_room`.
+  - Use with Home Assistant automations, smart switches or motion sensors to directly turn on your lights in the desired state.
+  - A synced scene is created for each group and area your scheduled entities are part of.
+  - **Known Limitations**:
+    - Dynamic scenes are temporary and require recreation after Home Assistant restarts. This is handled automatically but may require a Hue Scheduler restart for immediate recreation.
+    - Dynamic scenes cannot be assigned to areas or given custom names beyond their entity ID.
+- **Manual Activation Mode**: Added new `--require-scene-activation` command line flag to schedule states only when a synced Hue Scheduler scene is activated. Subsequent states continue normally until lights are turned off or manually overridden.
   - Designed to integrate with `--enable-scene-sync` for complete manual control over state activation.
   - Use `force:true` to disable this behavior for individual states.
 
