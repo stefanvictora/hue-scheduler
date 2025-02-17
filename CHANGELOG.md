@@ -10,8 +10,9 @@
   - **Known Home Assistant Limitations**:
     - Scenes are temporary and require recreation after Home Assistant restarts. This process is handled automatically but may require a Hue Scheduler restart for immediate recreation.
     - Dynamically created synced scenes cannot be assigned to areas or given custom names beyond their entity ID.
-- **Manual Activation Mode**: Added the `--require-scene-activation` flag to schedule states only when a synced Hue Scheduler scene is activated. Subsequent states continue normally until lights are turned off or manually overridden.
+- **Manual Activation Mode**: Added the `--require-scene-activation` command line flag to schedule states only when a synced Hue Scheduler scene is activated. Subsequent states continue normally until lights are turned off or manually overridden.
   - Designed to integrate with `--enable-scene-sync` for complete manual control over state activation.
+  - Use `force:true` to disable this behavior for individual states.
 
 ### Fixed
 - **Scene Sync**: Fixed a sync issue for states that where not activated for a longer period of time.

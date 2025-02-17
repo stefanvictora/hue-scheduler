@@ -7432,6 +7432,31 @@ class HueSchedulerTest {
         );
     }
 
+    @Test
+    void requireSceneActivation_withForceProperty_stillApplied() {
+        requireSceneActivation();
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now, "bri:100", "force:true");
+        addState(1, now.plusMinutes(10), "bri:110");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+        );
+        
+        advanceTimeAndRunAndAssertPutCalls(runnables.getFirst(), expectedPutCall(1).bri(100));
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.get(1)); // no update, since no force
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)) // next day
+        );
+    }
+
     private void simulateSceneActivated(String sceneId, String... containedLights) {
         simulateSceneWithNameActivated(sceneId, unsyncedSceneName, containedLights);
     }

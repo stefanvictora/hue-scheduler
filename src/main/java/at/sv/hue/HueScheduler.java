@@ -434,7 +434,7 @@ public final class HueScheduler implements Runnable {
                 scheduleAsyncSceneSync(snapshot);
                 MDC.put("context", snapshot.getContextName());
             }
-            if (requireSceneActivation && wasNotTurnedOnBySyncedScene(snapshot)) {
+            if (shouldIgnoreState(snapshot)) {
                 LOG.debug("Ignore state: {}", snapshot);
                 createOnPowerOnCopyAndReschedule(snapshot);
                 return;
@@ -577,6 +577,10 @@ public final class HueScheduler implements Runnable {
 
     private boolean shouldTrackUserModification(ScheduledStateSnapshot state) {
         return !disableUserModificationTracking && !state.isForced();
+    }
+
+    private boolean shouldIgnoreState(ScheduledStateSnapshot snapshot) {
+        return requireSceneActivation && !snapshot.isForced() && wasNotTurnedOnBySyncedScene(snapshot);
     }
 
     private boolean wasNotTurnedOnBySyncedScene(ScheduledStateSnapshot snapshot) {

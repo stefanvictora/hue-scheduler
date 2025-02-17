@@ -221,3 +221,6 @@ Hue Scheduler offers various transition-related properties to create the desired
   In this example, the sunset state would always be set, even if the light has been manually adjusted since the morning.
 
   **Note**: The `force` property can also enforce the ``on:false`` state, which otherwise is not rescheduled when turning a light off and on again. Warning: This means such lights can't be turned on at all during these schedules, as they will immediately turned off again.
+
+  When `--require-scene-activation` is enabled, using `force:true` will apply the state even if no synced scene has been activated.
+

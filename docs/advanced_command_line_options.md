@@ -40,6 +40,8 @@ This flag is designed to work in conjunction with `--enable-scene-sync` to provi
 Example use case: If you want lights to follow a schedule only after explicitly activating a synced Hue Scheduler scene 
 (e.g., through a smart switch or Home Assistant automation), rather than automatically applying states when lights are turned on.
 
+Use `force:true` to disable this behavior for individual states.
+
 **Default**: false
 
 ### `--scene-sync-name`
