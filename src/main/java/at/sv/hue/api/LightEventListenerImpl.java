@@ -36,10 +36,15 @@ public class LightEventListenerImpl implements LightEventListener {
         MDC.put("context", "on-event " + id);
         manualOverrideTracker.onLightTurnedOn(id);
         if (wasRecentlyAffectedBySyncedScene.test(id)) {
+            MDC.put("context", "on-event (synced) " + id);
             manualOverrideTracker.onLightTurnedOnBySyncedScene(id);
         } else {
             manualOverrideTracker.onLightTurnedOnManually(id);
         }
+        rescheduleWaitingStates(id);
+    }
+
+    private void rescheduleWaitingStates(String id) {
         List<Runnable> waitingList = onStateWaitingList.remove(id);
         if (waitingList != null) {
             log.debug("Reschedule {} waiting states.", waitingList.size());
@@ -49,9 +54,13 @@ public class LightEventListenerImpl implements LightEventListener {
 
     @Override
     public void onPhysicalOn(String deviceId) {
-        MDC.put("context", "on-event (physical)" + deviceId);
+        MDC.put("context", "on-event (physical) " + deviceId);
         affectedIdsByDeviceLookup.apply(deviceId)
-                                 .forEach(this::onLightOn);
+                                 .forEach(id -> {
+                                     MDC.put("context", "on-event (physical) " + id);
+                                     manualOverrideTracker.onLightTurnedOn(id);
+                                     rescheduleWaitingStates(id);
+                                 });
     }
 
     @Override

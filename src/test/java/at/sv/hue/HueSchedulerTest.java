@@ -5180,6 +5180,38 @@ class HueSchedulerTest {
     }
 
     @Test
+    void run_execution_manualOverride_onPhysicalOn_resetsManualOverride() {
+        enableUserModificationTracking();
+        addKnownLightIdsWithDefaultCapabilities(1);
+        when(mockedHueApi.getAffectedIdsByDevice("/device/354")).thenReturn(List.of("/lights/1"));
+
+        addState(1, now, "bri:100");
+        addState(1, now.plusMinutes(10), "bri:110");
+        manualOverrideTracker.onManuallyOverridden("/lights/1");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst()); // skipped, since manually overridden
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
+        );
+
+        scheduler.getHueEventListener().onPhysicalOn("/device/354");
+
+        ScheduledRunnable powerOnRunnable = ensureScheduledStates(
+                expectedPowerOnEnd(now.plusMinutes(10))
+        ).getFirst();
+
+        advanceTimeAndRunAndAssertPutCalls(powerOnRunnable,
+                expectedPutCall(1).bri(100)
+        );
+    }
+
+    @Test
     void run_execution_manualOverride_stateIsDirectlyRescheduledOnRun() {
         enableUserModificationTracking();
 
@@ -7443,7 +7475,7 @@ class HueSchedulerTest {
                 expectedRunnable(now, now.plusMinutes(10)),
                 expectedRunnable(now.plusMinutes(10), now.plusDays(1))
         );
-        
+
         advanceTimeAndRunAndAssertPutCalls(runnables.getFirst(), expectedPutCall(1).bri(100));
 
         ensureScheduledStates(
@@ -7451,6 +7483,102 @@ class HueSchedulerTest {
         );
 
         advanceTimeAndRunAndAssertPutCalls(runnables.get(1)); // no update, since no force
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)) // next day
+        );
+    }
+
+    @Test
+    void requireSceneActivation_onPhysicalOn_afterSyncedSceneTurnOn_doesNotPreventFurtherStatesToBeScheduled() {
+        requireSceneActivation();
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 5, 6);
+        when(mockedHueApi.getAffectedIdsByDevice("/device/789")).thenReturn(List.of("/groups/1", "/lights/6"));
+        addState("g1", now, "bri:100");
+        addState("g1", now.plusMinutes(10), "bri:110");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.getFirst());
+
+       ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
+        );
+
+        // synced scene -> applies first state, ignoring any light state
+
+        simulateSyncedSceneActivated("/scene/ABC", "/lights/5", "/lights/6");
+
+        ScheduledRunnable syncedSceneRunnable = ensureScheduledStates(
+                expectedPowerOnEnd(now.plusMinutes(10))
+        ).getFirst();
+
+        advanceTimeAndRunAndAssertPutCalls(syncedSceneRunnable,
+                expectedGroupPutCall(1).bri(100)
+        );
+
+        // simulate group light to be turned on physically -> keeps synced scene turn on
+
+        advanceCurrentTime(Duration.ofSeconds(sceneActivationIgnoreWindowInSeconds)); // after scene activation window
+
+        scheduler.getHueEventListener().onPhysicalOn("/device/789");
+
+        ScheduledRunnable physicalPowerOnRunnable = ensureScheduledStates(
+                expectedPowerOnEnd(initialNow.plusMinutes(10))
+        ).getFirst();
+
+        advanceTimeAndRunAndAssertPutCalls(physicalPowerOnRunnable,
+                expectedGroupPutCall(1).bri(100)
+        );
+
+        // still allows second state to be scheduled
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.get(1),
+                expectedGroupPutCall(1).bri(110)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)) // next day
+        );
+    }
+
+    @Test
+    void requireSceneActivation_onPhysicalOn_noSyncedSceneTurnedOnBefore_notApplied() {
+        requireSceneActivation();
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 5, 6);
+        when(mockedHueApi.getAffectedIdsByDevice("/device/789")).thenReturn(List.of("/groups/1", "/lights/6"));
+        addState("g1", now, "bri:100");
+        addState("g1", now.plusMinutes(10), "bri:110");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.getFirst());
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
+        );
+
+        // simulate group light to be turned on physically -> not applied
+
+        scheduler.getHueEventListener().onPhysicalOn("/device/789");
+
+        ScheduledRunnable physicalPowerOnRunnable = ensureScheduledStates(
+                expectedPowerOnEnd(initialNow.plusMinutes(10))
+        ).getFirst();
+
+        advanceTimeAndRunAndAssertPutCalls(physicalPowerOnRunnable); // ignored
+
+        // second state also ignored
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.get(1)); // ignored
 
         ensureScheduledStates(
                 expectedRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)) // next day
