@@ -420,6 +420,10 @@ class HueSchedulerTest {
         scheduler.getHueEventListener().onLightOn(id);
     }
 
+    private void simulateLightOffEvent(String id) {
+        scheduler.getHueEventListener().onLightOff(id);
+    }
+
     private ScheduledRunnable simulateLightOnEventExpectingSingleScheduledState() {
         simulateLightOnEvent("/lights/" + ID);
         return ensureScheduledStates(1).getFirst();
@@ -5757,6 +5761,41 @@ class HueSchedulerTest {
     }
 
     @Test
+    void run_execution_lightsIsOff_detectedViaSingleOffEvent_doesNotMakeAnyCalls_restAfterOnEvent() {
+        addKnownLightIdsWithDefaultCapabilities(2);
+        addState(2, "00:00", "bri:" + DEFAULT_BRIGHTNESS);
+        addState(2, "01:00", "bri:" + (DEFAULT_BRIGHTNESS + 10));
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(2);
+        ScheduledRunnable firstState = scheduledRunnables.get(0);
+        ScheduledRunnable secondState = scheduledRunnables.get(1);
+
+        simulateLightOffEvent("/lights/2");
+
+        advanceTimeAndRunAndAssertPutCalls(firstState); // no put call
+
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusHours(1)); // next day
+
+        // power on -> ignores off state
+
+        List<ScheduledRunnable> powerOnRunnables = simulateLightOnEvent("/lights/2",
+                expectedPowerOnEnd(initialNow.plusHours(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(powerOnRunnables.getFirst(),
+                expectedPutCall(2).bri(DEFAULT_BRIGHTNESS)
+        );
+
+        // second state, still treated as on
+
+        advanceTimeAndRunAndAssertPutCalls(secondState,
+                expectedPutCall(2).bri(DEFAULT_BRIGHTNESS + 10)
+        );
+
+        ensureRunnable(initialNow.plusDays(1).plusHours(1), initialNow.plusDays(2)); // next day
+    }
+
+    @Test
     void run_execution_lightOffCheck_connectionFailure_retries() {
         addKnownLightIdsWithDefaultCapabilities(1);
         addState(1, "00:00", "bri:" + DEFAULT_BRIGHTNESS);
@@ -7351,10 +7390,12 @@ class HueSchedulerTest {
                 expectedPutCall(1).bri(100)
         );
 
-        // wait until after ignore window -> turn on ignored again
+        // wait until after ignore window -> light turned off and on again. Is ignored again
 
         advanceCurrentTime(Duration.ofSeconds(sceneActivationIgnoreWindowInSeconds + 1));
 
+        simulateLightOffEvent("/lights/1"); // simulate light turned off
+        
         ScheduledRunnable powerOnRunnable2 = simulateLightOnEvent("/lights/1", expectedPowerOnEnd(initialNow.plusMinutes(10))).getFirst();
 
         runAndAssertPutCalls(powerOnRunnable2); // ignored again

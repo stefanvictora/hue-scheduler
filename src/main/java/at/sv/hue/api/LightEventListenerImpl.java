@@ -28,7 +28,7 @@ public class LightEventListenerImpl implements LightEventListener {
 
     @Override
     public void onLightOff(String id) {
-        // currently not needed
+        manualOverrideTracker.onLightOff(id);
     }
 
     @Override
@@ -38,8 +38,6 @@ public class LightEventListenerImpl implements LightEventListener {
         if (wasRecentlyAffectedBySyncedScene.test(id)) {
             MDC.put("context", "on-event (synced) " + id);
             manualOverrideTracker.onLightTurnedOnBySyncedScene(id);
-        } else {
-            manualOverrideTracker.onLightTurnedOnManually(id);
         }
         rescheduleWaitingStates(id);
     }
