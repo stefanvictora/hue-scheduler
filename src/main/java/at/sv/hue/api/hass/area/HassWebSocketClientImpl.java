@@ -13,6 +13,7 @@ import okhttp3.WebSocket;
 import okhttp3.WebSocketListener;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.MDC;
 
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -50,7 +51,7 @@ public class HassWebSocketClientImpl implements HassWebSocketClient {
     @Override
     public String sendCommand(String commandType) {
         int id = messageIdCounter.getAndIncrement();
-        return sendMessageAndWait(id, createCommandMessage(id, commandType));
+        return sendAndAwaitResponse(id, createCommandMessage(id, commandType));
     }
 
     private String createCommandMessage(int id, String commandType) {
@@ -68,33 +69,47 @@ public class HassWebSocketClientImpl implements HassWebSocketClient {
         }
     }
 
-    private String sendMessageAndWait(int id, String message) {
+    private String sendAndAwaitResponse(int id, String message) {
+        MDC.put("context", "websocket");
         CompletableFuture<String> future = new CompletableFuture<>();
         pendingRequests.put(id, future);
-        WebSocket ws = getOrEstablishConnection();
-        log.trace("Sending message to WebSocket: {}", message);
+        WebSocket ws = getOrConnect();
+        log.trace("Send: {}", message);
         if (!ws.send(message)) {
-            log.warn("WebSocket.send returned false; invalidating connection.");
-            invalidateConnection(ws, new HassWebSocketException("Failed to send message over WebSocket."));
+            HassWebSocketException exception = new HassWebSocketException("Failed to send message over WebSocket.");
+            invalidateConnection(ws, exception);
             pendingRequests.remove(id);
-            throw new HassWebSocketException("Failed to send message over WebSocket.");
+            throw exception;
         }
+        return awaitResponse(id, future);
+    }
+
+    private String awaitResponse(int id, CompletableFuture<String> future) {
         try {
             return future.get(requestTimeoutSeconds, TimeUnit.SECONDS);
         } catch (Exception e) {
             pendingRequests.remove(id);
-            throw new HassWebSocketException("Timeout or error waiting for response", e);
+            throw new HassWebSocketException("Timeout or error waiting for response.", e);
         }
     }
 
-    private WebSocket getOrEstablishConnection() {
+    private WebSocket getOrConnect() {
         synchronized (connectionLock) {
             if (webSocket == null) {
-                log.trace("Creating new WebSocket connection.");
+                log.trace("Connecting to HA WebSocket...");
                 authFuture = new CompletableFuture<>();
                 webSocket = createNewWebSocket();
             }
         }
+        return awaitAuthentication();
+    }
+
+    private WebSocket createNewWebSocket() {
+        Request request = new Request.Builder().url(origin + API_WEBSOCKET_PATH).build();
+        return client.newWebSocket(request, new HassWebSocketListener());
+    }
+
+    private WebSocket awaitAuthentication() {
         try {
             authFuture.get(requestTimeoutSeconds, TimeUnit.SECONDS);
         } catch (Exception e) {
@@ -109,11 +124,6 @@ public class HassWebSocketClientImpl implements HassWebSocketClient {
         }
     }
 
-    private WebSocket createNewWebSocket() {
-        Request request = new Request.Builder().url(origin + API_WEBSOCKET_PATH).build();
-        return client.newWebSocket(request, new HassWebSocketListener());
-    }
-
     /**
      * Centralizes connection invalidation logic.
      */
@@ -121,7 +131,6 @@ public class HassWebSocketClientImpl implements HassWebSocketClient {
         synchronized (connectionLock) {
             if (webSocket == ws) {
                 webSocket = null;
-                log.trace("Invalidated WebSocket connection due to error: {}", t.getMessage());
                 if (authFuture != null && !authFuture.isDone()) {
                     authFuture.completeExceptionally(t);
                 }
@@ -133,55 +142,66 @@ public class HassWebSocketClientImpl implements HassWebSocketClient {
 
     private class HassWebSocketListener extends WebSocketListener {
         @Override
-        public void onOpen(@NotNull WebSocket ws, @NotNull Response response) {
-            log.trace("WebSocket opened, sending authentication message.");
-            String authMessage = String.format("{\"type\": \"auth\", \"access_token\": \"%s\"}", accessToken);
-            ws.send(authMessage);
+        public void onOpen(@NotNull WebSocket webSocket, @NotNull Response response) {
+            MDC.put("context", "websocket");
+            log.info("HA WebSocket connected.");
+            authenticate(webSocket);
+            MDC.clear();
         }
 
         @Override
-        public void onMessage(@NotNull WebSocket ws, @NotNull String text) {
+        public void onMessage(@NotNull WebSocket webSocket, @NotNull String text) {
+            MDC.put("context", "websocket");
             try {
                 JsonNode node = mapper.readTree(text);
-                if (node.has("type")) {
-                    String type = node.get("type").asText();
-                    if ("auth_ok".equals(type)) {
-                        log.trace("WebSocket authentication successful.");
-                        authFuture.complete(null);
-                    } else if ("auth_invalid".equals(type)) {
-                        String errorMsg = "Authentication failed: " + text;
-                        log.error(errorMsg);
-                        authFuture.completeExceptionally(new HassWebSocketException(errorMsg));
-                    }
-                }
-                if (node.has("id")) {
-                    int id = node.get("id").asInt();
-                    CompletableFuture<String> future = pendingRequests.remove(id);
-                    if (future != null) {
-                        future.complete(text);
-                    }
-                }
+                handleMessage(node, text);
             } catch (Exception e) {
                 log.error("Failed to handle WebSocket message: '{}'", text, e);
             }
+            MDC.clear();
         }
 
         @Override
-        public void onFailure(@NotNull WebSocket ws, @NotNull Throwable t, @Nullable Response response) {
-            log.error("WebSocket failure: {}", t.getMessage());
-            invalidateConnection(ws, t);
+        public void onClosing(@NotNull WebSocket webSocket, int code, @NotNull String reason) {
+            MDC.put("context", "websocket");
+            log.trace("WebSocket is closing: [{}] {}", code, reason);
+            webSocket.close(code, reason);
+            invalidateConnection(webSocket, new HassWebSocketException("WebSocket closing: " + reason));
+            MDC.clear();
         }
 
         @Override
-        public void onClosing(@NotNull WebSocket ws, int code, @NotNull String reason) {
-            log.trace("WebSocket is closing: {} - {}", code, reason);
-            ws.close(code, reason);
-            invalidateConnection(ws, new HassWebSocketException("WebSocket closing: " + reason));
+        public void onFailure(@NotNull WebSocket webSocket, @NotNull Throwable t, @Nullable Response response) {
+            MDC.put("context", "websocket");
+            log.error("WebSocket failure: '{}'", t.getMessage());
+            webSocket.cancel();
+            invalidateConnection(webSocket, t);
+            MDC.clear();
         }
+    }
 
-        @Override
-        public void onClosed(@NotNull WebSocket ws, int code, @NotNull String reason) {
-            log.trace("WebSocket closed: {} - {}", code, reason);
+    private void authenticate(WebSocket webSocket) {
+        String authMessage = String.format("{\"type\": \"auth\", \"access_token\": \"%s\"}", accessToken);
+        webSocket.send(authMessage);
+    }
+
+    private void handleMessage(JsonNode node, String text) {
+        if (node.has("type")) {
+            String type = node.get("type").asText();
+            if ("auth_ok".equals(type)) {
+                authFuture.complete(null);
+            } else if ("auth_invalid".equals(type)) {
+                String errorMsg = "Authentication failed: '" + text + "'";
+                log.error(errorMsg);
+                authFuture.completeExceptionally(new HassWebSocketException(errorMsg));
+            }
+        }
+        if (node.has("id")) {
+            int id = node.get("id").asInt();
+            CompletableFuture<String> future = pendingRequests.remove(id);
+            if (future != null) {
+                future.complete(text);
+            }
         }
     }
 
