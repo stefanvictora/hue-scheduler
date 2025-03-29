@@ -22,7 +22,7 @@ public class HassAvailabilityListener implements HassAvailabilityEventListener {
         if (initialCheckPerformed.compareAndSet(false, true)) {
             if (checkFunction.get()) {
                 fullyStarted = true;
-                log.info("HA already available");
+                log.info("HA already available.");
             }
         }
     }

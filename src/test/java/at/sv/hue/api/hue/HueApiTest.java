@@ -93,7 +93,7 @@ class HueApiTest {
 
     @Test
     void getState_lightNotFound_exception() {
-        when(resourceProviderMock.getResource(getUrl("/light/ABCD-1234"))).thenThrow(new ResourceNotFoundException());
+        when(resourceProviderMock.getResource(getUrl("/light/ABCD-1234"))).thenThrow(new ResourceNotFoundException(""));
 
         assertThrows(ResourceNotFoundException.class, () -> getLightState("ABCD-1234"));
     }
