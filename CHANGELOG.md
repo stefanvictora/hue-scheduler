@@ -17,6 +17,8 @@
 
 ### Fixed
 - **Scene Sync**: Fixed a sync issue for states that where not activated for a longer period of time.
+- Improved reliability of Hue Scheduler during HA restarts and other cases of unavailability.
+- Reduce incorrect change detections for HA events.
 
 ## [0.12.3] - 2024-12-31
 

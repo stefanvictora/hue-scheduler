@@ -172,7 +172,7 @@ public final class HueScheduler implements Runnable {
     )
     int minTrBeforeGapInMinutes;
     @Option(names = "--scene-activation-ignore-window", paramLabel = "<duration>",
-            defaultValue = "${env:SCENE_ACTIVATION_IGNORE_WINDOW:-5}",
+            defaultValue = "${env:SCENE_ACTIVATION_IGNORE_WINDOW:-8}",
             description = "The delay in seconds during which turn-on events for affected lights and groups are ignored " +
                           "after a scene activation has been detected. Default: ${DEFAULT-VALUE} seconds.")
     int sceneActivationIgnoreWindowInSeconds;
