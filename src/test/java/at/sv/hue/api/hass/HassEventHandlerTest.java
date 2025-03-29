@@ -15,13 +15,15 @@ class HassEventHandlerTest {
 
     private LightEventListener lightEventListener;
     private SceneEventListener sceneEventListener;
+    private HassAvailabilityEventListener availabilityListener;
     private HassEventHandler handler;
 
     @BeforeEach
     void setUp() {
         lightEventListener = Mockito.mock(LightEventListener.class);
         sceneEventListener = Mockito.mock(SceneEventListener.class);
-        handler = new HassEventHandler(lightEventListener, sceneEventListener);
+        availabilityListener = Mockito.mock(HassAvailabilityEventListener.class);
+        handler = new HassEventHandler(lightEventListener, sceneEventListener, availabilityListener);
     }
 
     @Test
@@ -34,6 +36,30 @@ class HassEventHandlerTest {
                 .isInstanceOf(BridgeAuthenticationFailure.class);
 
         verifyNoEvents();
+    }
+
+    @Test
+    void onMessage_homeAssistantStarted() {
+        handler.onMessage("""
+                {
+                    "type": "event",
+                    "event": {
+                        "event_type": "homeassistant_started",
+                        "data": {},
+                        "origin": "LOCAL",
+                        "time_fired": "2025-03-29T12:27:06.273030+00:00",
+                        "context": {
+                            "id": "01JQGXXFN10NRN93F72KV1QEAX",
+                            "parent_id": null,
+                            "user_id": null
+                        }
+                    },
+                    "id": 1
+                }
+                """);
+
+        verify(availabilityListener).onStarted();
+        verifyNoEvents(); // no other events
     }
 
     @Test

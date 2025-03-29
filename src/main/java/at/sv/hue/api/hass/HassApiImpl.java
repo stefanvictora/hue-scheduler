@@ -2,6 +2,7 @@ package at.sv.hue.api.hass;
 
 import at.sv.hue.ColorMode;
 import at.sv.hue.api.ApiFailure;
+import at.sv.hue.api.BridgeConnectionFailure;
 import at.sv.hue.api.Capability;
 import at.sv.hue.api.EmptyGroupException;
 import at.sv.hue.api.GroupInfo;
@@ -44,6 +45,7 @@ public class HassApiImpl implements HueApi {
     private final HttpResourceProvider httpResourceProvider;
     private final HassAreaRegistry hassAreaRegistry;
     private final RateLimiter rateLimiter;
+    private final HassAvailabilityListener availabilityListener;
     private final ObjectMapper mapper;
     private final String baseUrl;
 
@@ -54,10 +56,11 @@ public class HassApiImpl implements HueApi {
     private boolean nameToStatesMapInvalidated;
 
     public HassApiImpl(String origin, HttpResourceProvider httpResourceProvider, HassAreaRegistry hassAreaRegistry,
-                       RateLimiter rateLimiter) {
+                       HassAvailabilityListener availabilityListener, RateLimiter rateLimiter) {
         baseUrl = origin + "/api";
         this.httpResourceProvider = httpResourceProvider;
         this.hassAreaRegistry = hassAreaRegistry;
+        this.availabilityListener = availabilityListener;
         this.rateLimiter = rateLimiter;
         mapper = new ObjectMapper();
         mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
@@ -66,7 +69,17 @@ public class HassApiImpl implements HueApi {
 
     @Override
     public void assertConnection() {
-        getOrLookupStates();
+        availabilityListener.performInitialCheck(() -> {
+            try {
+                Map<String, State> states = lookupStates();
+                return states != null && !states.isEmpty();
+            } catch (Exception e) {
+                return false;
+            }
+        });
+        if (!availabilityListener.isFullyStarted()) {
+            throw new BridgeConnectionFailure("HA not fully started yet. Waiting for startup to complete...");
+        }
     }
 
     @Override

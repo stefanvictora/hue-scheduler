@@ -13,10 +13,13 @@ public final class HassEventHandler {
     private final ObjectMapper objectMapper;
     private final LightEventListener eventListener;
     private final SceneEventListener sceneEventListener;
+    private final HassAvailabilityEventListener availabilityListener;
 
-    public HassEventHandler(LightEventListener eventListener, SceneEventListener sceneEventListener) {
+    public HassEventHandler(LightEventListener eventListener, SceneEventListener sceneEventListener,
+                            HassAvailabilityEventListener availabilityListener) {
         this.eventListener = eventListener;
         this.sceneEventListener = sceneEventListener;
+        this.availabilityListener = availabilityListener;
         objectMapper = new ObjectMapper();
         objectMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
     }
@@ -30,6 +33,8 @@ public final class HassEventHandler {
             if (event.isStateChangedEvent()) {
                 EventData data = event.event.data;
                 handleStateChangedEvent(data.getEntity_id(), data.old_state, data.new_state);
+            } else if (event.isHomeAssistantStartedEvent()) {
+                availabilityListener.onStarted();
             }
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
@@ -62,7 +67,15 @@ public final class HassEventHandler {
         EventDetails event;
 
         boolean isStateChangedEvent() {
-            return "event".equals(type) && "state_changed".equals(event.getEvent_type());
+            return isEventOfType("state_changed");
+        }
+
+        boolean isHomeAssistantStartedEvent() {
+            return isEventOfType("homeassistant_started");
+        }
+
+        private boolean isEventOfType(String type) {
+            return "event".equals(this.type) && type.equals(event.getEvent_type());
         }
     }
 

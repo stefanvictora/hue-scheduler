@@ -16,6 +16,7 @@ import at.sv.hue.api.SceneEventListener;
 import at.sv.hue.api.SceneEventListenerImpl;
 import at.sv.hue.api.hass.HassApiImpl;
 import at.sv.hue.api.hass.HassApiUtils;
+import at.sv.hue.api.hass.HassAvailabilityListener;
 import at.sv.hue.api.hass.HassEventHandler;
 import at.sv.hue.api.hass.HassEventStreamReader;
 import at.sv.hue.api.hass.area.HassAreaRegistry;
@@ -277,12 +278,13 @@ public final class HueScheduler implements Runnable {
         String websocketOrigin = HassApiUtils.getHassWebsocketOrigin(apiHost);
         HassAreaRegistry areaRegistry = new HassAreaRegistryImpl(
                 new HassWebSocketClientImpl(websocketOrigin, accessToken, httpClient, 5));
-        api = new HassApiImpl(apiHost, new HttpResourceProviderImpl(httpClient), areaRegistry, rateLimiter);
+        HassAvailabilityListener availabilityListener = new HassAvailabilityListener();
+        api = new HassApiImpl(apiHost, new HttpResourceProviderImpl(httpClient), areaRegistry, availabilityListener, rateLimiter);
         sceneEventListener = new SceneEventListenerImpl(api, Ticker.systemTicker(),
                 sceneActivationIgnoreWindowInSeconds,
                 sceneName -> HassApiUtils.matchesSceneSyncName(sceneName, sceneSyncName), lightEventListener);
         new HassEventStreamReader(websocketOrigin, accessToken, httpClient,
-                new HassEventHandler(lightEventListener, sceneEventListener)).start();
+                new HassEventHandler(lightEventListener, sceneEventListener, availabilityListener)).start();
         stateRegistry = new ScheduledStateRegistry(currentTime, api);
     }
 

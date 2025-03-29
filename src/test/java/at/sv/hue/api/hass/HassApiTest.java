@@ -2635,7 +2635,7 @@ public class HassApiTest {
     }
 
     private void setupApi(String origin) {
-        api = new HassApiImpl(origin, http, areaRegistry, permits -> {
+        api = new HassApiImpl(origin, http, areaRegistry, null, permits -> {
         });
         baseUrl = origin + "/api";
     }
