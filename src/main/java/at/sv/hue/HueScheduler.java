@@ -278,7 +278,7 @@ public final class HueScheduler implements Runnable {
         String websocketOrigin = HassApiUtils.getHassWebsocketOrigin(apiHost);
         HassAreaRegistry areaRegistry = new HassAreaRegistryImpl(
                 new HassWebSocketClientImpl(websocketOrigin, accessToken, httpClient, 5));
-        HassAvailabilityListener availabilityListener = new HassAvailabilityListener(() -> api.clearCaches());
+        HassAvailabilityListener availabilityListener = new HassAvailabilityListener(this::clearCachesAndReSyncScenes);
         api = new HassApiImpl(apiHost, new HttpResourceProviderImpl(httpClient), areaRegistry, availabilityListener, rateLimiter);
         sceneEventListener = new SceneEventListenerImpl(api, Ticker.systemTicker(),
                 sceneActivationIgnoreWindowInSeconds,
@@ -438,7 +438,7 @@ public final class HueScheduler implements Runnable {
                 return;
             }
             if (shouldSyncScene(snapshot)) {
-                scheduleAsyncSceneSync(snapshot);
+                scheduleAsyncSceneSync(snapshot, false);
                 MDC.put("context", snapshot.getContextName());
             }
             if (shouldIgnoreState(snapshot)) {
@@ -514,27 +514,27 @@ public final class HueScheduler implements Runnable {
         return manualOverrideTracker.wasJustTurnedOn(state.getId());
     }
 
-    private void scheduleAsyncSceneSync(ScheduledStateSnapshot state) {
+    private void scheduleAsyncSceneSync(ScheduledStateSnapshot state, boolean justOnce) {
         if (sceneSyncDelayInSeconds == 0) {
-            syncScene(state);
+            syncScene(state, justOnce);
         } else {
             stateScheduler.schedule(() -> {
-                syncScene(state);
+                syncScene(state, justOnce);
             }, currentTime.get().plusSeconds(sceneSyncDelayInSeconds), state.getEnd());
         }
     }
 
-    private void syncScene(ScheduledStateSnapshot state) {
+    private void syncScene(ScheduledStateSnapshot state, boolean justOnce) {
         MDC.put("context", state.getContextName() + " (scene sync)");
         try {
             stateRegistry.getAssignedGroups(state)
                          .forEach(groupInfo -> syncScene(groupInfo.groupId(), stateRegistry.getPutCalls(groupInfo.groupLights())));
-            if (state.performsInterpolation(currentTime.get())) {
-                scheduleNextSceneSync(state);
+            if (!justOnce && state.performsInterpolation(currentTime.get())) {
+                scheduleNextSceneSync(state, false);
             }
         } catch (Exception e) {
             LOG.error("Scene sync failed: '{}'. Retry in {}min", e.getLocalizedMessage(), sceneSyncIntervalInMinutes);
-            scheduleNextSceneSync(state);
+            scheduleNextSceneSync(state, justOnce);
         }
     }
 
@@ -542,13 +542,13 @@ public final class HueScheduler implements Runnable {
         api.createOrUpdateScene(groupId, sceneSyncName, putCalls);
     }
 
-    private void scheduleNextSceneSync(ScheduledStateSnapshot stateSnapshot) {
+    private void scheduleNextSceneSync(ScheduledStateSnapshot stateSnapshot, boolean justOnce) {
         ZonedDateTime end = stateSnapshot.getEnd();
         stateScheduler.schedule(() -> {
             if (currentTime.get().isAfter(end)) {
                 return;
             }
-            syncScene(stateSnapshot);
+            syncScene(stateSnapshot, justOnce);
         }, currentTime.get().plusMinutes(sceneSyncIntervalInMinutes), end);
     }
 
@@ -815,6 +815,17 @@ public final class HueScheduler implements Runnable {
                 api::clearCaches, apiCacheInvalidationIntervalInMinutes, apiCacheInvalidationIntervalInMinutes, TimeUnit.MINUTES);
         stateScheduler.scheduleAtFixedRate(
                 startTimeProvider::clearCaches, 3, 3, TimeUnit.DAYS);
+    }
+
+    /**
+     * Since Home Assistant synced scenes are only temporary, we have to re-sync them on each HA restart we detect.
+     */
+    void clearCachesAndReSyncScenes() {
+        api.clearCaches();
+        if (enableSceneSync) {
+            stateRegistry.findCurrentlyActiveStates()
+                         .forEach(state -> scheduleAsyncSceneSync(state, true));
+        }
     }
 
     LightEventListener getHueEventListener() {

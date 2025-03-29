@@ -8,8 +8,8 @@
   - Scenes are named following the pattern: `scene.<scene_sync_name>_<group_or_area_name>`. Customize via `--scene-sync-name` (default: `HueScheduler`). Example: `scene.huescheduler_living_room`.
   - Use with Home Assistant automations, smart switches or motion sensors to directly turn on your lights in the desired state.
   - A synced scene is created for each group and area your scheduled entities are part of.
-  - **Known Limitations**:
-    - Dynamic scenes are temporary and require recreation after Home Assistant restarts. This is handled automatically but may require a Hue Scheduler restart for immediate recreation.
+  - Note: Dynamic scenes are temporary and require recreation after Home Assistant restarts. This is handled automatically by Hue Scheduler.
+  - **Known Limitation**:
     - Dynamic scenes cannot be assigned to areas or given custom names beyond their entity ID.
 - **Manual Activation Mode**: Added new `--require-scene-activation` command line flag to schedule states only when a synced Hue Scheduler scene is activated. Subsequent states continue normally until lights are turned off or manually overridden.
   - Designed to integrate with `--enable-scene-sync` for complete manual control over state activation.

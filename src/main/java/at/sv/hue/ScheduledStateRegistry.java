@@ -165,14 +165,19 @@ public class ScheduledStateRegistry {
 
     private Optional<PutCall> findActivePutCall(List<ScheduledState> lightStatesForId) {
         ZonedDateTime now = currentTime.get();
+        return findActiveSnapshot(lightStatesForId)
+                .map(snapshot -> snapshot.getInterpolatedFullPicturePutCall(now));
+    }
+
+    private Optional<ScheduledStateSnapshot> findActiveSnapshot(List<ScheduledState> lightStatesForId) {
+        ZonedDateTime now = currentTime.get();
         ZonedDateTime theDayBefore = now.minusDays(1);
         ZonedDateTime theDayAfter = now.plusDays(1);
         return lightStatesForId.stream()
                                .flatMap(state -> Stream.of(state.getSnapshot(theDayBefore),
                                        state.getSnapshot(now), state.getSnapshot(theDayAfter)))
                                .filter(snapshot -> snapshot.isCurrentlyActive(now))
-                               .findFirst()
-                               .map(snapshot -> snapshot.getInterpolatedFullPicturePutCall(now));
+                               .findFirst();
     }
 
     private Stream<PutCall> createOverriddenLightPutCalls(PutCall otherGroupPutCall, List<String> groupLights) {
@@ -202,5 +207,12 @@ public class ScheduledStateRegistry {
 
     public Collection<List<ScheduledState>> values() {
         return lightStates.values();
+    }
+
+    public List<ScheduledStateSnapshot> findCurrentlyActiveStates() {
+        return values().stream()
+                .map(this::findActiveSnapshot)
+                .flatMap(Optional::stream)
+                .toList();
     }
 }
