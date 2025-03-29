@@ -63,7 +63,7 @@ class HassEventHandlerTest {
     }
 
     @Test
-    void onMessage_stateChanged_onEvent_noPreviousState_treatedAsOff() {
+    void onMessage_stateChanged_onEvent_noPreviousState_ignored() {
         handler.onMessage("""
                 {
                   "id": 1,
@@ -132,7 +132,7 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verify(lightEventListener).onLightOn("light.schreibtisch_r");
+        verifyNoEvents();
     }
 
     @Test
@@ -459,7 +459,7 @@ class HassEventHandlerTest {
     }
 
     @Test
-    void onMessage_stateChanged_lightOff_noPreviousState_treatedAsOff_noEvent() {
+    void onMessage_stateChanged_lightOff_noPreviousState_ignored() {
         handler.onMessage("""
                 {
                   "id": 1,
@@ -1357,6 +1357,73 @@ class HassEventHandlerTest {
                     "time_fired" : "2025-02-08T19:11:28.950183+00:00",
                     "context" : {
                       "id" : "01JKKFJPNP013F9BTVBGP4WW02",
+                      "parent_id" : null,
+                      "user_id" : null
+                    }
+                  },
+                  "id" : 1
+                }
+                """);
+
+        verifyNoEvents();
+    }
+
+    @Test
+    void onMessage_hueScene_onlyAttributesChanged_noEventTriggered() {
+        handler.onMessage("""
+                {
+                  "type" : "event",
+                  "event" : {
+                    "event_type" : "state_changed",
+                    "data" : {
+                      "entity_id" : "scene.bad_huescheduler",
+                      "old_state" : {
+                        "entity_id" : "scene.bad_huescheduler",
+                        "state" : "2025-02-09T13:20:57.257967+00:00",
+                        "attributes" : {
+                          "group_name" : "Bad",
+                          "group_type" : "room",
+                          "name" : "HueScheduler",
+                          "speed" : 0.5,
+                          "brightness" : 242,
+                          "is_dynamic" : false,
+                          "friendly_name" : "Bad HueScheduler"
+                        },
+                        "last_changed" : "2025-03-29T16:38:35.508777+00:00",
+                        "last_reported" : "2025-03-29T16:45:52.068893+00:00",
+                        "last_updated" : "2025-03-29T16:45:52.068893+00:00",
+                        "context" : {
+                          "id" : "01JQHCQ9J4Z21229HGC6G96WET",
+                          "parent_id" : null,
+                          "user_id" : null
+                        }
+                      },
+                      "new_state" : {
+                        "entity_id" : "scene.bad_huescheduler",
+                        "state" : "2025-02-09T13:20:57.257967+00:00",
+                        "attributes" : {
+                          "group_name" : "Bad",
+                          "group_type" : "room",
+                          "name" : "HueScheduler",
+                          "speed" : 0.5,
+                          "brightness" : 236,
+                          "is_dynamic" : false,
+                          "friendly_name" : "Bad HueScheduler"
+                        },
+                        "last_changed" : "2025-03-29T16:38:35.508777+00:00",
+                        "last_reported" : "2025-03-29T16:48:52.936191+00:00",
+                        "last_updated" : "2025-03-29T16:48:52.936191+00:00",
+                        "context" : {
+                          "id" : "01JQHCWT68X3HBTQWHJ00HH0N0",
+                          "parent_id" : null,
+                          "user_id" : null
+                        }
+                      }
+                    },
+                    "origin" : "LOCAL",
+                    "time_fired" : "2025-03-29T16:48:52.936191+00:00",
+                    "context" : {
+                      "id" : "01JQHCWT68X3HBTQWHJ00HH0N0",
                       "parent_id" : null,
                       "user_id" : null
                     }

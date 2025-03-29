@@ -8,6 +8,8 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Data;
 
+import java.util.Objects;
+
 public final class HassEventHandler {
 
     private final ObjectMapper objectMapper;
@@ -45,7 +47,7 @@ public final class HassEventHandler {
         if (newState == null) {
             return;
         }
-        if ((oldState == null || oldState.isOff()) && newState.isOn()) {
+        if (oldState != null && oldState.isOff() && newState.isOn()) {
             if (HassSupportedEntityType.isSupportedEntityType(entityId)) {
                 eventListener.onLightOn(entityId);
             }
@@ -56,7 +58,9 @@ public final class HassEventHandler {
         } else if (oldState != null && oldState.isOn() && (newState.isOff() || newState.isUnavailable())) {
             eventListener.onLightOff(entityId);
         } else if (oldState != null && newState.isScene() && !newState.isUnavailable() && !newState.isUnknown()) {
-            sceneEventListener.onSceneActivated(entityId);
+            if (!Objects.equals(oldState.state, newState.state)) {
+                sceneEventListener.onSceneActivated(entityId);
+            }
         }
     }
 
