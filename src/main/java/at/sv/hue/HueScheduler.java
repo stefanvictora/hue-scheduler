@@ -342,11 +342,12 @@ public final class HueScheduler implements Runnable {
     }
 
     private boolean assertConnection() {
+        MDC.put("context", "init");
         try {
             api.assertConnection();
             LOG.info("Connected to {}.", apiHost);
         } catch (BridgeConnectionFailure e) {
-            LOG.warn("Api not reachable: '{}'. Retrying in 5s.", e.getCause().getLocalizedMessage());
+            LOG.warn("Api not reachable: '{}'. Retrying in 5s.", getCauseMessage(e));
             return false;
         } catch (BridgeAuthenticationFailure e) {
             System.err.println("Api connection rejected: 'Unauthorized user'. Please make sure you use the correct" +
@@ -354,6 +355,10 @@ public final class HueScheduler implements Runnable {
             System.exit(3);
         }
         return true;
+    }
+
+    private static String getCauseMessage(Exception e) {
+        return Objects.requireNonNullElse(e.getCause(), e).getLocalizedMessage();
     }
 
     private void parseInput() {
@@ -764,7 +769,7 @@ public final class HueScheduler implements Runnable {
 
     private void logException(RuntimeException e) {
         if (e instanceof BridgeConnectionFailure) {
-            LOG.warn("Api not reachable, retrying in {}s.", bridgeFailureRetryDelayInSeconds);
+            LOG.warn("Api not reachable: '{}'. Retrying in {}s.", getCauseMessage(e), bridgeFailureRetryDelayInSeconds);
         } else {
             LOG.error("Api call failed: '{}'. Retrying in {}s.", e.getLocalizedMessage(), bridgeFailureRetryDelayInSeconds);
         }

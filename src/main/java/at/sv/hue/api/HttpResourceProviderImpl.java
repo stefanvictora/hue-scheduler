@@ -70,7 +70,7 @@ public class HttpResourceProviderImpl implements HttpResourceProvider {
             assertSuccessful(response);
             return getBody(response);
         } catch (IOException e) {
-            log.error("Failed '{}'", request, e);
+            log.error("Failed '{}'", request);
             throw new BridgeConnectionFailure("Failed '" + request + "'", e);
         }
     }
