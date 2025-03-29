@@ -10,8 +10,10 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.MDC;
 
-import java.time.Duration;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
 public final class HassEventStreamReader {
@@ -20,51 +22,67 @@ public final class HassEventStreamReader {
     private final String accessToken;
     private final OkHttpClient client;
     private final HassEventHandler hassEventHandler;
-    private int messageIdCounter = 1;
+    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+    private final AtomicInteger messageIdCounter = new AtomicInteger(1);
 
     public HassEventStreamReader(String origin, String accessToken, OkHttpClient client, HassEventHandler hassEventHandler) {
         this.origin = origin;
         this.accessToken = accessToken;
         this.client = client.newBuilder()
-                .retryOnConnectionFailure(true)
-                .pingInterval(30, TimeUnit.SECONDS)
-                .build();
+                            .retryOnConnectionFailure(true)
+                            .pingInterval(30, TimeUnit.SECONDS)
+                            .build();
         this.hassEventHandler = hassEventHandler;
     }
 
     public void start() {
         Request request = new Request.Builder().url(origin + "/api/websocket").build();
+        MDC.put("context", "events");
+        log.debug("Connecting to HA event stream...");
         client.newWebSocket(request, new WebSocketListener() {
             @Override
             public void onOpen(@NotNull WebSocket webSocket, @NotNull Response response) {
                 MDC.put("context", "events");
+                log.info("HA event stream connected.");
                 authenticate(webSocket);
-                subscribeToEvents(webSocket);
-                log.trace("HA event stream handler opened.");
+                subscribeToEvents(webSocket, "state_changed");
+                subscribeToEvents(webSocket, "homeassistant_started");
+                MDC.clear();
             }
 
             @Override
             public void onMessage(@NotNull WebSocket webSocket, @NotNull String text) {
                 MDC.put("context", "events");
-                hassEventHandler.onMessage(text);
+                try {
+                    hassEventHandler.onMessage(text);
+                } catch (Exception e) {
+                    log.error("Exception while handling message: {}", text, e);
+                }
+                MDC.clear();
             }
 
             @Override
             public void onClosing(@NotNull WebSocket webSocket, int code, @NotNull String reason) {
-                start();
+                MDC.put("context", "events");
+                log.warn("HA event stream closing: [{}] {}. Reconnecting in 3s.", code, reason);
+                webSocket.close(code, reason);
+                reconnectWithDelay();
+                MDC.clear();
             }
 
             @Override
             public void onFailure(@NotNull WebSocket webSocket, @NotNull Throwable t, @Nullable Response response) {
                 MDC.put("context", "events");
-                log.error("HA event stream failed. Retrying in 3s.", t);
-                try {
-                    Thread.sleep(Duration.ofSeconds(3));
-                } catch (InterruptedException ignore) {
-                }
-                start();
+                log.error("HA event stream failure: '{}'. Reconnecting in 3s.", t.getMessage());
+                webSocket.cancel();
+                reconnectWithDelay();
+                MDC.clear();
             }
         });
+    }
+
+    private void reconnectWithDelay() {
+        scheduler.schedule(this::start, 3, TimeUnit.SECONDS);
     }
 
     private void authenticate(WebSocket webSocket) {
@@ -72,9 +90,10 @@ public final class HassEventStreamReader {
         webSocket.send(authMessage);
     }
 
-    private void subscribeToEvents(WebSocket webSocket) {
-        int messageId = messageIdCounter++;
-        String subscribeMessage = String.format("{\"id\": %d, \"type\": \"subscribe_events\", \"event_type\": \"state_changed\"}", messageId);
+    private void subscribeToEvents(WebSocket webSocket, String type) {
+        int messageId = messageIdCounter.getAndIncrement();
+        String subscribeMessage = String.format(
+                "{\"id\": %d, \"type\": \"subscribe_events\", \"event_type\": \"%s\"}", messageId, type);
         webSocket.send(subscribeMessage);
     }
 }
