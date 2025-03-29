@@ -11,6 +11,7 @@ class HassApiUtilsTest {
         assertThat(HassApiUtils.matchesSceneSyncName("huescheduler_", "HueScheduler")).isTrue();
         assertThat(HassApiUtils.matchesSceneSyncName("huescheduler", "HueScheduler")).isFalse();
         assertThat(HassApiUtils.matchesSceneSyncName("something_else", "HueScheduler")).isFalse();
+        assertThat(HassApiUtils.matchesSceneSyncName(null, "HueScheduler")).isFalse();
         assertThat(HassApiUtils.matchesSceneSyncName("_test__", "!Test!")).isTrue();
     }
 

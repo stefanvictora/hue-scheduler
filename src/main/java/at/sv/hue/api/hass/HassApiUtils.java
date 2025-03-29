@@ -13,7 +13,7 @@ public final class HassApiUtils {
     }
 
     public static boolean matchesSceneSyncName(String sceneName, String syncName) {
-        return sceneName.contains(normalize(syncName) + "_");
+        return sceneName != null && sceneName.contains(normalize(syncName) + "_");
     }
 
     private static String normalize(String s) {
