@@ -278,7 +278,7 @@ public final class HueScheduler implements Runnable {
         String websocketOrigin = HassApiUtils.getHassWebsocketOrigin(apiHost);
         HassAreaRegistry areaRegistry = new HassAreaRegistryImpl(
                 new HassWebSocketClientImpl(websocketOrigin, accessToken, httpClient, 5));
-        HassAvailabilityListener availabilityListener = new HassAvailabilityListener();
+        HassAvailabilityListener availabilityListener = new HassAvailabilityListener(() -> api.clearCaches());
         api = new HassApiImpl(apiHost, new HttpResourceProviderImpl(httpClient), areaRegistry, availabilityListener, rateLimiter);
         sceneEventListener = new SceneEventListenerImpl(api, Ticker.systemTicker(),
                 sceneActivationIgnoreWindowInSeconds,

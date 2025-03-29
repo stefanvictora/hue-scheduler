@@ -12,10 +12,17 @@ public class HassAvailabilityListener implements HassAvailabilityEventListener {
     @Getter
     private volatile boolean fullyStarted = false;
     private final AtomicBoolean initialCheckPerformed = new AtomicBoolean(false);
+    private final Runnable onStartedCallback;
+
+    public HassAvailabilityListener(Runnable onStartedCallback) {
+        this.onStartedCallback = onStartedCallback;
+    }
 
     @Override
     public void onStarted() {
+        log.info("HA started.");
         fullyStarted = true;
+        onStartedCallback.run();
     }
 
     public void performInitialCheck(Supplier<Boolean> checkFunction) {
