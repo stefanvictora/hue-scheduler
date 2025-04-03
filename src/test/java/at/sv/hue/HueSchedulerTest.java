@@ -5796,6 +5796,38 @@ class HueSchedulerTest {
     }
 
     @Test
+    void run_execution_lightIsOff_doesNotApplyNextState_evenIfManualTurnOnAndOffHappensInBetween() {
+        addKnownLightIdsWithDefaultCapabilities(2);
+        addState(2, "00:00", "on:false");
+        addState(2, "01:00", "bri:" + DEFAULT_BRIGHTNESS);
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(2);
+        ScheduledRunnable firstState = scheduledRunnables.get(0);
+        ScheduledRunnable secondState = scheduledRunnables.get(1);
+
+        advanceTimeAndRunAndAssertPutCalls(firstState,
+                expectedPutCall(2).on(false)
+        );
+
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusHours(1)); // next day
+
+        // power on -> does not repeat on:false, since no force:true is present
+
+        simulateLightOnEvent("/lights/2");
+        ensureScheduledStates(0); // no power-on states scheduled
+
+        // manually turn-off lights again
+
+        simulateLightOffEvent("/lights/2");
+
+        // second state, still treated as off
+
+        advanceTimeAndRunAndAssertPutCalls(secondState);
+
+        ensureRunnable(initialNow.plusDays(1).plusHours(1), initialNow.plusDays(2)); // next day
+    }
+
+    @Test
     void run_execution_lightOffCheck_connectionFailure_retries() {
         addKnownLightIdsWithDefaultCapabilities(1);
         addState(1, "00:00", "bri:" + DEFAULT_BRIGHTNESS);

@@ -70,7 +70,6 @@ public class HassWebSocketClientImpl implements HassWebSocketClient {
     }
 
     private String sendAndAwaitResponse(int id, String message) {
-        MDC.put("context", "websocket");
         CompletableFuture<String> future = new CompletableFuture<>();
         pendingRequests.put(id, future);
         WebSocket ws = getOrConnect();

@@ -47,6 +47,7 @@ public class ManualOverrideTrackerImpl implements ManualOverrideTracker {
         TrackedState trackedState = getOrCreateTrackedState(id);
         trackedState.setLightIsOff(true);
         trackedState.setTurnedOnBySyncedScene(false);
+        trackedState.setJustTurnedOn(false);
     }
 
     @Override

@@ -77,6 +77,15 @@ class ManualOverrideTrackerImplTest {
     }
 
     @Test
+    void wasJustTurnedOn_resetAfterLightOff() {
+        tracker.onLightTurnedOn("1");
+
+        tracker.onLightOff("1");
+
+        assertWasJustTurnedOn("1", false);
+    }
+
+    @Test
     void wasActivatedBySyncedScene_returnsCorrectResult() {
         tracker.onLightTurnedOnBySyncedScene("1");
 
