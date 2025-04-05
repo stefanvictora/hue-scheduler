@@ -1041,8 +1041,7 @@ class HueApiTest {
                 """);
 
         assertThat(api.getAffectedIdsByScene("4b5a905c-cc5e-48be-bc15-84da7deb5da7"))
-                .containsExactly("a24f1683-3cd9-466f-8072-3eed721af248", "57eaaeee-cd72-4b3b-b2dc-7cccbce0bbd7",
-                        "4c69c282-3e45-4e87-adb0-fa52e03b4620");
+                .containsExactly("a24f1683-3cd9-466f-8072-3eed721af248", "4c69c282-3e45-4e87-adb0-fa52e03b4620"); // ignores off light
         assertThat(api.getAffectedIdsByScene("f96f02db-9765-401c-9aa5-86d59fbdde8e"))
                 .containsExactly("1aa6083d-3692-49e5-92f7-b926b302dd49", "1271bf6f-be63-42fc-b18c-3ad462914d8e",
                         "eeb336d9-243b-4756-8455-1c69f50efd31");

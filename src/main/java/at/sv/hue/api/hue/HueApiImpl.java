@@ -229,12 +229,18 @@ public final class HueApiImpl implements HueApi {
 
     private List<String> getAffectedIdsByScene(Scene scene) {
         List<String> resourceIds = new ArrayList<>(scene.getActions().stream()
+                                                        .filter(HueApiImpl::isOn)
                                                         .map(SceneAction::getTarget)
                                                         .map(ResourceReference::getRid)
                                                         .toList());
         String groupedLightId = getAndAssertGroupExists(scene.getGroup()).getGroupedLightId();
         resourceIds.add(groupedLightId);
         return resourceIds;
+    }
+
+    private static boolean isOn(SceneAction action) {
+        On on = action.getAction().on;
+        return on != null && on.isOn();
     }
 
     @Override
