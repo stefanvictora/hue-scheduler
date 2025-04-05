@@ -176,6 +176,11 @@ public final class HueScheduler implements Runnable {
             description = "The delay in seconds during which turn-on events for affected lights and groups are ignored " +
                           "after a scene activation has been detected. Default: ${DEFAULT-VALUE} seconds.")
     int sceneActivationIgnoreWindowInSeconds;
+    @Option(names = "--just-turned-on-window", paramLabel = "<duration>",
+            defaultValue = "${env:JUST_TURNED_ON_WINDOW:-10}",
+            description = "The delay in seconds after a turn-on event during which a light or group is considered recently turned on'. " +
+                          "Default: ${DEFAULT-VALUE} seconds.")
+    int justTurnedOnWindowInSeconds;
     @Option(names = "--insecure",
             defaultValue = "${env:INSECURE:-false}",
             description = "Disables certificate validation for older bridges using self-signed certificates." +
@@ -185,18 +190,16 @@ public final class HueScheduler implements Runnable {
     private StateScheduler stateScheduler;
     private final ManualOverrideTracker manualOverrideTracker;
     private final LightEventListener lightEventListener;
+    private final Supplier<ZonedDateTime> currentTime;
     private StartTimeProvider startTimeProvider;
-    private Supplier<ZonedDateTime> currentTime;
     private SceneEventListenerImpl sceneEventListener;
     private ScheduledStateRegistry stateRegistry;
     private int sceneSyncDelayInSeconds = 5;
 
     public HueScheduler() {
         currentTime = ZonedDateTime::now;
-        manualOverrideTracker = new ManualOverrideTrackerImpl();
-        lightEventListener = new LightEventListenerImpl(manualOverrideTracker,
-                deviceId -> api.getAffectedIdsByDevice(deviceId),
-                id -> sceneEventListener.wasRecentlyAffectedBySyncedScene(id));
+        manualOverrideTracker = new ManualOverrideTrackerImpl(Ticker.systemTicker(), justTurnedOnWindowInSeconds);
+        lightEventListener = createLightEventListener();
     }
 
     public HueScheduler(HueApi api, StateScheduler stateScheduler,
@@ -207,13 +210,10 @@ public final class HueScheduler implements Runnable {
                         int powerOnRescheduleDelayInMs, int bridgeFailureRetryDelayInSeconds,
                         int minTrBeforeGapInMinutes, int sceneActivationIgnoreWindowInSeconds, boolean interpolateAll,
                         boolean enableSceneSync, String sceneSyncName, int sceneSyncIntervalInMinutes,
-                        int sceneSyncDelayInSeconds) {
-        this();
+                        int sceneSyncDelayInSeconds, int justTurnedOnWindowInSeconds) {
         this.api = api;
         ZonedDateTime initialTime = currentTime.get();
-        this.sceneEventListener = new SceneEventListenerImpl(api,
-                () -> Duration.between(initialTime, currentTime.get()).toNanos(),
-                sceneActivationIgnoreWindowInSeconds, sceneSyncName::equals, lightEventListener);
+        Ticker fakeTicker = () -> Duration.between(initialTime, currentTime.get()).toNanos();
         this.stateScheduler = stateScheduler;
         this.startTimeProvider = startTimeProvider;
         this.currentTime = currentTime;
@@ -232,8 +232,19 @@ public final class HueScheduler implements Runnable {
         this.sceneSyncName = sceneSyncName;
         this.sceneSyncIntervalInMinutes = sceneSyncIntervalInMinutes;
         this.sceneSyncDelayInSeconds = sceneSyncDelayInSeconds;
+        this.justTurnedOnWindowInSeconds = justTurnedOnWindowInSeconds;
         apiCacheInvalidationIntervalInMinutes = 15;
         stateRegistry = new ScheduledStateRegistry(currentTime, api);
+        manualOverrideTracker = new ManualOverrideTrackerImpl(fakeTicker, justTurnedOnWindowInSeconds);
+        lightEventListener = createLightEventListener();
+        this.sceneEventListener = new SceneEventListenerImpl(api, fakeTicker, sceneActivationIgnoreWindowInSeconds,
+                sceneSyncName::equals, lightEventListener);
+    }
+
+    private LightEventListenerImpl createLightEventListener() {
+        return new LightEventListenerImpl(manualOverrideTracker,
+                deviceId -> api.getAffectedIdsByDevice(deviceId),
+                id -> sceneEventListener.wasRecentlyAffectedBySyncedScene(id));
     }
 
     private Integer parseInterpolationTransitionTime(String interpolationTransitionTimeString) {

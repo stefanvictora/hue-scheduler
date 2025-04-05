@@ -127,7 +127,7 @@ class HueSchedulerTest {
                 () -> now, 10.0, controlGroupLightsIndividually, disableUserModificationTracking,
                 requireSceneActivation, defaultInterpolationTransitionTimeInMs, 0, connectionFailureRetryDelay,
                 minTrGap, sceneActivationIgnoreWindowInSeconds, interpolateAll,
-                enableSceneSync, sceneSyncName, sceneSyncInterpolationInterval, sceneSyncDelayInSeconds);
+                enableSceneSync, sceneSyncName, sceneSyncInterpolationInterval, sceneSyncDelayInSeconds, 10);
         manualOverrideTracker = scheduler.getManualOverrideTracker();
     }
 
@@ -1108,7 +1108,7 @@ class HueSchedulerTest {
         finalPowerOns.get(0).run(); // already ended -> no put calls
 
         runAndAssertPutCalls(finalPowerOns.get(1),
-                expectedPutCall(1).bri(initialBrightness + 205),
+                // no interpolation, as outside of "just-turned-on" window
                 expectedPutCall(1).bri(initialBrightness + 210).transitionTime(3000) // remaining five minutes
         );
 
@@ -7128,6 +7128,94 @@ class HueSchedulerTest {
                 expectedPutCall(5).bri(130), expectedPutCall(6).bri(130));
 
         ensureRunnable(initialNow.plusDays(1).plusSeconds(2), initialNow.plusDays(1).plusMinutes(10)); // next day
+    }
+
+    @Test
+    void sceneSync_multipleSchedules_offStateIsCorrectlyReCheckedAfterSyncedSceneTurnedOnContainingOffStates_bugCase() {
+        enableSceneSync();
+
+        mockDefaultGroupCapabilities(1);
+        mockDefaultGroupCapabilities(2);
+        mockDefaultGroupCapabilities(3);
+        mockGroupLightsForId(1, 5, 6, 7, 8);
+        mockGroupLightsForId(2, 5, 6);
+        mockGroupLightsForId(3, 7, 8);
+        mockAssignedGroups(5, 1, 2);
+        mockAssignedGroups(6, 1, 2);
+        mockAssignedGroups(7, 1, 3);
+        mockAssignedGroups(8, 1, 3);
+        addState("g2", now, "bri:120");
+        addState("g3", now, "on:false");
+        addState("g2", now.plusMinutes(10), "bri:220");
+        addState("g3", now.plusMinutes(10), "bri:230");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+        );
+
+        // g2.1
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.getFirst(),
+                expectedGroupPutCall(2).bri(120)
+        );
+
+        assertSceneUpdate("/groups/1",
+                expectedPutCall(5).bri(120), expectedPutCall(6).bri(120), expectedPutCall(7).on(false), expectedPutCall(8).on(false));
+        assertSceneUpdate("/groups/2",
+                expectedPutCall(5).bri(120), expectedPutCall(6).bri(120));
+
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(10)); // next day
+
+        // g3.1
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.get(1),
+                expectedGroupPutCall(3).on(false)
+        );
+        simulateLightOffEvent("/groups/3");
+
+        assertSceneUpdate("/groups/1",
+                expectedPutCall(5).bri(120), expectedPutCall(6).bri(120), expectedPutCall(7).on(false), expectedPutCall(8).on(false));
+        assertSceneUpdate("/groups/3",
+                expectedPutCall(7).on(false), expectedPutCall(8).on(false));
+
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(10)); // next day
+
+        // Activate synced scene for g1 -> only applies g2 state again
+
+        simulateSyncedSceneActivated("/scene/synced_scene", "/lights/5", "/lights/6", "/lights/7", "/lights/8");
+
+        ScheduledRunnable syncedSceneRunnable = ensureScheduledStates(expectedPowerOnEnd(initialNow.plusMinutes(10))).getFirst();
+        advanceTimeAndRunAndAssertPutCalls(syncedSceneRunnable,
+                expectedGroupPutCall(2).bri(120)
+        );
+
+        // g2.2
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.get(2),
+                expectedGroupPutCall(2).bri(220)
+        );
+
+        assertSceneUpdate("/groups/1",
+                expectedPutCall(5).bri(220), expectedPutCall(6).bri(220), expectedPutCall(7).bri(230), expectedPutCall(8).bri(230));
+        assertSceneUpdate("/groups/2",
+                expectedPutCall(5).bri(220), expectedPutCall(6).bri(220));
+
+        ensureRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)); // next day
+
+        // g3.2: bug case -> synced scene activation triggers turnOn events internally; we need to still recheck off state to not apply states where the lights are off
+
+        mockIsGroupOff(3, true);
+        advanceTimeAndRunAndAssertPutCalls(runnables.get(3)); // no update, re-checks off state by api
+
+        assertSceneUpdate("/groups/1",
+                expectedPutCall(5).bri(220), expectedPutCall(6).bri(220), expectedPutCall(7).bri(230), expectedPutCall(8).bri(230));
+        assertSceneUpdate("/groups/3",
+                expectedPutCall(7).bri(230), expectedPutCall(8).bri(230));
+
+        ensureRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)); // next day
     }
 
     @Test

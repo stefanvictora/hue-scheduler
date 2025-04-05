@@ -5,16 +5,23 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Duration;
+import java.time.ZonedDateTime;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 @ExtendWith(MockitoExtension.class)
 class ManualOverrideTrackerImplTest {
 
     private ManualOverrideTrackerImpl tracker;
+    private ZonedDateTime currentTime;
 
     @BeforeEach
     void setUp() {
-        tracker = new ManualOverrideTrackerImpl();
+        currentTime = ZonedDateTime.now();
+        ZonedDateTime initialTime = currentTime;
+        tracker = new ManualOverrideTrackerImpl(
+                () -> Duration.between(initialTime, currentTime).toNanos(), 10);
     }
 
     @Test
@@ -81,6 +88,17 @@ class ManualOverrideTrackerImplTest {
         tracker.onLightTurnedOn("1");
 
         tracker.onLightOff("1");
+
+        assertWasJustTurnedOn("1", false);
+    }
+
+    @Test
+    void wasJustTurnedOn_resetAfterTimeout() {
+        tracker.onLightTurnedOn("1");
+
+        assertWasJustTurnedOn("1", true);
+        
+        currentTime = currentTime.plusSeconds(10);
 
         assertWasJustTurnedOn("1", false);
     }
