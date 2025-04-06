@@ -1,12 +1,10 @@
 package at.sv.hue.api;
 
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Ticker;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.time.Duration;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class ManualOverrideTrackerImpl implements ManualOverrideTracker {
@@ -14,21 +12,22 @@ public class ManualOverrideTrackerImpl implements ManualOverrideTracker {
     private static final TrackedState DEFAULT_STATE = new TrackedState();
 
     private final ConcurrentHashMap<String, TrackedState> trackedStatesPerId;
-    private final Cache<String, String> wasJustTurnedOnIds;
+    private final Map<String, Long> lastTurnedOnTimePerId;
+    private final long justTurnedOnWindowDuration;
+    private final Ticker ticker;
 
     public ManualOverrideTrackerImpl(Ticker ticker, int justTurnedOnWindowInSeconds) {
+        this.ticker = ticker;
+        justTurnedOnWindowDuration = justTurnedOnWindowInSeconds * 1_000_000_000L;
         trackedStatesPerId = new ConcurrentHashMap<>();
-        wasJustTurnedOnIds = Caffeine.newBuilder()
-                                     .ticker(ticker)
-                                     .expireAfterWrite(Duration.ofSeconds(justTurnedOnWindowInSeconds))
-                                     .build();
+        lastTurnedOnTimePerId = new ConcurrentHashMap<>();
     }
 
     @Override
     public void onManuallyOverridden(String id) {
         TrackedState trackedState = getOrCreateTrackedState(id);
         trackedState.setManuallyOverridden(true);
-        wasJustTurnedOnIds.invalidate(id);
+        resetJustTurnedOn(id);
         trackedState.setTurnedOnBySyncedScene(false);
     }
 
@@ -42,7 +41,7 @@ public class ManualOverrideTrackerImpl implements ManualOverrideTracker {
         TrackedState trackedState = getOrCreateTrackedState(id);
         trackedState.setManuallyOverridden(false);
         trackedState.setLightIsOff(false);
-        wasJustTurnedOnIds.put(id, id);
+        lastTurnedOnTimePerId.put(id, ticker.read());
     }
 
     @Override
@@ -56,7 +55,7 @@ public class ManualOverrideTrackerImpl implements ManualOverrideTracker {
         TrackedState trackedState = getOrCreateTrackedState(id);
         trackedState.setLightIsOff(true);
         trackedState.setTurnedOnBySyncedScene(false);
-        wasJustTurnedOnIds.invalidate(id);
+        resetJustTurnedOn(id);
     }
 
     @Override
@@ -66,7 +65,8 @@ public class ManualOverrideTrackerImpl implements ManualOverrideTracker {
 
     @Override
     public boolean wasJustTurnedOn(String id) {
-        return wasJustTurnedOnIds.getIfPresent(id) != null;
+        Long last = lastTurnedOnTimePerId.get(id);
+        return last != null && ticker.read() - last < justTurnedOnWindowDuration;
     }
 
     @Override
@@ -78,7 +78,7 @@ public class ManualOverrideTrackerImpl implements ManualOverrideTracker {
     public void onAutomaticallyAssigned(String id) {
         TrackedState trackedState = getOrCreateTrackedState(id);
         trackedState.setManuallyOverridden(false);  // maybe not needed, as this flag is overridden also on light-on events
-        wasJustTurnedOnIds.invalidate(id);
+        resetJustTurnedOn(id);
     }
 
     private TrackedState getOrCreateTrackedState(String id) {
@@ -87,6 +87,10 @@ public class ManualOverrideTrackerImpl implements ManualOverrideTracker {
 
     private TrackedState getOrDefaultState(String id) {
         return trackedStatesPerId.getOrDefault(id, DEFAULT_STATE);
+    }
+
+    private void resetJustTurnedOn(String id) {
+        lastTurnedOnTimePerId.remove(id);
     }
 
     @Getter
