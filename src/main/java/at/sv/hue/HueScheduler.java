@@ -188,8 +188,8 @@ public final class HueScheduler implements Runnable {
     private boolean insecure;
     private HueApi api;
     private StateScheduler stateScheduler;
-    private final ManualOverrideTracker manualOverrideTracker;
-    private final LightEventListener lightEventListener;
+    private ManualOverrideTracker manualOverrideTracker;
+    private LightEventListener lightEventListener;
     private final Supplier<ZonedDateTime> currentTime;
     private StartTimeProvider startTimeProvider;
     private SceneEventListenerImpl sceneEventListener;
@@ -198,8 +198,6 @@ public final class HueScheduler implements Runnable {
 
     public HueScheduler() {
         currentTime = ZonedDateTime::now;
-        manualOverrideTracker = new ManualOverrideTrackerImpl(Ticker.systemTicker(), justTurnedOnWindowInSeconds);
-        lightEventListener = createLightEventListener();
     }
 
     public HueScheduler(HueApi api, StateScheduler stateScheduler,
@@ -235,16 +233,20 @@ public final class HueScheduler implements Runnable {
         this.justTurnedOnWindowInSeconds = justTurnedOnWindowInSeconds;
         apiCacheInvalidationIntervalInMinutes = 15;
         stateRegistry = new ScheduledStateRegistry(currentTime, api);
-        manualOverrideTracker = new ManualOverrideTrackerImpl(fakeTicker, justTurnedOnWindowInSeconds);
-        lightEventListener = createLightEventListener();
+        manualOverrideTracker = createManualOverrideTracker(fakeTicker);
+        lightEventListener = createLightEventListener(manualOverrideTracker);
         this.sceneEventListener = new SceneEventListenerImpl(api, fakeTicker, sceneActivationIgnoreWindowInSeconds,
                 sceneSyncName::equals, lightEventListener);
     }
 
-    private LightEventListenerImpl createLightEventListener() {
-        return new LightEventListenerImpl(manualOverrideTracker,
+    private LightEventListenerImpl createLightEventListener(ManualOverrideTracker overrideTracker) {
+        return new LightEventListenerImpl(overrideTracker,
                 deviceId -> api.getAffectedIdsByDevice(deviceId),
                 id -> sceneEventListener.wasRecentlyAffectedBySyncedScene(id));
+    }
+
+    private ManualOverrideTracker createManualOverrideTracker(Ticker ticker) {
+        return new ManualOverrideTrackerImpl(ticker, justTurnedOnWindowInSeconds);
     }
 
     private Integer parseInterpolationTransitionTime(String interpolationTransitionTimeString) {
@@ -291,6 +293,8 @@ public final class HueScheduler implements Runnable {
                 new HassWebSocketClientImpl(websocketOrigin, accessToken, httpClient, 5));
         HassAvailabilityListener availabilityListener = new HassAvailabilityListener(this::clearCachesAndReSyncScenes);
         api = new HassApiImpl(apiHost, new HttpResourceProviderImpl(httpClient), areaRegistry, availabilityListener, rateLimiter);
+        manualOverrideTracker = createManualOverrideTracker(Ticker.systemTicker());
+        lightEventListener = createLightEventListener(manualOverrideTracker);
         sceneEventListener = new SceneEventListenerImpl(api, Ticker.systemTicker(),
                 sceneActivationIgnoreWindowInSeconds,
                 sceneName -> HassApiUtils.matchesSceneSyncName(sceneName, sceneSyncName), lightEventListener);
@@ -303,6 +307,8 @@ public final class HueScheduler implements Runnable {
         OkHttpClient httpsClient = createHueHttpsClient();
         RateLimiter rateLimiter = RateLimiter.create(requestsPerSecond);
         api = new HueApiImpl(new HttpResourceProviderImpl(httpsClient), apiHost, rateLimiter, apiCacheInvalidationIntervalInMinutes);
+        manualOverrideTracker = createManualOverrideTracker(Ticker.systemTicker());
+        lightEventListener = createLightEventListener(manualOverrideTracker);
         sceneEventListener = new SceneEventListenerImpl(api, Ticker.systemTicker(),
                 sceneActivationIgnoreWindowInSeconds, sceneSyncName::equals, lightEventListener);
         new HueEventStreamReader(apiHost, accessToken, httpsClient, new HueEventHandler(lightEventListener, sceneEventListener, api),
