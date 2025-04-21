@@ -53,6 +53,8 @@ class HueSchedulerTest {
     private static final double DEFAULT_X = 0.2862;
     private static final double DEFAULT_Y = 0.4311;
     private static final LightCapabilities NO_CAPABILITIES = LightCapabilities.builder().build();
+    private static final int MAX_TRANSITION_TIME = ScheduledState.MAX_TRANSITION_TIME;
+    private static final int MAX_TRANSITION_TIME_MS = ScheduledState.MAX_TRANSITION_TIME_MS;
     private final String sceneSyncName = "synced-scene";
     private final String unsyncedSceneName = "user-scene";
     private final int sceneSyncInterpolationInterval = 1;
@@ -74,8 +76,6 @@ class HueSchedulerTest {
     private InOrder sceneSyncOrderVerifier;
     private int expectedPutCalls;
     private String defaultInterpolationTransitionTimeInMs;
-    private int minTrGap = 2; // in minutes
-    private final int MAX_TRANSITION_TIME_WITH_BUFFER = ScheduledState.MAX_TRANSITION_TIME - minTrGap * 600;
     private boolean interpolateAll;
     private boolean enableSceneSync = false;
     private int expectedSceneUpdates;
@@ -126,7 +126,7 @@ class HueSchedulerTest {
         scheduler = new HueScheduler(mockedHueApi, stateScheduler, startTimeProvider,
                 () -> now, 10.0, controlGroupLightsIndividually, disableUserModificationTracking,
                 requireSceneActivation, defaultInterpolationTransitionTimeInMs, 0, connectionFailureRetryDelay,
-                minTrGap, sceneActivationIgnoreWindowInSeconds, interpolateAll,
+                sceneActivationIgnoreWindowInSeconds, interpolateAll,
                 enableSceneSync, sceneSyncName, sceneSyncInterpolationInterval, sceneSyncDelayInSeconds, 10);
         manualOverrideTracker = scheduler.getManualOverrideTracker();
     }
@@ -890,7 +890,7 @@ class HueSchedulerTest {
 
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(2),
                 expectedPutCall(1).bri(100), // interpolated call
-                expectedPutCall(1).bri(50).transitionTime(tr("58min")) // 2 min gap added
+                expectedPutCall(1).bri(50).transitionTime(tr("1h"))
         );
 
         ensureRunnable(now.plusDays(1), now.plusDays(1).plusHours(1));
@@ -966,7 +966,7 @@ class HueSchedulerTest {
 
         advanceTimeAndRunAndAssertPutCalls(previousDaySunriseState,
                 expectedPutCall(1).bri(50), // interpolated call
-                expectedPutCall(1).bri(47).transitionTime(18910)
+                expectedPutCall(1).bri(47).transitionTime(tr("33min31s"))
         );
 
         ensureScheduledStates(
@@ -1003,7 +1003,7 @@ class HueSchedulerTest {
     void parse_canParseTransitionTimeBefore_maxDuration_doesNotPerformAdditionalInterpolation() {
         addKnownLightIdsWithDefaultCapabilities(1);
         addState(1, now, "bri:10");
-        addState(1, now.plusHours(1).plusMinutes(50), "bri:200", "tr-before:" + ScheduledState.MAX_TRANSITION_TIME);
+        addState(1, now.plusHours(1).plusMinutes(50), "bri:200", "tr-before:" + MAX_TRANSITION_TIME);
 
         setCurrentTimeTo(now.plusMinutes(10)); // directly at start
 
@@ -1015,7 +1015,7 @@ class HueSchedulerTest {
 
         advanceTimeAndRunAndAssertPutCalls(trRunnable,
                 expectedPutCall(1).bri(10),
-                expectedPutCall(1).bri(200).transitionTime(ScheduledState.MAX_TRANSITION_TIME));
+                expectedPutCall(1).bri(200).transitionTime(MAX_TRANSITION_TIME));
 
         ensureRunnable(now.plusDays(1), now.plusDays(2).minusMinutes(10)); // next day
     }
@@ -1055,11 +1055,11 @@ class HueSchedulerTest {
 
         advanceTimeAndRunAndAssertPutCalls(trRunnable,
                 expectedPutCall(1).bri(initialBrightness), // previous state call as interpolation start
-                expectedPutCall(1).bri(initialBrightness + 100 - 2).transitionTime(MAX_TRANSITION_TIME_WITH_BUFFER) // first split of transition
+                expectedPutCall(1).bri(initialBrightness + 100).transitionTime(MAX_TRANSITION_TIME) // first split of transition
         );
 
         List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(
-                expectedRunnable(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)), // scheduled second split of transition
+                expectedRunnable(now.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)), // scheduled second split of transition
                 expectedRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)) // next day
         );
         ScheduledRunnable followUpRunnable = followUpRunnables.getFirst();
@@ -1068,10 +1068,10 @@ class HueSchedulerTest {
 
         advanceTimeAndRunAndAssertPutCalls(followUpRunnable,
                 // no interpolation as "initialBrightness + 100" already set at end of first part
-                expectedPutCall(1).bri(initialBrightness + 200 - 2).transitionTime(MAX_TRANSITION_TIME_WITH_BUFFER) // second split of transition
+                expectedPutCall(1).bri(initialBrightness + 200).transitionTime(MAX_TRANSITION_TIME) // second split of transition
         );
 
-        ScheduledRunnable finalSplit = ensureRunnable(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS),
+        ScheduledRunnable finalSplit = ensureRunnable(now.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS),
                 initialNow.plusDays(1)); // scheduled third split of transition
 
         // simulate power-on, ten minutes later: adjusts calls from above
@@ -1079,14 +1079,14 @@ class HueSchedulerTest {
         advanceCurrentTime(Duration.ofMinutes(5));
         List<ScheduledRunnable> powerOnRunnables = simulateLightOnEvent(
                 expectedPowerOnEnd(now.minusMinutes(5)),
-                expectedPowerOnEnd(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS).minusMinutes(5))
+                expectedPowerOnEnd(now.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS).minusMinutes(5))
         );
 
         powerOnRunnables.get(0).run(); // already ended -> no put calls
         // creates another power-on runnable but with adjusted end -> see "already ended" runnable for second power-on
         advanceTimeAndRunAndAssertPutCalls(powerOnRunnables.get(1),
                 expectedPutCall(1).bri(initialBrightness + 105), // adjusted to five minutes after
-                expectedPutCall(1).bri(initialBrightness + 200 - 2).transitionTime(MAX_TRANSITION_TIME_WITH_BUFFER - 3000)
+                expectedPutCall(1).bri(initialBrightness + 200).transitionTime(MAX_TRANSITION_TIME - 3000)
         );
 
         ensureScheduledStates(0);
@@ -1140,11 +1140,11 @@ class HueSchedulerTest {
 
         advanceTimeAndRunAndAssertPutCalls(trRunnable,
                 expectedPutCall(1).bri(initialBrightness), // previous state call as interpolation start
-                expectedPutCall(1).bri(initialBrightness + 100 - 2).transitionTime(MAX_TRANSITION_TIME_WITH_BUFFER) // first split of transition
+                expectedPutCall(1).bri(initialBrightness + 100).transitionTime(MAX_TRANSITION_TIME) // first split of transition
         );
 
         List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(
-                expectedRunnable(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)), // scheduled second split of transition
+                expectedRunnable(now.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)), // scheduled second split of transition
                 expectedRunnable(initialNow.plusDays(1), initialNow.plusDays(2)) // next day
         );
         ScheduledRunnable followUpRunnable = followUpRunnables.getFirst();
@@ -1153,10 +1153,10 @@ class HueSchedulerTest {
 
         advanceTimeAndRunAndAssertPutCalls(followUpRunnable,
                 // no interpolation as "initialBrightness + 100" already set at end of first part
-                expectedPutCall(1).bri(initialBrightness + 200 - 2).transitionTime(MAX_TRANSITION_TIME_WITH_BUFFER) // second split of transition
+                expectedPutCall(1).bri(initialBrightness + 200).transitionTime(MAX_TRANSITION_TIME) // second split of transition
         );
 
-        ScheduledRunnable finalSplit = ensureRunnable(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS),
+        ScheduledRunnable finalSplit = ensureRunnable(now.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS),
                 initialNow.plusDays(1)); // scheduled third split of transition
 
         advanceTimeAndRunAndAssertPutCalls(finalSplit,
@@ -1183,7 +1183,7 @@ class HueSchedulerTest {
         trRunnable.run(); // no interaction, as directly skipped
 
         List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(
-                expectedRunnable(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)), // next split
+                expectedRunnable(now.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)), // next split
                 expectedRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)) // next day
         );
         ScheduledRunnable secondSplit = followUpRunnables.getFirst();
@@ -1191,11 +1191,11 @@ class HueSchedulerTest {
         // power-on event
 
         ScheduledRunnable powerOnRunnable = simulateLightOnEventExpectingSingleScheduledState(
-                now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS)); // first split power on
+                now.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS)); // first split power on
 
         advanceTimeAndRunAndAssertPutCalls(powerOnRunnable,
                 expectedPutCall(1).bri(DEFAULT_BRIGHTNESS), // previous state call as interpolation start
-                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 100 - 2).transitionTime(MAX_TRANSITION_TIME_WITH_BUFFER) // first split of transition
+                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 100).transitionTime(MAX_TRANSITION_TIME) // first split of transition
         );
 
         // no user modification since split call -> proceeds normally
@@ -1233,18 +1233,18 @@ class HueSchedulerTest {
         setCurrentTimeToAndRun(trRunnable); // detects manual override
 
         List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(
-                expectedRunnable(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)), // next split
+                expectedRunnable(now.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)), // next split
                 expectedRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)) // next day
         );
         ScheduledRunnable secondSplit = followUpRunnables.getFirst();
 
         // advance time to second split -> will skip first split, as not relevant anymore
-        advanceCurrentTime(Duration.ofMillis(ScheduledState.MAX_TRANSITION_TIME_MS));
+        advanceCurrentTime(Duration.ofMillis(MAX_TRANSITION_TIME_MS));
 
         // power-on event
 
         List<ScheduledRunnable> powerOnRunnables = simulateLightOnEvent(
-                expectedPowerOnEnd(now.minus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS)),  // already ended
+                expectedPowerOnEnd(now.minus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS)),  // already ended
                 expectedPowerOnEnd(now) // already ended; power first split
         );
         advanceTimeAndRunAndAssertPutCalls(powerOnRunnables.get(0)); // already ended
@@ -1252,20 +1252,21 @@ class HueSchedulerTest {
 
         advanceTimeAndRunAndAssertPutCalls(secondSplit,
                 expectedPutCall(1).bri(initialBrightness + 100), // end of first split, which was skipped
-                expectedPutCall(1).bri(initialBrightness + 200 - 2).transitionTime(MAX_TRANSITION_TIME_WITH_BUFFER) // second split of transition
+                expectedPutCall(1).bri(initialBrightness + 200).transitionTime(MAX_TRANSITION_TIME) // second split of transition
         );
 
         ScheduledRunnable finalSplit = ensureScheduledStates(
-                expectedRunnable(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)) // scheduled final split of transition
+                expectedRunnable(now.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)) // scheduled final split of transition
         ).getFirst();
 
         // second power on, right at the start of the gap
 
-        advanceCurrentTime(Duration.ofMillis(ScheduledState.MAX_TRANSITION_TIME_MS).minusMinutes(minTrGap));
-        ScheduledRunnable powerOn = simulateLightOnEventExpectingSingleScheduledState(now.plusMinutes(minTrGap));
+        advanceCurrentTime(Duration.ofMillis(MAX_TRANSITION_TIME_MS).minusMinutes(2));
+        ScheduledRunnable powerOn = simulateLightOnEventExpectingSingleScheduledState(now.plusMinutes(2));
 
         advanceTimeAndRunAndAssertPutCalls(powerOn,
-                expectedPutCall(1).bri(initialBrightness + 198) // interpolation only
+                expectedPutCall(1).bri(initialBrightness + 198),
+                expectedPutCall(1).bri(initialBrightness + 200).transitionTime(tr("2min"))
         );
 
         // final split
@@ -1304,7 +1305,7 @@ class HueSchedulerTest {
         setCurrentTimeToAndRun(trRunnable); // detects manual override
 
         List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(
-                expectedRunnable(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)), // next split
+                expectedRunnable(now.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)), // next split
                 expectedRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)) // next day
         );
         ScheduledRunnable secondSplit = followUpRunnables.getFirst();
@@ -1313,13 +1314,13 @@ class HueSchedulerTest {
 
         List<ScheduledRunnable> powerOnRunnables = simulateLightOnEvent(
                 expectedPowerOnEnd(now), // first state, already ended
-                expectedPowerOnEnd(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS)) // powerOn first split
+                expectedPowerOnEnd(now.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS)) // powerOn first split
         );
 
         powerOnRunnables.get(0).run(); // already ended
         advanceTimeAndRunAndAssertPutCalls(powerOnRunnables.get(1),
                 expectedPutCall(1).bri(initialBrightness), // previous state call as interpolation start
-                expectedPutCall(1).bri(initialBrightness + 100 - 2).transitionTime(MAX_TRANSITION_TIME_WITH_BUFFER) // first split of transition
+                expectedPutCall(1).bri(initialBrightness + 100).transitionTime(MAX_TRANSITION_TIME) // first split of transition
         );
 
         // second split -> detect override
@@ -1328,14 +1329,14 @@ class HueSchedulerTest {
         setCurrentTimeToAndRun(secondSplit); // detects manual override
 
         ScheduledRunnable finalSplit = ensureScheduledStates(
-                expectedRunnable(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)) // scheduled final split of transition
+                expectedRunnable(now.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)) // scheduled final split of transition
         ).getFirst();
 
         // advance time to final split -> skips second split, as not relevant anymore
-        advanceCurrentTime(Duration.of(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS));
+        advanceCurrentTime(Duration.of(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS));
 
         List<ScheduledRunnable> secondPowerOnRunnables = simulateLightOnEvent(
-                expectedPowerOnEnd(now.minus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS)), // already ended
+                expectedPowerOnEnd(now.minus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS)), // already ended
                 expectedPowerOnEnd(now) // already ended; second split
         );
 
@@ -1374,7 +1375,7 @@ class HueSchedulerTest {
         trRunnable.run(); // detects manual override
 
         List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(
-                expectedRunnable(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)), // next split
+                expectedRunnable(now.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)), // next split
                 expectedRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)) // next day
         );
         ScheduledRunnable secondSplit = followUpRunnables.getFirst();
@@ -1383,7 +1384,7 @@ class HueSchedulerTest {
         advanceTimeAndRunAndAssertPutCalls(secondSplit);
 
         ScheduledRunnable finalSplit = ensureScheduledStates(
-                expectedRunnable(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)) // next split
+                expectedRunnable(now.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)) // next split
         ).getFirst();
 
         // final split -> still overridden
@@ -1391,8 +1392,8 @@ class HueSchedulerTest {
 
         List<ScheduledRunnable> powerOnRunnables = simulateLightOnEvent(
                 expectedPowerOnEnd(initialNow.plusMinutes(10)), // initial state, already ended
-                expectedPowerOnEnd(initialNow.plusMinutes(10).plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS)), // first split power on, already ended
-                expectedPowerOnEnd(initialNow.plusMinutes(10).plus(ScheduledState.MAX_TRANSITION_TIME_MS * 2, ChronoUnit.MILLIS)), // second split power on, already ended
+                expectedPowerOnEnd(initialNow.plusMinutes(10).plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS)), // first split power on, already ended
+                expectedPowerOnEnd(initialNow.plusMinutes(10).plus(MAX_TRANSITION_TIME_MS * 2, ChronoUnit.MILLIS)), // second split power on, already ended
                 expectedPowerOnEnd(initialNow.plusDays(1)) // final split power on
         );
 
@@ -1406,7 +1407,7 @@ class HueSchedulerTest {
     }
 
     @Test
-    void parse_canParseTransitionTimeBefore_longTransition_powerOnInGaps_correctlyHandled() {
+    void parse_canParseTransitionTimeBefore_longTransition_powerOnInGaps_noGaHandlingAnymore_treatedNormally() {
         addKnownLightIdsWithDefaultCapabilities(1);
         int initialBrightness = 40;
         addState(1, now, "bri:" + initialBrightness);
@@ -1428,58 +1429,58 @@ class HueSchedulerTest {
         // Run tr-runnable
 
         advanceTimeAndRunAndAssertPutCalls(trRunnable,
-                expectedPutCall(1).bri(initialBrightness + 100 - 2).transitionTime(MAX_TRANSITION_TIME_WITH_BUFFER) // first split of transition
+                expectedPutCall(1).bri(initialBrightness + 100).transitionTime(MAX_TRANSITION_TIME) // first split of transition
         );
 
         List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(
-                expectedRunnable(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)), // scheduled second split of transition
+                expectedRunnable(now.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)), // scheduled second split of transition
                 expectedRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)) // next day
         );
         ScheduledRunnable secondSplit = followUpRunnables.getFirst();
 
         // Power on, right at the start of the gap
 
-        advanceCurrentTime(Duration.ofMillis(ScheduledState.MAX_TRANSITION_TIME_MS).minusMinutes(minTrGap));
+        advanceCurrentTime(Duration.ofMillis(MAX_TRANSITION_TIME_MS).minusMinutes(2));
         List<ScheduledRunnable> powerOnRunnables = simulateLightOnEvent(
                 expectedPowerOnEnd(initialNow.plusMinutes(10)), // first state, already ended
-                expectedPowerOnEnd(now.plusMinutes(minTrGap)) // first split again
+                expectedPowerOnEnd(now.plusMinutes(2)) // first split again
         );
 
         powerOnRunnables.get(0).run(); // already ended
         advanceTimeAndRunAndAssertPutCalls(powerOnRunnables.get(1),
-                // performs just the interpolation call
-                expectedPutCall(1).bri(initialBrightness + 100 - 2)
+                expectedPutCall(1).bri(initialBrightness + 100 - 2),
+                expectedPutCall(1).bri(initialBrightness + 100).transitionTime(tr("2min"))
         );
 
         // Power on, one minute in the gap
 
         advanceCurrentTime(Duration.ofMinutes(1));
-        ScheduledRunnable inGapPowerRunnable = simulateLightOnEventExpectingSingleScheduledState(now.plusMinutes(minTrGap - 1));
+        ScheduledRunnable inGapPowerRunnable = simulateLightOnEventExpectingSingleScheduledState(now.plusMinutes(1));
 
         advanceTimeAndRunAndAssertPutCalls(inGapPowerRunnable,
-                // performs just the interpolation call
-                expectedPutCall(1).bri(initialBrightness + 100 - 1)
+                expectedPutCall(1).bri(initialBrightness + 100 - 1),
+                expectedPutCall(1).bri(initialBrightness + 100).transitionTime(tr("1min"))
         );
 
         advanceTimeAndRunAndAssertPutCalls(secondSplit,
-                expectedPutCall(1).bri(initialBrightness + 200 - 2).transitionTime(MAX_TRANSITION_TIME_WITH_BUFFER) // first split of transition
+                expectedPutCall(1).bri(initialBrightness + 200).transitionTime(MAX_TRANSITION_TIME) // first split of transition
         );
 
-        ScheduledRunnable thirdSplit = ensureRunnable(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1));
+        ScheduledRunnable thirdSplit = ensureRunnable(now.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1));
 
         // Advance to middle of second split, and cause power on -> does not over extend the transition, even though its less than the max transition length
 
-        advanceCurrentTime(Duration.ofMillis(ScheduledState.MAX_TRANSITION_TIME_MS / 2));
+        advanceCurrentTime(Duration.ofMillis(MAX_TRANSITION_TIME_MS / 2));
 
         List<ScheduledRunnable> powerOnRunnables2 = simulateLightOnEvent(
-                expectedPowerOnEnd(initialNow.plusMinutes(10).plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS)), // already ended power on for first split
-                expectedPowerOnEnd(initialNow.plusMinutes(10).plus(ScheduledState.MAX_TRANSITION_TIME_MS * 2, ChronoUnit.MILLIS))
+                expectedPowerOnEnd(initialNow.plusMinutes(10).plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS)), // already ended power on for first split
+                expectedPowerOnEnd(initialNow.plusMinutes(10).plus(MAX_TRANSITION_TIME_MS * 2, ChronoUnit.MILLIS))
         );
 
-        Duration untilThirdSplit = Duration.between(now, thirdSplit.getStart()).minusMinutes(minTrGap);
+        Duration untilThirdSplit = Duration.between(now, thirdSplit.getStart());
         advanceTimeAndRunAndAssertPutCalls(powerOnRunnables2.get(1),
                 expectedPutCall(1).bri(initialBrightness + 150), // interpolated call
-                expectedPutCall(1).bri(initialBrightness + 200 - 2).transitionTime((int) (untilThirdSplit.toMillis() / 100)) // transition till start of third and final split (minus buffer)
+                expectedPutCall(1).bri(initialBrightness + 200).transitionTime((int) (untilThirdSplit.toMillis() / 100)) // transition till start of third and final split
         );
 
         // Third and final split
@@ -1502,11 +1503,11 @@ class HueSchedulerTest {
 
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
                 expectedPutCall(1).bri(1),
-                expectedPutCall(1).bri(19 - 1).transitionTime(MAX_TRANSITION_TIME_WITH_BUFFER)
+                expectedPutCall(1).bri(19).transitionTime(MAX_TRANSITION_TIME)
         );
 
         ensureScheduledStates(
-                expectedRunnable(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), now.plusDays(1)), // next split
+                expectedRunnable(now.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), now.plusDays(1)), // next split
                 expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
         );
     }
@@ -1537,11 +1538,11 @@ class HueSchedulerTest {
 
         advanceTimeAndRunAndAssertPutCalls(firstSplit,
                 expectedPutCall(1).bri(1), // interpolated call
-                expectedPutCall(1).bri(18).transitionTime(MAX_TRANSITION_TIME_WITH_BUFFER)
+                expectedPutCall(1).bri(19).transitionTime(MAX_TRANSITION_TIME)
         );
 
         List<ScheduledRunnable> followUpStates = ensureScheduledStates(
-                expectedRunnable(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), now.plusDays(1)), // next split
+                expectedRunnable(now.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), now.plusDays(1)), // next split
                 expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
         );
         ScheduledRunnable secondSplit = followUpStates.getFirst();
@@ -1551,19 +1552,19 @@ class HueSchedulerTest {
         mockIsLightOff(1, false);
 
         // still scheduled next split call
-        ensureRunnable(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)); // next split
+        ensureRunnable(now.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)); // next split
 
         // power on event -> uses powerOn from second split
 
         List<ScheduledRunnable> powerOnEvents = simulateLightOnEvent(
-                expectedPowerOnEnd(initialNow.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS)), // already ended
-                expectedPowerOnEnd(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS)) // power on second split
+                expectedPowerOnEnd(initialNow.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS)), // already ended
+                expectedPowerOnEnd(now.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS)) // power on second split
         );
 
         powerOnEvents.get(0).run(); // already ended
         advanceTimeAndRunAndAssertPutCalls(powerOnEvents.get(1),
                 expectedPutCall(1).bri(19), // end of first split
-                expectedPutCall(1).bri(36).transitionTime(MAX_TRANSITION_TIME_WITH_BUFFER)
+                expectedPutCall(1).bri(36).transitionTime(MAX_TRANSITION_TIME)
         );
     }
 
@@ -1615,7 +1616,7 @@ class HueSchedulerTest {
         // first tr-before runnable
         advanceTimeAndRunAndAssertPutCalls(firstTrBeforeRunnable,
                 expectedPutCall(1).bri(DEFAULT_BRIGHTNESS),
-                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 10).transitionTime(tr("8min")) // gap added
+                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 10).transitionTime(tr("10min"))
         );
 
         ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(10)); // next day
@@ -1628,7 +1629,7 @@ class HueSchedulerTest {
 
         advanceTimeAndRunAndAssertPutCalls(powerOnRunnable,
                 expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 5),
-                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 10).transitionTime(tr("3min")) // gap added
+                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 10).transitionTime(tr("5min"))
         );
 
         // run 00:10 zero length runnable -> no interaction
@@ -1748,7 +1749,7 @@ class HueSchedulerTest {
 
         advanceTimeAndRunAndAssertPutCalls(firstTrBeforeRunnable,
                 expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 10), // interpolated call from "previous" state from day before
-                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).transitionTime(tr("3min")) // added gap
+                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).transitionTime(tr("5min"))
         );
 
         ScheduledRunnable nextDay1 = ensureRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(5)); // next day
@@ -1769,7 +1770,7 @@ class HueSchedulerTest {
 
         // no interpolation as previous state = last seen state
         advanceTimeAndRunAndAssertPutCalls(nextDay1,
-                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).transitionTime(tr("3min")) // gap added
+                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).transitionTime(tr("5min"))
         );
 
         ScheduledRunnable nextDay3 = ensureRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(5)); // next day
@@ -1788,7 +1789,7 @@ class HueSchedulerTest {
         setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS + 10));
 
         advanceTimeAndRunAndAssertPutCalls(nextDay3,
-                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).transitionTime(tr("3min")) // gap added
+                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).transitionTime(tr("5min"))
         );
 
         ensureRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(5)); // next day
@@ -1807,7 +1808,7 @@ class HueSchedulerTest {
 
         advanceTimeAndRunAndAssertPutCalls(powerOnRunnables.get(4),
                 expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 6), // adjusted interpolated call
-                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).transitionTime(tr("1min")) // gap added
+                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).transitionTime(tr("3min"))
         );
 
         setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS));
@@ -1866,7 +1867,7 @@ class HueSchedulerTest {
         setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS + 10));
         advanceTimeAndRunAndAssertPutCalls(firstStateOnTuesday,
                 // no interpolation, as "DEFAULT_BRIGHTNESS + 10" was already set before
-                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).transitionTime(tr("3min"))// gap added
+                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).transitionTime(tr("5min"))
         );
 
         ScheduledRunnable firstStateOnWednesday = ensureRunnable(now.plusDays(1), now.plusDays(2).plusMinutes(5)); // next day (Wednesday), now full day, as there is no additional state
@@ -1882,7 +1883,7 @@ class HueSchedulerTest {
         // same state as firstStateOnTuesday
         advanceTimeAndRunAndAssertPutCalls(powerOnRunnables2.get(1),
                 expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 10),
-                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).transitionTime(tr("3min")) // gap added
+                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).transitionTime(tr("5min"))
         );
 
         // second state
@@ -2021,7 +2022,7 @@ class HueSchedulerTest {
 
         setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS + 10));
         advanceTimeAndRunAndAssertPutCalls(firstStateOnSaturday,
-                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).transitionTime(tr("3min")) // gap added
+                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).transitionTime(tr("5min"))
         );
 
         ensureRunnable(now.plusDays(7), now.plusDays(7).plusMinutes(5));
@@ -2121,12 +2122,12 @@ class HueSchedulerTest {
 
         ZonedDateTime trBeforeStart = sunrise.minusHours(8);
         Duration initialStartOffset = Duration.between(trBeforeStart, now);
-        long adjustedSplitDuration = MAX_TRANSITION_TIME_WITH_BUFFER * 100 - initialStartOffset.toMillis();
-        long adjustedNextStart = ScheduledState.MAX_TRANSITION_TIME_MS - initialStartOffset.toMillis();
+        long adjustedSplitDuration = MAX_TRANSITION_TIME * 100 - initialStartOffset.toMillis();
+        long adjustedNextStart = MAX_TRANSITION_TIME_MS - initialStartOffset.toMillis();
 
         advanceTimeAndRunAndAssertPutCalls(crossOverState,
                 expectedPutCall(1).bri(19), // interpolated call
-                expectedPutCall(1).bri(61 - 1).transitionTime((int) (adjustedSplitDuration / 100)) // first split call
+                expectedPutCall(1).bri(61).transitionTime((int) (adjustedSplitDuration / 100)) // first split call
         );
 
         List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(
@@ -2136,22 +2137,22 @@ class HueSchedulerTest {
         ScheduledRunnable firstSplitCall = followUpRunnables.getFirst();
 
         advanceTimeAndRunAndAssertPutCalls(firstSplitCall,
-                expectedPutCall(1).bri(112 - 1).transitionTime(MAX_TRANSITION_TIME_WITH_BUFFER)
+                expectedPutCall(1).bri(112).transitionTime(MAX_TRANSITION_TIME)
         );
 
-        ScheduledRunnable secondSplitCall = ensureRunnable(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), sunset);
+        ScheduledRunnable secondSplitCall = ensureRunnable(now.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), sunset);
 
         advanceTimeAndRunAndAssertPutCalls(secondSplitCall,
-                expectedPutCall(1).bri(163 - 2).transitionTime(MAX_TRANSITION_TIME_WITH_BUFFER)
+                expectedPutCall(1).bri(163).transitionTime(MAX_TRANSITION_TIME)
         );
 
-        ScheduledRunnable thirdSplitCall = ensureRunnable(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), sunset);
+        ScheduledRunnable thirdSplitCall = ensureRunnable(now.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), sunset);
 
         advanceTimeAndRunAndAssertPutCalls(thirdSplitCall,
-                expectedPutCall(1).bri(213 - 1).transitionTime(MAX_TRANSITION_TIME_WITH_BUFFER)
+                expectedPutCall(1).bri(213).transitionTime(MAX_TRANSITION_TIME)
         );
 
-        ScheduledRunnable fourthSplitCall = ensureRunnable(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), sunset);
+        ScheduledRunnable fourthSplitCall = ensureRunnable(now.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), sunset);
 
         setCurrentTimeTo(fourthSplitCall);
         Duration finalSplitDuration = Duration.between(now, sunrise);
@@ -2183,15 +2184,15 @@ class HueSchedulerTest {
     }
 
     @Test
-    void parse_transitionTimeBefore_backToBack_alreadyEnoughGapInBetween_noAdjustmentsMade() {
+    void parse_transitionTimeBefore_backToBack_alreadyEnoughGapInBetween_gapHandlingRemoved_noAdjustmentsMade() {
         addKnownLightIdsWithDefaultCapabilities(1);
         addState(1, now, "bri:10"); // zero length
-        addState(1, "01:00", "bri:100", "tr-before:1h"); // gap not relevant
-        addState(1, "01:30", "bri:254", "tr-before:28min"); // gap of 2 minutes added
+        addState(1, "01:00", "bri:100", "tr-before:1h"); // 00:00-01:02
+        addState(1, "01:30", "bri:254", "tr-before:28min"); // 01:02-00:00
 
         List<ScheduledRunnable> scheduledRunnables = startScheduler(
-                expectedRunnable(now, now.plusHours(1).plusMinutes(minTrGap)),
-                expectedRunnable(now.plusHours(1).plusMinutes(minTrGap), now.plusDays(1)),
+                expectedRunnable(now, now.plusHours(1).plusMinutes(2)),
+                expectedRunnable(now.plusHours(1).plusMinutes(2), now.plusDays(1)),
                 expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
         );
         ScheduledRunnable firstTrRunnable = scheduledRunnables.get(0);
@@ -2204,7 +2205,7 @@ class HueSchedulerTest {
                 expectedPutCall(1).bri(100).transitionTime(36000) // no additional buffer used
         );
 
-        ensureRunnable(now.plusDays(1), now.plusDays(1).plusHours(1).plusMinutes(minTrGap)); // next day
+        ensureRunnable(now.plusDays(1), now.plusDays(1).plusHours(1).plusMinutes(2)); // next day
 
         // second tr-before runnable
 
@@ -2216,7 +2217,7 @@ class HueSchedulerTest {
     }
 
     @Test
-    void parse_transitionTimeBefore_withModificationTracking_backToBack_smallTrBefore_lessThanTwoMinutes_adjustedTrToEnsureGap() {
+    void parse_transitionTimeBefore_withModificationTracking_backToBack_smallTrBefore_lessThanTwoMinutes_justFine() {
         enableUserModificationTracking();
         addKnownLightIdsWithDefaultCapabilities(1);
         addState(1, now, "bri:10"); // zero length
@@ -2238,7 +2239,7 @@ class HueSchedulerTest {
 
         advanceTimeAndRunAndAssertPutCalls(firstTrRunnable,
                 expectedPutCall(1).bri(10),  // interpolated call
-                expectedPutCall(1).bri(100) // removed tr to ensure gap, does not use zero
+                expectedPutCall(1).bri(100).transitionTime(tr("2min"))
         );
 
         ensureRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(2));
@@ -2247,7 +2248,7 @@ class HueSchedulerTest {
 
         setLightStateResponse(1, expectedState().brightness(100));
         advanceTimeAndRunAndAssertPutCalls(secondTrRunnable,
-                expectedPutCall(1).bri(254) // removed tr to ensure gap, does not use zero
+                expectedPutCall(1).bri(254).transitionTime(tr("2min"))
         );
 
         ensureRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(2));
@@ -2263,11 +2264,11 @@ class HueSchedulerTest {
     }
 
     @Test
-    void parse_transitionTime_withModificationTracking_backToBack_ensuresGap() {
+    void parse_transitionTime_withModificationTracking_backToBack_ensuresNoOverlap() {
         enableUserModificationTracking();
         addKnownLightIdsWithDefaultCapabilities(1);
         addState(1, "00:00", "bri:10", "tr:2min");
-        addState(1, "00:02", "bri:100", "tr:2min"); // to small gap
+        addState(1, "00:02", "bri:100", "tr:2min"); // still fine
         addState(1, "00:05", "bri:150", "tr:6min"); // too long tr, which would cause overlap
         addState(1, "00:10", "bri:200");
 
@@ -2279,44 +2280,24 @@ class HueSchedulerTest {
         );
 
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
-                expectedPutCall(1).bri(10) // removes tr
+                expectedPutCall(1).bri(10).transitionTime(tr("2min"))
         );
 
         ensureRunnable(now.plusDays(1), initialNow.plusDays(1).plusMinutes(2));
 
         setLightStateResponse(1, expectedState().brightness(10));
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(1),
-                expectedPutCall(1).bri(100).transitionTime(tr("1min")) // ensures min gap
+                expectedPutCall(1).bri(100).transitionTime(tr("2min"))
         );
 
         ensureRunnable(now.plusDays(1), initialNow.plusDays(1).plusMinutes(5));
 
         setLightStateResponse(1, expectedState().brightness(100));
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(2),
-                expectedPutCall(1).bri(150).transitionTime(tr("3min")) // shortened tr and ensures gap
+                expectedPutCall(1).bri(150).transitionTime(tr("5min")) // shortened tr
         );
 
         ensureRunnable(now.plusDays(1), initialNow.plusDays(1).plusMinutes(10));
-    }
-
-    @Test
-    void parse_transitionTime_withModificationTracking_backToBack_customGap_usesGap() {
-        minTrGap = 5; // 5 minutes
-        enableUserModificationTracking();
-        addKnownLightIdsWithDefaultCapabilities(1);
-        addState(1, "00:00", "bri:10", "tr:7min");
-        addState(1, "00:07", "bri:100");
-
-        List<ScheduledRunnable> scheduledRunnables = startScheduler(
-                expectedRunnable(now, now.plusMinutes(7)),
-                expectedRunnable(now.plusMinutes(7), now.plusDays(1))
-        );
-
-        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
-                expectedPutCall(1).bri(10).transitionTime(tr("2min")) // adjusts to custom gap
-        );
-
-        ensureRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(7));
     }
 
     @Test
@@ -2399,14 +2380,14 @@ class HueSchedulerTest {
 
         setLightStateResponse(1, expectedState().brightness(254));
         advanceTimeAndRunAndAssertPutCalls(firstTrRunnable,
-                expectedPutCall(1).bri(100).transitionTime(tr("58min")) // gap added
+                expectedPutCall(1).bri(100).transitionTime(tr("1h"))
         );
 
         ensureRunnable(now.plusDays(1), initialNow.plusDays(2)); // next day
     }
 
     @Test
-    void parse_transitionTimeBefore_longDuration_backToBack_noGapsInBetween_considersPreviousDay_adjustsTrBefore() {
+    void parse_transitionTimeBefore_longDuration_backToBack_noGapsInBetween_considersPreviousDay_gapHandlingRemoved_noAdjustmentsMade() {
         enableUserModificationTracking();
         addKnownLightIdsWithDefaultCapabilities(1);
         addState(1, "00:00", "bri:100", "tr-before:23h"); // 01:00, starts yesterday
@@ -2432,7 +2413,7 @@ class HueSchedulerTest {
 
         setLightStateResponse(1, expectedState().brightness(100));
         advanceTimeAndRunAndAssertPutCalls(secondTrBeforeRunnable,
-                expectedPutCall(1).bri(254).transitionTime(tr("28min")) // gap added
+                expectedPutCall(1).bri(254).transitionTime(tr("30min"))
         );
 
         ensureRunnable(now.plusDays(1), initialNow.plusDays(1).plusHours(1));
@@ -2441,11 +2422,11 @@ class HueSchedulerTest {
 
         setLightStateResponse(1, expectedState().brightness(254));
         advanceTimeAndRunAndAssertPutCalls(nextDayFirst,
-                expectedPutCall(1).bri(243).transitionTime(MAX_TRANSITION_TIME_WITH_BUFFER) // first split call
+                expectedPutCall(1).bri(243).transitionTime(MAX_TRANSITION_TIME) // first split call
         );
 
         ensureScheduledStates(
-                expectedRunnable(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1).plusMinutes(30)),
+                expectedRunnable(now.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1).plusMinutes(30)),
                 expectedRunnable(initialNow.plusDays(1).plusHours(1), initialNow.plusDays(2).plusMinutes(30)) // next day
         );
     }
@@ -4156,7 +4137,7 @@ class HueSchedulerTest {
     @Test
     void parse_invalidTransitionTime_tooHigh_exception() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        assertThrows(InvalidTransitionTime.class, () -> addStateNow("1", "tr:" + ScheduledState.MAX_TRANSITION_TIME + 1));
+        assertThrows(InvalidTransitionTime.class, () -> addStateNow("1", "tr:" + MAX_TRANSITION_TIME + 1));
     }
 
     @Test
@@ -5501,11 +5482,11 @@ class HueSchedulerTest {
 
         advanceTimeAndRunAndAssertPutCalls(trBeforeRunnable,
                 expectedPutCall(1).bri(DEFAULT_BRIGHTNESS), // interpolated call
-                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 14).transitionTime(MAX_TRANSITION_TIME_WITH_BUFFER) // first split call
+                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 14).transitionTime(MAX_TRANSITION_TIME) // first split call
         );
 
         List<ScheduledRunnable> followUpStates = ensureScheduledStates(
-                expectedRunnable(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), now.plusDays(1)), // next split
+                expectedRunnable(now.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), now.plusDays(1)), // next split
                 expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
         );
         ScheduledRunnable secondSplit = followUpStates.getFirst();
@@ -5515,20 +5496,20 @@ class HueSchedulerTest {
         setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS + 14)); // same as first
 
         advanceTimeAndRunAndAssertPutCalls(secondSplit,
-                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 28).transitionTime(MAX_TRANSITION_TIME_WITH_BUFFER)
+                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 28).transitionTime(MAX_TRANSITION_TIME)
         );
 
-        ScheduledRunnable thirdSplit = ensureRunnable(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)); // next split
+        ScheduledRunnable thirdSplit = ensureRunnable(now.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)); // next split
 
         // third split -> still no override detected
 
         setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS + 28)); // same as second
 
         advanceTimeAndRunAndAssertPutCalls(thirdSplit,
-                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 41).transitionTime(MAX_TRANSITION_TIME_WITH_BUFFER)
+                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 42).transitionTime(MAX_TRANSITION_TIME)
         );
 
-        ScheduledRunnable fourthSplit = ensureRunnable(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)); // next split
+        ScheduledRunnable fourthSplit = ensureRunnable(now.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)); // next split
 
         // fourth split -> detects override
 
@@ -5540,9 +5521,9 @@ class HueSchedulerTest {
         // simulate light on -> re run fourth (and last) split
 
         List<ScheduledRunnable> powerOnEvents = simulateLightOnEvent(
-                expectedPowerOnEnd(initialNow.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS)), // already ended
-                expectedPowerOnEnd(initialNow.plus(ScheduledState.MAX_TRANSITION_TIME_MS * 2, ChronoUnit.MILLIS)), // already ended
-                expectedPowerOnEnd(initialNow.plus(ScheduledState.MAX_TRANSITION_TIME_MS * 3, ChronoUnit.MILLIS)), // already ended
+                expectedPowerOnEnd(initialNow.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS)), // already ended
+                expectedPowerOnEnd(initialNow.plus(MAX_TRANSITION_TIME_MS * 2, ChronoUnit.MILLIS)), // already ended
+                expectedPowerOnEnd(initialNow.plus(MAX_TRANSITION_TIME_MS * 3, ChronoUnit.MILLIS)), // already ended
                 expectedPowerOnEnd(initialNow.plusDays(1)) // fourth split again
         );
 
@@ -6395,14 +6376,14 @@ class HueSchedulerTest {
 
         advanceTimeAndRunAndAssertPutCalls(runnables.getFirst(),
                 expectedGroupPutCall(1).bri(100),
-                expectedGroupPutCall(1).bri(182).transitionTime(tr("1h38min"))
+                expectedGroupPutCall(1).bri(183).transitionTime(MAX_TRANSITION_TIME)
         );
 
         assertSceneUpdate("/groups/1", expectedPutCall(5).bri(100));
 
         List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(
                 expectedRunnable(now.plusMinutes(1), now.plusDays(1)), // scene sync schedule
-                expectedRunnable(now.plus(ScheduledState.MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), now.plusDays(1)), // split call
+                expectedRunnable(now.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), now.plusDays(1)), // split call
                 expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
         );
 
@@ -7235,7 +7216,7 @@ class HueSchedulerTest {
 
         advanceTimeAndRunAndAssertPutCalls(runnables.getFirst(),
                 expectedPutCall(1).bri(108),
-                expectedPutCall(1).bri(113).transitionTime(tr("38min"))
+                expectedPutCall(1).bri(113).transitionTime(tr("40min"))
         );
 
         assertSceneUpdate("/groups/5", expectedPutCall(1).bri(108));

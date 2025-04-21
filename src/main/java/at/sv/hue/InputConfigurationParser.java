@@ -26,14 +26,11 @@ public final class InputConfigurationParser {
 
     private final StartTimeProvider startTimeProvider;
     private final HueApi api;
-    private final int minTrBeforeGapInMinutes;
     private final boolean interpolateAll;
 
-    public InputConfigurationParser(StartTimeProvider startTimeProvider, HueApi api, int minTrBeforeGapInMinutes,
-                                    boolean interpolateAll) {
+    public InputConfigurationParser(StartTimeProvider startTimeProvider, HueApi api, boolean interpolateAll) {
         this.startTimeProvider = startTimeProvider;
         this.api = api;
-        this.minTrBeforeGapInMinutes = minTrBeforeGapInMinutes;
         this.interpolateAll = interpolateAll;
     }
 
@@ -92,7 +89,7 @@ public final class InputConfigurationParser {
                 String[] typeAndValue = part.split(":", 2);
                 if (typeAndValue.length != 2) {
                     throw new InvalidConfigurationLine("Invalid state property '" + part + "': " +
-                            "Each state property has to be in the format 'property:value'.");
+                                                       "Each state property has to be in the format 'property:value'.");
                 }
                 String parameter = typeAndValue[0];
                 String value = typeAndValue[1];
@@ -179,7 +176,7 @@ public final class InputConfigurationParser {
             }
             String start = parts[1];
             states.add(new ScheduledState(identifier, start, bri, ct, x, y, hue, sat, effect, on, transitionTimeBefore,
-                    transitionTime, dayOfWeeks, startTimeProvider, capabilities, minTrBeforeGapInMinutes, force,
+                    transitionTime, dayOfWeeks, startTimeProvider, capabilities, force,
                     interpolate, groupState, false));
         }
         return states;

@@ -162,15 +162,6 @@ public final class HueScheduler implements Runnable {
                           "Default: ${DEFAULT-VALUE} minutes."
     )
     int apiCacheInvalidationIntervalInMinutes;
-    @Option(
-            names = "--min-tr-before-gap", paramLabel = "<gap>",
-            defaultValue = "${env:MIN_TR_BEFORE_GAP:-3}",
-            description = "The minimum gap between multiple back-to-back tr-before states in minutes. This is needed as otherwise " +
-                          "the hue bridge may not yet recognise the end value of the transition and incorrectly marks " +
-                          "the light as manually overridden. This gap is automatically added between back-to-back " +
-                          "tr-before states. Default: ${DEFAULT-VALUE} minutes."
-    )
-    int minTrBeforeGapInMinutes;
     @Option(names = "--scene-activation-ignore-window", paramLabel = "<duration>",
             defaultValue = "${env:SCENE_ACTIVATION_IGNORE_WINDOW:-8}",
             description = "The delay in seconds during which turn-on events for affected lights and groups are ignored " +
@@ -206,7 +197,7 @@ public final class HueScheduler implements Runnable {
                         boolean disableUserModificationTracking, boolean requireSceneActivation,
                         String defaultInterpolationTransitionTimeString,
                         int powerOnRescheduleDelayInMs, int bridgeFailureRetryDelayInSeconds,
-                        int minTrBeforeGapInMinutes, int sceneActivationIgnoreWindowInSeconds, boolean interpolateAll,
+                        int sceneActivationIgnoreWindowInSeconds, boolean interpolateAll,
                         boolean enableSceneSync, String sceneSyncName, int sceneSyncIntervalInMinutes,
                         int sceneSyncDelayInSeconds, int justTurnedOnWindowInSeconds) {
         this.api = api;
@@ -222,7 +213,6 @@ public final class HueScheduler implements Runnable {
         this.defaultInterpolationTransitionTimeString = defaultInterpolationTransitionTimeString;
         this.powerOnRescheduleDelayInMs = powerOnRescheduleDelayInMs;
         this.bridgeFailureRetryDelayInSeconds = bridgeFailureRetryDelayInSeconds;
-        this.minTrBeforeGapInMinutes = minTrBeforeGapInMinutes;
         this.sceneActivationIgnoreWindowInSeconds = sceneActivationIgnoreWindowInSeconds;
         defaultInterpolationTransitionTime = parseInterpolationTransitionTime(defaultInterpolationTransitionTimeString);
         this.interpolateAll = interpolateAll;
@@ -398,7 +388,7 @@ public final class HueScheduler implements Runnable {
     }
 
     public void addState(String input) {
-        new InputConfigurationParser(startTimeProvider, api, minTrBeforeGapInMinutes, interpolateAll)
+        new InputConfigurationParser(startTimeProvider, api, interpolateAll)
                 .parse(input)
                 .forEach(stateRegistry::addState);
     }
@@ -752,9 +742,8 @@ public final class HueScheduler implements Runnable {
         Duration duration = Duration.between(now, nextState.getStart()).abs();
         Duration tr = Duration.ofMillis(putCall.getTransitionTime() * 100);
         long differenceInMinutes = duration.minus(tr).toMinutes();
-        int requiredGap = state.getRequiredGap();
-        if (differenceInMinutes < requiredGap) {
-            putCall.setTransitionTime(getAdjustedTransitionTime(duration, requiredGap, nextState));
+        if (differenceInMinutes < 0) {
+            putCall.setTransitionTime(getAdjustedTransitionTime(duration));
         }
         return putCall;
     }
@@ -770,18 +759,11 @@ public final class HueScheduler implements Runnable {
         return stateRegistry.getLastSeenState(state) == null;
     }
 
-    private Integer getAdjustedTransitionTime(Duration duration, int requiredGap, ScheduledStateSnapshot nextState) {
-        if (shouldEnsureGap(nextState)) {
-            duration = duration.minusMinutes(requiredGap);
-        }
+    private Integer getAdjustedTransitionTime(Duration duration) {
         if (duration.isZero() || duration.isNegative()) {
             return null;
         }
         return (int) (duration.toMillis() / 100);
-    }
-
-    private boolean shouldEnsureGap(ScheduledStateSnapshot nextState) {
-        return !disableUserModificationTracking && !nextState.isForced() && !nextState.isNullState();
     }
 
     private void logException(RuntimeException e) {

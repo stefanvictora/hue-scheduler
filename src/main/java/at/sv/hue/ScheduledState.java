@@ -55,7 +55,6 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
     private final boolean temporary;
     @Getter
     private final LightCapabilities capabilities;
-    private final int minTrBeforeGapInMinutes;
     private final Cache<ZonedDateTime, ScheduledStateSnapshot> snapshotCache;
     @Getter
     @Setter
@@ -73,7 +72,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
     public ScheduledState(Identifier identifier, String startString, Integer brightness, Integer ct, Double x, Double y,
                           Integer hue, Integer sat, String effect, Boolean on, String transitionTimeBeforeString, Integer definedTransitionTime,
                           Set<DayOfWeek> daysOfWeek, StartTimeProvider startTimeProvider, LightCapabilities capabilities,
-                          int minTrBeforeGapInMinutes, Boolean force, Boolean interpolate, boolean groupState, boolean temporary) {
+                          Boolean force, Boolean interpolate, boolean groupState, boolean temporary) {
         this.identifier = identifier;
         this.startString = startString;
         this.interpolate = interpolate;
@@ -96,7 +95,6 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
         this.definedTransitionTime = assertValidTransitionTime(definedTransitionTime);
         this.transitionTimeBeforeString = transitionTimeBeforeString;
         this.startTimeProvider = startTimeProvider;
-        this.minTrBeforeGapInMinutes = minTrBeforeGapInMinutes;
         this.force = force;
         this.temporary = temporary;
         originalState = this;
@@ -117,7 +115,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
         ScheduledState copy = new ScheduledState(state.identifier, start,
                 state.brightness, state.ct, state.x, state.y, state.hue, state.sat, state.effect, state.on,
                 state.transitionTimeBeforeString, state.definedTransitionTime, state.daysOfWeek, state.startTimeProvider,
-                state.capabilities, state.minTrBeforeGapInMinutes, state.force, state.interpolate, state.groupState, true);
+                state.capabilities, state.force, state.interpolate, state.groupState, true);
         copy.lastSeen = state.lastSeen;
         copy.originalState = state.originalState;
         copy.previousStateLookup = state.previousStateLookup;
@@ -321,10 +319,6 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
         Duration between = Duration.between(now, definedStart);
         if (between.isZero() || between.isNegative()) return 0;
         return (int) between.toMillis() / 100;
-    }
-
-    public int getRequiredGap() {
-        return minTrBeforeGapInMinutes;
     }
 
     public boolean isNullState() {

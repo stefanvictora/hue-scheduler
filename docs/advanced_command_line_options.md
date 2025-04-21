@@ -89,15 +89,6 @@ Desk  07:00  bri:100%  tr-before:20min
 
 **Default**: `4` (= 400 ms)
 
-### `--min-tr-before-gap`
-
-Only relevant and active if user modification tracking is not disabled (see `--disable-user-modification-tracking`). When using transitions, this defines the minimum gap between multiple back-to-back states in minutes. This is necessary as otherwise the hue bridge may not yet recognize the target value of the transition and may incorrectly mark the light as manually overridden.
-This gap is ensured by automatically shortening transitions between back-to-back states.
-
-If Hue Scheduler still detects manual overrides between back-to-back states using transitions, try increasing the default value.
-
-**Default**: `3` minutes
-
 ### `--max-requests-per-second`
 
 The maximum number of PUT API requests Hue Scheduler is allowed to perform per second. The official Hue API Documentation recommends keeping this at 10 requests per second, or else the bridge might drop some requests.
