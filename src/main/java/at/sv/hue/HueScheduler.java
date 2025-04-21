@@ -632,7 +632,7 @@ public final class HueScheduler implements Runnable {
         if (lastSeenState != null && lastSeenState.getLastPutCall().hasSameLightState(interpolatedPutCall) && wasNotJustTurnedOn(state)) {
             return false; // skip interpolation, last put call is the same as the current one; and no power cycle
         }
-        LOG.trace("Perform interpolation from previous state: {}", previousState);
+        LOG.debug("Perform interpolation from previous state: {}", previousState);
         Integer interpolationTransitionTime = getInterpolationTransitionTime(previousState);
         interpolatedPutCall.setTransitionTime(interpolationTransitionTime);
         putState(previousState, interpolatedPutCall);
@@ -705,7 +705,7 @@ public final class HueScheduler implements Runnable {
     }
 
     private void performPutApiCall(ScheduledStateSnapshot state, PutCall putCall) {
-        LOG.trace("{}", putCall);
+        LOG.debug("{}", putCall);
         state.recordLastPutCall(putCall);
         api.putState(putCall);
     }

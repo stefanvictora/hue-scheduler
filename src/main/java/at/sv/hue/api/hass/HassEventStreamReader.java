@@ -38,7 +38,7 @@ public final class HassEventStreamReader {
     public void start() {
         Request request = new Request.Builder().url(origin + "/api/websocket").build();
         MDC.put("context", "events");
-        log.debug("Connecting to HA event stream...");
+        log.trace("Connecting to HA event stream...");
         client.newWebSocket(request, new WebSocketListener() {
             @Override
             public void onOpen(@NotNull WebSocket webSocket, @NotNull Response response) {
