@@ -79,4 +79,18 @@ public final class PutCall {
         if (transitionTime == null) return "";
         return formatPropertyName("tr") + transitionTime + " (" + Duration.ofMillis(transitionTime * 100L) + ")";
     }
+
+    public boolean hasSameLightState(PutCall other) {
+        if (other == null) {
+            return false;
+        }
+        return Objects.equals(this.on, other.on) &&
+               Objects.equals(this.bri, other.bri) &&
+               Objects.equals(this.hue, other.hue) &&
+               Objects.equals(this.sat, other.sat) &&
+               Objects.equals(this.effect, other.effect) &&
+               Objects.equals(this.x, other.x) &&
+               Objects.equals(this.y, other.y) &&
+               Objects.equals(this.ct, other.ct);
+    }
 }

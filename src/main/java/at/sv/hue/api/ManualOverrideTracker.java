@@ -14,8 +14,6 @@ public interface ManualOverrideTracker {
 
     boolean isOff(String id);
 
-    boolean wasJustTurnedOn(String id);
-
     boolean wasTurnedOnBySyncedScene(String id);
 
     void onAutomaticallyAssigned(String id);

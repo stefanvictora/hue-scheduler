@@ -62,6 +62,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
     @Getter
     private ZonedDateTime lastSeen;
     private ScheduledState originalState;
+    @Getter
     private PutCall lastPutCall;
     @Setter
     private Function<ScheduledStateSnapshot, ScheduledStateSnapshot> previousStateLookup;

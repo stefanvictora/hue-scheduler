@@ -127,7 +127,7 @@ class HueSchedulerTest {
                 () -> now, 10.0, controlGroupLightsIndividually, disableUserModificationTracking,
                 requireSceneActivation, defaultInterpolationTransitionTimeInMs, 0, connectionFailureRetryDelay,
                 sceneActivationIgnoreWindowInSeconds, interpolateAll,
-                enableSceneSync, sceneSyncName, sceneSyncInterpolationInterval, sceneSyncDelayInSeconds, 10);
+                enableSceneSync, sceneSyncName, sceneSyncInterpolationInterval, sceneSyncDelayInSeconds);
         manualOverrideTracker = scheduler.getManualOverrideTracker();
     }
 
@@ -1108,7 +1108,7 @@ class HueSchedulerTest {
         finalPowerOns.get(0).run(); // already ended -> no put calls
 
         runAndAssertPutCalls(finalPowerOns.get(1),
-                // no interpolation, as outside of "just-turned-on" window
+                expectedPutCall(1).bri(initialBrightness + 205),
                 expectedPutCall(1).bri(initialBrightness + 210).transitionTime(3000) // remaining five minutes
         );
 
@@ -1238,26 +1238,27 @@ class HueSchedulerTest {
         );
         ScheduledRunnable secondSplit = followUpRunnables.getFirst();
 
-        // advance time to second split -> will skip first split, as not relevant anymore
-        advanceCurrentTime(Duration.ofMillis(MAX_TRANSITION_TIME_MS));
-
-        // power-on event
-
-        List<ScheduledRunnable> powerOnRunnables = simulateLightOnEvent(
-                expectedPowerOnEnd(now.minus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS)),  // already ended
-                expectedPowerOnEnd(now) // already ended; power first split
-        );
-        advanceTimeAndRunAndAssertPutCalls(powerOnRunnables.get(0)); // already ended
-        advanceTimeAndRunAndAssertPutCalls(powerOnRunnables.get(1)); // already ended
-
-        advanceTimeAndRunAndAssertPutCalls(secondSplit,
-                expectedPutCall(1).bri(initialBrightness + 100), // end of first split, which was skipped
-                expectedPutCall(1).bri(initialBrightness + 200).transitionTime(MAX_TRANSITION_TIME) // second split of transition
-        );
+        // run second split; still overridden
+        advanceTimeAndRunAndAssertPutCalls(secondSplit);
 
         ScheduledRunnable finalSplit = ensureScheduledStates(
                 expectedRunnable(now.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)) // scheduled final split of transition
         ).getFirst();
+
+        // power-on event, skips first split, as not relevant anymore
+
+        List<ScheduledRunnable> powerOnRunnables = simulateLightOnEvent(
+                expectedPowerOnEnd(now.minus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS)),  // already ended
+                expectedPowerOnEnd(now), // already ended; power first split
+                expectedPowerOnEnd(now.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS))
+        );
+        advanceTimeAndRunAndAssertPutCalls(powerOnRunnables.get(0)); // already ended
+        advanceTimeAndRunAndAssertPutCalls(powerOnRunnables.get(1)); // already ended
+
+        advanceTimeAndRunAndAssertPutCalls(powerOnRunnables.get(2),
+                expectedPutCall(1).bri(initialBrightness + 100), // end of first split, which was skipped
+                expectedPutCall(1).bri(initialBrightness + 200).transitionTime(MAX_TRANSITION_TIME) // second split of transition
+        );
 
         // second power on, right at the start of the gap
 
@@ -1271,7 +1272,7 @@ class HueSchedulerTest {
 
         // final split
 
-        setLightStateResponse(1, expectedState().brightness(initialBrightness + 200 - 2)); // same as second split
+        setLightStateResponse(1, expectedState().brightness(initialBrightness + 200)); // same as second split
         advanceTimeAndRunAndAssertPutCalls(finalSplit,
                 // no interpolation, as "initialBrightness + 200" already set at end of second split
                 expectedPutCall(1).bri(initialBrightness + 210).transitionTime(tr("10min"))// remaining 10 minutes
@@ -1323,7 +1324,7 @@ class HueSchedulerTest {
                 expectedPutCall(1).bri(initialBrightness + 100).transitionTime(MAX_TRANSITION_TIME) // first split of transition
         );
 
-        // second split -> detect override
+        // second split -> detects second manual override
 
         setLightStateResponse(1, expectedState().brightness(initialBrightness + 130)); // second modification
         setCurrentTimeToAndRun(secondSplit); // detects manual override
@@ -1332,18 +1333,19 @@ class HueSchedulerTest {
                 expectedRunnable(now.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)) // scheduled final split of transition
         ).getFirst();
 
-        // advance time to final split -> skips second split, as not relevant anymore
-        advanceCurrentTime(Duration.of(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS));
+        // final split; still overridden. skip second split
+        advanceTimeAndRunAndAssertPutCalls(finalSplit);
 
         List<ScheduledRunnable> secondPowerOnRunnables = simulateLightOnEvent(
                 expectedPowerOnEnd(now.minus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS)), // already ended
-                expectedPowerOnEnd(now) // already ended; second split
+                expectedPowerOnEnd(now), // already ended; second split
+                expectedPowerOnEnd(initialNow.plusDays(1))
         );
 
         advanceTimeAndRunAndAssertPutCalls(secondPowerOnRunnables.get(0)); // already ended
         advanceTimeAndRunAndAssertPutCalls(secondPowerOnRunnables.get(1)); // already ended
 
-        advanceTimeAndRunAndAssertPutCalls(finalSplit,
+        advanceTimeAndRunAndAssertPutCalls(secondPowerOnRunnables.get(2),
                 expectedPutCall(1).bri(initialBrightness + 200), // end of the second part, which was skipped
                 expectedPutCall(1).bri(initialBrightness + 210).transitionTime(6000) // remaining 10 minutes
         );
@@ -1855,8 +1857,7 @@ class HueSchedulerTest {
 
         setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS));
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(1),
-                // performs interpolation, since no put since last power on
-                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS),
+                // expectedPutCall(1).bri(DEFAULT_BRIGHTNESS),  -> no interpolation anymore since last turnedOn tracking change
                 expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 10).transitionTime(tr("5min"))
         );
 

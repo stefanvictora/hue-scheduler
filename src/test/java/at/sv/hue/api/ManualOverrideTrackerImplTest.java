@@ -5,7 +5,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.Duration;
 import java.time.ZonedDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -18,10 +17,8 @@ class ManualOverrideTrackerImplTest {
 
     @BeforeEach
     void setUp() {
-        currentTime = ZonedDateTime.now();
-        ZonedDateTime initialTime = currentTime;
         tracker = new ManualOverrideTrackerImpl(
-                () -> Duration.between(initialTime, currentTime).toNanos(), 10);
+        );
     }
 
     @Test
@@ -46,61 +43,14 @@ class ManualOverrideTrackerImplTest {
     }
 
     @Test
-    void wasJustTurnedOn_onlyActiveAfterUserTTurnsOnLights_eventAlsoResetsManualOverrideFlag() {
-        assertWasJustTurnedOn("1", false);
-        assertWasJustTurnedOn("2", false);
-
+    void onLightTurnedOn_resetsManualOverrideFlag() {
         tracker.onManuallyOverridden("1");
         tracker.onManuallyOverridden("2");
-
-        assertWasJustTurnedOn("1", false);
-        assertWasJustTurnedOn("2", false);
 
         tracker.onLightTurnedOn("1");
 
         assertIsManuallyOverridden("1", false);
         assertIsManuallyOverridden("2", true); // light 2 remains unaffected
-        assertWasJustTurnedOn("1", true);
-        assertWasJustTurnedOn("2", false); // light 2 remains unaffected
-    }
-
-    @Test
-    void wasJustTurnedOn_resetAfterAutomaticallyAssigned() {
-        tracker.onManuallyOverridden("1");
-        tracker.onLightTurnedOn("1");
-
-        tracker.onAutomaticallyAssigned("1");
-
-        assertWasJustTurnedOn("1", false);
-    }
-
-    @Test
-    void wasJustTurnedOn_resetAfterManuallyOverridden() {
-        tracker.onLightTurnedOn("1");
-
-        tracker.onManuallyOverridden("1");
-
-        assertWasJustTurnedOn("1", false);
-    }
-
-    @Test
-    void wasJustTurnedOn_resetAfterLightOff() {
-        tracker.onLightTurnedOn("1");
-
-        tracker.onLightOff("1");
-
-        assertWasJustTurnedOn("1", false);
-    }
-
-    @Test
-    void wasJustTurnedOn_resetAfterTimeout() {
-        tracker.onLightTurnedOn("1");
-
-        assertWasJustTurnedOn("1", true);
-        
-        currentTime = currentTime.plusSeconds(10);
-
-        assertWasJustTurnedOn("1", false);
     }
 
     @Test
@@ -126,10 +76,6 @@ class ManualOverrideTrackerImplTest {
         tracker.onManuallyOverridden("1");
 
         assertThat(tracker.wasTurnedOnBySyncedScene("1")).isFalse();
-    }
-
-    private void assertWasJustTurnedOn(String lightId, boolean expected) {
-        assertThat(tracker.wasJustTurnedOn(lightId)).isEqualTo(expected);
     }
 
     private void assertIsManuallyOverridden(String lightId, boolean expected) {
