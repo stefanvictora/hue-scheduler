@@ -87,7 +87,7 @@ public class HttpResourceProviderImpl implements HttpResourceProvider {
             throw new ResourceNotFoundException("Resource not found: " + getBody(response));
         }
         if (response.code() == 429) {
-            throw new ApiFailure("Rate limit exceeded: " + getBody(response));
+            throw new ApiFailure("Rate limit exceeded");
         }
         if (response.code() >= 500) {
             throw new ApiFailure("Server error: " + getBody(response));

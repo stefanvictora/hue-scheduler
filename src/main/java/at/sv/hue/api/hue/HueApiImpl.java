@@ -564,6 +564,7 @@ public final class HueApiImpl implements HueApi {
 
     private <T, C extends DataListContainer<T>> Map<String, T> lookup(String endpoint, TypeReference<C> typeReference,
                                                                       Function<T, String> idFunction) {
+        rateLimiter.acquire(1);
         String response = resourceProvider.getResource(createUrl(endpoint));
         try {
             C container = mapper.readValue(response, typeReference);

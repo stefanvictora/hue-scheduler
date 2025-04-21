@@ -98,10 +98,10 @@ class HttpResourceProviderTest {
     }
 
     @Test
-    void code_429_rateLimit_throwsApiFailure() {
+    void code_429_rateLimit_throwsApiFailure_ignoresDescription() {
         mockStatusCode(429, "Description");
 
-        assertThrowsError(ApiFailure.class, "Rate limit exceeded: Description");
+        assertThrowsError(ApiFailure.class, "Rate limit exceeded");
     }
 
     @Test
