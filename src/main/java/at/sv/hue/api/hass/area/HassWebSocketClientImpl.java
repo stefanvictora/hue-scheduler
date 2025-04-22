@@ -164,7 +164,6 @@ public class HassWebSocketClientImpl implements HassWebSocketClient {
         public void onClosing(@NotNull WebSocket webSocket, int code, @NotNull String reason) {
             MDC.put("context", "websocket");
             log.trace("WebSocket is closing: [{}] {}", code, reason);
-            webSocket.close(code, reason);
             invalidateConnection(webSocket, new HassWebSocketException("WebSocket closing: " + reason));
             MDC.clear();
         }

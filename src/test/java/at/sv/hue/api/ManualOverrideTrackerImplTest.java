@@ -5,20 +5,16 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.ZonedDateTime;
-
 import static org.assertj.core.api.Assertions.assertThat;
 
 @ExtendWith(MockitoExtension.class)
 class ManualOverrideTrackerImplTest {
 
     private ManualOverrideTrackerImpl tracker;
-    private ZonedDateTime currentTime;
 
     @BeforeEach
     void setUp() {
-        tracker = new ManualOverrideTrackerImpl(
-        );
+        tracker = new ManualOverrideTrackerImpl();
     }
 
     @Test

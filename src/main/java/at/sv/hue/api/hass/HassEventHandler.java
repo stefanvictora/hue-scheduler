@@ -79,7 +79,7 @@ public final class HassEventHandler {
         }
 
         private boolean isEventOfType(String type) {
-            return "event".equals(this.type) && type.equals(event.getEvent_type());
+            return "event".equals(this.type) && event != null && type.equals(event.getEvent_type());
         }
     }
 

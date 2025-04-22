@@ -38,7 +38,7 @@ class HttpResourceProviderTest {
         try {
             mockServer.shutdown();
         } catch (IOException e) {
-            log.error("MockWebServer shutdown error (ignored): {}", e.getMessage());
+            log.debug("MockWebServer shutdown error (ignored): {}", e.getMessage());
         }
     }
 

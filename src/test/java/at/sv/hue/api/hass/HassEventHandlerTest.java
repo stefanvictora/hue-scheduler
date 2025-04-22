@@ -59,7 +59,18 @@ class HassEventHandlerTest {
                 """);
 
         verify(availabilityListener).onStarted();
-        verifyNoEvents(); // no other events
+    }
+
+    @Test
+    void onMessage_missingEvent_ignored() {
+        handler.onMessage("""
+                {
+                    "type": "event",
+                    "id": 1
+                }
+                """);
+
+        verifyNoEvents();
     }
 
     @Test
@@ -1668,5 +1679,6 @@ class HassEventHandlerTest {
     private void verifyNoEvents() {
         verifyNoInteractions(lightEventListener);
         verifyNoInteractions(sceneEventListener);
+        verifyNoInteractions(availabilityListener);
     }
 }

@@ -34,10 +34,10 @@ public class HassAreaRegistryImpl implements HassAreaRegistry {
         Map<String, DeviceRegistryEntry> devices = getDeviceRegistry();
         EntityRegistryEntry targetEntry = entities.get(entityId);
         if (targetEntry == null) {
-            throw new LightNotFoundException("State with id '" + entityId + "' not found!");
+            throw new LightNotFoundException("Entity with id '" + entityId + "' not found in HA entity registry");
         }
         String effectiveAreaId = targetEntry.getEffectiveAreaId(devices);
-        if (effectiveAreaId == null) {
+        if (effectiveAreaId == null || effectiveAreaId.isBlank()) {
             return null;
         }
         List<String> areaEntities = entities.values().stream()

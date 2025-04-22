@@ -268,7 +268,7 @@ public class HassApiImpl implements HueApi {
     private State lookupStateByName(String name) {
         List<State> states = getOrLookupStatesByName(name);
         if (states.size() > 1) {
-            throw new NonUniqueNameException("There are " + states.size() + " states with the given name '" + name + "'." +
+            throw new NonUniqueNameException("There are " + states.size() + " entities with the given name '" + name + "'." +
                                              " Please use a unique ID instead.");
         }
         return states.getFirst();
@@ -301,6 +301,7 @@ public class HassApiImpl implements HueApi {
             sceneStates.put(putCall.getId(), changeState);
         }
         createScene.setEntities(sceneStates);
+        rateLimiter.acquire(1);
         httpResourceProvider.postResource(createUrl("/services/scene/create"), getBody(createScene));
     }
 
@@ -338,7 +339,7 @@ public class HassApiImpl implements HueApi {
     private State getAndAssertLightExists(String id) {
         State state = getOrLookupStates().get(id);
         if (state == null) {
-            throw new LightNotFoundException("State with id '" + id + "' not found!");
+            throw new LightNotFoundException("Entity with id '" + id + "' not found!");
         }
         return state;
     }
@@ -444,7 +445,7 @@ public class HassApiImpl implements HueApi {
                                             .filter(HassApiImpl::isNoGroupState)
                                             .findFirst()
                                             .map(State::getEntity_id)
-                                            .orElseThrow(() -> new LightNotFoundException("Non-group state with name '" + name + "' was not found!"));
+                                            .orElseThrow(() -> new LightNotFoundException("Non-group entity with name '" + name + "' was not found!"));
     }
 
     private static boolean isNoGroupState(State state) {
@@ -467,21 +468,21 @@ public class HassApiImpl implements HueApi {
         if (isHassGroup(state)) {
             return state.attributes.entity_id.contains(lightId);
         } else { // old Hue group
-            return state.attributes.lights.contains(lightName);
+            return state.attributes.lights != null && state.attributes.lights.contains(lightName);
         }
     }
 
     private List<State> getOrLookupStatesByName(String name) {
         List<State> states = getOrLookupNameToStateMap().get(name);
         if (states == null) {
-            throw new LightNotFoundException("State with name '" + name + "' was not found!");
+            throw new LightNotFoundException("Entity with name '" + name + "' was not found!");
         }
         return states;
     }
 
     private static void assertSupportedStateType(String id) {
         if (!isSupportedStateType(id)) {
-            throw new UnsupportedStateException("State with id '" + id + "' is not supported");
+            throw new UnsupportedStateException("Entity with id '" + id + "' is not supported");
         }
     }
 

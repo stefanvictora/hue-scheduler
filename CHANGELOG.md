@@ -16,7 +16,7 @@
   - Use `force:true` to disable this behavior for individual states.
 
 ### Fixed
-- **Scene Sync**: Fixed a sync issue for states that where not activated for a longer period of time.
+- **Scene Sync**: Fixed a sync issue for states that were not activated for a longer period of time.
 - Improved reliability of Hue Scheduler during HA restarts and other cases of unavailability.
 - Reduce incorrect change detections for HA events.
 

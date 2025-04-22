@@ -35,7 +35,7 @@ they remain accessible for use in automations. Hue Scheduler creates a scene for
 When enabled, states will only be applied when triggered by a synced scene activation.
 After scene activation, the current state and subsequent states will be applied until lights are turned off or manually
 modified.
-This flag is designed to work in conjunction with `--enable-scene-sync` to provide manual control over when states are activated.
+Enable this flag together with `--enable-scene-sync` to gain manual control over when states are activated.
 
 Example use case: If you want lights to follow a schedule only after explicitly activating a synced Hue Scheduler scene 
 (e.g., through a smart switch or Home Assistant automation), rather than automatically applying states when lights are turned on.

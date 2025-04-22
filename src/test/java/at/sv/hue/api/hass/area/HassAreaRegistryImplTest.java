@@ -17,6 +17,7 @@ import static org.mockito.Mockito.when;
 class HassAreaRegistryImplTest {
     private static final String ENTITY_REGISTRY_COMMAND = "config/entity_registry/list";
     private static final String DEVICE_REGISTRY_COMMAND = "config/device_registry/list";
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private HassWebSocketClient webSocketClient;
     private HassAreaRegistryImpl registry;
@@ -85,6 +86,22 @@ class HassAreaRegistryImplTest {
         String deviceId = "device_1";
         mockEntities(createEntity(entityId, null, deviceId));
         mockDevices(createDevice(deviceId, null));
+
+        assertThat(lookupAreaForEntityId(entityId)).isNull();
+    }
+
+    @Test
+    void lookupAreaForEntity_returnNull_whenEntityHasEmptyString() {
+        String entityId = "light.living_room";
+        mockEntities(createEntity(entityId, "", null));
+
+        assertThat(lookupAreaForEntityId(entityId)).isNull();
+    }
+
+    @Test
+    void lookupAreaForEntity_returnNull_whenEntityHasBlankString() {
+        String entityId = "light.living_room";
+        mockEntities(createEntity(entityId, "  ", null));
 
         assertThat(lookupAreaForEntityId(entityId)).isNull();
     }
@@ -195,7 +212,7 @@ class HassAreaRegistryImplTest {
 
     private String getRegistryResponse(List<?> entries) {
         try {
-            String arrayContent = new ObjectMapper().writeValueAsString(entries);
+            String arrayContent = MAPPER.writeValueAsString(entries);
             return """
                     {
                       "id": 1,
