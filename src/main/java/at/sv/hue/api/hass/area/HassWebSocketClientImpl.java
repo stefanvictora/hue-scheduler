@@ -191,7 +191,7 @@ public class HassWebSocketClientImpl implements HassWebSocketClient {
             } else if ("auth_invalid".equals(type)) {
                 String errorMsg = "Authentication failed: '" + text + "'";
                 log.error(errorMsg);
-                authFuture.completeExceptionally(new HassWebSocketException(errorMsg));
+                invalidateConnection(webSocket, new HassWebSocketException(errorMsg));
             }
         }
         if (node.has("id")) {

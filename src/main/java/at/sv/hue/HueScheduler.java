@@ -293,6 +293,7 @@ public final class HueScheduler implements Runnable {
         startTimeProvider = createStartTimeProvider(latitude, longitude, elevation);
         stateScheduler = createStateScheduler();
         defaultInterpolationTransitionTime = parseInterpolationTransitionTime(defaultInterpolationTransitionTimeString);
+        assertConfigurationParameters();
         assertInputIsReadable();
         assertConnectionAndStart();
     }
@@ -313,6 +314,13 @@ public final class HueScheduler implements Runnable {
 
     private StateSchedulerImpl createStateScheduler() {
         return new StateSchedulerImpl(Executors.newSingleThreadScheduledExecutor(), ZonedDateTime::now);
+    }
+
+    private void assertConfigurationParameters() {
+        if (requireSceneActivation && !enableSceneSync) {
+            System.err.println("--require-scene-activation requires --enable-scene-sync");
+            System.exit(1);
+        }
     }
 
     private void assertInputIsReadable() {

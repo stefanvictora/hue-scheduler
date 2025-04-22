@@ -74,8 +74,8 @@ public class ManualOverrideTrackerImpl implements ManualOverrideTracker {
     @Getter
     @Setter
     private static final class TrackedState {
-        private boolean manuallyOverridden;
-        private boolean turnedOnBySyncedScene;
-        private boolean lightIsOff;
+        private volatile boolean manuallyOverridden;
+        private volatile boolean turnedOnBySyncedScene;
+        private volatile boolean lightIsOff;
     }
 }

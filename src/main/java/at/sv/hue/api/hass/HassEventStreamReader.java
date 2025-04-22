@@ -22,7 +22,11 @@ public final class HassEventStreamReader {
     private final String accessToken;
     private final OkHttpClient client;
     private final HassEventHandler hassEventHandler;
-    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(factory -> {
+        Thread thread = new Thread(factory, "hass-reconnect");
+        thread.setDaemon(true);
+        return thread;
+    });
     private final AtomicInteger messageIdCounter = new AtomicInteger(1);
 
     public HassEventStreamReader(String origin, String accessToken, OkHttpClient client, HassEventHandler hassEventHandler) {

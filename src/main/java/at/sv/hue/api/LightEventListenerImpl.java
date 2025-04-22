@@ -40,6 +40,7 @@ public class LightEventListenerImpl implements LightEventListener {
             manualOverrideTracker.onLightTurnedOnBySyncedScene(id);
         }
         rescheduleWaitingStates(id);
+        MDC.clear();
     }
 
     private void rescheduleWaitingStates(String id) {
@@ -59,6 +60,7 @@ public class LightEventListenerImpl implements LightEventListener {
                                      manualOverrideTracker.onLightTurnedOn(id);
                                      rescheduleWaitingStates(id);
                                  });
+        MDC.clear();
     }
 
     @Override
