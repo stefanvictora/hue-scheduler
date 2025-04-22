@@ -2007,7 +2007,7 @@ public class HassApiTest {
         List<PutCall> putCalls = List.of(
                 PutCall.builder()
                        .id("light.kitchen_main")
-                       .bri(255)
+                       .bri(254)
                        .ct(100)
                        .build(),
                 PutCall.builder()
@@ -2039,7 +2039,7 @@ public class HassApiTest {
                     },
                     "light.kitchen_main" : {
                       "state" : "on",
-                      "brightness" : 256,
+                      "brightness" : 255,
                       "color_temp" : 100
                     }
                   }
