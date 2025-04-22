@@ -60,7 +60,8 @@ public class HassAreaRegistryImpl implements HassAreaRegistry {
                         entityRegistryCache = registryResponse.getResult().stream()
                                                               .filter(entry -> HassSupportedEntityType.isSupportedEntityType(entry.getEntity_id()))
                                                               .collect(Collectors.toConcurrentMap(EntityRegistryEntry::getEntity_id,
-                                                                      Function.identity()));
+                                                                      Function.identity(),
+                                                                      (e1, e2) -> e1));
                     } catch (Exception e) {
                         throw new HassWebSocketException("Failed to parse entity registry response", e);
                     }
@@ -83,7 +84,8 @@ public class HassAreaRegistryImpl implements HassAreaRegistry {
                         deviceRegistryCache = registryResponse.getResult().stream()
                                                               .filter(entry -> entry.getArea_id() != null)
                                                               .collect(Collectors.toConcurrentMap(DeviceRegistryEntry::getId,
-                                                                      Function.identity()));
+                                                                      Function.identity(),
+                                                                      (e1, e2) -> e1));
                     } catch (Exception e) {
                         throw new HassWebSocketException("Failed to parse device registry response", e);
                     }

@@ -106,9 +106,9 @@ public class ScheduledStateRegistry {
     public List<GroupInfo> getAssignedGroups(ScheduledStateSnapshot state) {
         List<GroupInfo> assignedGroups = getAssignedGroupsSortedBySizeDesc(getGroupLights(state));
         List<GroupInfo> additionalAreas = api.getAdditionalAreas(getGroupLights(state));
-        ArrayList<GroupInfo> groups = new ArrayList<>(assignedGroups);
-        groups.addAll(additionalAreas);
-        return groups;
+        return Stream.concat(assignedGroups.stream(), additionalAreas.stream())
+                     .distinct()
+                     .toList();
     }
 
     private List<GroupInfo> getAssignedGroupsSortedBySizeDesc(List<String> lightIds) {

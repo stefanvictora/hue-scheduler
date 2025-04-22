@@ -7257,13 +7257,16 @@ class HueSchedulerTest {
     }
 
     @Test
-    void sceneSync_withAdditionalAreas_considersThem() {
+    void sceneSync_withAdditionalAreas_considersThem_ignoresDuplicate() {
         enableSceneSync();
 
         addKnownLightIdsWithDefaultCapabilities(1);
         mockGroupLightsForId(5, 1);
         when(mockedHueApi.getAdditionalAreas(List.of("/lights/1")))
-                .thenReturn(List.of(new GroupInfo("/groups/7", List.of("/lights/1", "/lights/3"))));
+                .thenReturn(List.of(
+                        new GroupInfo("/groups/7", List.of("/lights/1", "/lights/3")),
+                        new GroupInfo("/groups/5", List.of("/lights/1")) // duplicate
+                ));
         addState(1, "00:00", "bri:100");
         addState(1, "12:00", "bri:200");
 
