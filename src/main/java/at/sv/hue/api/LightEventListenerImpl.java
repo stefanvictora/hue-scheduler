@@ -3,9 +3,9 @@ package at.sv.hue.api;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
@@ -13,7 +13,7 @@ import java.util.function.Predicate;
 public class LightEventListenerImpl implements LightEventListener {
 
     private final ManualOverrideTracker manualOverrideTracker;
-    private final ConcurrentHashMap<String, List<Runnable>> onStateWaitingList;
+    private final ConcurrentHashMap<String, CopyOnWriteArrayList<Runnable>> onStateWaitingList;
     private final Function<String, List<String>> affectedIdsByDeviceLookup;
     private final Predicate<String> wasRecentlyAffectedBySyncedScene;
 
@@ -65,6 +65,6 @@ public class LightEventListenerImpl implements LightEventListener {
 
     @Override
     public void runWhenTurnedOn(String id, Runnable runnable) {
-        onStateWaitingList.computeIfAbsent(id, i -> new ArrayList<>()).add(runnable);
+        onStateWaitingList.computeIfAbsent(id, i -> new CopyOnWriteArrayList<>()).add(runnable);
     }
 }
