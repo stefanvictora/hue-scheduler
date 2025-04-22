@@ -44,20 +44,20 @@ public final class HassEventHandler {
     }
 
     private void handleStateChangedEvent(String entityId, State oldState, State newState) {
-        if (newState == null) {
+        if (newState == null || oldState == null) {
             return;
         }
-        if (oldState != null && oldState.isOff() && newState.isOn()) {
+        if (oldState.isOff() && newState.isOn()) {
             if (HassSupportedEntityType.isSupportedEntityType(entityId)) {
                 eventListener.onLightOn(entityId);
             }
-        } else if (oldState != null && oldState.isUnavailable() && newState.isOn()) {
+        } else if (oldState.isUnavailable() && newState.isOn()) {
             if (HassSupportedEntityType.isSupportedEntityType(entityId)) {
                 eventListener.onPhysicalOn(entityId);
             }
-        } else if (oldState != null && oldState.isOn() && (newState.isOff() || newState.isUnavailable())) {
+        } else if (oldState.isOn() && (newState.isOff() || newState.isUnavailable())) {
             eventListener.onLightOff(entityId);
-        } else if (oldState != null && newState.isScene() && !newState.isUnavailable() && !newState.isUnknown()) {
+        } else if (newState.isScene() && !newState.isUnavailable() && !newState.isUnknown()) {
             if (!Objects.equals(oldState.state, newState.state)) {
                 sceneEventListener.onSceneActivated(entityId);
             }

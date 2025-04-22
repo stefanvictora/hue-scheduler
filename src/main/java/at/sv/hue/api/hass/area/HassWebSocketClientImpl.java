@@ -88,6 +88,9 @@ public class HassWebSocketClientImpl implements HassWebSocketClient {
             return future.get(requestTimeoutSeconds, TimeUnit.SECONDS);
         } catch (Exception e) {
             pendingRequests.remove(id);
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt(); // restore interrupt status
+            }
             throw new HassWebSocketException("Timeout or error waiting for response.", e);
         }
     }
@@ -113,6 +116,9 @@ public class HassWebSocketClientImpl implements HassWebSocketClient {
             authFuture.get(requestTimeoutSeconds, TimeUnit.SECONDS);
         } catch (Exception e) {
             invalidateConnection(webSocket, e);
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt(); // restore interrupt status
+            }
             throw new HassWebSocketException("Authentication timed out or failed.", e);
         }
         synchronized (connectionLock) {
