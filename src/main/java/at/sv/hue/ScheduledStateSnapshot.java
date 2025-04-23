@@ -117,7 +117,7 @@ public class ScheduledStateSnapshot {
     }
 
     public boolean isCurrentlyActive(ZonedDateTime now) {
-        return (getStart().isBefore(now) || getStart().isEqual(now)) && getEnd() != null && getEnd().isAfter(now);
+        return (getStart().isBefore(now) || getStart().isEqual(now)) && getEnd().isAfter(now);
     }
 
     public boolean hasGapBefore() {

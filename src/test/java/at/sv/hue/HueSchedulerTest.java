@@ -5226,34 +5226,119 @@ class HueSchedulerTest {
     }
 
     @Test
-    void run_execution_manualOverride_onPhysicalOn_resetsManualOverride() {
+    void run_execution_manualOverride_resetAfterPowerOn() {
         enableUserModificationTracking();
         addKnownLightIdsWithDefaultCapabilities(1);
-        when(mockedHueApi.getAffectedIdsByDevice("/device/354")).thenReturn(List.of("/lights/1"));
 
         addState(1, now, "bri:100");
         addState(1, now.plusMinutes(10), "bri:110");
-        manualOverrideTracker.onManuallyOverridden("/lights/1");
 
         List<ScheduledRunnable> scheduledRunnables = startScheduler(
                 expectedRunnable(now, now.plusMinutes(10)),
                 expectedRunnable(now.plusMinutes(10), now.plusDays(1))
         );
 
-        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst()); // skipped, since manually overridden
+        // first state -> current light state ignored
+
+        setLightStateResponse(1, expectedState().brightness(50)); // ignored for first run
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).bri(100)
+        );
+
+        ScheduledRunnable firstNextDay = ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
+        ).getFirst();
+
+
+        // second state -> detects manual override
+
+        setLightStateResponse(1, expectedState().brightness(50));
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(1)); // detects manual override
 
         ensureScheduledStates(
-                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
+                expectedRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)) // next day
         );
+        
+        // power on of second state -> resets overridden flag again
+
+        List<ScheduledRunnable> powerOnRunnables = simulateLightOnEvent(
+                expectedPowerOnEnd(initialNow.plusMinutes(10)), // already ended
+                expectedPowerOnEnd(initialNow.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(powerOnRunnables.get(1),
+                expectedPutCall(1).bri(110)
+        );
+
+        // next day -> applied normally again
+
+        setLightStateResponse(1, expectedState().brightness(110));
+        advanceTimeAndRunAndAssertPutCalls(firstNextDay,
+                expectedPutCall(1).bri(100)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusDays(2), initialNow.plusDays(2).plusMinutes(10)) // next day
+        );
+    }
+
+    @Test
+    void run_execution_manualOverride_resetAfterPhysicalPowerOn() {
+        enableUserModificationTracking();
+        addKnownLightIdsWithDefaultCapabilities(1);
+        when(mockedHueApi.getAffectedIdsByDevice("/device/354")).thenReturn(List.of("/lights/1"));
+
+        addState(1, now, "bri:100");
+        addState(1, now.plusMinutes(10), "bri:110");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+        );
+
+        // first state -> current light state ignored
+
+        setLightStateResponse(1, expectedState().brightness(20)); // ignored for first run
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).bri(100)
+        );
+
+        ScheduledRunnable firstNextDay = ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
+        ).getFirst();
+
+
+        // second state -> detects manual override
+
+        setLightStateResponse(1, expectedState().brightness(20));
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(1)); // detects manual override
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)) // next day
+        );
+
+        // physical power on of second state -> resets overridden flag again
 
         scheduler.getHueEventListener().onPhysicalOn("/device/354");
 
-        ScheduledRunnable powerOnRunnable = ensureScheduledStates(
-                expectedPowerOnEnd(now.plusMinutes(10))
-        ).getFirst();
+        List<ScheduledRunnable> powerOnRunnables = ensureScheduledStates(
+                expectedPowerOnEnd(initialNow.plusMinutes(10)), // already ended
+                expectedPowerOnEnd(initialNow.plusDays(1))
+        );
 
-        advanceTimeAndRunAndAssertPutCalls(powerOnRunnable,
+        advanceTimeAndRunAndAssertPutCalls(powerOnRunnables.get(1),
+                expectedPutCall(1).bri(110)
+        );
+
+        // next day -> applied normally again
+
+        setLightStateResponse(1, expectedState().brightness(110));
+        advanceTimeAndRunAndAssertPutCalls(firstNextDay,
                 expectedPutCall(1).bri(100)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusDays(2), initialNow.plusDays(2).plusMinutes(10)) // next day
         );
     }
 
