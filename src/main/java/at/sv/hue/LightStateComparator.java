@@ -9,6 +9,9 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class LightStateComparator {
 
+    static final int BRIGHTNESS_THRESHOLD = 10;
+    static final int COLOR_TEMPERATURE_THRESHOLD = 15;
+
     private final PutCall lastPutCall;
     private final LightState currentState;
 
@@ -27,7 +30,7 @@ public class LightStateComparator {
     }
 
     private boolean brightnessIsNotSimilar() {
-        return Math.abs(lastPutCall.getBri() - currentState.getBrightness()) >= 5;
+        return Math.abs(lastPutCall.getBri() - currentState.getBrightness()) >= BRIGHTNESS_THRESHOLD;
     }
 
     private boolean colorModeOrValuesDiffer() {
@@ -70,7 +73,7 @@ public class LightStateComparator {
     }
 
     private boolean colorTemperatureIsNotSimilar() {
-        return Math.abs(getAdjustedLastCt() - currentState.getColorTemperature()) >= 5;
+        return Math.abs(getAdjustedLastCt() - currentState.getColorTemperature()) >= COLOR_TEMPERATURE_THRESHOLD;
     }
 
     private int getAdjustedLastCt() {

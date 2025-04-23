@@ -113,7 +113,7 @@ class ScheduledStateTest {
                                                         .build();
         LightState lightState = LightState.builder()
                                           .on(true)
-                                          .colorTemperature(205)
+                                          .colorTemperature(200 + LightStateComparator.COLOR_TEMPERATURE_THRESHOLD)
                                           .colormode(ColorMode.CT)
                                           .lightCapabilities(COLOR_TEMPERATURE_LIGHT)
                                           .build();
@@ -628,7 +628,7 @@ class ScheduledStateTest {
                                                         .build();
         LightState lightState = LightState.builder()
                                           .on(true)
-                                          .brightness(15)
+                                          .brightness(10 + LightStateComparator.BRIGHTNESS_THRESHOLD)
                                           .lightCapabilities(BRIGHTNESS_ONLY)
                                           .build();
 

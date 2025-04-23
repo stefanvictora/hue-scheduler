@@ -67,7 +67,7 @@ Defines the delay in seconds during which turn-on events for affected lights and
 after scene activation has been detected. This prevents Hue Scheduler from taking over after lights or groups have
 been turned on via a scene.
 
-**Default**: `5` seconds
+**Default**: `8` seconds
 
 ### `--default-interpolation-transition-time`
 
