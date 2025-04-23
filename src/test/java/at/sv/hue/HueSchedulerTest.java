@@ -3404,6 +3404,11 @@ class HueSchedulerTest {
     }
 
     @Test
+    void parse_canHandleSaturationInPercent_trims() {
+        assertAppliedSaturation("0 %", 0);
+    }
+
+    @Test
     void parse_canHandleSaturationInPercent_halfPercent() {
         assertAppliedSaturation("0.5%", 1);
     }
@@ -3439,6 +3444,11 @@ class HueSchedulerTest {
     @Test
     void parse_canHandleBrightnessInPercent_minValue() {
         assertAppliedBrightness("1%", 1);
+    }
+
+    @Test
+    void parse_canHandleBrightnessInPercent_trims() {
+        assertAppliedBrightness("1 %", 1);
     }
 
     @Test
@@ -7594,6 +7604,57 @@ class HueSchedulerTest {
         ensureScheduledStates(
                 expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
         );
+    }
+
+    @Test
+    void clearCachesAndReSyncScenes_syncsCurrentActiveStates_ignoresRepeatedSyncsForInterpolations() {
+        enableSceneSync();
+
+        mockDefaultGroupCapabilities(1);
+        mockDefaultGroupCapabilities(2);
+        mockDefaultGroupCapabilities(3);
+        mockGroupLightsForId(1, 11);
+        mockGroupLightsForId(2, 22);
+        mockGroupLightsForId(3, 33);
+        addState("g1", now, "bri:110");
+        addState("g2", now, "bri:120");
+        addState("g3", now, "on:false");
+        addState("g1", now.plusMinutes(10), "bri:210");
+        addState("g2", now.plusMinutes(10), "bri:220", "tr-before:5min");
+        addState("g3", now.plusMinutes(10), "bri:230");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now, now.plusMinutes(5)),
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(5), now.plusDays(1)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+        );
+
+        scheduler.clearCachesAndReSyncScenes();
+
+        assertSceneUpdate("/groups/1", expectedPutCall(11).bri(110));
+        assertSceneUpdate("/groups/2", expectedPutCall(22).bri(120));
+        assertSceneUpdate("/groups/3", expectedPutCall(33).on(false));
+
+        advanceCurrentTime(Duration.ofMinutes(7));
+
+        scheduler.clearCachesAndReSyncScenes();
+
+        assertSceneUpdate("/groups/1", expectedPutCall(11).bri(110));
+        assertSceneUpdate("/groups/2", expectedPutCall(22).bri(160)); // interpolated value
+        assertSceneUpdate("/groups/3", expectedPutCall(33).on(false));
+
+        advanceCurrentTime(Duration.ofMinutes(3));
+
+        scheduler.clearCachesAndReSyncScenes();
+
+        assertSceneUpdate("/groups/1", expectedPutCall(11).bri(210));
+        assertSceneUpdate("/groups/2", expectedPutCall(22).bri(220));
+        assertSceneUpdate("/groups/3", expectedPutCall(33).bri(230));
+
+        verify(mockedHueApi, times(3)).clearCaches();
     }
 
     // todo: what about if the schedule contains on:true, should we then still not apply it?

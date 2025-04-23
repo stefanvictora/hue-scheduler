@@ -723,6 +723,10 @@ class HueApiTest {
                         {
                           "rid": "2f279281-3e45-462c-9e89-6b2d3363d883",
                           "rtype": "device"
+                        },
+                        {
+                          "rid": "SOMETHING_ELSE",
+                          "rtype": "another_resource"
                         }
                       ],
                       "services": [
@@ -1194,6 +1198,10 @@ class HueApiTest {
                       ],
                       "services": [
                         {
+                          "rid": "IGNORED_ID",
+                          "rtype": "another_service"
+                        },
+                        {
                           "rid": "GROUPED_LIGHT_ID_2",
                           "rtype": "grouped_light"
                         }
@@ -1210,6 +1218,43 @@ class HueApiTest {
         assertThat(getAssignedGroups("2")).containsExactly("GROUPED_LIGHT_ID_1");
         assertThat(getAssignedGroups("3")).containsExactlyInAnyOrder("GROUPED_LIGHT_ID_1", "GROUPED_LIGHT_ID_2");
         assertThat(getAssignedGroups("777")).isEmpty();
+    }
+
+    @Test
+    void getAssignedGroups_givenLightId_returnsGroupedLightIds_noIdPresent_exception() {
+        setGetResponse("/room", EMPTY_RESPONSE);
+        setGetResponse("/zone", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "GROUP_ID_1",
+                      "id_v1": "/groups/9",
+                      "children": [
+                        {
+                          "rid": "1",
+                          "rtype": "light"
+                        },
+                        {
+                          "rid": "2",
+                          "rtype": "light"
+                        },
+                        {
+                          "rid": "3",
+                          "rtype": "light"
+                        }
+                      ],
+                      "services": [],
+                      "metadata": {
+                        "name": "Oben",
+                        "archetype": "upstairs"
+                      },
+                      "type": "zone"
+                    }
+                  ]
+                }""");
+
+        assertThrows(GroupNotFoundException.class, () -> getAssignedGroups("2"));
     }
 
     @Test
