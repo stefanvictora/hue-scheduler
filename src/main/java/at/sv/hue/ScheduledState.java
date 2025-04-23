@@ -429,13 +429,6 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
         return context;
     }
 
-    private String getFormattedTransitionTimeBefore() {
-        if (transitionTimeBeforeString == null) {
-            return "";
-        }
-        return formatPropertyName("tr-before") + transitionTimeBeforeString;
-    }
-
     private String getFormattedPropertyIfSet(String name, Object property) {
         if (property == null) return "";
         return formatPropertyName(name) + property;

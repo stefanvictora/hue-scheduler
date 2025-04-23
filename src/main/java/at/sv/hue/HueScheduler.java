@@ -502,7 +502,7 @@ public final class HueScheduler implements Runnable {
     }
 
     private boolean shouldSyncScene(ScheduledStateSnapshot state) {
-        return enableSceneSync && !state.isTemporary() && !state.isSkipSceneSync();
+        return enableSceneSync && !state.isTemporary();
     }
 
     private boolean wasNotJustTurnedOn(ScheduledStateSnapshot state) {
@@ -777,7 +777,6 @@ public final class HueScheduler implements Runnable {
     }
 
     private void retryWhenBackOn(ScheduledStateSnapshot snapshot) {
-        snapshot.setSkipSceneSync(true);
         lightEventListener.runWhenTurnedOn(snapshot.getId(), () -> schedule(snapshot, powerOnRescheduleDelayInMs));
     }
 

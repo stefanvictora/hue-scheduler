@@ -3,7 +3,6 @@ package at.sv.hue;
 import at.sv.hue.api.PutCall;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import lombok.Setter;
 
 import java.time.DayOfWeek;
 import java.time.Duration;
@@ -28,9 +27,6 @@ public class ScheduledStateSnapshot {
     private volatile ZonedDateTime cachedEnd;
     private volatile ScheduledStateSnapshot cachedPreviousState;
     private volatile ScheduledStateSnapshot cachedNextState;
-    @Getter
-    @Setter
-    private volatile boolean skipSceneSync;
 
     public String getId() {
         return scheduledState.getId();

@@ -871,6 +871,31 @@ class HueSchedulerTest {
     }
 
     @Test
+    void parse_canParseTransitionTimeBefore_withAbsoluteTime_simple() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState("1", "00:00", "bri:1"); // 00:00-10:00
+        addState("1", "12:00", "bri:254", "tr-before:10:00"); // 10:00-12:00
+
+        startScheduler(
+                expectedRunnable(now, now.plusHours(10)),
+                expectedRunnable(now.plusHours(10), now.plusDays(1))
+        );
+    }
+
+    @Test
+    void parse_canParseTransitionTimeBefore_withAbsoluteTime_afterStartTime_ignored() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState("1", "00:00", "bri:1");
+        addState("1", "12:00", "bri:254", "tr-before:13:00"); // ignores tr-before
+
+        startScheduler(
+                expectedRunnable(now, now.plusHours(12)),
+                expectedRunnable(now.plusHours(12), now.plusDays(1))
+        );
+    }
+
+
+    @Test
     void parse_canParseInterpolateProperty_correctlyScheduled() {
         enableUserModificationTracking();
         addKnownLightIdsWithDefaultCapabilities(1);
