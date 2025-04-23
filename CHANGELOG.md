@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.12.4] - 2025-02-xx
+## [0.13.0] - 2025-04-xx
 
 ### Added
 - **Scene Sync Support for Home Assistant**: Implemented scene synchronization for Home Assistant.
