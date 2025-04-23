@@ -151,7 +151,7 @@ public class HassWebSocketClientImpl implements HassWebSocketClient {
             MDC.put("context", "websocket");
             log.info("HA WebSocket connected.");
             authenticate(webSocket);
-            MDC.clear();
+            MDC.remove("context");
         }
 
         @Override
@@ -163,7 +163,7 @@ public class HassWebSocketClientImpl implements HassWebSocketClient {
             } catch (Exception e) {
                 log.error("Failed to handle WebSocket message: '{}'", text, e);
             }
-            MDC.clear();
+            MDC.remove("context");
         }
 
         @Override
@@ -171,7 +171,7 @@ public class HassWebSocketClientImpl implements HassWebSocketClient {
             MDC.put("context", "websocket");
             log.trace("WebSocket is closing: [{}] {}", code, reason);
             invalidateConnection(webSocket, new HassWebSocketException("WebSocket closing: " + reason));
-            MDC.clear();
+            MDC.remove("context");
         }
 
         @Override
@@ -180,7 +180,7 @@ public class HassWebSocketClientImpl implements HassWebSocketClient {
             log.error("WebSocket failure: '{}'", t.getMessage());
             webSocket.cancel();
             invalidateConnection(webSocket, t);
-            MDC.clear();
+            MDC.remove("context");
         }
     }
 

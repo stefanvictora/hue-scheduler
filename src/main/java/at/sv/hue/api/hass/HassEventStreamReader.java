@@ -51,7 +51,7 @@ public final class HassEventStreamReader {
                 authenticate(webSocket);
                 subscribeToEvents(webSocket, "state_changed");
                 subscribeToEvents(webSocket, "homeassistant_started");
-                MDC.clear();
+                MDC.remove("context");
             }
 
             @Override
@@ -62,7 +62,7 @@ public final class HassEventStreamReader {
                 } catch (Exception e) {
                     log.error("Exception while handling message: {}", text, e);
                 }
-                MDC.clear();
+                MDC.remove("context");
             }
 
             @Override
@@ -71,7 +71,7 @@ public final class HassEventStreamReader {
                 log.warn("HA event stream closing: [{}] {}. Reconnecting in 3s.", code, reason);
                 webSocket.close(code, reason);
                 reconnectWithDelay();
-                MDC.clear();
+                MDC.remove("context");
             }
 
             @Override
@@ -80,7 +80,7 @@ public final class HassEventStreamReader {
                 log.error("HA event stream failure: '{}'. Reconnecting in 3s.", t.getMessage());
                 webSocket.cancel();
                 reconnectWithDelay();
-                MDC.clear();
+                MDC.remove("context");
             }
         });
     }
