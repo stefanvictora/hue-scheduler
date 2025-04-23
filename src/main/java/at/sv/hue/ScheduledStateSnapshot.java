@@ -200,7 +200,7 @@ public class ScheduledStateSnapshot {
         if (isInsideSplitCallWindow(now)) {
             return getNextTransitionTimeSplitStart(now).minusSeconds(1);
         } else {
-            return getEnd();
+            return null; // will be calculated on demand
         }
     }
 
@@ -210,7 +210,7 @@ public class ScheduledStateSnapshot {
     }
 
     private ZonedDateTime getNextTransitionTimeSplitStart(ZonedDateTime now) {
-        ZonedDateTime splitStart = getStart().plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS);
+        ZonedDateTime splitStart = getStart().plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS); // directly start with next
         while (splitStart.isBefore(now) || splitStart.isEqual(now)) {
             splitStart = splitStart.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS);
         }
@@ -247,7 +247,7 @@ public class ScheduledStateSnapshot {
             return putCall;
         }
         ScheduledStateSnapshot previousState = this;
-        while (putCall.getBri() == null || putCall.getColorMode() == ColorMode.NONE) {
+        while (putCall.getBri() == null || putCall.getColorMode() == ColorMode.NONE) { // stop as soon as we have brightness and color mode
             previousState = previousState.getPreviousState();
             if (previousState == null || isSameState(previousState) || previousState.isNullState()) {
                 break;

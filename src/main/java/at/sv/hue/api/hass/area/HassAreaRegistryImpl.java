@@ -3,7 +3,6 @@ package at.sv.hue.api.hass.area;
 import at.sv.hue.api.GroupInfo;
 import at.sv.hue.api.LightNotFoundException;
 import at.sv.hue.api.hass.HassSupportedEntityType;
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Data;
@@ -25,7 +24,6 @@ public class HassAreaRegistryImpl implements HassAreaRegistry {
         this.webSocketClient = webSocketClient;
         this.mapper = new ObjectMapper();
         mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
-        mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
     }
 
     @Override
@@ -62,6 +60,8 @@ public class HassAreaRegistryImpl implements HassAreaRegistry {
                                                               .collect(Collectors.toConcurrentMap(EntityRegistryEntry::getEntity_id,
                                                                       Function.identity(),
                                                                       (e1, e2) -> e1));
+                    } catch (HassWebSocketException e) {
+                        throw e;
                     } catch (Exception e) {
                         throw new HassWebSocketException("Failed to parse entity registry response", e);
                     }
@@ -82,10 +82,13 @@ public class HassAreaRegistryImpl implements HassAreaRegistry {
                             throw new HassWebSocketException("Failed to get device registry: " + response);
                         }
                         deviceRegistryCache = registryResponse.getResult().stream()
+                                                              // optimization: we only care about devices with area_id set
                                                               .filter(entry -> entry.getArea_id() != null)
                                                               .collect(Collectors.toConcurrentMap(DeviceRegistryEntry::getId,
                                                                       Function.identity(),
                                                                       (e1, e2) -> e1));
+                    } catch (HassWebSocketException e) {
+                        throw e;
                     } catch (Exception e) {
                         throw new HassWebSocketException("Failed to parse device registry response", e);
                     }

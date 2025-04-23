@@ -37,12 +37,23 @@ class HassAreaRegistryImplTest {
     }
 
     @Test
-    void lookupAreaForEntity_handleInvalidJsonResponse() {
+    void lookupAreaForEntity_handleInvalidJsonResponse_entities() {
         mockClientResponse(ENTITY_REGISTRY_COMMAND, "invalid json");
 
         assertThatThrownBy(() -> lookupAreaForEntityId("light.any"))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("Failed to parse entity registry response");
+                .isInstanceOf(HassWebSocketException.class)
+                .hasMessageContaining("Failed to parse entity registry response")
+                .hasCauseInstanceOf(JsonProcessingException.class);
+    }
+
+    @Test
+    void lookupAreaForEntity_handleInvalidJsonResponse_devices() {
+        mockClientResponse(DEVICE_REGISTRY_COMMAND, "invalid json");
+
+        assertThatThrownBy(() -> lookupAreaForEntityId("light.any"))
+                .isInstanceOf(HassWebSocketException.class)
+                .hasMessageContaining("Failed to parse device registry response")
+                .hasCauseInstanceOf(JsonProcessingException.class);
     }
 
     @Test
@@ -50,8 +61,8 @@ class HassAreaRegistryImplTest {
         mockClientResponse(ENTITY_REGISTRY_COMMAND, getFailureResponse());
 
         assertThatThrownBy(() -> lookupAreaForEntityId("light.any"))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("Failed to parse entity registry response");
+                .isInstanceOf(HassWebSocketException.class)
+                .hasMessageContaining("Failed to get entity registry");
     }
 
     @Test
@@ -59,8 +70,8 @@ class HassAreaRegistryImplTest {
         mockClientResponse(DEVICE_REGISTRY_COMMAND, getFailureResponse());
 
         assertThatThrownBy(() -> lookupAreaForEntityId("light.any"))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("Failed to parse device registry response");
+                .isInstanceOf(HassWebSocketException.class)
+                .hasMessageContaining("Failed to get device registry");
     }
 
     @Test
@@ -118,6 +129,19 @@ class HassAreaRegistryImplTest {
     }
 
     @Test
+    void lookupAreaForEntity_returnGroupInfo_whenEntityMappedDirectlyToArea_ignoresAnyDeviceArea() {
+        String entityId = "light.living_room";
+        String areaId = "living_room";
+        String deviceId = "device";
+        mockEntities(createEntity(entityId, areaId, deviceId));
+        mockDevices(createDevice(deviceId, "ignored_device_area"));
+
+        GroupInfo result = lookupAreaForEntityId(entityId);
+
+        assertGroupInfo(result, areaId, entityId);
+    }
+
+    @Test
     void lookupAreaForEntity_returnGroupInfo_whenEntityAreaResolvedFromDevice() {
         String entityId = "light.bedroom";
         String deviceId = "device_2";
@@ -139,16 +163,24 @@ class HassAreaRegistryImplTest {
         String notSupportedEntity = "sun.sun";
         String entityId4 = "light.another1";
         String entityId5 = "light.another2";
+        String entityId6 = "light.another3";
         String device1 = "device_1";
+        String device2 = "device_2";
         mockEntities(
                 createEntity(entityId1, areaId, null),
                 createEntity(entityId2, areaId, null),
+                createEntity(entityId2, areaId, null), // ignores duplicate
                 createEntity(entityId3, null, device1),
                 createEntity(notSupportedEntity, areaId, null),
                 createEntity(entityId4, null, null),
-                createEntity(entityId5, null, "unknown")
+                createEntity(entityId5, null, "unknown"),
+                createEntity(entityId6, null, device2)
         );
-        mockDevices(createDevice(device1, areaId));
+        mockDevices(
+                createDevice(device1, areaId),
+                createDevice(device1, areaId), // ignores duplicate
+                createDevice(device2, "another_area")
+        );
 
         GroupInfo result = lookupAreaForEntityId(entityId1);
 
@@ -218,6 +250,7 @@ class HassAreaRegistryImplTest {
                       "id": 1,
                       "type": "result",
                       "success": true,
+                      "anotherField": "thatIsIgnored",
                       "result": %s
                     }
                     """.formatted(arrayContent);
