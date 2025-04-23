@@ -100,6 +100,6 @@ public class LightStateComparator {
      * off lights inside a group, when the "on:true" state is enforced via the state.
      */
     private boolean isOnAndStateDiffers() {
-        return lastPutCall.getOn() != null && currentState.isOnOffSupported() && lastPutCall.isOn() && !currentState.isOn();
+        return lastPutCall.isOn() && currentState.isOnOffSupported() && !currentState.isOn();
     }
 }
