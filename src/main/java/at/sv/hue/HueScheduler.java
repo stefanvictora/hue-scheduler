@@ -430,7 +430,8 @@ public final class HueScheduler implements Runnable {
         LOG.debug("Schedule: {} in {}", snapshot, Duration.ofMillis(delayInMs + overlappingDelayInMs).withNanos(0));
         stateScheduler.schedule(() -> {
             MDC.put("context", snapshot.getContextName());
-            if (snapshot.endsBefore(currentTime.get())) {
+            ZonedDateTime now = currentTime.get();
+            if (snapshot.endsBefore(now)) {
                 LOG.debug("Already ended: {}", snapshot);
                 reschedule(snapshot);
                 return;
@@ -459,15 +460,14 @@ public final class HueScheduler implements Runnable {
                     createOnPowerOnCopyAndReschedule(snapshot);
                     return;
                 }
-                boolean performedInterpolation = putAdditionalInterpolatedStateIfNeeded(snapshot);
-                putState(snapshot, performedInterpolation);
+                boolean performedInterpolation = putAdditionalInterpolatedStateIfNeeded(snapshot, now);
+                putState(snapshot, performedInterpolation, now);
             } catch (BridgeConnectionFailure | ApiFailure e) {
                 logException(e);
                 retry(snapshot, getMs(bridgeFailureRetryDelayInSeconds));
                 return;
             }
-            snapshot.recordLastSeen(currentTime.get());
-            manualOverrideTracker.onAutomaticallyAssigned(snapshot.getId());
+            snapshot.recordLastSeen(now);
             if (snapshot.isOff()) {
                 LOG.info("Turned off");
             }
@@ -480,9 +480,10 @@ public final class HueScheduler implements Runnable {
             retryWhenBackOn(snapshot);
             return;
         }
-        if (snapshot.isInsideSplitCallWindow(currentTime.get())) {
+        ZonedDateTime now = currentTime.get();
+        if (snapshot.isInsideSplitCallWindow(now)) {
             ScheduledStateSnapshot nextSplitSnapshot = createTemporaryFollowUpSplitState(snapshot);
-            schedule(nextSplitSnapshot, snapshot.getNextInterpolationSplitDelayInMs(currentTime.get()));
+            schedule(nextSplitSnapshot, snapshot.getNextInterpolationSplitDelayInMs(now));
         }
         if (shouldRetryOnPowerOn(snapshot)) {
             ScheduledStateSnapshot powerOnCopy = createPowerOnCopy(snapshot);
@@ -630,8 +631,8 @@ public final class HueScheduler implements Runnable {
                   .allMatch(lastSeenGroupState -> lastSeenGroupState.lightStateDiffers(lightState));
     }
 
-    private boolean putAdditionalInterpolatedStateIfNeeded(ScheduledStateSnapshot state) {
-        PutCall interpolatedPutCall = state.getInterpolatedPutCallIfNeeded(currentTime.get());
+    private boolean putAdditionalInterpolatedStateIfNeeded(ScheduledStateSnapshot state, ZonedDateTime now) {
+        PutCall interpolatedPutCall = state.getInterpolatedPutCallIfNeeded(now);
         if (interpolatedPutCall == null) {
             return false;
         }
@@ -678,8 +679,7 @@ public final class HueScheduler implements Runnable {
         return seconds * 1000L;
     }
 
-    private void putState(ScheduledStateSnapshot state, boolean performedInterpolation) {
-        ZonedDateTime now = currentTime.get();
+    private void putState(ScheduledStateSnapshot state, boolean performedInterpolation, ZonedDateTime now) {
         if (state.isInsideSplitCallWindow(now)) {
             PutCall interpolatedSplitPutCall = state.getNextInterpolatedSplitPutCall(now);
             if (interpolatedSplitPutCall == null) {
@@ -729,11 +729,10 @@ public final class HueScheduler implements Runnable {
             return putCall;
         }
         ScheduledStateSnapshot nextState = state.getNextState();
-        Duration duration = Duration.between(now, nextState.getStart()).abs();
-        Duration tr = Duration.ofMillis(putCall.getTransitionTime() * 100);
-        long differenceInMinutes = duration.minus(tr).toMinutes();
-        if (differenceInMinutes < 0) {
-            putCall.setTransitionTime(getAdjustedTransitionTime(duration));
+        Duration availableDuration = Duration.between(now, nextState.getStart());
+        Duration requestedTransition = Duration.ofMillis(putCall.getTransitionTime() * 100L);
+        if (requestedTransition.compareTo(availableDuration) > 0) {
+            putCall.setTransitionTime(getTransitionTime(availableDuration));
         }
         return putCall;
     }
@@ -749,11 +748,8 @@ public final class HueScheduler implements Runnable {
         return stateRegistry.getLastSeenState(state) == null;
     }
 
-    private Integer getAdjustedTransitionTime(Duration duration) {
-        if (duration.isZero() || duration.isNegative()) {
-            return null;
-        }
-        return (int) (duration.toMillis() / 100);
+    private Integer getTransitionTime(Duration availableDuration) {
+        return (int) (availableDuration.toMillis() / 100);
     }
 
     private void logException(RuntimeException e) {

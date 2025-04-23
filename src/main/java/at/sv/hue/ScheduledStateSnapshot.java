@@ -1,6 +1,5 @@
 package at.sv.hue;
 
-import at.sv.hue.api.LightCapabilities;
 import at.sv.hue.api.PutCall;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -197,10 +196,6 @@ public class ScheduledStateSnapshot {
         return nextState.getStart().isBefore(now) || nextState.getStart().isEqual(now);
     }
 
-    public boolean isSplitState() {
-        return Duration.between(getStart(), definedStart).compareTo(Duration.ofMillis(MAX_TRANSITION_TIME_MS)) > 0;
-    }
-
     public boolean isInsideSplitCallWindow(ZonedDateTime now) {
         return getNextTransitionTimeSplitStart(now).isBefore(definedStart);
     }
@@ -305,10 +300,6 @@ public class ScheduledStateSnapshot {
 
     public boolean performsInterpolation(ZonedDateTime now) {
         return getInterpolatedPutCallIfNeeded(now) != null;
-    }
-
-    public LightCapabilities getCapabilities() {
-        return scheduledState.getCapabilities();
     }
 
     public void recordLastPutCall(PutCall putCall) {

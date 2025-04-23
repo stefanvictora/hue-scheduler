@@ -57,12 +57,6 @@ public class ManualOverrideTrackerImpl implements ManualOverrideTracker {
         return getOrDefaultState(id).isTurnedOnBySyncedScene();
     }
 
-    @Override
-    public void onAutomaticallyAssigned(String id) {
-        TrackedState trackedState = getOrCreateTrackedState(id);
-        trackedState.setManuallyOverridden(false);  // maybe not needed, as this flag is overridden also on light-on events
-    }
-
     private TrackedState getOrCreateTrackedState(String id) {
         return trackedStatesPerId.computeIfAbsent(id, i -> new TrackedState());
     }

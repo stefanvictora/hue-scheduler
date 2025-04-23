@@ -28,17 +28,6 @@ class ManualOverrideTrackerImplTest {
     }
 
     @Test
-    void isManuallyOverridden_resetByAutomaticallyAssignment() {
-        tracker.onManuallyOverridden("1");
-        tracker.onManuallyOverridden("2");
-
-        tracker.onAutomaticallyAssigned("1");
-
-        assertIsManuallyOverridden("1", false);
-        assertIsManuallyOverridden("2", true);
-    }
-
-    @Test
     void onLightTurnedOn_resetsManualOverrideFlag() {
         tracker.onManuallyOverridden("1");
         tracker.onManuallyOverridden("2");

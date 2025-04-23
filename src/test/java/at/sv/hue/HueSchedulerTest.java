@@ -1652,8 +1652,26 @@ class HueSchedulerTest {
     }
 
     @Test
+    void parse_transitionTimeBefore_viaInterpolate_usesTransitionFromPreviousState() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, "00:00", "bri:" + DEFAULT_BRIGHTNESS, "tr:2");
+        addState(1, "00:30", "bri:" + (DEFAULT_BRIGHTNESS + 30), "interpolate:true");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1)),
+                expectedRunnable(now.plusDays(1), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).transitionTime(2),
+                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 30).transitionTime(tr("30min"))
+        );
+
+        ensureRunnable(now.plusDays(1), now.plusDays(2));
+    }
+
+    @Test
     void parse_transitionTimeBefore_performsInterpolationsAfterPowerCycles_usesTransitionFromPreviousState() {
-        create();
         addKnownLightIdsWithDefaultCapabilities(1);
         addState(1, now, "bri:" + DEFAULT_BRIGHTNESS, "tr:1"); // this transition is used in interpolated call
         addState(1, now.plusMinutes(10), "bri:" + (DEFAULT_BRIGHTNESS + 10), "tr-before:9min");
@@ -3863,6 +3881,23 @@ class HueSchedulerTest {
         );
 
         ensureRunnable(now.plusDays(1), now.plusDays(1).plusHours(1));
+    }
+
+    @Test
+    void parse_nullState_backToBack_transition_correctsTooLongDuration_alsoWhenUsingSeconds() {
+        enableUserModificationTracking();
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, "00:00", "bri:" + DEFAULT_BRIGHTNESS, "tr:1min10s"); // 10 seconds too long
+        addState(1, "00:01");
+        startScheduler();
+
+        ScheduledRunnable runnable = ensureRunnable(now, now.plusMinutes(1));
+
+        advanceTimeAndRunAndAssertPutCalls(runnable,
+                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).transitionTime(tr("1min")) // shortened
+        );
+
+        ensureRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(1));
     }
 
     @Test
@@ -7500,7 +7535,7 @@ class HueSchedulerTest {
         advanceCurrentTime(Duration.ofSeconds(sceneActivationIgnoreWindowInSeconds + 1));
 
         simulateLightOffEvent("/lights/1"); // simulate light turned off
-        
+
         ScheduledRunnable powerOnRunnable2 = simulateLightOnEvent("/lights/1", expectedPowerOnEnd(initialNow.plusMinutes(10))).getFirst();
 
         runAndAssertPutCalls(powerOnRunnable2); // ignored again
@@ -7651,7 +7686,7 @@ class HueSchedulerTest {
 
         advanceTimeAndRunAndAssertPutCalls(runnables.getFirst());
 
-       ensureScheduledStates(
+        ensureScheduledStates(
                 expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
         );
 
