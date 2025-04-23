@@ -71,15 +71,15 @@ public final class HassEventHandler {
         EventDetails event;
 
         boolean isStateChangedEvent() {
-            return isEventOfType("state_changed");
+            return hasEventType("state_changed");
         }
 
         boolean isHomeAssistantStartedEvent() {
-            return isEventOfType("homeassistant_started");
+            return hasEventType("homeassistant_started");
         }
 
-        private boolean isEventOfType(String type) {
-            return "event".equals(this.type) && event != null && type.equals(event.getEvent_type());
+        private boolean hasEventType(String eventType) {
+            return "event".equals(this.type) && event != null && eventType.equals(event.getEvent_type());
         }
     }
 

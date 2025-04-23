@@ -1281,7 +1281,7 @@ class HassEventHandlerTest {
                       "entity_id" : "scene.zuhause_huescheduler_2",
                       "old_state" : {
                         "entity_id" : "scene.zuhause_huescheduler_2",
-                        "state" : "unknown",
+                        "state" : "2025-02-08T18:58:41.810800+00:00",
                         "attributes" : {
                           "group_name" : "Zuhause",
                           "group_type" : "zone",
@@ -1670,6 +1670,63 @@ class HassEventHandlerTest {
                     }
                   },
                   "id" : 1
+                }
+                """);
+
+        verifyNoEvents();
+    }
+
+    @Test
+    void onMessage_incorrectType_noEvent() {
+        handler.onMessage("""
+                {
+                  "type" : "INCORRECT_TYPE",
+                  "event" : {
+                    "event_type" : "state_changed",
+                    "data" : {
+                      "entity_id" : "scene.huescheduler_bad",
+                      "old_state" : {
+                        "entity_id" : "scene.huescheduler_bad",
+                        "state" : "2025-02-08T18:58:41.810800+00:00",
+                        "attributes" : {
+                          "entity_id" : [ "light.bad_tur", "light.bad_therme_neu", "light.bad_oben" ],
+                          "friendly_name" : "huescheduler_bad"
+                        },
+                        "last_changed" : "2025-02-08T19:13:36.495651+00:00",
+                        "last_reported" : "2025-02-08T19:13:36.495651+00:00",
+                        "last_updated" : "2025-02-08T19:13:36.495651+00:00",
+                        "context" : {
+                          "id" : "01JKKFPK7FX2QYV1M8XVZC9BQD",
+                          "parent_id" : null,
+                          "user_id" : null
+                        }
+                      },
+                      "new_state" : {
+                        "entity_id" : "scene.huescheduler_bad",
+                        "state" : "2025-02-08T19:14:25.879647+00:00",
+                        "attributes" : {
+                          "entity_id" : [ "light.bad_tur", "light.bad_therme_neu", "light.bad_oben" ],
+                          "friendly_name" : "huescheduler_bad"
+                        },
+                        "last_changed" : "2025-02-08T19:14:25.879907+00:00",
+                        "last_reported" : "2025-02-08T19:14:25.879907+00:00",
+                        "last_updated" : "2025-02-08T19:14:25.879907+00:00",
+                        "context" : {
+                          "id" : "01JKKFR3EJS8CS87BVTPCDJMWX",
+                          "parent_id" : "01JKKFR3DBQDFT2GPA330J85XF",
+                          "user_id" : null
+                        }
+                      }
+                    },
+                    "origin" : "LOCAL",
+                    "time_fired" : "2025-02-08T19:14:25.879907+00:00",
+                    "context" : {
+                      "id" : "01JKKFR3EJS8CS87BVTPCDJMWX",
+                      "parent_id" : "01JKKFR3DBQDFT2GPA330J85XF",
+                      "user_id" : null
+                    }
+                  },
+                  "id" : 2
                 }
                 """);
 
