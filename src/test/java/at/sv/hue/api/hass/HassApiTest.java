@@ -1,6 +1,8 @@
 package at.sv.hue.api.hass;
 
 import at.sv.hue.ColorMode;
+import at.sv.hue.api.ApiFailure;
+import at.sv.hue.api.BridgeConnectionFailure;
 import at.sv.hue.api.Capability;
 import at.sv.hue.api.EmptyGroupException;
 import at.sv.hue.api.GroupInfo;
@@ -24,10 +26,8 @@ import java.net.URL;
 import java.util.EnumSet;
 import java.util.List;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -45,6 +45,53 @@ public class HassApiTest {
         areaRegistry = Mockito.mock(HassAreaRegistry.class);
         setupApi("http://localhost:8123");
         sceneSyncUrl = getUrl("/services/scene/create");
+    }
+
+    private void setupApi(String origin) {
+        HassAvailabilityListener availabilityListener = new HassAvailabilityListener(() -> {
+        });
+        api = new HassApiImpl(origin, http, areaRegistry, availabilityListener, permits -> {
+        });
+        baseUrl = origin + "/api";
+    }
+
+    @Test
+    void assertConnection_stateLookupThrowsException_exception() {
+        when(http.getResource(any())).thenThrow(new ApiFailure("HTTP Failure"));
+
+        assertThatThrownBy(() -> api.assertConnection()).isInstanceOf(BridgeConnectionFailure.class);
+    }
+
+    @Test
+    void assertConnection_emptyStates_exception() {
+        setGetResponse("/states", "[]");
+
+        assertThatThrownBy(() -> api.assertConnection()).isInstanceOf(BridgeConnectionFailure.class);
+    }
+
+    @Test
+    void assertConnection_hasStates_noException() {
+        setGetResponse("/states", """
+                [
+                  {
+                    "entity_id": "light.schreibtisch_r",
+                    "state": "on",
+                    "attributes": {
+                      "friendly_name": "Schreibtisch R",
+                      "supported_features": 44
+                    },
+                    "last_changed": "2023-09-24T08:09:56.861254+00:00",
+                    "last_updated": "2023-09-24T08:09:56.861254+00:00",
+                    "context": {
+                      "id": "123456789",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  }
+                ]
+                """);
+
+        assertThatNoException().isThrownBy(() -> api.assertConnection());
     }
 
     @Test
@@ -2651,12 +2698,6 @@ public class HassApiTest {
 
         assertThat(api.isLightOff("light.on_off")).isTrue();
         assertThat(api.isGroupOff("light.on_off")).isTrue();
-    }
-
-    private void setupApi(String origin) {
-        api = new HassApiImpl(origin, http, areaRegistry, null, permits -> {
-        });
-        baseUrl = origin + "/api";
     }
 
     private void setGetResponse(String expectedUrl, @Language("JSON") String response) {

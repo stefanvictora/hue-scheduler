@@ -71,8 +71,7 @@ public class HassApiImpl implements HueApi {
     public void assertConnection() {
         availabilityListener.performInitialCheck(() -> {
             try {
-                Map<String, State> states = lookupStates();
-                return states != null && !states.isEmpty();
+                return !lookupStates().isEmpty();
             } catch (Exception e) {
                 return false;
             }
