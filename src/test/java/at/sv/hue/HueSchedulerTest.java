@@ -7657,6 +7657,23 @@ class HueSchedulerTest {
         verify(mockedHueApi, times(3)).clearCaches();
     }
 
+    @Test
+    void clearCachesAndReSyncScenes_sceneSyncNotEnabled_justClearsCaches() {
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 11);
+        addState("g1", now, "bri:110");
+        addState("g1", now.plusMinutes(10), "bri:210");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+        );
+
+        scheduler.clearCachesAndReSyncScenes();
+
+        verify(mockedHueApi).clearCaches();
+    }
+
     // todo: what about if the schedule contains on:true, should we then still not apply it?
 
     @Test

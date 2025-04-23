@@ -30,7 +30,7 @@ they remain accessible for use in automations. Hue Scheduler creates a scene for
 
 ### `--require-scene-activation`
 
-*New in 0.12.4*
+*New in 0.13.0*
 
 When enabled, states will only be applied when triggered by a synced scene activation.
 After scene activation, the current state and subsequent states will be applied until lights are turned off or manually
