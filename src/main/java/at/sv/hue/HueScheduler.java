@@ -49,6 +49,7 @@ import java.time.Duration;
 import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -609,9 +610,19 @@ public final class HueScheduler implements Runnable {
             return false;
         }
         if (state.isGroupState()) {
-            return api.getGroupStates(state.getId()).stream().anyMatch(this::isGroupStateDifferent);
+            List<LightState> groupStates = api.getGroupStates(state.getId());
+            boolean anyOverridden = groupStates.stream().anyMatch(this::isGroupStateDifferent);
+            if (anyOverridden && LOG.isTraceEnabled()) {
+                logGroupOverridden(state, groupStates);
+            }
+            return anyOverridden;
         } else {
-            return lastSeenState.lightStateDiffers(api.getLightState(state.getId()));
+            LightState lightState = api.getLightState(state.getId());
+            boolean differs = lastSeenState.lightStateDiffers(lightState);
+            if (differs && LOG.isTraceEnabled()) {
+                logLightOverridden(state, lightState, lastSeenState);
+            }
+            return differs;
         }
     }
 
@@ -810,6 +821,70 @@ public final class HueScheduler implements Runnable {
             stateRegistry.findCurrentlyActiveStates()
                          .forEach(state -> scheduleAsyncSceneSync(state, true));
         }
+    }
+
+    private void logGroupOverridden(ScheduledStateSnapshot state, List<LightState> groupStates) {
+        LOG.trace("Override detected for group {}. Checking individual lights...", state.getId());
+        groupStates.forEach(lightState -> {
+            ScheduledState lastSeenLightState = stateRegistry.getLastSeenState(lightState.getId());
+            if (lastSeenLightState != null) {
+                boolean differs = lastSeenLightState.lightStateDiffers(lightState);
+                if (differs) {
+                    LOG.trace("\t- Actual:   {}", formatLightState(lightState));
+                    LOG.trace("\t  Expected: {}", formatLastPutCall(lastSeenLightState.getLastPutCall()));
+                }
+            } else {
+                boolean allGroupStatesDiffer = allSeenGroupStatesDiffer(lightState);
+                if (allGroupStatesDiffer) {
+                    LOG.trace("\t- Actual:   {}", formatLightState(lightState));
+                    api.getAssignedGroups(lightState.getId())
+                       .stream()
+                       .map(stateRegistry::getLastSeenState)
+                       .filter(Objects::nonNull)
+                       .forEach(lastSeenGroupState -> {
+                           LOG.trace("\t  Expected: {}", formatLastPutCall(lastSeenGroupState.getLastPutCall()));
+                       });
+                }
+            }
+        });
+    }
+
+    private void logLightOverridden(ScheduledStateSnapshot state, LightState lightState, ScheduledState lastSeenState) {
+        LOG.trace("Override detected for light {}.", state.getId());
+        LOG.trace("\tActual:   {}", formatLightState(lightState));
+        LOG.trace("\tExpected: {}", formatLastPutCall(lastSeenState.getLastPutCall()));
+    }
+
+    private String formatLightState(LightState lightState) {
+        List<String> properties = new ArrayList<>();
+
+        if (lightState.getId() != null) properties.add("id=" + lightState.getId());
+        properties.add("on=" + lightState.isOn());
+        if (lightState.getBrightness() != null) properties.add("bri=" + lightState.getBrightness());
+        if (lightState.getColorTemperature() != null) properties.add("ct=" + lightState.getColorTemperature());
+        if (lightState.getX() != null) properties.add("x=" + lightState.getX());
+        if (lightState.getY() != null) properties.add("y=" + lightState.getY());
+        if (lightState.getEffect() != null) properties.add("effect=" + lightState.getEffect());
+
+        return "{" + String.join(", ", properties) + "}";
+    }
+
+    private String formatLastPutCall(PutCall putCall) {
+        if (putCall == null) return "null";
+
+        List<String> properties = new ArrayList<>();
+
+        if (putCall.isGroupState()) properties.add("id=" + putCall.getId());
+        if (putCall.getOn() != null) properties.add("on=" + putCall.getOn());
+        if (putCall.getBri() != null) properties.add("bri=" + putCall.getBri());
+        if (putCall.getCt() != null) properties.add("ct=" + putCall.getCt());
+        if (putCall.getHue() != null) properties.add("hue=" + putCall.getHue());
+        if (putCall.getSat() != null) properties.add("sat=" + putCall.getSat());
+        if (putCall.getX() != null) properties.add("x=" + putCall.getX());
+        if (putCall.getY() != null) properties.add("y=" + putCall.getY());
+        if (putCall.getEffect() != null) properties.add("effect=" + putCall.getEffect());
+
+        return "{" + String.join(", ", properties) + "}";
     }
 
     LightEventListener getHueEventListener() {
