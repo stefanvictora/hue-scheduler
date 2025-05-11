@@ -217,6 +217,10 @@ public class ScheduledStateSnapshot {
         return splitStart;
     }
 
+    public int getRequiredGap() {
+        return scheduledState.getRequiredGap();
+    }
+
     public boolean isRetryAfterPowerOnState() {
         return scheduledState.isRetryAfterPowerOnState();
     }
@@ -272,8 +276,11 @@ public class ScheduledStateSnapshot {
     }
 
     public PutCall getNextInterpolatedSplitPutCall(ZonedDateTime now) {
-        ZonedDateTime nextSplitStart = getNextTransitionTimeSplitStart(now);
+        ZonedDateTime nextSplitStart = getNextTransitionTimeSplitStart(now).minusMinutes(getRequiredGap()); // add buffer;
         Duration between = Duration.between(now, nextSplitStart);
+        if (between.isZero() || between.isNegative()) {
+            return null; // we are inside the required gap, skip split call;
+        }
         PutCall interpolatedSplitPutCall = getInterpolatedPutCallIfNeeded(nextSplitStart, false);
         if (interpolatedSplitPutCall == null) {
             return null; // no interpolation possible; todo: write test or remove if not needed anymore
