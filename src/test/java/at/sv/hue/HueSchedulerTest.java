@@ -55,6 +55,10 @@ class HueSchedulerTest {
     private static final LightCapabilities NO_CAPABILITIES = LightCapabilities.builder().build();
     private static final int MAX_TRANSITION_TIME = ScheduledState.MAX_TRANSITION_TIME;
     private static final int MAX_TRANSITION_TIME_MS = ScheduledState.MAX_TRANSITION_TIME_MS;
+    private static final int BRIGHTNESS_OVERRIDE_THRESHOLD = 24;
+    private static final int BRIGHTNESS_OVERRIDE_THRESHOLD_PERCENT = 10;
+    private static final int COLOR_TEMPERATURE_OVERRIDE_THRESHOLD_KELVIN = 350;
+    private static final double COLOR_OVERRIDE_THRESHOLD = 8.0;
     private final String sceneSyncName = "synced-scene";
     private final String unsyncedSceneName = "user-scene";
     private final int sceneSyncInterpolationInterval = 1;
@@ -127,7 +131,8 @@ class HueSchedulerTest {
         scheduler = new HueScheduler(mockedHueApi, stateScheduler, startTimeProvider,
                 () -> now, 10.0, controlGroupLightsIndividually, disableUserModificationTracking,
                 requireSceneActivation, defaultInterpolationTransitionTimeInMs, 0, connectionFailureRetryDelay,
-                minTrGap, sceneActivationIgnoreWindowInSeconds, interpolateAll,
+                minTrGap, BRIGHTNESS_OVERRIDE_THRESHOLD_PERCENT, COLOR_TEMPERATURE_OVERRIDE_THRESHOLD_KELVIN,
+                COLOR_OVERRIDE_THRESHOLD, sceneActivationIgnoreWindowInSeconds, interpolateAll,
                 enableSceneSync, sceneSyncName, sceneSyncInterpolationInterval, sceneSyncDelayInSeconds);
         manualOverrideTracker = scheduler.getManualOverrideTracker();
     }
@@ -757,7 +762,7 @@ class HueSchedulerTest {
     }
 
     @Test
-    void parse_hassEntityId_detectsManualOverrides() {
+    void parse_hassEntityId_detectsManualOverrides_brightness() {
         enableUserModificationTracking();
         mockLightCapabilities("light.test", defaultCapabilities);
         addState("light.test", "00:00", "bri:" + DEFAULT_BRIGHTNESS);
@@ -774,7 +779,31 @@ class HueSchedulerTest {
 
         ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusHours(1)); // next day
 
-        setLightStateResponse("light.test", expectedState().brightness(DEFAULT_BRIGHTNESS + LightStateComparator.BRIGHTNESS_THRESHOLD)); // overridden
+        setLightStateResponse("light.test", expectedState().brightness(DEFAULT_BRIGHTNESS + BRIGHTNESS_OVERRIDE_THRESHOLD)); // overridden
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(1));
+
+        ensureRunnable(initialNow.plusDays(1).plusHours(1), initialNow.plusDays(2)); // next day
+    }
+
+    @Test
+    void parse_hassEntityId_detectsManualOverrides_ct() {
+        enableUserModificationTracking();
+        mockLightCapabilities("light.test", defaultCapabilities);
+        addState("light.test", "00:00", "ct:" + DEFAULT_CT);
+        addState("light.test", "01:00", "ct:" + (DEFAULT_CT + 10));
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusHours(1)),
+                expectedRunnable(now.plusHours(1), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall("light.test").ct(DEFAULT_CT)
+        );
+
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusHours(1)); // next day
+
+        setLightStateResponse("light.test", expectedState().colormode(ColorMode.CT).colorTemperature(DEFAULT_CT + 65)); // overridden
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(1));
 
         ensureRunnable(initialNow.plusDays(1).plusHours(1), initialNow.plusDays(2)); // next day
@@ -1255,7 +1284,7 @@ class HueSchedulerTest {
 
         ensureRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)); // next day
 
-        setLightStateResponse(1, expectedState().brightness(initialBrightness + 10)); // user modification
+        setLightStateResponse(1, expectedState().brightness(initialBrightness + BRIGHTNESS_OVERRIDE_THRESHOLD)); // user modification
         setCurrentTimeToAndRun(trRunnable); // detects manual override
 
         List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(
@@ -1328,7 +1357,7 @@ class HueSchedulerTest {
 
         // run tr-runnable -> detects manual override
 
-        setLightStateResponse(1, expectedState().brightness(initialBrightness + 10)); // user modification
+        setLightStateResponse(1, expectedState().brightness(initialBrightness + BRIGHTNESS_OVERRIDE_THRESHOLD)); // user modification
         setCurrentTimeToAndRun(trRunnable); // detects manual override
 
         List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(
@@ -1352,7 +1381,7 @@ class HueSchedulerTest {
 
         // second split -> detects second manual override
 
-        setLightStateResponse(1, expectedState().brightness(initialBrightness + 130)); // second modification
+        setLightStateResponse(1, expectedState().brightness(initialBrightness + 100 + BRIGHTNESS_OVERRIDE_THRESHOLD)); // second modification
         setCurrentTimeToAndRun(secondSplit); // detects manual override
 
         ScheduledRunnable finalSplit = ensureScheduledStates(
@@ -1399,7 +1428,7 @@ class HueSchedulerTest {
         ensureRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)); // next day
 
         setCurrentTimeTo(trRunnable);
-        setLightStateResponse(1, expectedState().brightness(initialBrightness + 10)); // user modification
+        setLightStateResponse(1, expectedState().brightness(initialBrightness + BRIGHTNESS_OVERRIDE_THRESHOLD)); // user modification
         trRunnable.run(); // detects manual override
 
         List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(
@@ -4720,7 +4749,7 @@ class HueSchedulerTest {
         ensureRunnable(initialNow.plusDays(1)); // for next day
 
         // user modified light state between first and second state -> update skipped and retry scheduled
-        setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS + LightStateComparator.BRIGHTNESS_THRESHOLD) // modified
+        setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS + BRIGHTNESS_OVERRIDE_THRESHOLD) // modified
                                                 .colorTemperature(DEFAULT_CT)
                                                 .colormode(ColorMode.CT));
 
@@ -4798,7 +4827,7 @@ class HueSchedulerTest {
 
         // user modified group state between first and second state -> update skipped and retry scheduled
         LightState.LightStateBuilder userModifiedLightState = expectedState().id("/lights/9")
-                                                                             .brightness(DEFAULT_BRIGHTNESS + LightStateComparator.BRIGHTNESS_THRESHOLD)
+                                                                             .brightness(DEFAULT_BRIGHTNESS + BRIGHTNESS_OVERRIDE_THRESHOLD)
                                                                              .colormode(ColorMode.CT);
         LightState.LightStateBuilder sameAsFirst = expectedState().id("/lights/10")
                                                                   .brightness(DEFAULT_BRIGHTNESS)
@@ -4944,7 +4973,7 @@ class HueSchedulerTest {
         // next group call -> detects override
         setGroupStateResponses(1,
                 expectedState().id("/lights/9").brightness(DEFAULT_BRIGHTNESS),
-                expectedState().id("/lights/11").brightness(DEFAULT_BRIGHTNESS - 11) // manually modified
+                expectedState().id("/lights/11").brightness(DEFAULT_BRIGHTNESS - BRIGHTNESS_OVERRIDE_THRESHOLD) // manually modified
         );
         advanceTimeAndRunAndAssertPutCalls(runnables.get(2)); // no put call
 
@@ -4989,7 +5018,7 @@ class HueSchedulerTest {
 
         // next group call -> detects override
         setGroupStateResponses(1,
-                expectedState().id("/lights/9").brightness(DEFAULT_BRIGHTNESS - LightStateComparator.BRIGHTNESS_THRESHOLD), // manually modified
+                expectedState().id("/lights/9").brightness(DEFAULT_BRIGHTNESS - BRIGHTNESS_OVERRIDE_THRESHOLD), // manually modified
                 expectedState().id("/lights/11").brightness(DEFAULT_BRIGHTNESS)
         );
         advanceTimeAndRunAndAssertPutCalls(runnables.get(2)); // no put call
@@ -5107,7 +5136,7 @@ class HueSchedulerTest {
 
         // next group call -> detects override
         setGroupStateResponses(1,
-                expectedState().id("/lights/9").brightness(DEFAULT_BRIGHTNESS - 10), // manually overridden (matches no other group)
+                expectedState().id("/lights/9").brightness(DEFAULT_BRIGHTNESS + BRIGHTNESS_OVERRIDE_THRESHOLD), // manually overridden (matches no other group)
                 expectedState().id("/lights/11").brightness(DEFAULT_BRIGHTNESS) // no modification
         );
         advanceTimeAndRunAndAssertPutCalls(runnables.get(3)); // no put call
@@ -5145,7 +5174,7 @@ class HueSchedulerTest {
 
         // next group call -> detects override
         setGroupStateResponses(1,
-                expectedState().id("/lights/9").brightness(DEFAULT_BRIGHTNESS - 10), // manually overridden
+                expectedState().id("/lights/9").brightness(DEFAULT_BRIGHTNESS - BRIGHTNESS_OVERRIDE_THRESHOLD), // manually overridden
                 expectedState().id("/lights/11").brightness(DEFAULT_BRIGHTNESS) // no modification
         );
         advanceTimeAndRunAndAssertPutCalls(runnables.get(1)); // no put call
@@ -5651,7 +5680,7 @@ class HueSchedulerTest {
 
         // Second state -> detects manual override
 
-        setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS - 10)); // overridden
+        setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS - BRIGHTNESS_OVERRIDE_THRESHOLD)); // overridden
 
         advanceTimeAndRunAndAssertPutCalls(secondState); // detected as overridden -> no put calls
 
@@ -5705,7 +5734,7 @@ class HueSchedulerTest {
 
         // fourth split -> detects override
 
-        setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS + 42 + LightStateComparator.BRIGHTNESS_THRESHOLD)); // overridden
+        setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS + 42 + BRIGHTNESS_OVERRIDE_THRESHOLD)); // overridden
 
         advanceTimeAndRunAndAssertPutCalls(fourthSplit); // detects override
 
@@ -6323,7 +6352,7 @@ class HueSchedulerTest {
         // simulate scene activated
         simulateSceneActivated("/scenes/789AI", "/lights/40", "/lights/1");
         // modifies light state
-        setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS + LightStateComparator.BRIGHTNESS_THRESHOLD));
+        setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS + BRIGHTNESS_OVERRIDE_THRESHOLD));
 
         // next runnable: detects modification
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(1)); // no put
@@ -7827,7 +7856,7 @@ class HueSchedulerTest {
 
         // light has been modified before second state -> triggers override
 
-        setLightStateResponse(1, expectedState().brightness(120));
+        setLightStateResponse(1, expectedState().brightness(100 + BRIGHTNESS_OVERRIDE_THRESHOLD));
         advanceTimeAndRunAndAssertPutCalls(runnables.get(1));
 
         ScheduledRunnable secondNextDay = ensureScheduledStates(

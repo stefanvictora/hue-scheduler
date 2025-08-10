@@ -98,6 +98,39 @@ If Hue Scheduler still detects manual overrides between back-to-back states usin
 
 **Default**: `3` minutes
 
+### `--color-override-threshold`
+
+*New in 0.13.0*
+
+The color difference threshold (Delta-E CIE76) above which a light's color is considered manually overridden. Lower values detect smaller color changes but may trigger during transitions. Higher values ignore transition noise but may miss subtle adjustments.
+
+Only relevant and active if user modification tracking is not disabled (see `--disable-user-modification-tracking`).
+
+**Recommended Range**: 5-15  
+**Default**: `8.0`
+
+### `--brightness-override-threshold`
+
+*New in 0.13.0*
+
+The brightness difference threshold (percentage points) above which a light's brightness is considered manually overridden. For example, 10 means changes from 50% to 60% brightness would trigger override detection.
+
+Only relevant and active if user modification tracking is not disabled (see `--disable-user-modification-tracking`).
+
+**Recommended Range**: 5-20  
+**Default**: `10`%
+
+### `--ct-override-threshold`
+
+*New in 0.13.0*
+
+The color temperature difference threshold (Kelvin) above which a light's temperature is considered manually overridden. For example, 350 means changes from 3000K to 3350K would trigger detection.
+
+Only relevant and active if user modification tracking is not disabled (see `--disable-user-modification-tracking`).
+
+**Recommended Range**: 100-500  
+**Default**: `350`K
+
 ### `--max-requests-per-second`
 
 The maximum number of PUT API requests Hue Scheduler is allowed to perform per second. The official Hue API Documentation recommends keeping this at 10 requests per second, or else the bridge might drop some requests.

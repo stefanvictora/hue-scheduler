@@ -172,6 +172,33 @@ public final class HueScheduler implements Runnable {
                           "tr-before states. Default: ${DEFAULT-VALUE} minutes."
     )
     int minTrBeforeGapInMinutes;
+    @Option(
+            names = "--brightness-override-threshold", paramLabel = "<percent>",
+            defaultValue = "${env:BRIGHTNESS_OVERRIDE_THRESHOLD:-10}",
+            description = "The brightness difference threshold (percentage points) above which a light's brightness " +
+                          "is considered manually overridden. For example, 10 means changes from 50% to 60% " +
+                          "brightness would trigger override detection. Typical range: 5-20. " +
+                          "Default: ${DEFAULT-VALUE}."
+    )
+    int brightnessOverrideThresholdPercentage;
+    @Option(
+            names = "--ct-override-threshold", paramLabel = "<kelvin>",
+            defaultValue = "${env:CT_OVERRIDE_THRESHOLD:-350}",
+            description = "The color temperature difference threshold (Kelvin) above which a light's temperature " +
+                          "is considered manually overridden. For example, 350 means changes from 3000K to 3350K " +
+                          "would trigger detection. Typical range: 100-500. Default: ${DEFAULT-VALUE}."
+    )
+    int colorTemperatureOverrideThresholdKelvin;
+    @Option(
+            names = "--color-override-threshold", paramLabel = "<delta>",
+            defaultValue = "${env:COLOR_OVERRIDE_THRESHOLD:-8.0}",
+            description = "The color difference threshold (Delta-E CIE76) above which a light's color is considered " +
+                          "manually overridden. Lower values detect smaller color changes but may trigger during " +
+                          "transitions. Higher values ignore transition noise but may miss subtle adjustments. " +
+                          "Typical range: 5-15. Default: ${DEFAULT-VALUE}."
+    )
+    double colorOverrideThreshold;
+
     @Option(names = "--scene-activation-ignore-window", paramLabel = "<duration>",
             defaultValue = "${env:SCENE_ACTIVATION_IGNORE_WINDOW:-8}",
             description = "The delay in seconds during which turn-on events for affected lights and groups are ignored " +
@@ -206,9 +233,10 @@ public final class HueScheduler implements Runnable {
                         boolean disableUserModificationTracking, boolean requireSceneActivation,
                         String defaultInterpolationTransitionTimeString,
                         int powerOnRescheduleDelayInMs, int bridgeFailureRetryDelayInSeconds,
-                        int minTrBeforeGapInMinutes, int sceneActivationIgnoreWindowInSeconds, boolean interpolateAll,
-                        boolean enableSceneSync, String sceneSyncName, int sceneSyncIntervalInMinutes,
-                        int sceneSyncDelayInSeconds) {
+                        int minTrBeforeGapInMinutes, int brightnessOverrideThresholdPercentage,
+                        int colorTemperatureOverrideThresholdKelvin, double colorOverrideThreshold,
+                        int sceneActivationIgnoreWindowInSeconds, boolean interpolateAll, boolean enableSceneSync,
+                        String sceneSyncName, int sceneSyncIntervalInMinutes, int sceneSyncDelayInSeconds) {
         this();
         this.api = api;
         ZonedDateTime initialTime = currentTime.get();
@@ -224,6 +252,9 @@ public final class HueScheduler implements Runnable {
         this.powerOnRescheduleDelayInMs = powerOnRescheduleDelayInMs;
         this.bridgeFailureRetryDelayInSeconds = bridgeFailureRetryDelayInSeconds;
         this.minTrBeforeGapInMinutes = minTrBeforeGapInMinutes;
+        this.brightnessOverrideThresholdPercentage = brightnessOverrideThresholdPercentage;
+        this.colorTemperatureOverrideThresholdKelvin = colorTemperatureOverrideThresholdKelvin;
+        this.colorOverrideThreshold = colorOverrideThreshold;
         this.sceneActivationIgnoreWindowInSeconds = sceneActivationIgnoreWindowInSeconds;
         defaultInterpolationTransitionTime = parseInterpolationTransitionTime(defaultInterpolationTransitionTimeString);
         this.interpolateAll = interpolateAll;
@@ -390,7 +421,8 @@ public final class HueScheduler implements Runnable {
     }
 
     public void addState(String input) {
-        new InputConfigurationParser(startTimeProvider, api, minTrBeforeGapInMinutes, interpolateAll)
+        new InputConfigurationParser(startTimeProvider, api, minTrBeforeGapInMinutes, brightnessOverrideThresholdPercentage,
+                colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold, interpolateAll)
                 .parse(input)
                 .forEach(stateRegistry::addState);
     }

@@ -17,6 +17,9 @@ class ScheduledStateTest {
 
     private static final Double[][] GAMUT_A = new Double[][]{{0.704, 0.296}, {0.2151, 0.7106}, {0.138, 0.08}};
     private static final Double[][] GAMUT_C = new Double[][]{{0.6915, 0.3083}, {0.17, 0.7}, {0.1532, 0.0475}};
+    private static final int BRIGHTNESS_THRESHOLD = 10;
+    private static final int COLOR_TEMPERATURE_THRESHOLD_KELVIN = 350;
+    private static final double COLOR_THRESHOLD = 8.0;
 
     private static final LightCapabilities COLOR_TEMPERATURE_LIGHT = LightCapabilities
             .builder()
@@ -98,7 +101,7 @@ class ScheduledStateTest {
                                                         .build();
         LightState lightState = LightState.builder()
                                           .on(true)
-                                          .colorTemperature(204)
+                                          .colorTemperature(215)
                                           .colormode(ColorMode.CT)
                                           .lightCapabilities(COLOR_TEMPERATURE_LIGHT)
                                           .build();
@@ -113,7 +116,7 @@ class ScheduledStateTest {
                                                         .build();
         LightState lightState = LightState.builder()
                                           .on(true)
-                                          .colorTemperature(200 + LightStateComparator.COLOR_TEMPERATURE_THRESHOLD)
+                                          .colorTemperature(216)
                                           .colormode(ColorMode.CT)
                                           .lightCapabilities(COLOR_TEMPERATURE_LIGHT)
                                           .build();
@@ -330,8 +333,8 @@ class ScheduledStateTest {
                                                         .build();
         LightState lightState = LightState.builder()
                                           .on(true)
-                                          .x(0.461)
-                                          .y(0.273)
+                                          .x(0.340)
+                                          .y(0.334)
                                           .colormode(ColorMode.XY)
                                           .lightCapabilities(COLOR_LIGHT_ONLY)
                                           .build();
@@ -366,7 +369,7 @@ class ScheduledStateTest {
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .x(0.123)
-                                          .y(0.555)
+                                          .y(0.355)
                                           .colormode(ColorMode.XY)
                                           .lightCapabilities(COLOR_LIGHT_ONLY)
                                           .build();
@@ -452,11 +455,11 @@ class ScheduledStateTest {
         ScheduledState scheduledState = scheduledState().hue(1000)
                                                         .sat(50)
                                                         .capabilities(defaultCapabilities)
-                                                        .build();
+                                                        .build(); // ~ x=0.385; y=0.329
         LightState lightState = LightState.builder()
                                           .on(true)
-                                          .x(0.4949)
-                                          .y(0.3559)
+                                          .x(0.261)
+                                          .y(0.250)
                                           .colormode(ColorMode.HS)
                                           .lightCapabilities(COLOR_LIGHT_ONLY)
                                           .build();
@@ -628,7 +631,7 @@ class ScheduledStateTest {
                                                         .build();
         LightState lightState = LightState.builder()
                                           .on(true)
-                                          .brightness(10 + LightStateComparator.BRIGHTNESS_THRESHOLD)
+                                          .brightness(10 + BRIGHTNESS_THRESHOLD)
                                           .lightCapabilities(BRIGHTNESS_ONLY)
                                           .build();
 
@@ -642,7 +645,7 @@ class ScheduledStateTest {
                                                         .build();
         LightState lightState = LightState.builder()
                                           .on(true)
-                                          .brightness(14)
+                                          .brightness(10 + BRIGHTNESS_THRESHOLD - 1)
                                           .lightCapabilities(BRIGHTNESS_ONLY)
                                           .build();
 
@@ -979,7 +982,10 @@ class ScheduledStateTest {
     }
 
     private static ScheduledState.ScheduledStateBuilder scheduledState() {
-        return ScheduledState.builder().identifier(new Identifier("ID", "name"));
+        return ScheduledState.builder().identifier(new Identifier("ID", "name"))
+                             .brightnessOverrideThreshold(BRIGHTNESS_THRESHOLD)
+                             .colorTemperatureOverrideThresholdKelvin(COLOR_TEMPERATURE_THRESHOLD_KELVIN)
+                             .colorOverrideThreshold(COLOR_THRESHOLD);
     }
 
     private static void assertLightStateDiffers(ScheduledState scheduledState, LightState lightState, boolean expected) {

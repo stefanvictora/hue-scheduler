@@ -27,14 +27,21 @@ public final class InputConfigurationParser {
     private final StartTimeProvider startTimeProvider;
     private final HueApi api;
     private final int minTrBeforeGapInMinutes;
+    private final int brightnessOverrideThreshold;
+    private final int colorTemperatureOverrideThresholdKelvin;
+    private final double colorOverrideThreshold;
     private final boolean interpolateAll;
 
     public InputConfigurationParser(StartTimeProvider startTimeProvider, HueApi api, int minTrBeforeGapInMinutes,
-                                    boolean interpolateAll) {
+                                    int brightnessOverrideThresholdPercent, int colorTemperatureOverrideThresholdKelvin,
+                                    double colorOverrideThreshold, boolean interpolateAll) {
         this.startTimeProvider = startTimeProvider;
         this.api = api;
         this.minTrBeforeGapInMinutes = minTrBeforeGapInMinutes;
+        this.colorOverrideThreshold = colorOverrideThreshold;
         this.interpolateAll = interpolateAll;
+        brightnessOverrideThreshold = parseBrightnessPercentValue(brightnessOverrideThresholdPercent);
+        this.colorTemperatureOverrideThresholdKelvin = colorTemperatureOverrideThresholdKelvin;
     }
 
     public List<ScheduledState> parse(String input) {
@@ -92,7 +99,7 @@ public final class InputConfigurationParser {
                 String[] typeAndValue = part.split(":", 2);
                 if (typeAndValue.length != 2) {
                     throw new InvalidConfigurationLine("Invalid state property '" + part + "': " +
-                            "Each state property has to be in the format 'property:value'.");
+                                                       "Each state property has to be in the format 'property:value'.");
                 }
                 String parameter = typeAndValue[0];
                 String value = typeAndValue[1];
@@ -179,8 +186,8 @@ public final class InputConfigurationParser {
             }
             String start = parts[1];
             states.add(new ScheduledState(identifier, start, bri, ct, x, y, hue, sat, effect, on, transitionTimeBefore,
-                    transitionTime, dayOfWeeks, startTimeProvider, capabilities, minTrBeforeGapInMinutes, force,
-                    interpolate, groupState, false));
+                    transitionTime, dayOfWeeks, startTimeProvider, capabilities, minTrBeforeGapInMinutes, brightnessOverrideThreshold,
+                    colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold, force, interpolate, groupState, false));
         }
         return states;
     }
@@ -206,6 +213,10 @@ public final class InputConfigurationParser {
     private int parseBrightnessPercentValue(String value) {
         String percentString = value.replace("%", "").trim();
         Double percent = parseDouble(percentString, "bri");
+        return parseBrightnessPercentValue(percent);
+    }
+
+    private int parseBrightnessPercentValue(double percent) {
         if (percent < 1) {
             return 1;
         }

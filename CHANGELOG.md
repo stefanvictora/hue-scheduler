@@ -16,7 +16,10 @@
   - Use `force:true` to disable this behavior for individual states.
  
 ### Changed
-- Increased threshold for manual override detection for `bri` and `ct`.
+- Improved thresholds for manual override detection for `bri`, `ct` and color. Added new configuration options for fine-tuning:
+  - `--brightness-override-threshold`
+  - `--ct-override-threshold`
+  - `--color-override-threshold`
 
 ### Fixed
 - **Scene Sync**: Fixed a sync issue for states that were not activated for a longer period of time.
