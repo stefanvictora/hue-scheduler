@@ -6,9 +6,7 @@ import at.sv.hue.api.LightNotFoundException;
 public interface HassAreaRegistry {
     /**
      * Looks up the area associated with the given entity ID and retrieves information
-     * about the area and its contained entities. If the entity is not found or the entity
-     * does not belong to an area, appropriate behavior is handled, such as throwing an exception
-     * or returning {@code null}.
+     * about the area and its contained entities.
      *
      * @param entityId the ID of the entity for which the area information should be retrieved
      * @return a {@code GroupInfo} object containing the area's ID and a list of associated entities,

@@ -16,7 +16,7 @@
   - Use `force:true` to disable this behavior for individual states.
  
 ### Changed
-- Removed automatic gaps in back-to-back transitions. Increased threshold for manual override detection for `bri` and `ct`.
+- Increased threshold for manual override detection for `bri` and `ct`.
 
 ### Fixed
 - **Scene Sync**: Fixed a sync issue for states that were not activated for a longer period of time.

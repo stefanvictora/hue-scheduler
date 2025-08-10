@@ -58,7 +58,7 @@ Specifies the name of the synced scene. Used with --enable-scene-sync.
 
 Sets the interval (in minutes) for syncing interpolated states to scenes. Used with --enable-scene-sync.
 
-**Default**: `2` minutes
+**Default**: `3` minutes
 
 ### `--scene-activation-ignore-window`
 

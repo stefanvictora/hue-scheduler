@@ -129,9 +129,6 @@ public class HassWebSocketClientImpl implements HassWebSocketClient {
         }
     }
 
-    /**
-     * Centralizes connection invalidation logic.
-     */
     private void invalidateConnection(WebSocket ws, Throwable t) {
         synchronized (connectionLock) {
             if (webSocket == ws) {
