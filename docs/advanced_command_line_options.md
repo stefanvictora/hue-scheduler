@@ -107,7 +107,7 @@ The color difference threshold (Delta-E CIE76) above which a light's color is co
 Only relevant and active if user modification tracking is not disabled (see `--disable-user-modification-tracking`).
 
 **Recommended Range**: 5-15  
-**Default**: `8.0`
+**Default**: `6.0`
 
 ### `--brightness-override-threshold`
 

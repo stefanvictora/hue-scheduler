@@ -191,7 +191,7 @@ public final class HueScheduler implements Runnable {
     int colorTemperatureOverrideThresholdKelvin;
     @Option(
             names = "--color-override-threshold", paramLabel = "<delta>",
-            defaultValue = "${env:COLOR_OVERRIDE_THRESHOLD:-8.0}",
+            defaultValue = "${env:COLOR_OVERRIDE_THRESHOLD:-6.0}",
             description = "The color difference threshold (Delta-E CIE76) above which a light's color is considered " +
                           "manually overridden. Lower values detect smaller color changes but may trigger during " +
                           "transitions. Higher values ignore transition noise but may miss subtle adjustments. " +
