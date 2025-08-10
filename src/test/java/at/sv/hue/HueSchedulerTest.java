@@ -6428,6 +6428,53 @@ class HueSchedulerTest {
     }
 
     @Test
+    void sceneSync_groupState_singleState_createsScene() {
+        enableSceneSync();
+
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 6);
+        addState("g1", now, "bri:100");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.getFirst(),
+                expectedGroupPutCall(1).bri(100)
+        );
+
+        assertSceneUpdate("/groups/1", expectedPutCall(6).bri(100));
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
+        );
+    }
+
+    @Test
+    void sceneSync_groupState_withNullState_createsScene() {
+        enableSceneSync();
+
+        mockDefaultGroupCapabilities(2);
+        mockGroupLightsForId(2, 6);
+        addState("g2", now, "bri:100");
+        addState("g2", now.plusMinutes(10));
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.getFirst(),
+                expectedGroupPutCall(2).bri(100)
+        );
+
+        assertSceneUpdate("/groups/2", expectedPutCall(6).bri(100));
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
+        );
+    }
+
+    @Test
     void sceneSync_delayGreaterThanZero_createsScheduledTaskForSync() {
         sceneSyncDelayInSeconds = 5;
         enableSceneSync();
