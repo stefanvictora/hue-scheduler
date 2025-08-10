@@ -42,6 +42,7 @@ class HassAvailabilityListenerTest {
         listener.performInitialCheck(() -> true);
 
         assertThat(listener.isFullyStarted()).isFalse(); // still false
+        verifyNoInteractions(onRestartedCallback);
     }
 
     @Test

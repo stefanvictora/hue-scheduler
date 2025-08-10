@@ -187,6 +187,7 @@ class HassAreaRegistryImplTest {
         assertThat(result).isNotNull();
         assertThat(result.groupId()).isEqualTo(areaId);
         assertThat(result.groupLights()).containsExactlyInAnyOrder(entityId1, entityId2, entityId3);
+        assertThat(result.groupLights()).containsOnlyOnce(entityId2);
     }
 
     @Test
