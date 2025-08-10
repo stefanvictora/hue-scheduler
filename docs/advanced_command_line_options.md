@@ -177,7 +177,7 @@ Configures the read timeout of the API v2 SSE event stream in minutes. The conne
 
 *New in 0.12.2*
 
-Disables SSL certificate validation for the Hue Bridge. Needed if your bridge still uses self-signed certificates instead of the one issues by Signify. See [Phis Hue Developer Documentation](https://developers.meethue.com/develop/application-design-guidance/using-https/) (requires login).
+Disables SSL certificate validation for the Hue Bridge. Needed if your bridge still uses self-signed certificates instead of the one issues by Signify. See [Philips Hue Developer Documentation](https://developers.meethue.com/develop/application-design-guidance/using-https/) (requires login).
 
 **Default**: false
 

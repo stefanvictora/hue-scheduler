@@ -34,7 +34,7 @@ public class HttpResourceProviderImpl implements HttpResourceProvider {
     }
 
     private static String getTruncatedBody(String body) {
-        return body.length() > 100 ? body.substring(0, 100) + "..." : body;
+        return body.length() > 150 ? body.substring(0, 150) + "..." : body;
     }
 
     @Override

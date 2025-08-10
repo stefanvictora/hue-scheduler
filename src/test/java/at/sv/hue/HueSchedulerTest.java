@@ -687,6 +687,16 @@ class HueSchedulerTest {
     }
 
     @Test
+    void parse_x_canHandleSpaces() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addStateNow("1", "x: 0.1234 ", "y:0.5678 ");
+
+        startScheduler();
+
+        ensureScheduledStates(1);
+    }
+
+    @Test
     void parse_missingParts_atLeastIdAndTimeNeedsToBeSet() {
         addKnownLightIdsWithDefaultCapabilities(1);
         assertThrows(InvalidConfigurationLine.class, () -> addState("1\t"));

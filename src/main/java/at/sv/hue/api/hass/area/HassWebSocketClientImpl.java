@@ -156,7 +156,7 @@ public class HassWebSocketClientImpl implements HassWebSocketClient {
             MDC.put("context", "websocket");
             try {
                 JsonNode node = mapper.readTree(text);
-                handleMessage(node, text);
+                handleMessage(webSocket, node, text);
             } catch (Exception e) {
                 log.error("Failed to handle WebSocket message: '{}'", text, e);
             }
@@ -186,7 +186,7 @@ public class HassWebSocketClientImpl implements HassWebSocketClient {
         webSocket.send(authMessage);
     }
 
-    private void handleMessage(JsonNode node, String text) {
+    private void handleMessage(WebSocket webSocket, JsonNode node, String text) {
         if (node.has("type")) {
             String type = node.get("type").asText();
             if ("auth_ok".equals(type)) {
