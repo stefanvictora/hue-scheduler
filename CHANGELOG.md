@@ -24,7 +24,7 @@
 ### Fixed
 - Fixed an issue where states were not properly synchronized after extended periods of inactivity.
 - Improved reliability of Hue Scheduler during HA restarts and other cases of unavailability.
-- Reduced incorrect change detections for HA events.
+- Reduced false positive change detections for Home Assistant events.
 
 ## [0.12.3] - 2024-12-31
 
@@ -55,7 +55,7 @@
   - To enable this feature, use the `--enable-scene-sync` command line flag or set `ENABLE_SCENE_SYNC=true` as an environment variable (default: `false`).
   - **Additional Configurable Properties**:
     - `--scene-sync-name`: Specifies the name for the synced scenes (default: `HueScheduler`).
-    - `--scene-sync-interval`: Defines the interval for scene synchronization in minutes (default: `2`).
+    - `--scene-sync-interval`: Defines the interval for scene synchronization in minutes (default: `3`).
   - **Limitation**: Currently, this feature is supported only when connected to a Hue bridge.
 
 - **APIv2 Light Effects**: Added support for scheduling all Hue APIv2 light effects.
@@ -78,7 +78,7 @@
 
 ### Added
 - **Scene Activation Detection**: Hue Scheduler now temporarily disables turn-on event tracking for affected lights and groups when scenes are activated. This prevents it from taking over control when lights are turned on via scenes (#10).
-  - A new `--scene-activation-ignore-window` command line option has been added to fine-tune this behavior, with a default value of `5` seconds.
+  - A new `--scene-activation-ignore-window` command line option has been added to fine-tune this behavior, with a default value of `8` seconds.
   - To disable this behavior, you can either disable user modification tracking entirely (see `--disable-user-modification-tracking`) or set the `force:true` property on a state-by-state basis.
   - Limitations: When connected to Home Assistant, scenes turned on via the Hue bridge (e.g., via apps, smart switches, etc.) cannot be detected due to Home Assistant limitations. However, Hue-based scenes turned on via Home Assistant can still be detected.
 

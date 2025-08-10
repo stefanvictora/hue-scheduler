@@ -23,8 +23,8 @@ Flag to globally disable tracking of user modifications of lights. Per default H
 
 Enables the creation of scenes that always match the state of a scheduled light, room or zone.
 
-Note: Dynamically created Home Assistant scenes can't be assigned to areas or directly displayed in the dashboard. However,
-they remain accessible for use in automations. Hue Scheduler creates a scene for each group and area a scheduled entity is assigned to.
+Note: Dynamically created Home Assistant scenes can't be assigned to areas. However, they remain usable in automations.
+Hue Scheduler creates one scene per group and per area that a scheduled entity belongs to.
 
 **Default**: false
 
@@ -32,10 +32,10 @@ they remain accessible for use in automations. Hue Scheduler creates a scene for
 
 *New in 0.13.0*
 
-When enabled, states will only be applied when triggered by a synced scene activation.
-After scene activation, the current state and subsequent states will be applied until lights are turned off or manually
-modified.
-Enable this flag together with `--enable-scene-sync` to gain manual control over when states are activated.
+When enabled, Hue Scheduler applies states only after a synced scene has been activated.
+After scene activation, the current and subsequent scheduled states will be applied until lights are turned off or manually modified.
+Use together with `--enable-scene-sync` to gain manual control over when states are activated.
+If no synced scene has been activated since the last off event, Hue Scheduler will not apply scheduled states (except those marked with `force:true`).
 
 Example use case: If you want lights to follow a schedule only after explicitly activating a synced Hue Scheduler scene 
 (e.g., through a smart switch or Home Assistant automation), rather than automatically applying states when lights are turned on.
@@ -177,7 +177,7 @@ Configures the read timeout of the API v2 SSE event stream in minutes. The conne
 
 *New in 0.12.2*
 
-Disables SSL certificate validation for the Hue Bridge. Needed if your bridge still uses self-signed certificates instead of the one issues by Signify. See [Philips Hue Developer Documentation](https://developers.meethue.com/develop/application-design-guidance/using-https/) (requires login).
+Disables SSL certificate validation for the Hue Bridge. Needed if your bridge still uses self-signed certificates instead of the one issued by Signify. See [Philips Hue Developer Documentation](https://developers.meethue.com/develop/application-design-guidance/using-https/) (requires login).
 
 **Default**: false
 
