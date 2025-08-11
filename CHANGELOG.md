@@ -25,6 +25,7 @@
 - Fixed an issue where states were not properly synchronized after extended periods of inactivity.
 - Improved reliability of Hue Scheduler during HA restarts and other cases of unavailability.
 - Reduced false positive change detections for Home Assistant events.
+- Ignore unreachable lights during group modification tracking.
 
 ## [0.12.3] - 2024-12-31
 

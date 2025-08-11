@@ -669,6 +669,9 @@ public final class HueScheduler implements Runnable {
     }
 
     private boolean isGroupStateDifferent(LightState lightState) {
+        if (lastSeenAsOff(lightState.getId())) {
+            return false; // ignore modifications if the light was turned off or is currently unreachable
+        }
         ScheduledState lastSeenLightState = stateRegistry.getLastSeenState(lightState.getId());
         if (lastSeenLightState != null) {
             return lastSeenLightState.lightStateDiffers(lightState);

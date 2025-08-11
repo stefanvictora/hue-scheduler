@@ -4895,6 +4895,43 @@ class HueSchedulerTest {
     }
 
     @Test
+    void run_execution_manualOverride_groupState_someLightsNotReachable_ignoredInComparison() {
+        enableUserModificationTracking();
+
+        mockGroupLightsForId(1, 9, 10);
+        mockDefaultGroupCapabilities(1);
+        addState("g1", now, "bri:" + DEFAULT_BRIGHTNESS);
+        addState("g1", now.plusHours(1), "bri:" + (DEFAULT_BRIGHTNESS + 10));
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(2);
+        ScheduledRunnable firstState = scheduledRunnables.get(0);
+        ScheduledRunnable secondState = scheduledRunnables.get(1);
+
+        // first state is set normally
+        advanceTimeAndRunAndAssertPutCalls(firstState,
+                expectedGroupPutCall(1).bri(DEFAULT_BRIGHTNESS)
+        );
+
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusHours(1)); // next day
+
+        simulateLightOffEvent("/lights/9"); // not reachable triggered via event
+        // user modified group state between first and second state -> not relevant, since light is considered unreachable; even if the light state reports "on:true"
+        LightState.LightStateBuilder userModifiedLightState = expectedState().id("/lights/9")
+                                                                             .brightness(DEFAULT_BRIGHTNESS + BRIGHTNESS_OVERRIDE_THRESHOLD)
+                                                                             .colormode(ColorMode.CT);
+        LightState.LightStateBuilder sameAsFirst = expectedState().id("/lights/10")
+                                                                  .brightness(DEFAULT_BRIGHTNESS)
+                                                                  .colormode(ColorMode.CT);
+        setGroupStateResponses(1, sameAsFirst, userModifiedLightState);
+
+        advanceTimeAndRunAndAssertPutCalls(secondState,
+                expectedGroupPutCall(1).bri(DEFAULT_BRIGHTNESS + 10) // no change detected
+        );
+
+        ensureRunnable(initialNow.plusDays(1).plusHours(1), initialNow.plusDays(2)); // next day
+    }
+
+    @Test
     void manualOverride_group_overlappingStates_overriddenBySchedule_notDetectedAsOverridden() {
         enableUserModificationTracking();
 
@@ -6402,7 +6439,7 @@ class HueSchedulerTest {
     }
 
     @Test
-    void sceneSync_groupState_createsAndUpdatesScene_evenIfLightIsOff_stillSchedulesForNextDay() {
+    void sceneSync_groupState_createsAndUpdatesScene_evenIfGroupIsOff_stillSchedulesForNextDay() {
         enableSceneSync();
 
         mockDefaultGroupCapabilities(1);
