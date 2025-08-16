@@ -587,7 +587,7 @@ public final class HueScheduler implements Runnable {
                 scheduleNextSceneSync(state, false);
             }
         } catch (Exception e) {
-            LOG.error("Scene sync failed: '{}'. Retry in {}min", e.getLocalizedMessage(), sceneSyncIntervalInMinutes);
+            LOG.error("Scene sync failed: '{}'. Retry in {}min", e.getLocalizedMessage(), sceneSyncIntervalInMinutes, e);
             scheduleNextSceneSync(state, justOnce);
         }
     }
