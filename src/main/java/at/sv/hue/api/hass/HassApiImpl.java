@@ -527,8 +527,18 @@ public class HassApiImpl implements HueApi {
     }
 
     @Override
-    public void onModification(String type, String id) {
-        clearCaches();
+    public void onModification(String type, String entityId, Object content) {
+        synchronized (lightMapLock) {
+            if (availableStates != null) {
+                if (content == null) { // entity deleted
+                    availableStates.remove(entityId);
+                } else if (content instanceof State newState) {
+                    availableStates.put(entityId, newState);
+                }
+                // Invalidate the name-to-states map so it gets rebuilt on next access
+                nameToStatesMapInvalidated = true;
+            }
+        }
     }
 
     @Data

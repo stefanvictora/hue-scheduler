@@ -952,6 +952,6 @@ class HueEventHandlerTest {
     }
 
     private void verifyResourceModification(String type, String id) {
-        verify(resourceModificationEventListener).onModification(type, id);
+        verify(resourceModificationEventListener).onModification(type, id, null);
     }
 }

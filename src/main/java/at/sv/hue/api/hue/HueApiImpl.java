@@ -637,7 +637,7 @@ public final class HueApiImpl implements HueApi {
     }
 
     @Override
-    public void onModification(String type, String id) {
+    public void onModification(String type, String id, Object content) {
         // todo: maybe switch to different caching logic so we can invalidate individual entries instead of the full cache
         switch (type) {
             case "light" -> availableLightsCache.invalidateAll();

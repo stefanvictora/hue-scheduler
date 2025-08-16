@@ -69,7 +69,7 @@ public final class HueEventHandler implements BackgroundEventHandler {
                         continue;
                     }
                 }
-                resourceModificationEventListener.onModification(hueEvent.getType(), hueEvent.getId());
+                resourceModificationEventListener.onModification(hueEvent.getType(), hueEvent.getId(), null);
             }
         }
     }

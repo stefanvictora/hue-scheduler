@@ -8,7 +8,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -38,7 +40,7 @@ class HassEventHandlerTest {
                 }"""))
                 .isInstanceOf(BridgeAuthenticationFailure.class);
 
-        verifyNoEvents();
+        verifyNoLightEvents();
     }
 
     @Test
@@ -146,7 +148,7 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verifyOnlyEntityCreatedEvent("scene.schreibtisch_r");
+        verifyResourceModification("scene.schreibtisch_r");
     }
 
     @Test
@@ -469,11 +471,11 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verifyNoEvents();
+        verifyNoLightEvents();
     }
 
     @Test
-    void onMessage_stateChanged_lightOff_noPreviousState_ignored() {
+    void onMessage_stateChanged_lightOff_noPreviousState_onlyResourceModificationEvent() {
         handler.onMessage("""
                 {
                   "id": 1,
@@ -542,7 +544,8 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verifyOnlyEntityCreatedEvent("light.schreibtisch_r");
+        verifyResourceModification("light.schreibtisch_r");
+        verifyNoLightEvents();
     }
 
     @Test
@@ -661,7 +664,7 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verifyNoEvents();
+        verifyNoLightEvents();
     }
 
     @Test
@@ -780,7 +783,7 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verifyNoEvents();
+        verifyNoLightEvents();
     }
 
     @Test
@@ -1103,7 +1106,7 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verifyNoEvents();
+        verifyNoLightEvents();
     }
 
     @Test
@@ -1137,14 +1140,14 @@ class HassEventHandlerTest {
 
     @Test
     void onMessage_subscribe_ignored() {
-          handler.onMessage("""
-                  {
-                      "id": 50,
-                      "type": "result",
-                      "success": true,
-                      "result": null
-                  }
-                  """);
+        handler.onMessage("""
+                {
+                    "id": 50,
+                    "type": "result",
+                    "success": true,
+                    "result": null
+                }
+                """);
 
         verifyNoEvents();
     }
@@ -1337,7 +1340,7 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verifyNoEvents();
+        verifyNoLightEvents();
     }
 
     @Test
@@ -1379,7 +1382,8 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verifyOnlyEntityCreatedEvent("scene.huescheduler_bad");
+        verifyResourceModification("scene.huescheduler_bad");
+        verifyNoLightEvents();
     }
 
     @Test
@@ -1486,7 +1490,7 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verifyNoEvents();
+        verifyNoLightEvents();
     }
 
     @Test
@@ -1550,7 +1554,7 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verifyNoEvents();
+        verifyNoLightEvents();
     }
 
     @Test
@@ -1716,7 +1720,7 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verifyNoEvents();
+        verifyNoLightEvents();
     }
 
     @Test
@@ -1773,20 +1777,26 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verifyNoEvents();
+        verifyNoLightEvents();
     }
 
     private void verifyNoEvents() {
-        verifyNoInteractions(lightEventListener);
-        verifyNoInteractions(sceneEventListener);
-        verifyNoInteractions(availabilityListener);
+        verifyNoLightEvents();
         verifyNoInteractions(resourceModificationListener);
+        verifyNoInteractions(availabilityListener);
     }
 
-    private void verifyOnlyEntityCreatedEvent(String id) {
-        verify(resourceModificationListener).onModification(null, id);
+    private void verifyNoLightEvents() {
         verifyNoInteractions(lightEventListener);
         verifyNoInteractions(sceneEventListener);
         verifyNoInteractions(availabilityListener);
+    }
+
+    private void verifyResourceModification(String entityId) {
+        verify(resourceModificationListener).onModification(isNull(), eq(entityId),
+                assertArg(state -> assertThat(state)
+                        .isInstanceOf(State.class)
+                        .extracting("entity_id")
+                        .isEqualTo(entityId)));
     }
 }

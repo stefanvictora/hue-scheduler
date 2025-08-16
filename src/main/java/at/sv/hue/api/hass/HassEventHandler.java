@@ -48,10 +48,8 @@ public final class HassEventHandler {
     }
 
     private void handleStateChangedEvent(String entityId, State oldState, State newState) {
-        if (oldState == null && newState != null) { // new entity created
-            if (HassSupportedEntityType.isSupportedEntityType(entityId) || entityId.startsWith("scene.")) {
-                resourceModificationEventListener.onModification(null, entityId);
-            }
+        if (HassSupportedEntityType.isSupportedEntityType(entityId) || entityId.startsWith("scene.")) {
+            resourceModificationEventListener.onModification(null, entityId, newState);
         }
 
         if (newState == null || oldState == null) {
