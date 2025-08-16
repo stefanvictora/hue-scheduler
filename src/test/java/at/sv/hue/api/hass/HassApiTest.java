@@ -612,6 +612,7 @@ public class HassApiTest {
         assertThat(lightState).isEqualTo(LightState.builder()
                                                    .id("light.ceiling")
                                                    .on(false)
+                                                   .unavailable(true)
                                                    .lightCapabilities(LightCapabilities.builder()
                                                                                        .ctMin(153)
                                                                                        .ctMax(500)
@@ -795,6 +796,7 @@ public class HassApiTest {
         assertThat(lightState).isEqualTo(LightState.builder()
                                                    .id("light.on_off")
                                                    .on(false)
+                                                   .unavailable(true)
                                                    .lightCapabilities(LightCapabilities.builder()
                                                                                        .capabilities(EnumSet.of(Capability.ON_OFF))
                                                                                        .build())
@@ -1585,7 +1587,7 @@ public class HassApiTest {
                   },
                   {
                     "entity_id": "light.schreibtisch_l",
-                    "state": "on",
+                    "state": "unavailable",
                     "attributes": {
                       "min_color_temp_kelvin": 2000,
                       "max_color_temp_kelvin": 6535,
@@ -1705,7 +1707,8 @@ public class HassApiTest {
         assertThat(groupStates).containsExactly(
                 LightState.builder()
                           .id("light.schreibtisch_l")
-                          .on(true)
+                          .on(false)
+                          .unavailable(true)
                           .colormode(ColorMode.CT)
                           .effect("none")
                           .brightness(127)

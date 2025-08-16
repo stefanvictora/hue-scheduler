@@ -19,6 +19,7 @@ public final class LightState {
     private final String effect;
     private final ColorMode colormode;
     private final boolean on;
+    private final boolean unavailable;
     @Builder.Default
     private final LightCapabilities lightCapabilities = LightCapabilities.builder().build();
     

@@ -4,6 +4,7 @@ import lombok.Data;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 @Data
@@ -18,6 +19,13 @@ final class Device implements Resource {
         return services.stream()
                        .filter(ResourceReference::isLight)
                        .toList();
+    }
+
+    Optional<String> getZigbeeConnectivityResource() {
+        return services.stream()
+                       .filter(ResourceReference::isZigbeeConnectivity)
+                       .findFirst()
+                       .map(ResourceReference::getRid);
     }
 
     Stream<String> getLightIds() {

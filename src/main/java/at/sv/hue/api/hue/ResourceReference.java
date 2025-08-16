@@ -19,6 +19,10 @@ final class ResourceReference {
         return "device".equals(rtype);
     }
 
+    boolean isZigbeeConnectivity() {
+        return "zigbee_connectivity".equals(rtype);
+    }
+
     boolean isRoom() {
         return "room".equals(rtype);
     }

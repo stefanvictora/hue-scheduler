@@ -16,6 +16,9 @@ public class LightStateComparator {
     private final double colorOverrideThreshold;
 
     public boolean lightStateDiffers() {
+        if (currentState.isUnavailable()) {
+            return false; // don't compare state if light is unavailable
+        }
         if (currentState.isOff() && !isOnAndStateDiffers()) {
             return false; // don't compare state if light is off, unless it's an on state
         }

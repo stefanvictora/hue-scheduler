@@ -139,24 +139,39 @@ public final class HueApiImpl implements HueApi {
 
     @Override
     public LightState getLightState(String lightId) {
-        return lookupLight(lightId).getLightState();
+        Light light = lookupLight(lightId);
+        return light.getLightState(isUnavailable(light, this::lookupZigbeeConnectivity));
     }
 
     @Override
     public List<LightState> getGroupStates(String groupedLightId) {
         Map<String, Light> currentLights = lookupLights();
+        Map<String, ZigbeeConnectivity> connectivity = lookupZigbeeConnectivity();
         return getGroupLights(groupedLightId).stream()
-                                             .map(lightId -> getLightState(currentLights, lightId))
+                                             .map(lightId -> getLightState(currentLights, connectivity, lightId))
                                              .filter(Objects::nonNull)
                                              .collect(Collectors.toList());
     }
 
-    private LightState getLightState(Map<String, Light> lights, String lightId) {
+    private LightState getLightState(Map<String, Light> lights, Map<String, ZigbeeConnectivity> connectivity,
+                                     String lightId) {
         Light light = lights.get(lightId);
         if (light == null) {
             return null;
         }
-        return light.getLightState();
+        return light.getLightState(isUnavailable(light, connectivity::get));
+    }
+
+    private boolean isUnavailable(Light light, Function<String, ZigbeeConnectivity> lookupZigbeeConnectivity) {
+        String owner = light.getOwner().getRid();
+        Device device = getAvailableDevices().get(owner);
+        if (device == null) {
+            return false;
+        }
+        return device.getZigbeeConnectivityResource()
+                     .map(lookupZigbeeConnectivity)
+                     .map(ZigbeeConnectivity::isUnavailable)
+                     .orElse(false);
     }
 
     private URL createUrl(String url) {
@@ -537,9 +552,19 @@ public final class HueApiImpl implements HueApi {
         }, Light::getId).get(id);
     }
 
+    private ZigbeeConnectivity lookupZigbeeConnectivity(String id) {
+        return lookup("/zigbee_connectivity/" + id, new TypeReference<ZigbeeConnectivityResponse>() {
+        }, ZigbeeConnectivity::getId).get(id);
+    }
+
     private Map<String, Light> lookupLights() {
         return lookup("/light", new TypeReference<LightResponse>() {
         }, Light::getId);
+    }
+
+    private Map<String, ZigbeeConnectivity> lookupZigbeeConnectivity() {
+        return lookup("/zigbee_connectivity", new TypeReference<ZigbeeConnectivityResponse>() {
+        }, ZigbeeConnectivity::getId);
     }
 
     private Map<String, Scene> lookupScenes() {
@@ -631,6 +656,11 @@ public final class HueApiImpl implements HueApi {
     @Data
     private static final class LightResponse implements DataListContainer<Light> {
         List<Light> data;
+    }
+
+    @Data
+    private static final class ZigbeeConnectivityResponse implements DataListContainer<ZigbeeConnectivity> {
+        List<ZigbeeConnectivity> data;
     }
 
     @Data

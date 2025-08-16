@@ -192,6 +192,7 @@ class HueApiTest {
                   ]
                 }
                 """);
+        setGetResponse("/device", EMPTY_RESPONSE);
 
         LightState lightState = getLightState("9a40e007-8d76-4954-ba88-0f52444b7df6");
 
@@ -311,6 +312,7 @@ class HueApiTest {
                   ]
                 }
                 """);
+        setGetResponse("/device", EMPTY_RESPONSE);
 
         LightState lightState = getLightState("9d8378df-fa1b-4988-b9d1-2ba568143116");
 
@@ -386,6 +388,7 @@ class HueApiTest {
                     }
                   ]
                 }""");
+        setGetResponse("/device", EMPTY_RESPONSE);
 
         LightState lightState = getLightState("94eb9b65-f310-4c31-907a-89da8ef7ccdd");
 
@@ -443,6 +446,7 @@ class HueApiTest {
                     }
                   ]
                 }""");
+        setGetResponse("/device", EMPTY_RESPONSE);
 
         LightState lightState = getLightState("426ab1f6-c27f-42ba-b18d-0783665b4e21");
 
@@ -458,7 +462,81 @@ class HueApiTest {
     }
 
     @Test
-    void getGroupState_returnsListOfLightStates_ignoresUnknownLights() {
+    void getState_onOffBulbOnly_isUnavailable_correctlySet() {
+        setGetResponse("/light/unavailable_light", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "unavailable_light",
+                      "owner": {
+                        "rid": "device_id",
+                        "rtype": "device"
+                      },
+                      "metadata": {
+                        "name": "Plug",
+                        "archetype": "plug",
+                        "function": "functional"
+                      },
+                      "on": {
+                        "on": true
+                      },
+                      "type": "light"
+                    }
+                  ]
+                }""");
+        setGetResponse("/device", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "device_id",
+                      "services": [
+                        {
+                          "rid": "zigbee_id",
+                          "rtype": "zigbee_connectivity"
+                        },
+                        {
+                          "rid": "unavailable_light",
+                          "rtype": "light"
+                        }
+                      ],
+                      "type": "device"
+                    }
+                  ]
+                }""");
+        setGetResponse("/zigbee_connectivity/zigbee_id", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "zigbee_id",
+                      "owner": {
+                        "rid": "device_id",
+                        "rtype": "device"
+                      },
+                      "status": "disconnected",
+                      "type": "zigbee_connectivity"
+                    }
+                  ]
+                }""");
+
+        LightState lightState = getLightState("unavailable_light");
+
+        assertLightState(lightState, LightState
+                .builder()
+                .id("unavailable_light")
+                .on(true)
+                .unavailable(true)
+                .colormode(ColorMode.NONE)
+                .lightCapabilities(LightCapabilities.builder()
+                                                    .capabilities(EnumSet.of(Capability.ON_OFF))
+                                                    .build())
+                .build());
+    }
+
+    @Test
+    void getGroupState_returnsListOfLightStates_andTheirAvailability_ignoresUnknownLights() {
         setGetResponse("/grouped_light", """
                 {
                   "errors": [],
@@ -521,6 +599,10 @@ class HueApiTest {
                         {
                           "rid": "af9a2b88-6fb0-4699-9300-356d3f306b0d",
                           "rtype": "light"
+                        },
+                        {
+                          "rid": "9d8378df-fa1b-4988-b9d1-2ba568143116",
+                          "rtype": "light"
                         }
                       ],
                       "services": [
@@ -545,7 +627,7 @@ class HueApiTest {
                       "id": "af9a2b88-6fb0-4699-9300-356d3f306b0d",
                       "id_v1": "/lights/11",
                       "owner": {
-                        "rid": "afa4e081-7089-471d-8d27-83b59d4541f7",
+                        "rid": "Device_ID_1",
                         "rtype": "device"
                       },
                       "metadata": {
@@ -560,7 +642,7 @@ class HueApiTest {
                       "id": "79016b3c-6258-4f7f-a847-e5c360112b07",
                       "id_v1": "/lights/49",
                       "owner": {
-                        "rid": "6f8a1d35-8997-46a8-9120-9d5b838d94fe",
+                        "rid": "Device_ID_2",
                         "rtype": "device"
                       },
                       "metadata": {
@@ -579,6 +661,109 @@ class HueApiTest {
                       },
                       "color_temperature_delta": {},
                       "type": "light"
+                    },
+                    {
+                      "id": "9d8378df-fa1b-4988-b9d1-2ba568143116",
+                      "id_v1": "/lights/50",
+                      "owner": {
+                        "rid": "Device_ID_3",
+                        "rtype": "device"
+                      },
+                      "metadata": {
+                        "name": "Bad Decke"
+                      },
+                      "on": {
+                        "on": false
+                      },
+                      "type": "light"
+                    }
+                  ]
+                }""");
+        setGetResponse("/device", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "Device_ID_1",
+                      "id_v1": "/lights/11",
+                      "metadata": {
+                        "name": "Bad Tür",
+                        "archetype": "hue_lightstrip"
+                      },
+                      "identify": {},
+                      "services": [
+                        {
+                          "rid": "Zigbee_ID_1",
+                          "rtype": "zigbee_connectivity"
+                        },
+                        {
+                          "rid": "af9a2b88-6fb0-4699-9300-356d3f306b0d",
+                          "rtype": "light"
+                        }
+                      ],
+                      "type": "device"
+                    },
+                    {
+                      "id": "Device_ID_2",
+                      "id_v1": "/lights/49",
+                      "metadata": {
+                        "name": "Bad Tür",
+                        "archetype": "hue_lightstrip"
+                      },
+                      "identify": {},
+                      "services": [
+                        {
+                          "rid": "Zigbee_ID_2",
+                          "rtype": "zigbee_connectivity"
+                        },
+                        {
+                          "rid": "79016b3c-6258-4f7f-a847-e5c360112b07",
+                          "rtype": "light"
+                        }
+                      ],
+                      "type": "device"
+                    },
+                    {
+                      "id": "Device_ID_3",
+                      "id_v1": "/lights/50",
+                      "metadata": {
+                        "name": "Bad Decke",
+                        "archetype": "hue_lightstrip"
+                      },
+                      "identify": {},
+                      "services": [
+                        {
+                          "rid": "9d8378df-fa1b-4988-b9d1-2ba568143116",
+                          "rtype": "light"
+                        }
+                      ],
+                      "type": "device"
+                    }
+                  ]
+                }""");
+        setGetResponse("/zigbee_connectivity", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "Zigbee_ID_1",
+                      "id_v1": "/lights/11",
+                      "owner": {
+                        "rid": "Device_ID_1",
+                        "rtype": "device"
+                      },
+                      "status": "connectivity_issue",
+                      "type": "zigbee_connectivity"
+                    },
+                    {
+                      "id": "Zigbee_ID_2",
+                      "id_v1": "/lights/49",
+                      "owner": {
+                        "rid": "Device_ID_2",
+                        "rtype": "device"
+                      },
+                      "status": "connected",
+                      "type": "zigbee_connectivity"
                     }
                   ]
                 }""");
@@ -587,6 +772,7 @@ class HueApiTest {
                 LightState.builder()
                           .id("af9a2b88-6fb0-4699-9300-356d3f306b0d")
                           .on(true)
+                          .unavailable(true)
                           .colormode(ColorMode.NONE)
                           .lightCapabilities(LightCapabilities.builder()
                                                               .capabilities(EnumSet.of(Capability.ON_OFF))
@@ -595,6 +781,7 @@ class HueApiTest {
                 LightState.builder()
                           .id("79016b3c-6258-4f7f-a847-e5c360112b07")
                           .on(false)
+                          .unavailable(false)
                           .brightness(127)
                           .colorTemperature(170)
                           .colormode(ColorMode.CT)
@@ -609,6 +796,16 @@ class HueApiTest {
                 LightState.builder()
                           .id("af9a2b88-6fb0-4699-9300-356d3f306b0d")
                           .on(true)
+                          .unavailable(true)
+                          .colormode(ColorMode.NONE)
+                          .lightCapabilities(LightCapabilities.builder()
+                                                              .capabilities(EnumSet.of(Capability.ON_OFF))
+                                                              .build())
+                          .build(),
+                LightState.builder()
+                          .id("9d8378df-fa1b-4988-b9d1-2ba568143116")
+                          .on(false)
+                          .unavailable(false) // default to false, if we can't determine it
                           .colormode(ColorMode.NONE)
                           .lightCapabilities(LightCapabilities.builder()
                                                               .capabilities(EnumSet.of(Capability.ON_OFF))
@@ -2513,6 +2710,7 @@ class HueApiTest {
                     }
                   ]
                 }""");
+        setGetResponse("/device", EMPTY_RESPONSE);
 
         assertThat(isLightOff("426ab1f6-c27f-42ba-b18d-0783665b4e21")).isFalse();
     }
@@ -2542,6 +2740,7 @@ class HueApiTest {
                     }
                   ]
                 }""");
+        setGetResponse("/device", EMPTY_RESPONSE);
 
         assertThat(isLightOff("631f8419-1b41-495a-9708-81d679644b07")).isTrue();
     }

@@ -369,7 +369,7 @@ public class HassApiImpl implements HueApi {
         return new LightState(state.entity_id, hassToHueBrightness(attributes.brightness), attributes.color_temp, getXY(attributes.xy_color, 0),
                 getXY(attributes.xy_color, 1),
                 getEffect(attributes.effect), getColorMode(attributes.color_mode),
-                getOn(state.state), createLightCapabilities(state));
+                getOn(state.state), getUnavailable(state.state), createLightCapabilities(state));
     }
 
     private static Double getXY(Double[] xy, int i) {
@@ -400,6 +400,10 @@ public class HassApiImpl implements HueApi {
 
     private static boolean getOn(String state) {
         return "on".equals(state);
+    }
+
+    private static boolean getUnavailable(String state) {
+        return "unavailable".equals(state);
     }
 
     private static LightCapabilities createLightCapabilities(State state) {

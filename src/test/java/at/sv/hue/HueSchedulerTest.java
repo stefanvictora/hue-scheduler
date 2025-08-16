@@ -4914,9 +4914,9 @@ class HueSchedulerTest {
 
         ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusHours(1)); // next day
 
-        simulateLightOffEvent("/lights/9"); // not reachable triggered via event
         // user modified group state between first and second state -> not relevant, since light is considered unreachable; even if the light state reports "on:true"
         LightState.LightStateBuilder userModifiedLightState = expectedState().id("/lights/9")
+                                                                             .unavailable(true)
                                                                              .brightness(DEFAULT_BRIGHTNESS + BRIGHTNESS_OVERRIDE_THRESHOLD)
                                                                              .colormode(ColorMode.CT);
         LightState.LightStateBuilder sameAsFirst = expectedState().id("/lights/10")
