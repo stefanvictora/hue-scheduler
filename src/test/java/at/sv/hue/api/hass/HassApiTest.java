@@ -2,6 +2,7 @@ package at.sv.hue.api.hass;
 
 import at.sv.hue.ColorMode;
 import at.sv.hue.api.ApiFailure;
+import at.sv.hue.api.BridgeAuthenticationFailure;
 import at.sv.hue.api.BridgeConnectionFailure;
 import at.sv.hue.api.Capability;
 import at.sv.hue.api.EmptyGroupException;
@@ -56,10 +57,17 @@ public class HassApiTest {
     }
 
     @Test
-    void assertConnection_stateLookupThrowsException_exception() {
+    void assertConnection_stateLookupThrowsApiFailureException_exception() {
         when(http.getResource(any())).thenThrow(new ApiFailure("HTTP Failure"));
 
         assertThatThrownBy(() -> api.assertConnection()).isInstanceOf(BridgeConnectionFailure.class);
+    }
+
+    @Test
+    void assertConnection_stateLookupThrowsBridgeAuthenticationException_reThrowsException() {
+        when(http.getResource(any())).thenThrow(new BridgeAuthenticationFailure());
+
+        assertThatThrownBy(() -> api.assertConnection()).isInstanceOf(BridgeAuthenticationFailure.class);
     }
 
     @Test

@@ -2,6 +2,7 @@ package at.sv.hue.api.hass;
 
 import at.sv.hue.ColorMode;
 import at.sv.hue.api.ApiFailure;
+import at.sv.hue.api.BridgeAuthenticationFailure;
 import at.sv.hue.api.BridgeConnectionFailure;
 import at.sv.hue.api.Capability;
 import at.sv.hue.api.EmptyGroupException;
@@ -72,6 +73,8 @@ public class HassApiImpl implements HueApi {
         availabilityListener.performInitialCheck(() -> {
             try {
                 return !lookupStates().isEmpty();
+            } catch (BridgeAuthenticationFailure e) {
+                throw e; // abort startup
             } catch (Exception e) {
                 return false;
             }
@@ -351,7 +354,7 @@ public class HassApiImpl implements HueApi {
             return states.stream()
                          .collect(Collectors.toMap(State::getEntity_id, Function.identity()));
         } catch (JsonProcessingException | NullPointerException e) {
-            throw new ApiFailure("Failed to parse light states response '" + response + "':" + e.getLocalizedMessage());
+            throw new ApiFailure("Failed to parse light states response '" + response + "': " + e.getLocalizedMessage());
         }
     }
 
