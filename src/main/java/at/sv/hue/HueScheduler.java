@@ -316,7 +316,7 @@ public final class HueScheduler implements Runnable {
                 sceneActivationIgnoreWindowInSeconds,
                 sceneName -> HassApiUtils.matchesSceneSyncName(sceneName, sceneSyncName), lightEventListener);
         new HassEventStreamReader(websocketOrigin, accessToken, httpClient,
-                new HassEventHandler(lightEventListener, sceneEventListener, availabilityListener)).start();
+                new HassEventHandler(lightEventListener, sceneEventListener, availabilityListener, api)).start();
         stateRegistry = new ScheduledStateRegistry(currentTime, api);
     }
 

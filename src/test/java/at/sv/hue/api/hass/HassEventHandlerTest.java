@@ -2,6 +2,7 @@ package at.sv.hue.api.hass;
 
 import at.sv.hue.api.BridgeAuthenticationFailure;
 import at.sv.hue.api.LightEventListener;
+import at.sv.hue.api.ResourceModificationEventListener;
 import at.sv.hue.api.SceneEventListener;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,13 +18,15 @@ class HassEventHandlerTest {
     private SceneEventListener sceneEventListener;
     private HassAvailabilityEventListener availabilityListener;
     private HassEventHandler handler;
+    private ResourceModificationEventListener resourceModificationListener;
 
     @BeforeEach
     void setUp() {
         lightEventListener = Mockito.mock(LightEventListener.class);
         sceneEventListener = Mockito.mock(SceneEventListener.class);
         availabilityListener = Mockito.mock(HassAvailabilityEventListener.class);
-        handler = new HassEventHandler(lightEventListener, sceneEventListener, availabilityListener);
+        resourceModificationListener = Mockito.mock(ResourceModificationEventListener.class);
+        handler = new HassEventHandler(lightEventListener, sceneEventListener, availabilityListener, resourceModificationListener);
     }
 
     @Test
@@ -74,7 +77,7 @@ class HassEventHandlerTest {
     }
 
     @Test
-    void onMessage_stateChanged_onEvent_noPreviousState_ignored() {
+    void onMessage_stateChanged_onEvent_noPreviousState_triggersResourceModification_evenForScene() {
         handler.onMessage("""
                 {
                   "id": 1,
@@ -82,10 +85,10 @@ class HassEventHandlerTest {
                   "event": {
                     "event_type": "state_changed",
                     "data": {
-                      "entity_id": "light.schreibtisch_r",
+                      "entity_id": "scene.schreibtisch_r",
                       "old_state": null,
                       "new_state": {
-                        "entity_id": "light.schreibtisch_r",
+                        "entity_id": "scene.schreibtisch_r",
                         "state": "on",
                         "attributes": {
                           "min_color_temp_kelvin": 2000,
@@ -143,7 +146,7 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verifyNoEvents();
+        verifyOnlyEntityCreatedEvent("scene.schreibtisch_r");
     }
 
     @Test
@@ -539,7 +542,7 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verifyNoEvents();
+        verifyOnlyEntityCreatedEvent("light.schreibtisch_r");
     }
 
     @Test
@@ -1338,7 +1341,7 @@ class HassEventHandlerTest {
     }
 
     @Test
-    void onMessage_haScene_update_noEventTriggered() {
+    void onMessage_haScene_created_onlyResourceModificationEvent() {
         handler.onMessage("""
                 {
                   "type" : "event",
@@ -1353,6 +1356,46 @@ class HassEventHandlerTest {
                         "attributes" : {
                           "entity_id" : [ "light.bad_tur", "light.bad_therme_neu", "light.bad_oben" ],
                           "friendly_name" : "huescheduler_bad"
+                        },
+                        "last_changed" : "2025-02-08T19:11:28.950183+00:00",
+                        "last_reported" : "2025-02-08T19:11:28.950183+00:00",
+                        "last_updated" : "2025-02-08T19:11:28.950183+00:00",
+                        "context" : {
+                          "id" : "01JKKFJPNP013F9BTVBGP4WW02",
+                          "parent_id" : null,
+                          "user_id" : null
+                        }
+                      }
+                    },
+                    "origin" : "LOCAL",
+                    "time_fired" : "2025-02-08T19:11:28.950183+00:00",
+                    "context" : {
+                      "id" : "01JKKFJPNP013F9BTVBGP4WW02",
+                      "parent_id" : null,
+                      "user_id" : null
+                    }
+                  },
+                  "id" : 1
+                }
+                """);
+
+        verifyOnlyEntityCreatedEvent("scene.huescheduler_bad");
+    }
+
+    @Test
+    void onMessage_unsupportedEntityType_created_noEvents() {
+        handler.onMessage("""
+                {
+                  "type" : "event",
+                  "event" : {
+                    "event_type" : "state_changed",
+                    "data" : {
+                      "entity_id" : "sun.sun",
+                      "old_state" : null,
+                      "new_state" : {
+                        "entity_id" : "sun.sun",
+                        "state" : "2025-02-08T18:58:41.810800+00:00",
+                        "attributes" : {
                         },
                         "last_changed" : "2025-02-08T19:11:28.950183+00:00",
                         "last_reported" : "2025-02-08T19:11:28.950183+00:00",
@@ -1734,6 +1777,14 @@ class HassEventHandlerTest {
     }
 
     private void verifyNoEvents() {
+        verifyNoInteractions(lightEventListener);
+        verifyNoInteractions(sceneEventListener);
+        verifyNoInteractions(availabilityListener);
+        verifyNoInteractions(resourceModificationListener);
+    }
+
+    private void verifyOnlyEntityCreatedEvent(String id) {
+        verify(resourceModificationListener).onModification(null, id);
         verifyNoInteractions(lightEventListener);
         verifyNoInteractions(sceneEventListener);
         verifyNoInteractions(availabilityListener);

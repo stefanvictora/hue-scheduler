@@ -2,6 +2,7 @@ package at.sv.hue.api.hass;
 
 import at.sv.hue.api.BridgeAuthenticationFailure;
 import at.sv.hue.api.LightEventListener;
+import at.sv.hue.api.ResourceModificationEventListener;
 import at.sv.hue.api.SceneEventListener;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -16,12 +17,15 @@ public final class HassEventHandler {
     private final LightEventListener eventListener;
     private final SceneEventListener sceneEventListener;
     private final HassAvailabilityEventListener availabilityListener;
+    private final ResourceModificationEventListener resourceModificationEventListener;
 
     public HassEventHandler(LightEventListener eventListener, SceneEventListener sceneEventListener,
-                            HassAvailabilityEventListener availabilityListener) {
+                            HassAvailabilityEventListener availabilityListener,
+                            ResourceModificationEventListener resourceModificationEventListener) {
         this.eventListener = eventListener;
         this.sceneEventListener = sceneEventListener;
         this.availabilityListener = availabilityListener;
+        this.resourceModificationEventListener = resourceModificationEventListener;
         objectMapper = new ObjectMapper();
         objectMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
     }
@@ -44,6 +48,12 @@ public final class HassEventHandler {
     }
 
     private void handleStateChangedEvent(String entityId, State oldState, State newState) {
+        if (oldState == null && newState != null) { // new entity created
+            if (HassSupportedEntityType.isSupportedEntityType(entityId) || entityId.startsWith("scene.")) {
+                resourceModificationEventListener.onModification(null, entityId);
+            }
+        }
+
         if (newState == null || oldState == null) {
             return;
         }

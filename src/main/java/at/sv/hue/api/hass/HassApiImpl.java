@@ -351,7 +351,7 @@ public class HassApiImpl implements HueApi {
             return states.stream()
                          .collect(Collectors.toMap(State::getEntity_id, Function.identity()));
         } catch (JsonProcessingException | NullPointerException e) {
-            throw new ApiFailure("Failed to parse light states response '" + response + ":" + e.getLocalizedMessage());
+            throw new ApiFailure("Failed to parse light states response '" + response + "':" + e.getLocalizedMessage());
         }
     }
 
@@ -528,7 +528,7 @@ public class HassApiImpl implements HueApi {
 
     @Override
     public void onModification(String type, String id) {
-        // todo
+        clearCaches();
     }
 
     @Data
