@@ -363,6 +363,18 @@ public final class HueScheduler implements Runnable {
             System.err.println("--require-scene-activation requires --enable-scene-sync");
             System.exit(1);
         }
+        if (brightnessOverrideThresholdPercentage < 1 || brightnessOverrideThresholdPercentage > 100) {
+            System.err.println("--brightness-override-threshold must be within [1,100]");
+            System.exit(1);
+        }
+        if (colorTemperatureOverrideThresholdKelvin <= 0) {
+            System.err.println("--ct-override-threshold must be > 0");
+            System.exit(1);
+        }
+        if (colorOverrideThreshold <= 0) {
+            System.err.println("--color-override-threshold must be > 0.0");
+            System.exit(1);
+        }
     }
 
     private void assertInputIsReadable() {
