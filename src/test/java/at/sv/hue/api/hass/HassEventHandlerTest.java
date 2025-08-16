@@ -40,7 +40,7 @@ class HassEventHandlerTest {
                 }"""))
                 .isInstanceOf(BridgeAuthenticationFailure.class);
 
-        verifyNoLightEvents();
+        verifyNoLightOrSceneEvents();
     }
 
     @Test
@@ -471,7 +471,7 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verifyNoLightEvents();
+        verifyNoLightOrSceneEvents();
     }
 
     @Test
@@ -545,7 +545,7 @@ class HassEventHandlerTest {
                 """);
 
         verifyResourceModification("light.schreibtisch_r");
-        verifyNoLightEvents();
+        verifyNoLightOrSceneEvents();
     }
 
     @Test
@@ -664,7 +664,7 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verifyNoLightEvents();
+        verifyNoLightOrSceneEvents();
     }
 
     @Test
@@ -783,7 +783,7 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verifyNoLightEvents();
+        verifyNoLightOrSceneEvents();
     }
 
     @Test
@@ -1106,7 +1106,7 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verifyNoLightEvents();
+        verifyNoLightOrSceneEvents();
     }
 
     @Test
@@ -1340,7 +1340,7 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verifyNoLightEvents();
+        verifyNoLightOrSceneEvents();
     }
 
     @Test
@@ -1383,7 +1383,7 @@ class HassEventHandlerTest {
                 """);
 
         verifyResourceModification("scene.huescheduler_bad");
-        verifyNoLightEvents();
+        verifyNoLightOrSceneEvents();
     }
 
     @Test
@@ -1490,7 +1490,7 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verifyNoLightEvents();
+        verifyNoLightOrSceneEvents();
     }
 
     @Test
@@ -1554,7 +1554,7 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verifyNoLightEvents();
+        verifyNoLightOrSceneEvents();
     }
 
     @Test
@@ -1682,7 +1682,7 @@ class HassEventHandlerTest {
     }
 
     @Test
-    void onMessage_noNewState_noEvent() {
+    void onMessage_noNewState_removalEvent() {
         handler.onMessage("""
                 {
                   "type" : "event",
@@ -1720,7 +1720,8 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verifyNoLightEvents();
+        verifyResourceRemoval("scene.huescheduler_bad");
+        verifyNoLightOrSceneEvents();
     }
 
     @Test
@@ -1777,19 +1778,18 @@ class HassEventHandlerTest {
                 }
                 """);
 
-        verifyNoLightEvents();
+        verifyNoLightOrSceneEvents();
     }
 
     private void verifyNoEvents() {
-        verifyNoLightEvents();
+        verifyNoLightOrSceneEvents();
         verifyNoInteractions(resourceModificationListener);
         verifyNoInteractions(availabilityListener);
     }
 
-    private void verifyNoLightEvents() {
+    private void verifyNoLightOrSceneEvents() {
         verifyNoInteractions(lightEventListener);
         verifyNoInteractions(sceneEventListener);
-        verifyNoInteractions(availabilityListener);
     }
 
     private void verifyResourceModification(String entityId) {
@@ -1798,5 +1798,9 @@ class HassEventHandlerTest {
                         .isInstanceOf(State.class)
                         .extracting("entity_id")
                         .isEqualTo(entityId)));
+    }
+
+    private void verifyResourceRemoval(String entityId) {
+        verify(resourceModificationListener).onModification(isNull(), eq(entityId), isNull());
     }
 }

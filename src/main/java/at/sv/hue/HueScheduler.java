@@ -767,8 +767,8 @@ public final class HueScheduler implements Runnable {
 
     private void performPutApiCall(ScheduledStateSnapshot state, PutCall putCall) {
         LOG.debug("{}", putCall);
-        state.recordLastPutCall(putCall);
         api.putState(putCall);
+        state.recordLastPutCall(putCall);
     }
 
     private PutCall getPutCallWithAdjustedTr(ScheduledStateSnapshot state, ZonedDateTime now, boolean performedInterpolation) {

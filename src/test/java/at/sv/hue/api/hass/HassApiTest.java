@@ -2078,6 +2078,7 @@ public class HassApiTest {
                 PutCall.builder()
                        .id("light.kitchen_counter")
                        .on(false)
+                       .transitionTime(400)
                        .build()
         );
 
@@ -2088,7 +2089,8 @@ public class HassApiTest {
                   "scene_id" : "huescheduler_kitchen",
                   "entities" : {
                     "light.kitchen_counter" : {
-                      "state" : "off"
+                      "state" : "off",
+                      "transition": 40.0
                     },
                     "light.kitchen_table" : {
                       "state" : "on",
@@ -2426,6 +2428,82 @@ public class HassApiTest {
     }
 
     @Test
+    void onModification_updatesStates_getSceneName_initiallyNoResult_afterwardsSceneIsFound() {
+        String sceneName = "Test Scene";
+        String sceneId = "scene.test_scene";
+        setGetResponse("/states", "[]");
+
+        assertThat(api.getSceneName(sceneId)).isNull();
+        assertThatThrownBy(() -> api.getLightIdentifierByName(sceneName)).isInstanceOf(LightNotFoundException.class);
+
+        State updatedScene = createExampleState(sceneId, sceneName);
+        api.onModification(null, sceneId, updatedScene);
+
+        // Name is now found
+        assertThat(api.getSceneName(sceneId)).isEqualTo(sceneName);
+        assertThat(api.getLightIdentifierByName(sceneName)).isEqualTo(new Identifier(sceneId, sceneName));
+
+        // Scene deleted again
+        api.onModification(null, sceneId, null);
+
+        // Reflected in lookup
+        assertThat(api.getSceneName(sceneId)).isNull();
+        assertThatThrownBy(() -> api.getLightIdentifierByName(sceneName)).isInstanceOf(LightNotFoundException.class);
+    }
+
+    @Test
+    void onModification_noLookupBefore_ignored() {
+        String sceneId = "scene.ignored";
+        setGetResponse("/states", "[]");
+
+        State ignoredScene = createExampleState(sceneId, "Ignored scene");
+        api.onModification(null, "light.test", ignoredScene);
+
+        // Performs initial API fetch and ignores any modifications before
+        assertThat(api.getSceneName(sceneId)).isNull();
+    }
+
+    @Test
+    void onModification_updatesStates_getSceneName_overwritesExistingEntry() {
+        String sceneId = "scene.test_scene";
+        setGetResponse("/states", """
+                [
+                  {
+                    "entity_id": "scene.test_scene",
+                    "state": "2024-06-22T20:26:10.406785+00:00",
+                    "attributes": {
+                      "entity_id": [
+                        "light.1",
+                        "light.2"
+                      ],
+                      "id": "1719087533616",
+                      "friendly_name": "Test Scene"
+                    },
+                    "last_changed": "2024-06-22T20:26:48.309168+00:00",
+                    "last_reported": "2024-06-22T20:26:48.309168+00:00",
+                    "last_updated": "2024-06-22T20:26:48.309168+00:00",
+                    "context": {
+                      "id": "01J10T2K3NY0G61R0PE3K95TXZ",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  }
+                ]
+                """);
+
+        assertThat(api.getSceneName(sceneId)).isEqualTo("Test Scene");
+
+        api.onModification(null, sceneId, createExampleState(sceneId, "Updated Name"));
+
+        assertThat(api.getSceneName(sceneId)).isEqualTo("Updated Name");
+
+        // Ignores non-State objects
+        api.onModification(null, sceneId, new Object());
+
+        assertThat(api.getSceneName(sceneId)).isEqualTo("Updated Name");
+    }
+
+    @Test
     void putState_turnOn_brightness_ct_transition_areConvertedToHassFormat() {
         putState(PutCall.builder()
                         .on(true)
@@ -2741,5 +2819,14 @@ public class HassApiTest {
 
     private static String removeSpaces(@Language("JSON") String expectedBody) {
         return expectedBody.replaceAll("\\s+|\\n", "");
+    }
+
+    private static State createExampleState(String entityId, String friendlyName) {
+        State state = new State();
+        state.setEntity_id(entityId);
+        StateAttributes attributes = new StateAttributes();
+        attributes.setFriendly_name(friendlyName);
+        state.setAttributes(attributes);
+        return state;
     }
 }
