@@ -294,10 +294,12 @@ public class HassApiImpl implements HueApi {
         createScene.setScene_id(HassApiUtils.getNormalizedSceneSyncName(sceneSyncName + "_" + groupId));
         HashMap<String, ChangeState> sceneStates = new HashMap<>();
         for (PutCall putCall : putCalls) {
-            ChangeState changeState = getChangeState(putCall);
+            ChangeState changeState;
             if (putCall.getOn() == Boolean.FALSE) {
+                changeState = new ChangeState();
                 changeState.setState("off");
             } else {
+                changeState = getChangeState(putCall);
                 changeState.setState("on");
             }
             sceneStates.put(putCall.getId(), changeState);

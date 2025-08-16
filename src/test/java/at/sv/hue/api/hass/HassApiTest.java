@@ -2078,7 +2078,8 @@ public class HassApiTest {
                 PutCall.builder()
                        .id("light.kitchen_counter")
                        .on(false)
-                       .transitionTime(400)
+                       .transitionTime(400) // ignored
+                       .bri(100) // ignored
                        .build()
         );
 
@@ -2089,8 +2090,7 @@ public class HassApiTest {
                   "scene_id" : "huescheduler_kitchen",
                   "entities" : {
                     "light.kitchen_counter" : {
-                      "state" : "off",
-                      "transition": 40.0
+                      "state" : "off"
                     },
                     "light.kitchen_table" : {
                       "state" : "on",

@@ -1794,10 +1794,7 @@ class HassEventHandlerTest {
 
     private void verifyResourceModification(String entityId) {
         verify(resourceModificationListener).onModification(isNull(), eq(entityId),
-                assertArg(state -> assertThat(state)
-                        .isInstanceOf(State.class)
-                        .extracting("entity_id")
-                        .isEqualTo(entityId)));
+                assertArg((State s) -> assertThat(s.getEntity_id()).isEqualTo(entityId)));
     }
 
     private void verifyResourceRemoval(String entityId) {
