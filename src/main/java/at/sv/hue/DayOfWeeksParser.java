@@ -47,7 +47,7 @@ public final class DayOfWeeksParser {
             case "su", "sun", "so" -> DayOfWeek.SUNDAY;
             default ->
                     throw new InvalidPropertyValue("Unknown day parameter '" + day + "'. Please check your spelling. " +
-                                                   "Supported values (case insensitive): [Mo|Mon, Tu|Di|Tue, We|Wed|Wen|Mi, Th|Do|Thu, Fr|Fri, Sa|Sat Su|So|Sun]");
+                                                   "Supported values (case insensitive): [Mo|Mon, Tu|Di|Tue, We|Wed|Wen|Mi, Th|Do|Thu, Fr|Fri, Sa|Sat, Su|So|Sun]");
         };
     }
 

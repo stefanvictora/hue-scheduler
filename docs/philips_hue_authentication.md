@@ -11,11 +11,11 @@ If you don't know your bridge's IP address, visit [https://discovery.meethue.com
 1. Open the Hue CLIP debug tool in your browser: `http://<BRIDGE_IP_ADDRESS>/debug/clip.html`
 
 2. In the form, enter:
-    ```
+    ```text
     URL:	/api
     Body:	{"devicetype":"hue_scheduler#<name>"}
     ```
-    `<name>` can be any label up to **26 characters** so that the full `devicetype` (including the `hue_scheduler#` prefix) stays within the Hue limit.
+   Use any `<name>` label up to **26 characters** so the full `devicetype` (including the `hue_scheduler#` prefix) stays within Hue’s limit.
 
 3. Press the **link button** on the Hue Bridge (the big round button). Within **30 seconds**, click **POST** in the CLIP tool.
 4. You should receive a success response containing your **username** (Hue API key). Example:

@@ -150,7 +150,7 @@ Desk  15:00  x:0.1652  y:0.3103
 
 - `tr` — **transition duration** *at* the state's start time. Base unit is 100 ms; default is `4` (= 400 ms). Max `60000` (= 100 min).
 
-  > Tip: Units are supported and can be combined, e.g., `tr:10s`, `tr:2min`, `tr:1h20min5s`..
+  > Tip: Units are supported and can be combined, e.g., `tr:10s`, `tr:2min`, `tr:1h20min5s`.
 
 - `tr-before` — **pre-transition** that starts **before** the state's start time (Hue Scheduler feature). Practically capped at 24 h. Supports relative durations, absolute times, and solar times:
 

@@ -10,13 +10,13 @@
 
 ## Introduction
 
-**New in 0.12.0** — **Sync schedules to scenes** so lights turn on in the desired state instantly (opt-in via ``--enable-scene-sync``). **Home Assistant support was added in 0.13.0.**
+**New in 0.12.0** — **Sync schedules to scenes** so lights turn on in the desired state instantly (opt-in via ``--enable-scene-sync``). Home Assistant support was added in 0.13.0.
 
 Hue Scheduler goes beyond tools like Adaptive Lighting by giving you precise control over brightness, color temperature, color, power state, and custom interpolations between solar and absolute times. It's designed to work with dumb wall switches: as soon as lights become available, Hue Scheduler applies the correct results consistent even after physical on/off toggles.
 
 ## Demo
 
-Configure your lights with a simple, text-based file (fields separated by a tab or at least two spaces. Below are examples for daily routines, interpolations, power control, and ambiance.
+Configure your lights with a simple, text-based file (fields separated by a tab or at least two spaces). Below are examples for daily routines, interpolations, power control, and ambiance.
                      
 ~~~
 # Living Room
@@ -60,22 +60,22 @@ Use fixed times (24-hour `HH:mm[:ss]`, e.g., `06:00`, `23:30:15`) or solar times
 **Properties**
 
 - **Basic**
-    - `bri` — brightness `1–254` or `1%–100%`
-    - `ct` — color temperature in **Kelvin** `6500–1000` or **Mired** `153–500` (cool → warm)
-    - `on` — power state (`true|false`)
-    - `days` — active days (e.g., `days:Mo-Fr`, `days:Tu,We`)
+    - **`bri`** — brightness `1–254` or `1%–100%`
+    - **`ct`** — color temperature in **Kelvin** `6500–1000` or **Mired** `153–500` (cool → warm)
+    - **`on`** — power state (`true|false`)
+    - **`days`** — active days (e.g., `days:Mo-Fr`, `days:Tu,We`)
 - **Color**
-    - `color` (hex or RGB), e.g., `#3CD0E2` or `60,208,226`
-    - `hue` `0–65535` (wraps), requires `sat`
-    - `sat` `0–254` or `0%–100%`, requires `hue`
-    - `effect` (e.g., `prism`, `fire`, `none`)
+    - **`color`** (hex or RGB), e.g., `#3CD0E2` or `60,208,226`
+    - **`hue`** `0–65535` (wraps), requires `sat`
+    - **`sat`** `0–254` or `0%–100%`, requires `hue`
+    - **`effect`** (e.g., `prism`, `fire`, `none`)
 - **Advanced**
-    - `x` / `y` — CIE xy (e.g., `x:0.6024 y:0.3433`)
-    - `force:true` — enforce state even after user changes
+    - **`x`** / **`y`** — CIE xy (e.g., `x:0.6024 y:0.3433`)
+    - **`force:true`** — enforce state even after user changes
 - **Transitions**
-    - `tr` — transition at start (e.g., `tr:10s`, `tr:1h5min`)
-    - `tr-before` — pre-transition starting before the state (relative, absolute, or solar, e.g., `tr-before:30min`, `tr-before:06:00`, `tr-before:civil_dawn+5`)
-    - `interpolate:true` — auto-transition from the previous state; also spans across days
+    - **`tr`** — transition at start (e.g., `tr:10s`, `tr:1h5min`)
+    - **`tr-before`** — pre-transition starting before the state (relative, absolute, or solar, e.g., `tr-before:30min`, `tr-before:06:00`, `tr-before:civil_dawn+5`)
+    - **`interpolate:true`** — auto-transition from the previous state; also spans across days
 
 > [!TIP]
 > Full syntax and edge cases: see the [full configuration guide](docs/light_configuration.md).

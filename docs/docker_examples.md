@@ -11,7 +11,7 @@ services:
     image: stefanvictora/hue-scheduler:0.12
     environment:
       - API_HOST=192.168.0.157
-      - ACCESS_TOKEN=1028d66426293e821ecfd9ef1a0731df
+      - ACCESS_TOKEN=1234567890abcdefghijklmnopqrstuv
       - LAT=48.208731
       - LONG=16.372599
       - ELEVATION=165
@@ -21,13 +21,13 @@ services:
       - log.level=TRACE
     volumes:
       - type: bind
-        source: /home/stefan/.config/hue-scheduler/input.txt
+        source: /home/user_name/.config/hue-scheduler/input.txt
         target: /config/input.txt
         read_only: true
     restart: unless-stopped
  ```
 
-On Windows, adapt the source path, e.g. `C:\Users\Stefan\.config\hue-scheduler\input.txt`. (If you use WSL, map from your Linux path instead.)
+On Windows, adapt the source path, e.g. `C:\Users\user_name\.config\hue-scheduler\input.txt`. (If you use WSL, map from your Linux path instead.)
 
 
 ## `docker run` usage
@@ -47,11 +47,16 @@ docker run -d --name hue-scheduler \
   /config/input.txt
 ```
 
+Note for Windows:
+- PowerShell: use `${PWD}` instead of `$(pwd)` in the `-v` mount.
+- CMD: provide an absolute path (e.g., `C:\path\to\input.txt:C:\config\input.txt`) or run from WSL and keep the bash example.
+
 **Stop / Start / Remove:**
 
 ```bash
 docker stop hue-scheduler
 docker start hue-scheduler
+docker logs -f hue-scheduler
 docker rm hue-scheduler
 ```
 
