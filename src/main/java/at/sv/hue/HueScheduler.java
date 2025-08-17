@@ -62,27 +62,34 @@ public final class HueScheduler implements Runnable {
 
     private static final Logger LOG = LoggerFactory.getLogger(HueScheduler.class);
 
+    @CommandLine.Spec
+    CommandLine.Model.CommandSpec spec;
+
     @Parameters(
+            index = "0",
             defaultValue = "${env:API_HOST}",
             description = "The host for your Philips Hue Bridge or origin (i.e. scheme, host, port) for your Home Assistant instance. " +
                           "Examples: Philips Hue: 192.168.0.157; " +
                           "Home Assistant: http://localhost:8123, or https://UNIQUE_ID.ui.nabu.casa")
     String apiHost;
     @Parameters(
+            index = "1",
             defaultValue = "${env:ACCESS_TOKEN}",
             description = "The Philips Hue Bridge or Home Assistant access token used for authentication.")
     String accessToken;
-    @Parameters(paramLabel = "CONFIG_FILE",
+    @Parameters(
+            index = "2",
+            paramLabel = "CONFIG_FILE",
             defaultValue = "${env:CONFIG_FILE}",
             description = "The configuration file containing your schedules.")
     Path configFile;
     @Option(names = "--lat", required = true,
             defaultValue = "${env:LAT}",
-            description = "The latitude of your location.")
+            description = "The latitude of your in degrees [-90..90].")
     double latitude;
     @Option(names = "--long", required = true,
             defaultValue = "${env:LONG}",
-            description = "The longitude of your location.")
+            description = "The longitude of your location in degrees [-180..180].")
     double longitude;
     @Option(names = "--elevation", paramLabel = "<meters>",
             defaultValue = "${env:ELEVATION:-0.0}",
@@ -151,7 +158,7 @@ public final class HueScheduler implements Runnable {
             description = "The delay in seconds for retrying an API call, if the bridge could not be reached due to " +
                           "network failure, or if it returned an API error code. Default: ${DEFAULT-VALUE} seconds.")
     int bridgeFailureRetryDelayInSeconds;
-    @Option(names = "--event-stream-read-timeout", paramLabel = "<timout>",
+    @Option(names = "--event-stream-read-timeout", paramLabel = "<timeout>",
             defaultValue = "${env:EVENT_STREAM_READ_TIMEOUT:-120}",
             description = "The read timeout of the API v2 SSE event stream in minutes. " +
                           "The connection is automatically restored after a timeout. Default: ${DEFAULT-VALUE} minutes.")
@@ -176,7 +183,7 @@ public final class HueScheduler implements Runnable {
             names = "--brightness-override-threshold", paramLabel = "<percent>",
             defaultValue = "${env:BRIGHTNESS_OVERRIDE_THRESHOLD:-10}",
             description = "The brightness difference threshold (percentage points) above which a light's brightness " +
-                          "is considered manually overridden. For example, 10 means changes from 50% to 60% " +
+                          "is considered manually overridden. For example, 10 means a change from 50%% to 60%% " +
                           "brightness would trigger override detection. Typical range: 5-20. " +
                           "Default: ${DEFAULT-VALUE}."
     )
@@ -185,7 +192,7 @@ public final class HueScheduler implements Runnable {
             names = "--ct-override-threshold", paramLabel = "<kelvin>",
             defaultValue = "${env:CT_OVERRIDE_THRESHOLD:-350}",
             description = "The color temperature difference threshold (Kelvin) above which a light's temperature " +
-                          "is considered manually overridden. For example, 350 means changes from 3000K to 3350K " +
+                          "is considered manually overridden. For example, 350 means a change from 3000K to 3350K " +
                           "would trigger detection. Typical range: 100-500. Default: ${DEFAULT-VALUE}."
     )
     int colorTemperatureOverrideThresholdKelvin;
@@ -289,6 +296,7 @@ public final class HueScheduler implements Runnable {
     @Override
     public void run() {
         MDC.put("context", "init");
+        assertConfigurationParameters();
         if (HassApiUtils.isHassConnection(accessToken)) {
             setupHassApi();
         } else {
@@ -335,7 +343,6 @@ public final class HueScheduler implements Runnable {
         startTimeProvider = createStartTimeProvider(latitude, longitude, elevation);
         stateScheduler = createStateScheduler();
         defaultInterpolationTransitionTime = parseInterpolationTransitionTime(defaultInterpolationTransitionTimeString);
-        assertConfigurationParameters();
         assertInputIsReadable();
         assertConnectionAndStart();
     }
@@ -359,22 +366,76 @@ public final class HueScheduler implements Runnable {
     }
 
     private void assertConfigurationParameters() {
-        if (requireSceneActivation && !enableSceneSync) {
-            System.err.println("--require-scene-activation requires --enable-scene-sync");
-            System.exit(1);
+        assertGeographicConfigurations();
+        assertRateLimitingConfiguration();
+        assertSceneSyncConfigurations();
+        assertManualOverrideThresholds();
+        assertApiConfigurations();
+        assertTimingConfigurations();
+    }
+
+    private void assertGeographicConfigurations() {
+        if (latitude < -90 || latitude > 90) {
+            fail("--lat must be between -90 and 90 degrees");
         }
+        if (longitude < -180 || longitude > 180) {
+            fail("--long must be between -180 and 180 degrees");
+        }
+    }
+
+    private void assertRateLimitingConfiguration() {
+        if (requestsPerSecond <= 0) {
+            fail("--max-requests-per-second must be > 0");
+        }
+    }
+
+    private void assertSceneSyncConfigurations() {
+        if (requireSceneActivation && !enableSceneSync) {
+            fail("--require-scene-activation requires --enable-scene-sync");
+        }
+        if (enableSceneSync && (sceneSyncName == null || sceneSyncName.isBlank())) {
+            fail("--scene-sync-name must be non-empty when --enable-scene-sync is set");
+        }
+        if (enableSceneSync && sceneSyncIntervalInMinutes <= 0) {
+            fail("--scene-sync-interval must be > 0");
+        }
+    }
+
+    private void assertManualOverrideThresholds() {
         if (brightnessOverrideThresholdPercentage < 1 || brightnessOverrideThresholdPercentage > 100) {
-            System.err.println("--brightness-override-threshold must be within [1,100]");
-            System.exit(1);
+            fail("--brightness-override-threshold must be within [1,100]");
         }
         if (colorTemperatureOverrideThresholdKelvin <= 0) {
-            System.err.println("--ct-override-threshold must be > 0");
-            System.exit(1);
+            fail("--ct-override-threshold must be > 0");
         }
         if (colorOverrideThreshold <= 0) {
-            System.err.println("--color-override-threshold must be > 0.0");
-            System.exit(1);
+            fail("--color-override-threshold must be > 0.0");
         }
+    }
+
+    private void assertApiConfigurations() {
+        if (eventStreamReadTimeoutInMinutes <= 0) {
+            fail("--event-stream-read-timeout must be > 0");
+        }
+        if (apiCacheInvalidationIntervalInMinutes <= 0) {
+            fail("--api-cache-invalidation-interval must be > 0");
+        }
+    }
+
+    private void assertTimingConfigurations() {
+        if (powerOnRescheduleDelayInMs < 0) {
+            fail("--power-on-reschedule-delay must be >= 0");
+        }
+        if (minTrBeforeGapInMinutes < 0) {
+            fail("--min-tr-before-gap must be >= 0");
+        }
+        if (sceneActivationIgnoreWindowInSeconds < 0) {
+            fail("--scene-activation-ignore-window must be >= 0");
+        }
+    }
+
+    private void fail(String msg) {
+        throw new CommandLine.ParameterException(spec.commandLine(), msg);
     }
 
     private void assertInputIsReadable() {
