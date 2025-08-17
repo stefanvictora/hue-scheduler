@@ -18,7 +18,7 @@ Hue Scheduler goes beyond tools like Adaptive Lighting by giving you precise con
 
 Configure your lights with a simple, text-based file (fields separated by a tab or at least two spaces). Below are examples for daily routines, interpolations, power control, and ambiance.
                      
-~~~text
+```text
 # Living Room
 light.living_room  sunrise      bri:80%    ct:6000         tr:10s  force:true
 light.living_room  sunrise+60   bri:100%   ct:5000         interpolate:true
@@ -32,7 +32,7 @@ Porch Light  23:00        on:false              tr:5min
 # Motion Sensor: Inactive at night on weekdays
 switch.sensor_hallway_activated   08:00   on:true
 switch.sensor_hallway_activated   22:00   on:false   days:Mo-Fr
-~~~
+```
 
 > [!TIP]
 > Hue Scheduler does **not** automatically turn on lights (unless you specify `on:true`). You stay in control; it handles adjustments once lights are on.
@@ -45,9 +45,9 @@ switch.sensor_hallway_activated   22:00   on:false   days:Mo-Fr
 
 Each line has three parts (separated by a tab or ≥2 spaces):
 
-~~~yacas
+```yacas
 <Light/Group Name or ID>  <Start Time Expression>  [<Property>:<Value>]*
-~~~
+```
 
 **Light/Group Name or ID**
 
@@ -94,7 +94,7 @@ Run Hue Scheduler via Docker (recommended) or manually with Java. Configuration 
 
 1. **Create `docker-compose.yml`:**
 
-   ~~~yaml
+   ```yaml
    services:
      hue-scheduler:
        container_name: hue-scheduler
@@ -113,7 +113,7 @@ Run Hue Scheduler via Docker (recommended) or manually with Java. Configuration 
            target: /config/input.txt
            read_only: true
        restart: unless-stopped
-   ~~~
+   ```
    A filled-out example is available in [docs/docker_examples.md](docs/docker_examples.md).
 
 2. **Provide parameters:**
@@ -131,13 +131,13 @@ Run Hue Scheduler via Docker (recommended) or manually with Java. Configuration 
   
 3. **Start/stop with Docker Compose:**
 
-   ~~~shell
+   ```shell
    # Start:
    docker compose up -d
    
    # Stop & remove:
    docker compose down
-   ~~~
+   ```
 
 If your Raspberry Pi doesn't have Docker yet, see [docs/docker_on_raspberrypi.md](docs/docker_on_raspberrypi.md).
 
@@ -145,9 +145,9 @@ If your Raspberry Pi doesn't have Docker yet, see [docs/docker_on_raspberrypi.md
 
 1. **Download the latest release**: [releases/latest](https://github.com/stefanvictora/hue-scheduler/releases/latest).
 2. **Run the JAR** (replace placeholders):
-   ~~~shell
+   ```shell
    java -jar hue-scheduler.jar <API_HOST> <ACCESS_TOKEN> --lat=<LATITUDE> --long=<LONGITUDE> --elevation=<ELEVATION> <CONFIG_FILE_PATH>
-   ~~~
+   ```
 
 ## FAQ
 
@@ -195,14 +195,14 @@ No, unless you explicitly connect to a cloud-hosted Home Assistant instance. You
 
 ## Developing
 
-~~~shell
+```shell
 # Clone:
 git clone https://github.com/stefanvictora/hue-scheduler.git
 cd hue-scheduler
 
 # Build with Maven:
 mvnw clean install
-~~~
+```
 
 The runnable JAR is created at `target/hue-scheduler.jar` (with all dependencies).
 
@@ -210,19 +210,19 @@ The runnable JAR is created at `target/hue-scheduler.jar` (with all dependencies
 
 Build and run your own image (replace `<VERSION>`):
 
-~~~shell
+```shell
 docker build -t stefanvictora/hue-scheduler:<VERSION> -f Dockerfile .
-~~~
+```
 
 Usage is shown in **Quick Start → Docker**. Useful commands:
 
-~~~shell
+```shell
 # Rebuild and run:
 docker compose up -d --build
 
 # Remove container on exit:
 docker run --rm -e "log.level=TRACE" --name hue-scheduler ...
-~~~
+```
 
 ## Similar Projects
 

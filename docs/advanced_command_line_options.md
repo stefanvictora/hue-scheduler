@@ -1,11 +1,6 @@
 # Advanced Configuration — CLI Flags & Tuning
  
-> [!NOTE]
-> Every CLI option can also be set via an environment variable. Example: `--interpolate-all` ⇢ `INTERPOLATE_ALL=true`.
-> 
-> **Mapping:** `--some-option` → `SOME_OPTION` (uppercase, hyphens → underscores).
-
-### Grouped Index
+## Index
 
 **Scene Sync & Activation**
 
@@ -34,6 +29,11 @@
 **Security**
 
 - [`--insecure`](#--insecure)
+
+> [!NOTE]
+> Every CLI option can also be set via an environment variable. Example: `--interpolate-all` ⇢ `INTERPOLATE_ALL=true`.
+>
+> **Mapping:** `--some-option` → `SOME_OPTION` (uppercase, hyphens → underscores).
 
 ## Scene Sync & Activation
 
@@ -93,7 +93,7 @@ Globally sets `interpolate:true` for all states unless a state explicitly uses `
 
 Sets the default transition time used for **interpolated calls** when a light is turned on during a `tr-before` window. Accepts either a multiple of 100 ms (e.g., `4`) or duration strings (e.g., `5s`, `1min`). If the **previous state** defines `tr`, that value is reused instead.
 
-~~~yacas
+```yacas
 # Uses the default:
 Desk  06:00  bri:50%
 Desk  07:00  bri:100%  tr-before:20min
@@ -105,7 +105,7 @@ Desk  07:00  bri:100%  tr-before:20min
 # Disables interpolation transitions:
 Desk  06:00  bri:50%  tr:0
 Desk  07:00  bri:100%  tr-before:20min
-~~~
+```
 
 **Default:** `4` (= 400 ms)
 
@@ -123,7 +123,7 @@ If overrides are still detected between adjacent transitioning states, increase 
 
 ### `--disable-user-modification-tracking`
 
-Disables tracking of manual changes. By default, Hue Scheduler compares the previously seen state with the current state and only applies the scheduled state if the user hasn’t modified the light in the meantime. To enforce a state regardless of user changes, use the per-state property `force:true`.
+Disables tracking of manual changes. By default, Hue Scheduler compares the previously seen state with the current state and only applies the scheduled state if the user hasn’t modified the light since then. To enforce a state regardless of user changes, use the per-state property `force:true`.
 
 **Default:** `false`
 
@@ -177,15 +177,15 @@ Sets the application log level:
 
 Note: JVM arguments must appear **before** `-jar`:
 
-~~~bash
+```bash
 java -Dlog.level=TRACE -jar hue-scheduler.jar ...
-~~~
+```
 
 With Docker, set via env var:
 
-~~~bash
+```bash
 docker run -d --name hue-scheduler -e log.level=TRACE ...
-~~~
+```
         
 ## Performance & Rate Limiting
 

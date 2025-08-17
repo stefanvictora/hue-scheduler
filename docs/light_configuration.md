@@ -4,9 +4,9 @@ Hue Scheduler uses a simple **text-based** format. Each non-empty line is one sc
 
 Each line has three parts separated by a tab **or** at least two spaces (recommended):
 
-~~~yacas
+```yacas
 <Light/Group Name or ID>  <Start Time Expression>  [<Property>:<Value>]*
-~~~
+```
 
 ## `<Light/Group Name or ID>`
 
@@ -14,7 +14,7 @@ The light or group (room or zone) to control, given by name or ID. You can targe
          
 **Philips Hue example:**
                         
-~~~yacas
+```yacas
 Kitchen, Living room, Desk lamp    civil_dusk  ct:2400
 
 # Is equal to:
@@ -24,7 +24,7 @@ g1, g2, 1                          civil_dusk  ct:2400
 g1                                 civil_dusk  ct:2400
 g2                                 civil_dusk  ct:2400
 1                                  civil_dusk  ct:2400
-~~~
+```
 
 You can look up Hue IDs by sending `GET /api/<username>/lights` or `GET /api/<username>/groups` to your bridge. The response lists all lights and groups. To distinguish IDs, **prefix group IDs with `g`** (lowercase).
 
@@ -32,14 +32,14 @@ Note: If a group and a light share the same name, Hue Scheduler prefers the **gr
 
 **Home Assistant example:**
 
-~~~yacas
+```yacas
 Kitchen, Test Switch, TV Mute      civil_dusk  on:true
 
 # Is equal to:
 light.kitchen                      civil_dusk  on:true
 input_boolean.test_switch          civil_dusk  on:true
 switch.tv_mute                     civil_dusk  on:true
-~~~
+```
 
 ## `<Start Time Expression>`
 
@@ -62,9 +62,9 @@ These times vary by location and date. To see your current values, start Hue Sch
 
 You can also **offset** solar times:
 
-~~~yacas
+```yacas
 <sun_constant>[+-]<minutes>
-~~~
+```
 
 Examples: `sunset-30` (30 minutes before sunset), `sunrise+60` (one hour after sunrise). Offsets update daily with the sun.
 
@@ -76,10 +76,10 @@ Hue Scheduler ends a state at the **start time of the next state for the same ta
 
 Example:
 
-  ~~~yacas
+  ```yacas
 Hallway  07:00       bri:254
 Hallway  civil_dusk  bri:150
-  ~~~
+  ```
 
 This results in two **dynamic intervals** (adjusted daily):
 
@@ -88,10 +88,10 @@ This results in two **dynamic intervals** (adjusted daily):
 
 To **create gaps**, define a state with no properties:
 
-  ~~~yacas
+  ```yacas
 Hallway  07:00  bri:254
 Hallway  10:00
-  ~~~
+  ```
 
 Only **07:00–10:00** is scheduled. If the light is turned on outside this window, Hue Scheduler does **not** enforce any state.
 
@@ -115,13 +115,13 @@ Properties define the state applied during the interval.
 
     - Examples: `days:Mo-We,Fr-Su`, `days:Sa-Tu` (i.e., `Sa,Su,Mo,Tu`)
 
-    ~~~yacas
+    ```yacas
     Office        sunrise     bri:254  ct:6500  tr:10s  days:Mo-Fr
     Office        sunset      bri:200  ct:3000  tr-before:20min  days:Mo-Fr
 
     Living room   22:00       bri:100   effect:prism  days:Fr,Sa
     Living room   23:59       days:Fr,Sa
-    ~~~
+    ```
 
 ### Color
 
@@ -134,14 +134,14 @@ Hue Scheduler supports several ways to set color:
 - `x` / `y` — **[CIE xy](https://en.wikipedia.org/wiki/CIE_1931_color_space)** coordinates (`0.0–1.0`). Useful for exact colors read from the Hue API. Cannot be combined with other color properties.
 
 Examples:
-~~~yacas
+```yacas
 Desk  10:00  color:#3CD0E2
 Desk  11:00  color:60, 208, 226
 Desk  12:00  hue:2000  sat:100
 Desk  13:00  effect:candle  bri:50%
 Desk  14:00  effect:none
 Desk  15:00  x:0.1652  y:0.3103
-~~~
+```
 
 ### Transitions & Interpolations
 
@@ -154,11 +154,11 @@ Desk  15:00  x:0.1652  y:0.3103
 
 - `tr-before` — **pre-transition** that starts **before** the state's start time (Hue Scheduler feature). Practically capped at 24 h. Supports relative durations, absolute times, and solar times:
 
-  ~~~yacas
+  ```yacas
   Office  sunrise  on:true  bri:254  tr-before:30min
   Office  sunrise  on:true  bri:254  tr-before:06:00
   Office  sunrise  on:true  bri:254  tr-before:civil_dawn+5
-  ~~~
+  ```
 
   In the first example, the transition starts 30 minutes before sunrise, while in the last example, it starts 5 minutes after ``civil_dawn`` to smoothly turn on the light to full brightness until sunrise.
 
@@ -166,10 +166,10 @@ Desk  15:00  x:0.1652  y:0.3103
 
     **Late turn-on behavior:** If lights are turned on after a `tr-before` has already started, Hue Scheduler shortens the remaining fade and **interpolates** from the previous state:
 
-  ~~~yacas
+  ```yacas
   Office  06:00  ct:400  tr:2s
   Office  09:00  ct:200  tr-before:30min  tr:10s
-  ~~~
+  ```
 
     1. At **08:30**, the full 30-min fade runs from `ct:400` → `ct:200`.
     2. At **08:45**, the remaining 15 min run, starting near `ct:300`.
@@ -179,7 +179,7 @@ Desk  15:00  x:0.1652  y:0.3103
 
 - `interpolate:true` — Start transitions **automatically** from the previous state (a shorthand for common `tr-before` patterns):
 
-  ~~~yacas
+  ```yacas
   # Instead of:
   Office  sunrise  bri:100
   Office  noon     bri:254  tr-before:sunrise
@@ -188,15 +188,15 @@ Desk  15:00  x:0.1652  y:0.3103
   Office  sunrise  bri:100
   Office  noon     bri:254  interpolate:true
   Office  sunset   bri:50   interpolate:true
-  ~~~
+  ```
    
     Interpolations also **span days**:
  
-  ~~~yacas
+  ```yacas
   Office  sunrise  bri:100  interpolate:true
   Office  noon     bri:254  interpolate:true
   Office  sunset   bri:50   interpolate:true
-  ~~~
+  ```
    
     In this example, Hue Scheduler also interpolates from `sunset` → next day's `sunrise`.
 
@@ -206,10 +206,10 @@ Desk  15:00  x:0.1652  y:0.3103
 
 - `force:true` — **enforce** the state even if the user manually changed the light since the last scheduled state (`true|false`, default `false`). Relevant only if user-modification tracking is enabled (default).
 
-  ~~~yacas
+  ```yacas
   Office  09:00  bri:254  ct:6500
   Office  sunset bri:200  ct:3000  force:true
-  ~~~
+  ```
 
     Here, the sunset state is always applied—even if the user changed the light during the day.
 

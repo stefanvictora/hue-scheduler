@@ -11,7 +11,7 @@ services:
     image: stefanvictora/hue-scheduler:0.13
     environment:
       - API_HOST=192.168.0.157
-      - ACCESS_TOKEN=1234567890abcdefghijklmnopqrstuv
+      - ACCESS_TOKEN=<TOKEN>
       - LAT=48.208731
       - LONG=16.372599
       - ELEVATION=165
