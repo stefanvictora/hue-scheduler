@@ -109,7 +109,7 @@ Properties define the state applied during the interval.
   > Note: To *smoothly* turn a light **on**, include another property (e.g., `bri` or `ct`) with a transition. Otherwise, turning on uses the previous/default state immediately (transition ignored). This does **not** apply when turning lights **off**.
 
 - `days` — **days of week**. Supported aliases:
-    - `Mo|Mon`, `Tu|Tue|Di`, `We|Wen|Wed|Mi`, `Th|Thu|Do`, `Fr|Fri`, `Sa|Sat`, `Su|Sun|So`
+    - `Mo|Mon`, `Tu|Tue|Di`, `We|Wed|Mi`, `Th|Thu|Do`, `Fr|Fri`, `Sa|Sat`, `Su|Sun|So`
 
       Separate with `,` or use a range with `-`. Ranges **wrap** across the week.
 

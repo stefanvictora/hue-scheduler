@@ -70,7 +70,7 @@ Use fixed times (24-hour `HH:mm[:ss]`, e.g., `06:00`, `23:30:15`) or solar times
     - **`sat`** `0–254` or `0%–100%`, requires `hue`
     - **`effect`** (e.g., `prism`, `fire`, `none`)
 - **Advanced**
-    - **`x`** / **`y`** — CIE xy (e.g., `x:0.6024 y:0.3433`)
+    - **`x`** / **`y`** — CIE xy (e.g., `x:0.6024  y:0.3433`)
     - **`force:true`** — enforce state even after user changes
 - **Transitions**
     - **`tr`** — transition at start (e.g., `tr:10s`, `tr:1h5min`)
@@ -117,11 +117,15 @@ Run Hue Scheduler via Docker (recommended) or manually with Java. Configuration 
    A filled-out example is available in [docs/docker_examples.md](docs/docker_examples.md).
 
 2. **Provide parameters:**
+
+   Environment variables:
     - `API_HOST` — Hue Bridge or Home Assistant origin (e.g., `192.168.0.157`, `http://ha.local:8123`, `https://UNIQUE_ID.ui.nabu.casa`)
     - `ACCESS_TOKEN` — [Hue bridge username](https://github.com/stefanvictora/hue-scheduler/blob/main/docs/philips_hue_authentication.md) or [Home Assistant long-lived access token](https://www.home-assistant.io/docs/authentication/).
     - `LAT`, `LONG`, `ELEVATION` — location for solar times
     - `TZ` — your time zone
-    - `SOURCE` — path to the [configuration file](docs/light_configuration.md) containing the light schedules.
+   
+   Volume configuration:
+    - `SOURCE` — local path to your [configuration file](docs/light_configuration.md) containing the light schedules.
     
     Advanced options: see [Advanced Command-Line Options ](docs/advanced_command_line_options.md). From 0.12.0 onward, enable Scene Sync via `ENABLE_SCENE_SYNC=true` (env) or `--enable-scene-sync` (CLI).
   
