@@ -31,6 +31,7 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -292,7 +293,7 @@ public class HassApiImpl implements HueApi {
     public void createOrUpdateScene(String groupId, String sceneSyncName, List<PutCall> putCalls) {
         CreateScene createScene = new CreateScene();
         createScene.setScene_id(HassApiUtils.getNormalizedSceneSyncName(sceneSyncName + "_" + groupId));
-        HashMap<String, ChangeState> sceneStates = new HashMap<>();
+        HashMap<String, ChangeState> sceneStates = new LinkedHashMap<>();
         for (PutCall putCall : putCalls) {
             ChangeState changeState;
             if (putCall.getOn() == Boolean.FALSE) {

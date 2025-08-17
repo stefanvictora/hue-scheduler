@@ -2089,18 +2089,18 @@ public class HassApiTest {
                 {
                   "scene_id" : "huescheduler_kitchen",
                   "entities" : {
-                    "light.kitchen_counter" : {
-                      "state" : "off"
+                    "light.kitchen_main" : {
+                      "state" : "on",
+                      "brightness" : 255,
+                      "color_temp" : 100
                     },
                     "light.kitchen_table" : {
                       "state" : "on",
                       "brightness" : 100,
                       "xy_color" : [ 0.497, 0.384 ]
                     },
-                    "light.kitchen_main" : {
-                      "state" : "on",
-                      "brightness" : 255,
-                      "color_temp" : 100
+                    "light.kitchen_counter" : {
+                      "state" : "off"
                     }
                   }
                 }""")
