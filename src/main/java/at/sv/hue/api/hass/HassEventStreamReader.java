@@ -83,6 +83,7 @@ public final class HassEventStreamReader {
                 MDC.remove("context");
             }
         });
+        MDC.remove("context");
     }
 
     private void reconnectWithDelay() {

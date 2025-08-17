@@ -6105,6 +6105,29 @@ class HueSchedulerTest {
     }
 
     @Test
+    void sceneTurnedOn_apiDoesNotReturnASceneName_noException() {
+        addKnownLightIdsWithDefaultCapabilities(2);
+        addState(2, now, "bri:" + DEFAULT_BRIGHTNESS);
+        addState(2, now.plusMinutes(10), "bri:" + (DEFAULT_BRIGHTNESS + 10));
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(2).bri(DEFAULT_BRIGHTNESS)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
+        );
+
+        // simulate scene activated, with no name -> no exception
+        simulateSceneWithNameActivated("/scenes/unknown", null, "/lights/1", "/lights/2");
+    }
+
+    @Test
     void sceneTurnedOn_containsLightThatHaveSchedules_insideSceneIgnoreWindow_doesNotApplySchedules() {
         enableUserModificationTracking();
         addKnownLightIdsWithDefaultCapabilities(2);

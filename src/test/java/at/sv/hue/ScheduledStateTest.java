@@ -110,7 +110,7 @@ class ScheduledStateTest {
     }
 
     @Test
-    void lightStateDiffers_ct_differentColorTemperature_aboveThreshold_false() {
+    void lightStateDiffers_ct_differentColorTemperature_aboveThreshold_true() {
         ScheduledState scheduledState = scheduledState().ct(200)
                                                         .capabilities(defaultCapabilities)
                                                         .build();

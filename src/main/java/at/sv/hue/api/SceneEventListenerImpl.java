@@ -47,9 +47,11 @@ public final class SceneEventListenerImpl implements SceneEventListener {
             log.info("Synced scene activated. Re-engage scheduler.");
             affectedIdsByScene.forEach(lightOrGroupId -> recentlyAffectedSyncedIds.put(lightOrGroupId, lightOrGroupId));
             affectedIdsByScene.forEach(lightEventListener::onLightOn);
+            MDC.remove("context");
             return;
         }
         affectedIdsByScene.forEach(lightOrGroupId -> recentlyAffectedIds.put(lightOrGroupId, lightOrGroupId));
+        MDC.remove("context");
     }
 
     private Set<String> getAffectedIdsForScene(String sceneId) {

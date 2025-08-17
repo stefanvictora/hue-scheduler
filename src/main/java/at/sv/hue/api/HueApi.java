@@ -98,9 +98,14 @@ public interface HueApi extends ResourceModificationEventListener {
     List<String> getAssignedGroups(String lightId);
 
     /**
-     * Used for scene sync to determine which areas to additionally consider
+     * Used for scene sync to determine which additional areas to consider for the given lights.
+     * This is primarily used by Home Assistant to resolve areas that contain the specified lights,
+     * enabling scene synchronization across related areas. For Hue implementations, this typically
+     * returns an empty list as Hue uses a different grouping model.
      *
-     * @return a list of additional areas and their contained lights
+     * @param lightIds the light IDs to resolve areas for; must not be null
+     * @return a list of GroupInfo objects representing additional areas and their contained light IDs;
+     *         each GroupInfo contains an area/group ID and the list of light IDs it contains; never null
      */
     List<GroupInfo> getAdditionalAreas(List<String> lightIds);
 

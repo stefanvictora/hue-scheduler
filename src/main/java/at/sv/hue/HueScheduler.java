@@ -651,6 +651,7 @@ public final class HueScheduler implements Runnable {
             LOG.error("Scene sync failed: '{}'. Retry in {}min", e.getLocalizedMessage(), sceneSyncIntervalInMinutes, e);
             scheduleNextSceneSync(state, justOnce);
         }
+        MDC.remove("context");
     }
 
     private void syncScene(String groupId, List<PutCall> putCalls) {
@@ -929,6 +930,7 @@ public final class HueScheduler implements Runnable {
     private void logSolarDataInfo() {
         MDC.put("context", "info");
         LOG.info("Current solar times:\n{}", startTimeProvider.toDebugString(currentTime.get()));
+        MDC.remove("context");
     }
 
     private void scheduleApiCacheClear() {

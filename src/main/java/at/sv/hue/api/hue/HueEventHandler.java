@@ -38,12 +38,14 @@ public final class HueEventHandler implements BackgroundEventHandler {
     public void onOpen() {
         MDC.put("context", "events");
         log.trace("Hue event stream handler opened.");
+        MDC.remove("context");
     }
 
     @Override
     public void onClosed() {
         MDC.put("context", "events");
         log.trace("Hue event stream handler closed.");
+        MDC.remove("context");
     }
 
     @Override
@@ -54,7 +56,6 @@ public final class HueEventHandler implements BackgroundEventHandler {
                 if (hueEvent.isLightOrGroup() && hueEvent.isOffEvent()) {
                     lightEventListener.onLightOff(hueEvent.getId());
                 } else if (hueEvent.isLightOrGroup() && hueEvent.isOnEvent()) {
-                    MDC.put("context", "events");
                     if (hueEvent.isPhysical()) {
                         lightEventListener.onPhysicalOn(hueEvent.getOwner().getRid());
                     } else {
@@ -86,6 +87,7 @@ public final class HueEventHandler implements BackgroundEventHandler {
     public void onError(Throwable t) {
         MDC.put("context", "events");
         log.error("An error occurred during event stream processing: {}", t.getLocalizedMessage());
+        MDC.remove("context");
     }
 
     @Data
