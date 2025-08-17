@@ -10,7 +10,7 @@
 
 ## Introduction
 
-**New in 0.12.0** — **Sync schedules to scenes** so lights turn on in the desired state instantly (opt-in via ``--enable-scene-sync``). Home Assistant support was added in 0.13.0.
+**New in 0.12.0** — **Sync schedules to scenes** so lights turn on in the desired state instantly (opt-in via ``--enable-scene-sync``). Now also with Home Assistant support.
 
 Hue Scheduler goes beyond tools like Adaptive Lighting by giving you precise control over brightness, color temperature, color, power state, and custom interpolations between solar and absolute times. It's designed to work with dumb wall switches: as soon as lights become available, Hue Scheduler applies the correct results consistent even after physical on/off toggles.
 
@@ -98,7 +98,7 @@ Run Hue Scheduler via Docker (recommended) or manually with Java. Configuration 
    services:
      hue-scheduler:
        container_name: hue-scheduler
-       image: stefanvictora/hue-scheduler:0.12
+       image: stefanvictora/hue-scheduler:0.13
        environment:
          - API_HOST=
          - ACCESS_TOKEN=
@@ -125,7 +125,7 @@ Run Hue Scheduler via Docker (recommended) or manually with Java. Configuration 
     - `TZ` — your time zone
    
    Volume configuration:
-    - `SOURCE` — local path to your [configuration file](docs/light_configuration.md) containing the light schedules.
+    - `source` — local path to your [configuration file](docs/light_configuration.md) containing the light schedules.
     
     Advanced options: see [Advanced Command-Line Options ](docs/advanced_command_line_options.md). From 0.12.0 onward, enable Scene Sync via `ENABLE_SCENE_SYNC=true` (env) or `--enable-scene-sync` (CLI).
   
@@ -161,7 +161,7 @@ It's a Hue Bridge limitation. Physically powered-on lights are typically detecte
 
 ### My Ikea TRÅDFRI bulbs don’t respect transitions when changing multiple properties.
 
-Some TRÅDFRI firmware versions fail when applying **multiple properties with a non-zero transition**. Because the Hue Bridge defaults to 400 ms (`tr:4`) if not specified, set `tr:0` when changing multiple properties on those bulbs—or split changes into separate states. See issue `#5` for details.
+Some TRÅDFRI firmware versions fail when applying **multiple properties with a non-zero transition**. Because the Hue Bridge defaults to 400 ms (`tr:4`) if not specified, set `tr:0` when changing multiple properties on those bulbs—or split changes into separate states. See issue https://github.com/stefanvictora/hue-scheduler/issues/5 for details.
 
 ### How does Hue Scheduler compare to Adaptive Lighting?
 

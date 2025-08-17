@@ -40,7 +40,7 @@ public final class DayOfWeeksParser {
         return switch (day.trim().toLowerCase(Locale.ENGLISH)) {
             case "mo", "mon" -> DayOfWeek.MONDAY;
             case "tu", "tue", "di" -> DayOfWeek.TUESDAY;
-            case "we", "wed", "mi" -> DayOfWeek.WEDNESDAY;
+            case "we", "wed", "wen", "mi" -> DayOfWeek.WEDNESDAY;
             case "th", "thu", "do" -> DayOfWeek.THURSDAY;
             case "fr", "fri" -> DayOfWeek.FRIDAY;
             case "sa", "sat" -> DayOfWeek.SATURDAY;

@@ -3464,7 +3464,7 @@ class HueSchedulerTest {
     @Test
     void parse_weekdayScheduling_canParseAllSupportedValues_threeLetterEnglish() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        addStateNow(1, "ct:" + DEFAULT_CT, "days:Mon,Tue,Wed,Thu,Fri,Sat,Sun");
+        addStateNow(1, "ct:" + DEFAULT_CT, "days:Mon,Tue,Wen,Wed,Thu,Fri,Sat,Sun");
     }
 
     @Test

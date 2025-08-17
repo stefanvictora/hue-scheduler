@@ -436,7 +436,10 @@ public final class HueScheduler implements Runnable {
     }
 
     private void fail(String msg) {
-        throw new CommandLine.ParameterException(spec.commandLine(), msg);
+        if (spec != null) {
+            throw new CommandLine.ParameterException(spec.commandLine(), msg);
+        }
+        throw new IllegalArgumentException(msg);
     }
 
     private void assertInputIsReadable() {

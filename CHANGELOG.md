@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.13.0] - 2025-04-xx
+## [0.13.0] - 2025-08-18
 
 ### Added
 - **Scene Sync for Home Assistant**
