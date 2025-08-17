@@ -1,10 +1,10 @@
 # Docker Examples
     
-## Docker Compose Example
+## Docker Compose example
 
-Below you can find a full `docker-compose.yml` example file for someone located in Vienna, Austria connecting to his local Philips Hue Bridge:
+Below is a complete `docker-compose.yml` for a setup in **Vienna, Austria**, connecting to a **local Philips Hue Bridge**:
   
-~~~yml
+```yaml
 services:
   hue-scheduler:
     container_name: hue-scheduler
@@ -17,7 +17,7 @@ services:
       - ELEVATION=165
       - TZ=Europe/Vienna
       - CONFIG_FILE=/config/input.txt # do not edit
-      - ENABLE_SCENE_SYNC=true
+      - ENABLE_SCENE_SYNC=true        # optional
       - log.level=TRACE
     volumes:
       - type: bind
@@ -25,25 +25,34 @@ services:
         target: /config/input.txt
         read_only: true
     restart: unless-stopped
-~~~
+ ```
 
-If you are using Docker on Windows, make sure to adapt the source path of your input file. E.g. `C:\Users\Stefan\.config\hue-scheduler\input.txt`
+On Windows, adapt the source path, e.g. `C:\Users\Stefan\.config\hue-scheduler\input.txt`. (If you use WSL, map from your Linux path instead.)
 
-## Docker Run Usage
 
-If you don't want to use docker compose, you can also directly create and run the container for Hue Scheduler with ``docker run``. Make sure to replace the placeholder values and adapt the `TZ` time zone variable:
+## `docker run` usage
 
-~~~shell
-docker run -d --name hue-scheduler -v $(pwd)/input.txt:/config/input.txt:ro -e log.level=DEBUG -e TZ=Europe/Vienna --restart unless-stopped stefanvictora/hue-scheduler:0.12 <API_HOST> <ACCESS_TOKEN> --lat <LATITUDE> --long <LONGITUDE> --elevation <ELEVATION> --enable-scene-sync /config/input.txt
-~~~
+If you prefer not to use Docker Compose, you can create and run the container directly. Replace placeholders and adjust `TZ`:
 
-**Stop / Start / Remove container:**
+```bash
+docker run -d --name hue-scheduler \
+  -v "$(pwd)/input.txt:/config/input.txt:ro" \
+  -e log.level=DEBUG \
+  -e TZ=Europe/Vienna \
+  --restart unless-stopped \
+  stefanvictora/hue-scheduler:0.12 \
+  <API_HOST> <ACCESS_TOKEN> \
+  --lat <LATITUDE> --long <LONGITUDE> --elevation <ELEVATION> \
+  --enable-scene-sync \
+  /config/input.txt
+```
 
-~~~shell
+**Stop / Start / Remove:**
+
+```bash
 docker stop hue-scheduler
 docker start hue-scheduler
 docker rm hue-scheduler
-~~~
+```
 
-This mounts the ``input.txt`` file from the current working directory (see ``PWD`` variable) as read-only file to be used as input for Hue Scheduler. Feel free to change the input file and location to your setup.
-
+This mounts `input.txt` from your **current working directory** (`$(pwd)`) into the container at `/config/input.txt` (read-only). Adjust the file name and path to fit your setup. `CONFIG_FILE` is the **in-container** path; the bind mount wires it up.

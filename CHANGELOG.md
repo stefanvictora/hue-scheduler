@@ -3,29 +3,36 @@
 ## [0.13.0] - 2025-04-xx
 
 ### Added
-- **Scene Sync Support for Home Assistant**: Implemented scene synchronization for Home Assistant.
-  - Activate via `--enable-scene-sync` command-line flag.
-  - Scenes are named following the pattern: `scene.<scene_sync_name>_<group_or_area_name>`. Customize via `--scene-sync-name` (default: `HueScheduler`). Example: `scene.huescheduler_living_room`. It uses lowercase letters and underscores instead of spaces.
-  - Use with Home Assistant automations, smart switches, or motion sensors to turn on your lights in the desired state.
-  - A synced scene is created for each group and area your scheduled entities are part of.
-  - Note: Dynamic scenes are temporary and require recreation after Home Assistant restarts. This is handled automatically by Hue Scheduler.
-  - **Known Limitation**:
-    - Dynamic scenes cannot be assigned to areas or given custom names beyond their entity ID.
-- **Manual Activation Mode**: Added new `--require-scene-activation` command line flag to schedule states only when a synced Hue Scheduler scene is activated. Subsequent states continue normally until lights are turned off or manually overridden.
-  - Designed to integrate with `--enable-scene-sync` for complete manual control over state activation.
-  - Use `force:true` to disable this behavior for individual states.
- 
+- **Scene Sync for Home Assistant**
+    
+    Add scene synchronization with Home Assistant.
+    - Enable via `--enable-scene-sync` (or `ENABLE_SCENE_SYNC=true`).
+    - Scenes are created with the pattern `scene.<scene_sync_name>_<group_or_area_name>`; customize with `--scene-sync-name` (default: `HueScheduler`). Example: `scene.huescheduler_living_room`. Names are lowercase with underscores.
+    - Use in HA automations, smart switches, or motion sensors to turn on lights in the desired state.
+    - A synced scene is created for **each group** and **each area** your scheduled entities belong to.
+    - **Note:** Dynamic scenes are temporary and are recreated automatically by Hue Scheduler after HA restarts.
+    - **Known limitation:** Dynamic scenes cannot be assigned to areas or renamed.
+- **Manual Activation Mode**
+
+    Add `--require-scene-activation` to apply scheduled states **only after** a synced Hue Scheduler scene has been activated. Subsequent states continue normally until lights are turned off or manually modified.
+    - Designed to be used with `--enable-scene-sync` for explicit, manual control over when schedules take effect.
+    - Use `force:true` on individual states to bypass this behavior.
+
 ### Changed
-- Improved thresholds for manual override detection for `bri`, `ct` and color. Added new configuration options for fine-tuning:
-  - `--brightness-override-threshold`
-  - `--ct-override-threshold`
-  - `--color-override-threshold`
+- **Manual override detection**
+    
+    Make detection of user changes more robust and configurable. New thresholds:
+    - `--brightness-override-threshold` — brightness difference (percentage points), **default:** `10`
+    - `--ct-override-threshold` — color temperature difference (Kelvin), **default:** `350`
+    - `--color-override-threshold` — color difference (ΔE CIE76), **default:** `6.0`
+        
+        These settings are active only when user-modification tracking is enabled (default).
 
 ### Fixed
-- Fixed an issue where states were not properly synchronized after extended periods of inactivity.
-- Improved reliability of Hue Scheduler during HA restarts and other cases of unavailability.
-- Reduced false positive change detections for Home Assistant events.
-- Ignore unreachable lights during group modification tracking.
+- **Scene Sync:** Correctly synchronize states after extended inactivity.
+- **Reliability:** Improved handling of Home Assistant restarts and temporary unavailability.
+- **Event detection:** Fewer false positives from HA change events.
+- **Group tracking:** Ignore unavailable lights when evaluating group modifications.
 
 ## [0.12.3] - 2024-12-31
 
