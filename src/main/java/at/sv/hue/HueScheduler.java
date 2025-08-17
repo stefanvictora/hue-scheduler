@@ -477,7 +477,7 @@ public final class HueScheduler implements Runnable {
     private void parseInput() {
         try {
             Files.lines(configFile)
-                 .filter(s -> !s.isEmpty())
+                 .filter(s -> !s.isBlank())
                  .filter(s -> !s.startsWith("//") && !s.startsWith("#"))
                  .forEachOrdered(input -> {
                      try {
