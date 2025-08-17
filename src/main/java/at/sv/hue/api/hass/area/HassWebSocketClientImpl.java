@@ -136,10 +136,10 @@ public class HassWebSocketClientImpl implements HassWebSocketClient {
                 if (authFuture != null && !authFuture.isDone()) {
                     authFuture.completeExceptionally(t);
                 }
+                pendingRequests.forEach((id, future) -> future.completeExceptionally(t));
+                pendingRequests.clear();
             }
         }
-        pendingRequests.forEach((id, future) -> future.completeExceptionally(t));
-        pendingRequests.clear();
     }
 
     private class HassWebSocketListener extends WebSocketListener {
