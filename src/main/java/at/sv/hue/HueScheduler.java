@@ -86,7 +86,7 @@ public final class HueScheduler implements Runnable {
     Path configFile;
     @Option(names = "--lat", required = true,
             defaultValue = "${env:LAT}",
-            description = "The latitude of your in degrees [-90..90].")
+            description = "The latitude of your location in degrees [-90..90].")
     double latitude;
     @Option(names = "--long", required = true,
             defaultValue = "${env:LONG}",

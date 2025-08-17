@@ -1,23 +1,41 @@
-# Advanced Command Line Options
+# Advanced Configuration — CLI Flags & Tuning
  
-The following advanced command-line options are available.
-
 > [!NOTE]
-> Every CLI option can also be set via an environment variable.
-> Mapping: `--some-option` → `SOME_OPTION` (uppercase, hyphens → underscores).
-> Example: `--interpolate-all` ⇢ `INTERPOLATE_ALL=true`.
+> Every CLI option can also be set via an environment variable. Example: `--interpolate-all` ⇢ `INTERPOLATE_ALL=true`.
+> 
+> **Mapping:** `--some-option` → `SOME_OPTION` (uppercase, hyphens → underscores).
 
-### `--interpolate-all`
+### Grouped Index
 
-Globally sets `interpolate:true` for all states unless a state explicitly uses `interpolate:false`. Useful when you want interpolation between most or all states.
+**Scene Sync & Activation**
 
-**Default:** `false`
+- [`--enable-scene-sync`](#--enable-scene-sync) · [`--require-scene-activation`](#--require-scene-activation) · [`--scene-sync-name`](#--scene-sync-name) · [`--scene-sync-interval`](#--scene-sync-interval) · [`--scene-activation-ignore-window`](#--scene-activation-ignore-window)
 
-### `--disable-user-modification-tracking`
+**Interpolation & Transitions**
 
-Disables tracking of manual changes. By default, Hue Scheduler compares the previously seen state with the current state and only applies the scheduled state if the user hasn’t modified the light in the meantime. To enforce a state regardless of user changes, use the per-state property `force:true`.
+- [`--interpolate-all`](#--interpolate-all) · [`--default-interpolation-transition-time`](#--default-interpolation-transition-time) · [`--min-tr-before-gap`](#--min-tr-before-gap)
 
-**Default:** `false`
+**Manual Overrides & Sensitivity**
+
+- [`--disable-user-modification-tracking`](#--disable-user-modification-tracking) · [`--color-override-threshold`](#--color-override-threshold) · [`--brightness-override-threshold`](#--brightness-override-threshold) · [`--ct-override-threshold`](#--ct-override-threshold)
+
+**Logging**
+
+- [`-Dlog.level`](#-dloglevel-jvm)
+
+**Reliability & Connectivity**
+
+- [`--bridge-failure-retry-delay`](#--bridge-failure-retry-delay) · [`--power-on-reschedule-delay`](#--power-on-reschedule-delay) · [`--event-stream-read-timeout`](#--event-stream-read-timeout)
+
+**Performance & Rate Limiting**
+
+- [`--max-requests-per-second`](#--max-requests-per-second) · [`--control-group-lights-individually`](#--control-group-lights-individually-experimental)
+
+**Security**
+
+- [`--insecure`](#--insecure)
+
+## Scene Sync & Activation
 
 ### `--enable-scene-sync`
 
@@ -63,6 +81,14 @@ Delay **in seconds** after detecting a scene activation during which **turn-on e
 
 **Default:** `8` seconds
 
+## Interpolation & Transitions
+
+### `--interpolate-all`
+
+Globally sets `interpolate:true` for all states unless a state explicitly uses `interpolate:false`. Useful when you want interpolation between most or all states.
+
+**Default:** `false`
+
 ### `--default-interpolation-transition-time`
 
 Sets the default transition time used for **interpolated calls** when a light is turned on during a `tr-before` window. Accepts either a multiple of 100 ms (e.g., `4`) or duration strings (e.g., `5s`, `1min`). If the **previous state** defines `tr`, that value is reused instead.
@@ -87,11 +113,19 @@ Desk  07:00  bri:100%  tr-before:20min
 
 Relevant only when user-modification tracking is **enabled**.
 
-Minimum gap **in minutes** enforced between **back-to-back** states that use transitions. Without a gap, the Hue Bridge may not recognize the final target value of the first transition yet and could flag the light as "manually overridden". Hue Scheduler ensures this gap by shortening overlapping transitions as needed.
+Minimum gap **in minutes** enforced between **back-to-back** states that use transitions. Without a gap, the Hue Bridge may not recognize the final target value of the first transition yet and could flag the light as "manually overridden." Hue Scheduler ensures this gap by shortening overlapping transitions as needed.
 
 If overrides are still detected between adjacent transitioning states, increase this value.
 
 **Default:** `3` minutes
+
+## Manual Overrides & Sensitivity
+
+### `--disable-user-modification-tracking`
+
+Disables tracking of manual changes. By default, Hue Scheduler compares the previously seen state with the current state and only applies the scheduled state if the user hasn’t modified the light in the meantime. To enforce a state regardless of user changes, use the per-state property `force:true`.
+
+**Default:** `false`
 
 ### `--color-override-threshold`
 
@@ -129,53 +163,7 @@ Relevant only when user-modification tracking is **enabled**.
 
 **Default:** `350` K
 
-### `--max-requests-per-second`
-
-Max number of **PUT** API requests per second. Philips Hue recommends ~**10** requests/sec overall; above that, the bridge may drop requests.
-
-Note: Groups are controlled via broadcast messages, which are more expensive. Philips Hue recommends ≤ 1 group update/sec. Hue Scheduler automatically rate-limits light vs. group updates accordingly.
-
-> As a general guideline we always recommend to our developers to stay at roughly 10 commands per second to the /lights resource with a 100ms gap between each API call. For /groups commands you should keep to a maximum of 1 per second.
->
-> > -- [Hue System Performance — Philips Hue Developer Program (meethue.com)](https://developers.meethue.com/develop/application-design-guidance/hue-system-performance/) (requires login)
-
-To keep the convenience of groups while improving performance, you can try the experimental `--control-group-lights-individually` option below.
-
-**Default & recommended:** `10`
-
-### `--control-group-lights-individually` *(Experimental)*
-
-Controls lights in a group **individually** instead of using group broadcasts. This can help in some setups but is **not recommended** anymore because it may interfere with manual-modification tracking.
-
-Note: In this mode, Hue Scheduler does **not** validate whether **all** lights in the group support a given command. Mixed-capability groups (e.g., CT-only + color) may result in some lights not being updated.
-
-**Default:** `false`
-
-### `--bridge-failure-retry-delay`
-
-Retry delay **in seconds** after a network failure or a Hue API error response.
-
-**Default:** `10` seconds
-
-### `--power-on-reschedule-delay`
-
-Delay **in milliseconds** between receiving an **on-event** and (re)applying the current scheduled state.
-
-**Default:** `150` ms
-
-### `--event-stream-read-timeout`
-
-Read timeout **in minutes** for the API v2 SSE event stream. The connection is automatically restored after a timeout. The default (2 hours) may be adjusted in future releases based on further observations.
-
-**Default:** `120` minutes
-
-### `--insecure`
-
-*New in 0.12.2*
-
-Disables SSL certificate validation for the Hue Bridge. Required if your bridge still uses a self-signed certificate instead of one issued by Signify. See [Philips Hue Developer Documentation](https://developers.meethue.com/develop/application-design-guidance/using-https/) (login required).
-
-**Default:** `false`
+## Logging
 
 ### `-Dlog.level` (JVM)
 
@@ -198,3 +186,57 @@ With Docker, set via env var:
 ~~~bash
 docker run -d --name hue-scheduler -e log.level=TRACE ...
 ~~~
+        
+## Performance & Rate Limiting
+
+### `--max-requests-per-second`
+
+Max number of **PUT** API requests per second. Philips Hue recommends ~**10** requests/sec overall; above that, the bridge may drop requests.
+
+Note: Groups are controlled via broadcast messages, which are more expensive. Philips Hue recommends ≤ 1 group update/sec. Hue Scheduler automatically rate-limits light vs. group updates accordingly.
+
+> As a general guideline we always recommend to our developers to stay at roughly 10 commands per second to the /lights resource with a 100ms gap between each API call. For /groups commands you should keep to a maximum of 1 per second.
+>
+> > -- [Hue System Performance — Philips Hue Developer Program (meethue.com)](https://developers.meethue.com/develop/application-design-guidance/hue-system-performance/) (requires login)
+
+To keep the convenience of groups while improving performance, you can try the experimental `--control-group-lights-individually` option below.
+
+**Default & recommended:** `10`
+
+### `--control-group-lights-individually` *(Experimental)*
+
+Controls lights in a group **individually** instead of using group broadcasts. This can help in some setups but is **not recommended** anymore because it may interfere with manual-modification tracking.
+
+Note: In this mode, Hue Scheduler does **not** validate whether **all** lights in the group support a given command. Mixed-capability groups (e.g., CT-only + color) may result in some lights not being updated.
+
+**Default:** `false`
+    
+## Reliability & Connectivity
+
+### `--bridge-failure-retry-delay`
+
+Retry delay **in seconds** after a network failure or a Hue API error response.
+
+**Default:** `10` seconds
+
+### `--power-on-reschedule-delay`
+
+Delay **in milliseconds** between receiving an **on-event** and (re)applying the current scheduled state.
+
+**Default:** `150` ms
+
+### `--event-stream-read-timeout`
+
+Read timeout **in minutes** for the API v2 SSE event stream. The connection is automatically restored after a timeout. The default (2 hours) may be adjusted in future releases based on further observations.
+
+**Default:** `120` minutes
+
+## Security
+
+### `--insecure`
+
+*New in 0.12.2*
+
+Disables SSL certificate validation for the Hue Bridge. Required if your bridge still uses a self-signed certificate instead of one issued by Signify. See [Philips Hue Developer Documentation](https://developers.meethue.com/develop/application-design-guidance/using-https/) (login required).
+
+**Default:** `false`

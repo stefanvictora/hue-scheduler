@@ -8,7 +8,7 @@ Below is a complete `docker-compose.yml` for a setup in **Vienna, Austria**, con
 services:
   hue-scheduler:
     container_name: hue-scheduler
-    image: stefanvictora/hue-scheduler:0.12
+    image: stefanvictora/hue-scheduler:0.13
     environment:
       - API_HOST=192.168.0.157
       - ACCESS_TOKEN=1234567890abcdefghijklmnopqrstuv
@@ -40,16 +40,18 @@ docker run -d --name hue-scheduler \
   -e log.level=DEBUG \
   -e TZ=Europe/Vienna \
   --restart unless-stopped \
-  stefanvictora/hue-scheduler:0.12 \
+  stefanvictora/hue-scheduler:0.13 \
   <API_HOST> <ACCESS_TOKEN> \
   --lat <LATITUDE> --long <LONGITUDE> --elevation <ELEVATION> \
   --enable-scene-sync \
   /config/input.txt
 ```
 
+This mounts `input.txt` from your **current working directory** (`$(pwd)`) into the container at `/config/input.txt` (read-only). Adjust the file name and path to fit your setup. `CONFIG_FILE` is the **in-container** path; the bind mount wires it up.
+
 Note for Windows:
 - PowerShell: use `${PWD}` instead of `$(pwd)` in the `-v` mount.
-- CMD: provide an absolute path (e.g., `C:\path\to\input.txt:C:\config\input.txt`) or run from WSL and keep the bash example.
+- CMD: provide an absolute path (e.g., `C:\path\to\input.txt:/config/input.txt`) or run from WSL and keep the bash example.
 
 **Stop / Start / Remove:**
 
@@ -59,5 +61,3 @@ docker start hue-scheduler
 docker logs -f hue-scheduler
 docker rm hue-scheduler
 ```
-
-This mounts `input.txt` from your **current working directory** (`$(pwd)`) into the container at `/config/input.txt` (read-only). Adjust the file name and path to fit your setup. `CONFIG_FILE` is the **in-container** path; the bind mount wires it up.

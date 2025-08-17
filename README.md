@@ -18,7 +18,7 @@ Hue Scheduler goes beyond tools like Adaptive Lighting by giving you precise con
 
 Configure your lights with a simple, text-based file (fields separated by a tab or at least two spaces). Below are examples for daily routines, interpolations, power control, and ambiance.
                      
-~~~
+~~~text
 # Living Room
 light.living_room  sunrise      bri:80%    ct:6000         tr:10s  force:true
 light.living_room  sunrise+60   bri:100%   ct:5000         interpolate:true
@@ -127,7 +127,7 @@ Run Hue Scheduler via Docker (recommended) or manually with Java. Configuration 
    Volume configuration:
     - `source` — local path to your [configuration file](docs/light_configuration.md) containing the light schedules.
     
-    Advanced options: see [Advanced Command-Line Options ](docs/advanced_command_line_options.md). From 0.12.0 onward, enable Scene Sync via `ENABLE_SCENE_SYNC=true` (env) or `--enable-scene-sync` (CLI).
+    Advanced options: see [Advanced Command-Line Options](docs/advanced_command_line_options.md). From 0.12.0 onward, enable Scene Sync via `ENABLE_SCENE_SYNC=true` (env) or `--enable-scene-sync` (CLI).
   
 3. **Start/stop with Docker Compose:**
 
@@ -159,7 +159,7 @@ Yes. From **0.12.0**, with Scene Sync enabled (``--enable-scene-sync``), Hue Sch
 
 It's a Hue Bridge limitation. Physically powered-on lights are typically detected after ~3–4 seconds; app/switch activations are near-instant. Also note: after turning lights **off** via a dumb wall switch, the bridge can take up to ~2 minutes to register the change. Fast off / on cycles may be missed; to clear manual overrides with dumb switches, wait ~2 minutes before turning lights back on.
 
-### My Ikea TRÅDFRI bulbs don’t respect transitions when changing multiple properties.
+### My Ikea TRÅDFRI bulbs don’t respect transitions when changing multiple properties
 
 Some TRÅDFRI firmware versions fail when applying **multiple properties with a non-zero transition**. Because the Hue Bridge defaults to 400 ms (`tr:4`) if not specified, set `tr:0` when changing multiple properties on those bulbs—or split changes into separate states. See issue https://github.com/stefanvictora/hue-scheduler/issues/5 for details.
 
@@ -224,14 +224,14 @@ docker compose up -d --build
 docker run --rm -e "log.level=TRACE" --name hue-scheduler ...
 ~~~
 
-##  Similar Projects
+## Similar Projects
 
 - [Kelvin — The hue bot](https://github.com/stefanwichmann/kelvin) — automates color temperature and brightness over the day
 - [Adaptive Lighting](https://github.com/basnijholt/adaptive-lighting) — Home Assistant custom component for adaptive CT and brightness
 
 ## License
 
-```
+```text
 Copyright 2021-2025 Stefan Victora
 
 Licensed under the Apache License, Version 2.0 (the "License");

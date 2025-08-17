@@ -15,7 +15,7 @@
 - **Manual Activation Mode**
 
     Add `--require-scene-activation` to apply scheduled states **only after** a synced Hue Scheduler scene has been activated. Subsequent states continue normally until lights are turned off or manually modified.
-    - Designed to be used with `--enable-scene-sync` for explicit, manual control over when schedules take effect.
+    - Requires `--enable-scene-sync` for explicit, manual control over when schedules take effect.
     - Use `force:true` on individual states to bypass this behavior.
 
 ### Changed
@@ -26,7 +26,7 @@
     - `--ct-override-threshold` — color temperature difference (Kelvin), **default:** `350`
     - `--color-override-threshold` — color difference (ΔE CIE76), **default:** `6.0`
         
-        These settings are active only when user-modification tracking is enabled (default).
+    These settings are active only when user-modification tracking is enabled (default).
 
 ### Fixed
 - **Scene Sync:** Correctly synchronize states after extended inactivity.

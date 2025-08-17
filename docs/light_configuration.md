@@ -204,7 +204,7 @@ Desk  15:00  x:0.1652  y:0.3103
 
 ### Advanced
 
-- `force` — **enforce** the state even if the user manually changed the light since the last scheduled state (`true|false`, default `false`). Relevant only if user-modification tracking is enabled (default).
+- `force:true` — **enforce** the state even if the user manually changed the light since the last scheduled state (`true|false`, default `false`). Relevant only if user-modification tracking is enabled (default).
 
   ~~~yacas
   Office  09:00  bri:254  ct:6500
