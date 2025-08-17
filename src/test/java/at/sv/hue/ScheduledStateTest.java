@@ -679,7 +679,7 @@ class ScheduledStateTest {
     }
 
     @Test
-    void lightStateDiffers_onState_stateIsOff_differentState_false() {
+    void lightStateDiffers_offState_stateIsOn_differentState_ignored_false() {
         ScheduledState scheduledState = scheduledState().on(false)
                                                         .capabilities(defaultCapabilities)
                                                         .build();
@@ -692,9 +692,9 @@ class ScheduledStateTest {
     }
 
     @Test
-    void lightStateDiffers_onState_false() {
-        ScheduledState scheduledState = scheduledState().capabilities(defaultCapabilities)
-                                                        .brightness(10)
+    void lightStateDiffers_stateIsOff_noOtherProperties_false() {
+        ScheduledState scheduledState = scheduledState().brightness(10)
+                                                        .capabilities(defaultCapabilities)
                                                         .build();
         LightState lightState = LightState.builder()
                                           .on(false)
@@ -705,7 +705,7 @@ class ScheduledStateTest {
     }
 
     @Test
-    void lightStateDiffers_stateHasNoOnStateDefined_false() {
+    void lightStateDiffers_stateIsOff_propertyDifferenceIsIgnoredInComparison_false() {
         ScheduledState scheduledState = scheduledState().brightness(1)
                                                         .capabilities(defaultCapabilities)
                                                         .build();
@@ -719,7 +719,7 @@ class ScheduledStateTest {
     }
 
     @Test
-    void lightStateDiffers_offState_currentHasNoOnState_propertiesDifferIsIgnoredInComparison_false() {
+    void lightStateDiffers_stateIsOff_propertyDifferenceIsIgnoredInComparison2_false() {
         ScheduledState scheduledState = scheduledState().brightness(10)
                                                         .hue(1000)
                                                         .sat(100)

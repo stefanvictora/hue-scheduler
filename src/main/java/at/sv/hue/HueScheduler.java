@@ -56,6 +56,7 @@ import java.util.Objects;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 
 @Command(name = "HueScheduler", version = "0.13.0", mixinStandardHelpOptions = true, sortOptions = false)
 public final class HueScheduler implements Runnable {
@@ -475,9 +476,8 @@ public final class HueScheduler implements Runnable {
     }
 
     private void parseInput() {
-        try {
-            Files.lines(configFile)
-                 .filter(s -> !s.isBlank())
+        try (Stream<String> lines = Files.lines(configFile)) {
+            lines.filter(s -> !s.isBlank())
                  .filter(s -> !s.startsWith("//") && !s.startsWith("#"))
                  .forEachOrdered(input -> {
                      try {

@@ -151,14 +151,14 @@ public final class HueEventHandler implements BackgroundEventHandler {
         }
 
         private String getSceneActiveStatus() {
-            if (status != null && status.get("active") != null) {
+            if (status != null && status.has("active")) {
                 return status.get("active").asText();
             }
             return null;
         }
 
         private boolean isSceneRecall() {
-            return status != null && status.get("last_recall") != null;
+            return status != null && status.hasNonNull("last_recall");
         }
 
         public boolean notRelevantSceneModification() {

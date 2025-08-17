@@ -12,6 +12,7 @@ import org.slf4j.MDC;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -28,6 +29,8 @@ public final class HassEventStreamReader {
         return thread;
     });
     private final AtomicInteger messageIdCounter = new AtomicInteger(1);
+
+    private volatile ScheduledFuture<?> pendingReconnect;
 
     public HassEventStreamReader(String origin, String accessToken, OkHttpClient client, HassEventHandler hassEventHandler) {
         this.origin = origin;
@@ -87,7 +90,16 @@ public final class HassEventStreamReader {
     }
 
     private void reconnectWithDelay() {
-        scheduler.schedule(this::start, 3, TimeUnit.SECONDS);
+        synchronized (this) {
+            if (isCurrentlyReconnecting()) {
+                return;
+            }
+            pendingReconnect = scheduler.schedule(this::start, 3, TimeUnit.SECONDS);
+        }
+    }
+
+    private boolean isCurrentlyReconnecting() {
+        return pendingReconnect != null && !pendingReconnect.isDone();
     }
 
     private void authenticate(WebSocket webSocket) {

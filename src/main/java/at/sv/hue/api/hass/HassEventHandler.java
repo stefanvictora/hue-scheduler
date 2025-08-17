@@ -48,7 +48,8 @@ public final class HassEventHandler {
     }
 
     private void handleStateChangedEvent(String entityId, State oldState, State newState) {
-        if (HassSupportedEntityType.isSupportedEntityType(entityId) || entityId.startsWith("scene.")) {
+        boolean supportedEntityType = HassSupportedEntityType.isSupportedEntityType(entityId);
+        if (supportedEntityType || entityId.startsWith("scene.")) {
             resourceModificationEventListener.onModification(null, entityId, newState);
         }
 
@@ -56,11 +57,11 @@ public final class HassEventHandler {
             return;
         }
         if (oldState.isOff() && newState.isOn()) {
-            if (HassSupportedEntityType.isSupportedEntityType(entityId)) {
+            if (supportedEntityType) {
                 eventListener.onLightOn(entityId);
             }
         } else if (oldState.isUnavailable() && newState.isOn()) {
-            if (HassSupportedEntityType.isSupportedEntityType(entityId)) {
+            if (supportedEntityType) {
                 eventListener.onPhysicalOn(entityId);
             }
         } else if (oldState.isOn() && (newState.isOff() || newState.isUnavailable())) {

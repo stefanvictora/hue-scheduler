@@ -23,10 +23,6 @@ class EntityRegistryEntry {
     }
 
     public boolean isContainedIn(String areaId, Map<String, DeviceRegistryEntry> devices) {
-        if (area_id == null && device_id != null) {
-            DeviceRegistryEntry device = devices.get(device_id);
-            return device != null && areaId.equals(device.getArea_id());
-        }
-        return areaId.equals(area_id);
+        return areaId.equals(getEffectiveAreaId(devices));
     }
 }

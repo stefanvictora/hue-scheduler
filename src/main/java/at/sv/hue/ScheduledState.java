@@ -226,7 +226,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
 
     private Integer assertValidTransitionTime(Integer transitionTime) {
         if (transitionTime != null && (transitionTime > MAX_TRANSITION_TIME || transitionTime < 0)) {
-            throw new InvalidTransitionTime("Invalid transition time '" + transitionTime + ". Allowed integer range: 0-" + MAX_TRANSITION_TIME);
+            throw new InvalidTransitionTime("Invalid transition time '" + transitionTime + "'. Allowed integer range: 0-" + MAX_TRANSITION_TIME);
         }
         return transitionTime;
     }

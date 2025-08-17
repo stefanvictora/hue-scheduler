@@ -4,9 +4,9 @@
 
 ### Added
 - **Scene Sync Support for Home Assistant**: Implemented scene synchronization for Home Assistant.
-  - Activate via `--enable-scene-sync` command line flag.
+  - Activate via `--enable-scene-sync` command-line flag.
   - Scenes are named following the pattern: `scene.<scene_sync_name>_<group_or_area_name>`. Customize via `--scene-sync-name` (default: `HueScheduler`). Example: `scene.huescheduler_living_room`. It uses lowercase letters and underscores instead of spaces.
-  - Use with Home Assistant automations, smart switches or motion sensors to directly turn on your lights in the desired state.
+  - Use with Home Assistant automations, smart switches, or motion sensors to turn on your lights in the desired state.
   - A synced scene is created for each group and area your scheduled entities are part of.
   - Note: Dynamic scenes are temporary and require recreation after Home Assistant restarts. This is handled automatically by Hue Scheduler.
   - **Known Limitation**:

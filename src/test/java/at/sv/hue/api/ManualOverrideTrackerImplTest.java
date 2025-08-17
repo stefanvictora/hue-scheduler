@@ -39,14 +39,14 @@ class ManualOverrideTrackerImplTest {
     }
 
     @Test
-    void wasActivatedBySyncedScene_returnsCorrectResult() {
+    void wasTurnedOnBySyncedScene_returnsCorrectResult() {
         tracker.onLightTurnedOnBySyncedScene("1");
 
         assertThat(tracker.wasTurnedOnBySyncedScene("1")).isTrue();
     }
 
     @Test
-    void wasActivatedBySyncedScene_resetOnLightOff() {
+    void wasTurnedOnBySyncedScene_resetOnLightOff() {
         tracker.onLightTurnedOnBySyncedScene("1");
 
         tracker.onLightOff("1");
@@ -55,7 +55,7 @@ class ManualOverrideTrackerImplTest {
     }
 
     @Test
-    void wasActivatedBySyncedScene_resetOnManualOverridden() {
+    void wasTurnedOnBySyncedScene_resetOnManualOverridden() {
         tracker.onLightTurnedOnBySyncedScene("1");
 
         tracker.onManuallyOverridden("1");
@@ -69,6 +69,13 @@ class ManualOverrideTrackerImplTest {
 
         assertThat(tracker.wasTurnedOnBySyncedScene("1")).isTrue();
         assertThat(tracker.wasTurnedOnBySyncedScene("2")).isFalse();
+    }
+
+    @Test
+    void wasTurnedOnBySyncedScene_onLightNormallyTurnedOn_doesNotSetSyncedScene() {
+        tracker.onLightTurnedOn("1");
+
+        assertThat(tracker.wasTurnedOnBySyncedScene("1")).isFalse();
     }
 
     private void assertIsManuallyOverridden(String lightId, boolean expected) {

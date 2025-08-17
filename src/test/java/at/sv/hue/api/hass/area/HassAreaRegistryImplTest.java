@@ -102,6 +102,16 @@ class HassAreaRegistryImplTest {
     }
 
     @Test
+    void lookupAreaForEntity_returnNull_whenDeviceHasBlankArea() {
+        String entityId = "light.bedroom";
+        String deviceId = "device_1";
+        mockEntities(createEntity(entityId, null, deviceId));
+        mockDevices(createDevice(deviceId, "  "));
+
+        assertThat(lookupAreaForEntityId(entityId)).isNull();
+    }
+
+    @Test
     void lookupAreaForEntity_returnNull_whenEntityHasEmptyString() {
         String entityId = "light.living_room";
         mockEntities(createEntity(entityId, "", null));

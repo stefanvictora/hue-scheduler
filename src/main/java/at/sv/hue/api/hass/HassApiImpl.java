@@ -150,7 +150,8 @@ public class HassApiImpl implements HueApi {
         changeState.setBrightness(hueToHassBrightness(putCall.getBri()));
         changeState.setColor_temp(putCall.getCt());
         changeState.setEffect(putCall.getEffect());
-        changeState.setTransition(convertToSeconds(putCall.getTransitionTime())); // todo: find out the max value of home assistant
+        // transition in seconds (float ≥ 0); HA applies no global max (device integration may enforce limits)
+        changeState.setTransition(convertToSeconds(putCall.getTransitionTime()));
         if (putCall.getHue() != null && putCall.getSat() != null) {
             changeState.setHs_color(getHsColor(putCall));
         } else if (putCall.getX() != null && putCall.getY() != null) {
@@ -293,7 +294,7 @@ public class HassApiImpl implements HueApi {
     public void createOrUpdateScene(String groupId, String sceneSyncName, List<PutCall> putCalls) {
         CreateScene createScene = new CreateScene();
         createScene.setScene_id(HassApiUtils.getNormalizedSceneSyncName(sceneSyncName + "_" + groupId));
-        HashMap<String, ChangeState> sceneStates = new LinkedHashMap<>();
+        Map<String, ChangeState> sceneStates = new LinkedHashMap<>();
         for (PutCall putCall : putCalls) {
             ChangeState changeState;
             if (putCall.getOn() == Boolean.FALSE) {

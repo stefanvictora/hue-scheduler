@@ -118,7 +118,7 @@ The brightness difference threshold (percentage points) above which a light's br
 Only relevant and active if user modification tracking is not disabled (see `--disable-user-modification-tracking`).
 
 **Recommended Range**: 5-20  
-**Default**: `10`%
+**Default**: `10` percent
 
 ### `--ct-override-threshold`
 
@@ -129,7 +129,7 @@ The color temperature difference threshold (Kelvin) above which a light's temper
 Only relevant and active if user modification tracking is not disabled (see `--disable-user-modification-tracking`).
 
 **Recommended Range**: 100-500  
-**Default**: `350`K
+**Default**: `350` Kelvin
 
 ### `--max-requests-per-second`
 
