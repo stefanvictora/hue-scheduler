@@ -40,14 +40,14 @@ public final class DayOfWeeksParser {
         return switch (day.trim().toLowerCase(Locale.ENGLISH)) {
             case "mo", "mon" -> DayOfWeek.MONDAY;
             case "tu", "tue", "di" -> DayOfWeek.TUESDAY;
-            case "we", "wen", "mi" -> DayOfWeek.WEDNESDAY;
+            case "we", "wed", "wen", "mi" -> DayOfWeek.WEDNESDAY;
             case "th", "thu", "do" -> DayOfWeek.THURSDAY;
             case "fr", "fri" -> DayOfWeek.FRIDAY;
             case "sa", "sat" -> DayOfWeek.SATURDAY;
             case "su", "sun", "so" -> DayOfWeek.SUNDAY;
             default ->
                     throw new InvalidPropertyValue("Unknown day parameter '" + day + "'. Please check your spelling. " +
-                                                   "Supported values (case insensitive): [Mo|Mon, Tu|Di|Tue, We|Mi|Wen, Th|Do|Thu, Fr|Fri, Sa|Sat Su|So|Sun]");
+                                                   "Supported values (case insensitive): [Mo|Mon, Tu|Di|Tue, We|Wed|Mi, Th|Do|Thu, Fr|Fri, Sa|Sat, Su|So|Sun]");
         };
     }
 

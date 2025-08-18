@@ -2,8 +2,11 @@ package at.sv.hue.api.hass;
 
 import at.sv.hue.ColorMode;
 import at.sv.hue.api.ApiFailure;
+import at.sv.hue.api.BridgeAuthenticationFailure;
+import at.sv.hue.api.BridgeConnectionFailure;
 import at.sv.hue.api.Capability;
 import at.sv.hue.api.EmptyGroupException;
+import at.sv.hue.api.GroupInfo;
 import at.sv.hue.api.GroupNotFoundException;
 import at.sv.hue.api.HttpResourceProvider;
 import at.sv.hue.api.HueApi;
@@ -13,6 +16,7 @@ import at.sv.hue.api.LightNotFoundException;
 import at.sv.hue.api.LightState;
 import at.sv.hue.api.PutCall;
 import at.sv.hue.api.RateLimiter;
+import at.sv.hue.api.hass.area.HassAreaRegistry;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -27,6 +31,7 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -40,7 +45,9 @@ import static at.sv.hue.api.hass.BrightnessConverter.hueToHassBrightness;
 public class HassApiImpl implements HueApi {
 
     private final HttpResourceProvider httpResourceProvider;
+    private final HassAreaRegistry hassAreaRegistry;
     private final RateLimiter rateLimiter;
+    private final HassAvailabilityListener availabilityListener;
     private final ObjectMapper mapper;
     private final String baseUrl;
 
@@ -50,9 +57,12 @@ public class HassApiImpl implements HueApi {
     private Map<String, List<State>> nameToStatesMap;
     private boolean nameToStatesMapInvalidated;
 
-    public HassApiImpl(String origin, HttpResourceProvider httpResourceProvider, RateLimiter rateLimiter) {
+    public HassApiImpl(String origin, HttpResourceProvider httpResourceProvider, HassAreaRegistry hassAreaRegistry,
+                       HassAvailabilityListener availabilityListener, RateLimiter rateLimiter) {
         baseUrl = origin + "/api";
         this.httpResourceProvider = httpResourceProvider;
+        this.hassAreaRegistry = hassAreaRegistry;
+        this.availabilityListener = availabilityListener;
         this.rateLimiter = rateLimiter;
         mapper = new ObjectMapper();
         mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
@@ -61,7 +71,18 @@ public class HassApiImpl implements HueApi {
 
     @Override
     public void assertConnection() {
-        getOrLookupStates();
+        availabilityListener.performInitialCheck(() -> {
+            try {
+                return !lookupStates().isEmpty();
+            } catch (BridgeAuthenticationFailure e) {
+                throw e; // abort startup
+            } catch (Exception e) {
+                return false;
+            }
+        });
+        if (!availabilityListener.isFullyStarted()) {
+            throw new BridgeConnectionFailure("HA not fully started yet. Waiting for startup to complete...");
+        }
     }
 
     @Override
@@ -119,19 +140,24 @@ public class HassApiImpl implements HueApi {
         } else {
             rateLimiter.acquire(1);
         }
-        ChangeState changeState = new ChangeState();
+        ChangeState changeState = getChangeState(putCall);
         changeState.setEntity_id(id);
+        httpResourceProvider.postResource(getUpdateUrl(putCall), getBody(changeState));
+    }
+
+    private ChangeState getChangeState(PutCall putCall) {
+        ChangeState changeState = new ChangeState();
         changeState.setBrightness(hueToHassBrightness(putCall.getBri()));
         changeState.setColor_temp(putCall.getCt());
         changeState.setEffect(putCall.getEffect());
-        changeState.setTransition(convertToSeconds(putCall.getTransitionTime())); // todo: find out the max value of home assistant
+        // transition in seconds (float ≥ 0); HA applies no global max (device integration may enforce limits)
+        changeState.setTransition(convertToSeconds(putCall.getTransitionTime()));
         if (putCall.getHue() != null && putCall.getSat() != null) {
             changeState.setHs_color(getHsColor(putCall));
         } else if (putCall.getX() != null && putCall.getY() != null) {
             changeState.setXy_color(getXyColor(putCall));
         }
-
-        httpResourceProvider.postResource(getUpdateUrl(putCall), getBody(changeState));
+        return changeState;
     }
 
     private Integer[] getHsColor(PutCall putCall) {
@@ -153,12 +179,12 @@ public class HassApiImpl implements HueApi {
         }
 
         List<String> groupLights = new ArrayList<>();
-        if (isHueGroup(state)) {
+        if (isHassGroup(state)) {
+            groupLights.addAll(state.attributes.entity_id);
+        } else {
             groupLights.addAll(state.attributes.lights.stream()
                                                       .map(this::getNonGroupLightId)
                                                       .toList());
-        } else {
-            groupLights.addAll(state.attributes.entity_id);
         }
 
         if (groupLights.isEmpty()) {
@@ -220,6 +246,15 @@ public class HassApiImpl implements HueApi {
     }
 
     @Override
+    public List<GroupInfo> getAdditionalAreas(List<String> lightIds) {
+        return lightIds.stream()
+                       .map(hassAreaRegistry::lookupAreaForEntity)
+                       .filter(Objects::nonNull)
+                       .distinct()
+                       .toList();
+    }
+
+    @Override
     public Identifier getGroupIdentifierByName(String name) {
         State state = lookupStateByName(name);
         if (isNoGroupState(state)) {
@@ -237,7 +272,7 @@ public class HassApiImpl implements HueApi {
     private State lookupStateByName(String name) {
         List<State> states = getOrLookupStatesByName(name);
         if (states.size() > 1) {
-            throw new NonUniqueNameException("There are " + states.size() + " states with the given name '" + name + "'." +
+            throw new NonUniqueNameException("There are " + states.size() + " entities with the given name '" + name + "'." +
                                              " Please use a unique ID instead.");
         }
         return states.getFirst();
@@ -256,8 +291,24 @@ public class HassApiImpl implements HueApi {
     }
 
     @Override
-    public void createOrUpdateScene(String groupId, String sceneSyncName, List<PutCall> overriddenPutCalls) {
-        // todo
+    public void createOrUpdateScene(String groupId, String sceneSyncName, List<PutCall> putCalls) {
+        CreateScene createScene = new CreateScene();
+        createScene.setScene_id(HassApiUtils.getNormalizedSceneSyncName(sceneSyncName + "_" + groupId));
+        Map<String, ChangeState> sceneStates = new LinkedHashMap<>();
+        for (PutCall putCall : putCalls) {
+            ChangeState changeState;
+            if (putCall.getOn() == Boolean.FALSE) {
+                changeState = new ChangeState();
+                changeState.setState("off");
+            } else {
+                changeState = getChangeState(putCall);
+                changeState.setState("on");
+            }
+            sceneStates.put(putCall.getId(), changeState);
+        }
+        createScene.setEntities(sceneStates);
+        rateLimiter.acquire(1);
+        httpResourceProvider.postResource(createUrl("/services/scene/create"), getBody(createScene));
     }
 
     @Override
@@ -266,6 +317,7 @@ public class HassApiImpl implements HueApi {
             availableStatesInvalidated = true;
             nameToStatesMapInvalidated = true;
         }
+        hassAreaRegistry.clearCaches();
     }
 
     private Map<String, List<State>> getOrLookupNameToStateMap() {
@@ -293,7 +345,7 @@ public class HassApiImpl implements HueApi {
     private State getAndAssertLightExists(String id) {
         State state = getOrLookupStates().get(id);
         if (state == null) {
-            throw new LightNotFoundException("State with id '" + id + "' not found!");
+            throw new LightNotFoundException("Entity with id '" + id + "' not found!");
         }
         return state;
     }
@@ -304,9 +356,9 @@ public class HassApiImpl implements HueApi {
             List<State> states = mapper.readValue(response, new TypeReference<>() {
             });
             return states.stream()
-                         .collect(Collectors.toMap(State::getEntity_id, Function.identity()));
+                         .collect(Collectors.toConcurrentMap(State::getEntity_id, Function.identity()));
         } catch (JsonProcessingException | NullPointerException e) {
-            throw new ApiFailure("Failed to parse light states response '" + response + ":" + e.getLocalizedMessage());
+            throw new ApiFailure("Failed to parse light states response '" + response + "': " + e.getLocalizedMessage());
         }
     }
 
@@ -324,7 +376,7 @@ public class HassApiImpl implements HueApi {
         return new LightState(state.entity_id, hassToHueBrightness(attributes.brightness), attributes.color_temp, getXY(attributes.xy_color, 0),
                 getXY(attributes.xy_color, 1),
                 getEffect(attributes.effect), getColorMode(attributes.color_mode),
-                getOn(state.state), createLightCapabilities(state));
+                getOn(state.state), getUnavailable(state.state), createLightCapabilities(state));
     }
 
     private static Double getXY(Double[] xy, int i) {
@@ -338,7 +390,7 @@ public class HassApiImpl implements HueApi {
         if (effect == null) {
             return null;
         }
-        return effect.toLowerCase(Locale.getDefault());
+        return effect.toLowerCase(Locale.ROOT);
     }
 
     private static ColorMode getColorMode(String colorMode) {
@@ -355,6 +407,10 @@ public class HassApiImpl implements HueApi {
 
     private static boolean getOn(String state) {
         return "on".equals(state);
+    }
+
+    private static boolean getUnavailable(String state) {
+        return "unavailable".equals(state);
     }
 
     private static LightCapabilities createLightCapabilities(State state) {
@@ -399,7 +455,7 @@ public class HassApiImpl implements HueApi {
                                             .filter(HassApiImpl::isNoGroupState)
                                             .findFirst()
                                             .map(State::getEntity_id)
-                                            .orElseThrow(() -> new LightNotFoundException("Non-group state with name '" + name + "' was not found!"));
+                                            .orElseThrow(() -> new LightNotFoundException("Non-group entity with name '" + name + "' was not found!"));
     }
 
     private static boolean isNoGroupState(State state) {
@@ -419,24 +475,24 @@ public class HassApiImpl implements HueApi {
     }
 
     private boolean containsLightIdOrName(State state, String lightId, String lightName) {
-        if (isHueGroup(state)) {
-            return state.attributes.lights.contains(lightName);
-        } else { // isHassGroup
+        if (isHassGroup(state)) {
             return state.attributes.entity_id.contains(lightId);
+        } else { // old Hue group
+            return state.attributes.lights != null && state.attributes.lights.contains(lightName);
         }
     }
 
     private List<State> getOrLookupStatesByName(String name) {
         List<State> states = getOrLookupNameToStateMap().get(name);
         if (states == null) {
-            throw new LightNotFoundException("State with name '" + name + "' was not found!");
+            throw new LightNotFoundException("Entity with name '" + name + "' was not found!");
         }
         return states;
     }
 
     private static void assertSupportedStateType(String id) {
         if (!isSupportedStateType(id)) {
-            throw new UnsupportedStateException("State with id '" + id + "' is not supported");
+            throw new UnsupportedStateException("Entity with id '" + id + "' is not supported");
         }
     }
 
@@ -469,27 +525,44 @@ public class HassApiImpl implements HueApi {
         return type.name().toLowerCase(Locale.ROOT);
     }
 
-    private String getBody(ChangeState changeState) {
+    private String getBody(Object object) {
         try {
-            return mapper.writeValueAsString(changeState);
+            return mapper.writeValueAsString(object);
         } catch (JsonProcessingException e) {
             throw new IllegalArgumentException("Failed to create state body", e);
         }
     }
 
     @Override
-    public void onModification(String type, String id) {
-        // todo
+    public void onModification(String type, String entityId, Object content) {
+        synchronized (lightMapLock) {
+            if (availableStates != null && !availableStatesInvalidated) {
+                if (content == null) { // entity deleted
+                    availableStates.remove(entityId);
+                    nameToStatesMapInvalidated = true;
+                } else if (content instanceof State newState) {
+                    availableStates.put(entityId, newState);
+                    nameToStatesMapInvalidated = true;
+                }
+            }
+        }
     }
 
     @Data
     private static final class ChangeState {
         String entity_id;
+        String state;
         Integer brightness;
         Integer color_temp;
         Double[] xy_color;
         Integer[] hs_color;
         String effect;
         Float transition;
+    }
+
+    @Data
+    private static final class CreateScene {
+        String scene_id;
+        Map<String, ChangeState> entities;
     }
 }

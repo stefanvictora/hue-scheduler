@@ -1,8 +1,12 @@
 package at.sv.hue.api.hass;
 
 import at.sv.hue.ColorMode;
+import at.sv.hue.api.ApiFailure;
+import at.sv.hue.api.BridgeAuthenticationFailure;
+import at.sv.hue.api.BridgeConnectionFailure;
 import at.sv.hue.api.Capability;
 import at.sv.hue.api.EmptyGroupException;
+import at.sv.hue.api.GroupInfo;
 import at.sv.hue.api.GroupNotFoundException;
 import at.sv.hue.api.HttpResourceProvider;
 import at.sv.hue.api.Identifier;
@@ -10,6 +14,7 @@ import at.sv.hue.api.LightCapabilities;
 import at.sv.hue.api.LightNotFoundException;
 import at.sv.hue.api.LightState;
 import at.sv.hue.api.PutCall;
+import at.sv.hue.api.hass.area.HassAreaRegistry;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,8 +27,8 @@ import java.net.URL;
 import java.util.EnumSet;
 import java.util.List;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -31,12 +36,70 @@ public class HassApiTest {
 
     private HassApiImpl api;
     private HttpResourceProvider http;
+    private HassAreaRegistry areaRegistry;
     private String baseUrl;
+    private URL sceneSyncUrl;
 
     @BeforeEach
     void setUp() {
         http = Mockito.mock(HttpResourceProvider.class);
+        areaRegistry = Mockito.mock(HassAreaRegistry.class);
         setupApi("http://localhost:8123");
+        sceneSyncUrl = getUrl("/services/scene/create");
+    }
+
+    private void setupApi(String origin) {
+        HassAvailabilityListener availabilityListener = new HassAvailabilityListener(() -> {
+        });
+        api = new HassApiImpl(origin, http, areaRegistry, availabilityListener, permits -> {
+        });
+        baseUrl = origin + "/api";
+    }
+
+    @Test
+    void assertConnection_stateLookupThrowsApiFailureException_exception() {
+        when(http.getResource(any())).thenThrow(new ApiFailure("HTTP Failure"));
+
+        assertThatThrownBy(() -> api.assertConnection()).isInstanceOf(BridgeConnectionFailure.class);
+    }
+
+    @Test
+    void assertConnection_stateLookupThrowsBridgeAuthenticationException_reThrowsException() {
+        when(http.getResource(any())).thenThrow(new BridgeAuthenticationFailure());
+
+        assertThatThrownBy(() -> api.assertConnection()).isInstanceOf(BridgeAuthenticationFailure.class);
+    }
+
+    @Test
+    void assertConnection_emptyStates_exception() {
+        setGetResponse("/states", "[]");
+
+        assertThatThrownBy(() -> api.assertConnection()).isInstanceOf(BridgeConnectionFailure.class);
+    }
+
+    @Test
+    void assertConnection_hasStates_noException() {
+        setGetResponse("/states", """
+                [
+                  {
+                    "entity_id": "light.schreibtisch_r",
+                    "state": "on",
+                    "attributes": {
+                      "friendly_name": "Schreibtisch R",
+                      "supported_features": 44
+                    },
+                    "last_changed": "2023-09-24T08:09:56.861254+00:00",
+                    "last_updated": "2023-09-24T08:09:56.861254+00:00",
+                    "context": {
+                      "id": "123456789",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  }
+                ]
+                """);
+
+        assertThatNoException().isThrownBy(() -> api.assertConnection());
     }
 
     @Test
@@ -557,6 +620,7 @@ public class HassApiTest {
         assertThat(lightState).isEqualTo(LightState.builder()
                                                    .id("light.ceiling")
                                                    .on(false)
+                                                   .unavailable(true)
                                                    .lightCapabilities(LightCapabilities.builder()
                                                                                        .ctMin(153)
                                                                                        .ctMax(500)
@@ -740,6 +804,7 @@ public class HassApiTest {
         assertThat(lightState).isEqualTo(LightState.builder()
                                                    .id("light.on_off")
                                                    .on(false)
+                                                   .unavailable(true)
                                                    .lightCapabilities(LightCapabilities.builder()
                                                                                        .capabilities(EnumSet.of(Capability.ON_OFF))
                                                                                        .build())
@@ -1223,6 +1288,69 @@ public class HassApiTest {
     }
 
     @Test
+    void getGroupLights_newHueGroupsWithEntityId() {
+        setGetResponse("/states", """
+                [
+                    {
+                        "entity_id": "light.bad",
+                        "state": "off",
+                        "attributes": {
+                            "min_color_temp_kelvin": 2000,
+                            "max_color_temp_kelvin": 6535,
+                            "min_mireds": 153,
+                            "max_mireds": 500,
+                            "supported_color_modes": [
+                                "color_temp",
+                                "xy"
+                            ],
+                            "color_mode": null,
+                            "brightness": null,
+                            "color_temp_kelvin": null,
+                            "color_temp": null,
+                            "hs_color": null,
+                            "rgb_color": null,
+                            "xy_color": null,
+                            "is_hue_group": true,
+                            "hue_scenes": [
+                                "Hell",
+                                "HueScheduler",
+                                "Gedimmt",
+                                "Abend"
+                            ],
+                            "hue_type": "room",
+                            "lights": [
+                                "Bad Oben",
+                                "Bad Tür",
+                                "Bad Therme neu"
+                            ],
+                            "entity_id": [
+                                "light.bad_therme_neu",
+                                "light.bad_oben",
+                                "light.bad_tur"
+                            ],
+                            "dynamics": false,
+                            "icon": "mdi:lightbulb-group",
+                            "friendly_name": "Bad",
+                            "supported_features": 40
+                        },
+                        "last_changed": "2025-02-08T10:46:13.048207+00:00",
+                        "last_reported": "2025-02-08T10:46:13.048207+00:00",
+                        "last_updated": "2025-02-08T10:46:13.048207+00:00",
+                        "context": {
+                            "id": "01JKJJNH9RNH9HBDYGZMYGM7VY",
+                            "parent_id": null,
+                            "user_id": null
+                        }
+                    }
+                ]
+                """);
+
+        assertThat(api.getGroupLights("light.bad")).containsExactlyInAnyOrder("light.bad_therme_neu",
+                "light.bad_oben", "light.bad_tur"
+        );
+    }
+
+    @Test
     void getGroupLights_notAGroup_exception() {
         setGetResponse("/states", """
                 [
@@ -1467,7 +1595,7 @@ public class HassApiTest {
                   },
                   {
                     "entity_id": "light.schreibtisch_l",
-                    "state": "on",
+                    "state": "unavailable",
                     "attributes": {
                       "min_color_temp_kelvin": 2000,
                       "max_color_temp_kelvin": 6535,
@@ -1587,7 +1715,8 @@ public class HassApiTest {
         assertThat(groupStates).containsExactly(
                 LightState.builder()
                           .id("light.schreibtisch_l")
-                          .on(true)
+                          .on(false)
+                          .unavailable(true)
                           .colormode(ColorMode.CT)
                           .effect("none")
                           .brightness(127)
@@ -1624,225 +1753,388 @@ public class HassApiTest {
     void getAssignedGroups_returnsGroupIdsTheGivenLightIdIsContained_ignoresScenes() {
         setGetResponse("/states", """
                 [
-                    {
-                      "entity_id": "light.couch_group",
-                      "state": "on",
-                      "attributes": {
-                        "supported_color_modes": [
-                          "xy"
-                        ],
-                        "color_mode": "xy",
-                        "brightness": 255,
-                        "hs_color": [
-                          12.464,
-                          81.176
-                        ],
-                        "rgb_color": [
-                          255,
-                          91,
-                          48
-                        ],
-                        "xy_color": [
-                          0.6408,
-                          0.3284
-                        ],
-                        "is_hue_group": true,
-                        "hue_scenes": [
-                          "Gedimmt",
-                          "Nachtlicht",
-                          "Hell",
-                          "Frühlingsblüten",
-                          "Sonnenuntergang Savanne",
-                          "Tropendämmerung",
-                          "Nordlichter"
-                        ],
-                        "hue_type": "zone",
-                        "lights": [
-                          "Couch Light"
-                        ],
-                        "dynamics": false,
-                        "icon": "mdi:lightbulb-group",
-                        "friendly_name": "Couch",
-                        "supported_features": 40
-                      },
-                      "last_changed": "2023-09-24T14:06:34.783862+00:00",
-                      "last_updated": "2023-09-24T14:06:34.783862+00:00",
-                      "context": {
-                        "id": "123456789",
-                        "parent_id": null,
-                        "user_id": null
-                      }
+                  {
+                    "entity_id": "light.couch_group",
+                    "state": "on",
+                    "attributes": {
+                      "supported_color_modes": [
+                        "xy"
+                      ],
+                      "color_mode": "xy",
+                      "brightness": 255,
+                      "hs_color": [
+                        12.464,
+                        81.176
+                      ],
+                      "rgb_color": [
+                        255,
+                        91,
+                        48
+                      ],
+                      "xy_color": [
+                        0.6408,
+                        0.3284
+                      ],
+                      "is_hue_group": true,
+                      "hue_scenes": [
+                        "Gedimmt",
+                        "Nachtlicht",
+                        "Hell",
+                        "Frühlingsblüten",
+                        "Sonnenuntergang Savanne",
+                        "Tropendämmerung",
+                        "Nordlichter"
+                      ],
+                      "hue_type": "zone",
+                      "lights": [
+                        "Couch Light"
+                      ],
+                      "dynamics": false,
+                      "icon": "mdi:lightbulb-group",
+                      "friendly_name": "Couch",
+                      "supported_features": 40
                     },
-                    {
-                      "entity_id": "light.couch_group2",
-                      "state": "on",
-                      "attributes": {
-                        "min_color_temp_kelvin": 2000,
-                        "max_color_temp_kelvin": 6535,
-                        "min_mireds": 153,
-                        "max_mireds": 500,
-                        "effect_list": [
-                          "None",
-                          "candle",
-                          "fire",
-                          "unknown"
-                        ],
-                        "supported_color_modes": [
-                          "brightness",
-                          "color_temp",
-                          "xy"
-                        ],
-                        "color_mode": "brightness",
-                        "brightness": 255,
-                        "effect": "None",
-                        "entity_id": [
-                          "light.couch_light"
-                        ],
-                        "icon": "mdi:lightbulb-group",
-                        "friendly_name": "Couch",
-                        "supported_features": 44
-                      },
-                      "last_changed": "2023-09-24T14:06:35.260070+00:00",
-                      "last_updated": "2023-09-24T14:20:00.208887+00:00",
-                      "context": {
-                        "id": "123456789",
-                        "parent_id": null,
-                        "user_id": null
-                      }
-                    },
-                    {
-                      "entity_id": "light.another_group",
-                      "state": "on",
-                      "attributes": {
-                        "min_color_temp_kelvin": 2000,
-                        "max_color_temp_kelvin": 6535,
-                        "min_mireds": 153,
-                        "max_mireds": 500,
-                        "effect_list": [
-                          "None",
-                          "candle",
-                          "fire",
-                          "unknown"
-                        ],
-                        "supported_color_modes": [
-                          "brightness",
-                          "color_temp",
-                          "xy"
-                        ],
-                        "color_mode": "brightness",
-                        "brightness": 255,
-                        "effect": "None",
-                        "entity_id": [
-                          "light.another_light"
-                        ],
-                        "icon": "mdi:lightbulb-group",
-                        "friendly_name": "Another Group",
-                        "supported_features": 44
-                      },
-                      "last_changed": "2023-09-24T14:06:35.260070+00:00",
-                      "last_updated": "2023-09-24T14:20:00.208887+00:00",
-                      "context": {
-                        "id": "123456789",
-                        "parent_id": null,
-                        "user_id": null
-                      }
-                    },
-                    {
-                      "entity_id": "light.another_light",
-                      "state": "on",
-                      "attributes": {
-                        "supported_color_modes": [
-                          "xy"
-                        ],
-                        "color_mode": "xy",
-                        "brightness": 245,
-                        "hs_color": [
-                          12.464,
-                          81.176
-                        ],
-                        "rgb_color": [
-                          255,
-                          91,
-                          48
-                        ],
-                        "xy_color": [
-                          0.6408,
-                          0.3284
-                        ],
-                        "mode": "normal",
-                        "dynamics": "none",
-                        "friendly_name": "Another Light",
-                        "supported_features": 40
-                      },
-                      "last_changed": "2023-09-24T14:50:55.040229+00:00",
-                      "last_updated": "2023-09-24T16:13:00.757488+00:00",
-                      "context": {
-                        "id": "01HB3ZECEN2DN594VKX5RFRQ5P",
-                        "parent_id": null,
-                        "user_id": null
-                      }
-                    },
-                    {
-                      "entity_id": "light.couch_light",
-                      "state": "on",
-                      "attributes": {
-                        "supported_color_modes": [
-                          "xy"
-                        ],
-                        "color_mode": "xy",
-                        "brightness": 245,
-                        "hs_color": [
-                          12.464,
-                          81.176
-                        ],
-                        "rgb_color": [
-                          255,
-                          91,
-                          48
-                        ],
-                        "xy_color": [
-                          0.6408,
-                          0.3284
-                        ],
-                        "mode": "normal",
-                        "dynamics": "none",
-                        "friendly_name": "Couch Light",
-                        "supported_features": 40
-                      },
-                      "last_changed": "2023-09-24T14:50:55.040229+00:00",
-                      "last_updated": "2023-09-24T16:13:00.757488+00:00",
-                      "context": {
-                        "id": "01HB3ZECEN2DN594VKX5RFRQ5P",
-                        "parent_id": null,
-                        "user_id": null
-                      }
-                    },
-                    {
-                        "entity_id": "scene.test_scene",
-                        "state": "2024-06-22T20:26:10.406785+00:00",
-                        "attributes": {
-                            "entity_id": [
-                                "light.couch_light",
-                                "light.another_light"
-                            ],
-                            "id": "1719087533616",
-                            "friendly_name": "Test Scene"
-                        },
-                        "last_changed": "2024-06-22T20:26:48.309168+00:00",
-                        "last_reported": "2024-06-22T20:26:48.309168+00:00",
-                        "last_updated": "2024-06-22T20:26:48.309168+00:00",
-                        "context": {
-                            "id": "01J10T2K3NY0G61R0PE3K95TXZ",
-                            "parent_id": null,
-                            "user_id": null
-                        }
+                    "last_changed": "2023-09-24T14:06:34.783862+00:00",
+                    "last_updated": "2023-09-24T14:06:34.783862+00:00",
+                    "context": {
+                      "id": "123456789",
+                      "parent_id": null,
+                      "user_id": null
                     }
-                  ]
+                  },
+                  {
+                    "entity_id": "light.couch_group2",
+                    "state": "on",
+                    "attributes": {
+                      "min_color_temp_kelvin": 2000,
+                      "max_color_temp_kelvin": 6535,
+                      "min_mireds": 153,
+                      "max_mireds": 500,
+                      "effect_list": [
+                        "None",
+                        "candle",
+                        "fire",
+                        "unknown"
+                      ],
+                      "supported_color_modes": [
+                        "brightness",
+                        "color_temp",
+                        "xy"
+                      ],
+                      "color_mode": "brightness",
+                      "brightness": 255,
+                      "effect": "None",
+                      "entity_id": [
+                        "light.couch_light"
+                      ],
+                      "icon": "mdi:lightbulb-group",
+                      "friendly_name": "Couch",
+                      "supported_features": 44
+                    },
+                    "last_changed": "2023-09-24T14:06:35.260070+00:00",
+                    "last_updated": "2023-09-24T14:20:00.208887+00:00",
+                    "context": {
+                      "id": "123456789",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  },
+                  {
+                    "entity_id": "light.couch_group3",
+                    "state": "on",
+                    "attributes": {
+                      "supported_color_modes": [
+                        "xy"
+                      ],
+                      "color_mode": "xy",
+                      "brightness": 255,
+                      "hs_color": [
+                        12.464,
+                        81.176
+                      ],
+                      "rgb_color": [
+                        255,
+                        91,
+                        48
+                      ],
+                      "xy_color": [
+                        0.6408,
+                        0.3284
+                      ],
+                      "is_hue_group": true,
+                      "hue_scenes": [
+                        "Gedimmt",
+                        "Nachtlicht",
+                        "Hell",
+                        "Frühlingsblüten",
+                        "Sonnenuntergang Savanne",
+                        "Tropendämmerung",
+                        "Nordlichter"
+                      ],
+                      "hue_type": "zone",
+                      "lights": [
+                        "Couch Light"
+                      ],
+                      "entity_id": [
+                        "light.couch_light"
+                      ],
+                      "dynamics": false,
+                      "icon": "mdi:lightbulb-group",
+                      "friendly_name": "Couch",
+                      "supported_features": 40
+                    },
+                    "last_changed": "2023-09-24T14:06:34.783862+00:00",
+                    "last_updated": "2023-09-24T14:06:34.783862+00:00",
+                    "context": {
+                      "id": "123456789",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  },
+                  {
+                    "entity_id": "light.couch_group_invalid",
+                    "state": "on",
+                    "attributes": {
+                      "is_hue_group": true,
+                      "hue_type": "zone",
+                      "dynamics": false,
+                      "icon": "mdi:lightbulb-group",
+                      "friendly_name": "Couch",
+                      "supported_features": 40
+                    },
+                    "last_changed": "2023-09-24T14:06:34.783862+00:00",
+                    "last_updated": "2023-09-24T14:06:34.783862+00:00",
+                    "context": {
+                      "id": "123456789",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  },
+                  {
+                    "entity_id": "light.another_group",
+                    "state": "on",
+                    "attributes": {
+                      "min_color_temp_kelvin": 2000,
+                      "max_color_temp_kelvin": 6535,
+                      "min_mireds": 153,
+                      "max_mireds": 500,
+                      "effect_list": [
+                        "None",
+                        "candle",
+                        "fire",
+                        "unknown"
+                      ],
+                      "supported_color_modes": [
+                        "brightness",
+                        "color_temp",
+                        "xy"
+                      ],
+                      "color_mode": "brightness",
+                      "brightness": 255,
+                      "effect": "None",
+                      "entity_id": [
+                        "light.another_light"
+                      ],
+                      "icon": "mdi:lightbulb-group",
+                      "friendly_name": "Another Group",
+                      "supported_features": 44
+                    },
+                    "last_changed": "2023-09-24T14:06:35.260070+00:00",
+                    "last_updated": "2023-09-24T14:20:00.208887+00:00",
+                    "context": {
+                      "id": "123456789",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  },
+                  {
+                    "entity_id": "light.another_light",
+                    "state": "on",
+                    "attributes": {
+                      "supported_color_modes": [
+                        "xy"
+                      ],
+                      "color_mode": "xy",
+                      "brightness": 245,
+                      "hs_color": [
+                        12.464,
+                        81.176
+                      ],
+                      "rgb_color": [
+                        255,
+                        91,
+                        48
+                      ],
+                      "xy_color": [
+                        0.6408,
+                        0.3284
+                      ],
+                      "mode": "normal",
+                      "dynamics": "none",
+                      "friendly_name": "Another Light",
+                      "supported_features": 40
+                    },
+                    "last_changed": "2023-09-24T14:50:55.040229+00:00",
+                    "last_updated": "2023-09-24T16:13:00.757488+00:00",
+                    "context": {
+                      "id": "01HB3ZECEN2DN594VKX5RFRQ5P",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  },
+                  {
+                    "entity_id": "light.couch_light",
+                    "state": "on",
+                    "attributes": {
+                      "supported_color_modes": [
+                        "xy"
+                      ],
+                      "color_mode": "xy",
+                      "brightness": 245,
+                      "hs_color": [
+                        12.464,
+                        81.176
+                      ],
+                      "rgb_color": [
+                        255,
+                        91,
+                        48
+                      ],
+                      "xy_color": [
+                        0.6408,
+                        0.3284
+                      ],
+                      "mode": "normal",
+                      "dynamics": "none",
+                      "friendly_name": "Couch Light",
+                      "supported_features": 40
+                    },
+                    "last_changed": "2023-09-24T14:50:55.040229+00:00",
+                    "last_updated": "2023-09-24T16:13:00.757488+00:00",
+                    "context": {
+                      "id": "01HB3ZECEN2DN594VKX5RFRQ5P",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  },
+                  {
+                    "entity_id": "scene.test_scene",
+                    "state": "2024-06-22T20:26:10.406785+00:00",
+                    "attributes": {
+                      "entity_id": [
+                        "light.couch_light",
+                        "light.another_light"
+                      ],
+                      "id": "1719087533616",
+                      "friendly_name": "Test Scene"
+                    },
+                    "last_changed": "2024-06-22T20:26:48.309168+00:00",
+                    "last_reported": "2024-06-22T20:26:48.309168+00:00",
+                    "last_updated": "2024-06-22T20:26:48.309168+00:00",
+                    "context": {
+                      "id": "01J10T2K3NY0G61R0PE3K95TXZ",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  }
+                ]
                 """);
 
         assertThat(api.getAssignedGroups("light.couch_light")).containsExactlyInAnyOrder("light.couch_group",
-                "light.couch_group2");
+                "light.couch_group2", "light.couch_group3");
         assertThat(api.getAssignedGroups("light.another_light")).containsExactlyInAnyOrder("light.another_group");
+    }
+
+    @Test
+    void getAdditionalAreas_returnsDistinctAreasList_ignoresNull() {
+        GroupInfo kitchenArea = new GroupInfo("kitchen", List.of("light.kitchen_1", "light.kitchen_2", "light.kitchen_3"));
+        mockAreaForEntity("light.kitchen_1", kitchenArea);
+        mockAreaForEntity("light.kitchen_2", kitchenArea);
+        mockAreaForEntity("light.living_room", null);
+
+        List<GroupInfo> areas = api.getAdditionalAreas(List.of("light.kitchen_1", "light.kitchen_2",
+                "light.living_room", "light.unknown"));
+
+        assertThat(areas).containsExactlyInAnyOrder(kitchenArea);
+    }
+
+    @Test
+    void createOrUpdateScene_withMultipleLights_createsSceneWithAllLights_implicitlySetsOn() {
+        String groupId = "kitchen";
+        String sceneName = "HueScheduler";
+        List<PutCall> putCalls = List.of(
+                PutCall.builder()
+                       .id("light.kitchen_main")
+                       .bri(254)
+                       .ct(100)
+                       .build(),
+                PutCall.builder()
+                       .id("light.kitchen_table")
+                       .on(true)
+                       .bri(100)
+                       .x(0.497)
+                       .y(0.384)
+                       .build(),
+                PutCall.builder()
+                       .id("light.kitchen_counter")
+                       .on(false)
+                       .transitionTime(400) // ignored
+                       .bri(100) // ignored
+                       .build()
+        );
+
+        createOrUpdateScene(groupId, sceneName, putCalls);
+
+        verify(http).postResource(sceneSyncUrl, removeSpaces("""
+                {
+                  "scene_id" : "huescheduler_kitchen",
+                  "entities" : {
+                    "light.kitchen_main" : {
+                      "state" : "on",
+                      "brightness" : 255,
+                      "color_temp" : 100
+                    },
+                    "light.kitchen_table" : {
+                      "state" : "on",
+                      "brightness" : 100,
+                      "xy_color" : [ 0.497, 0.384 ]
+                    },
+                    "light.kitchen_counter" : {
+                      "state" : "off"
+                    }
+                  }
+                }""")
+        );
+    }
+
+    @Test
+    void createOrUpdateScene_withEmptyPutCalls_createsSceneWithNoStates() {
+        String groupId = "bedroom";
+        String sceneName = "night";
+        List<PutCall> putCalls = List.of();
+
+        createOrUpdateScene(groupId, sceneName, putCalls);
+
+        verify(http).postResource(eq(sceneSyncUrl), argThat(body ->
+                body.contains("\"scene_id\":\"night_bedroom\"") &&
+                body.contains("\"entities\":{}}")
+        ));
+    }
+
+    @Test
+    void createOrUpdateScene_withSpecialCharactersInName_normalizesSceneId() {
+        String groupId = "living-room";
+        String sceneName = "Movie Time!";
+        PutCall putCall = PutCall.builder()
+                                 .id("light.living_room_main")
+                                 .on(true)
+                                 .build();
+
+        createOrUpdateScene(groupId, sceneName, List.of(putCall));
+
+        verify(http).postResource(eq(sceneSyncUrl), argThat(body ->
+                body.contains("\"scene_id\":\"movie_time__living_room\"")
+        ));
     }
 
     @Test
@@ -1972,7 +2264,7 @@ public class HassApiTest {
                     }
                   ]
                 """);
-        
+
         assertThat(api.getAffectedIdsByDevice("light.couch_light")).containsExactlyInAnyOrder("light.couch_light",
                 "light.couch_group", "light.couch_group2");
     }
@@ -2133,6 +2425,82 @@ public class HassApiTest {
         assertThat(api.getSceneName("scene.test_scene")).isEqualTo("Test Scene");
         assertThat(api.getSceneName("scene.hue_scene")).isEqualTo("Wohnzimmer Miami");
         assertThat(api.getSceneName("scene.unknown")).isNull();
+    }
+
+    @Test
+    void onModification_updatesStates_getSceneName_initiallyNoResult_afterwardsSceneIsFound() {
+        String sceneName = "Test Scene";
+        String sceneId = "scene.test_scene";
+        setGetResponse("/states", "[]");
+
+        assertThat(api.getSceneName(sceneId)).isNull();
+        assertThatThrownBy(() -> api.getLightIdentifierByName(sceneName)).isInstanceOf(LightNotFoundException.class);
+
+        State updatedScene = createExampleState(sceneId, sceneName);
+        api.onModification(null, sceneId, updatedScene);
+
+        // Name is now found
+        assertThat(api.getSceneName(sceneId)).isEqualTo(sceneName);
+        assertThat(api.getLightIdentifierByName(sceneName)).isEqualTo(new Identifier(sceneId, sceneName));
+
+        // Scene deleted again
+        api.onModification(null, sceneId, null);
+
+        // Reflected in lookup
+        assertThat(api.getSceneName(sceneId)).isNull();
+        assertThatThrownBy(() -> api.getLightIdentifierByName(sceneName)).isInstanceOf(LightNotFoundException.class);
+    }
+
+    @Test
+    void onModification_noLookupBefore_ignored() {
+        String sceneId = "scene.ignored";
+        setGetResponse("/states", "[]");
+
+        State ignoredScene = createExampleState(sceneId, "Ignored scene");
+        api.onModification(null, "light.test", ignoredScene);
+
+        // Performs initial API fetch and ignores any modifications before
+        assertThat(api.getSceneName(sceneId)).isNull();
+    }
+
+    @Test
+    void onModification_updatesStates_getSceneName_overwritesExistingEntry() {
+        String sceneId = "scene.test_scene";
+        setGetResponse("/states", """
+                [
+                  {
+                    "entity_id": "scene.test_scene",
+                    "state": "2024-06-22T20:26:10.406785+00:00",
+                    "attributes": {
+                      "entity_id": [
+                        "light.1",
+                        "light.2"
+                      ],
+                      "id": "1719087533616",
+                      "friendly_name": "Test Scene"
+                    },
+                    "last_changed": "2024-06-22T20:26:48.309168+00:00",
+                    "last_reported": "2024-06-22T20:26:48.309168+00:00",
+                    "last_updated": "2024-06-22T20:26:48.309168+00:00",
+                    "context": {
+                      "id": "01J10T2K3NY0G61R0PE3K95TXZ",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  }
+                ]
+                """);
+
+        assertThat(api.getSceneName(sceneId)).isEqualTo("Test Scene");
+
+        api.onModification(null, sceneId, createExampleState(sceneId, "Updated Name"));
+
+        assertThat(api.getSceneName(sceneId)).isEqualTo("Updated Name");
+
+        // Ignores non-State objects
+        api.onModification(null, sceneId, new Object());
+
+        assertThat(api.getSceneName(sceneId)).isEqualTo("Updated Name");
     }
 
     @Test
@@ -2421,12 +2789,6 @@ public class HassApiTest {
         assertThat(api.isGroupOff("light.on_off")).isTrue();
     }
 
-    private void setupApi(String origin) {
-        api = new HassApiImpl(origin, http, permits -> {
-        });
-        baseUrl = origin + "/api";
-    }
-
     private void setGetResponse(String expectedUrl, @Language("JSON") String response) {
         when(http.getResource(getUrl(expectedUrl))).thenReturn(response);
     }
@@ -2445,5 +2807,26 @@ public class HassApiTest {
 
     private LightState getLightState(String id) {
         return api.getLightState(id);
+    }
+
+    private void mockAreaForEntity(String entityId, GroupInfo area) {
+        when(areaRegistry.lookupAreaForEntity(entityId)).thenReturn(area);
+    }
+
+    private void createOrUpdateScene(String groupId, String sceneName, List<PutCall> putCalls) {
+        api.createOrUpdateScene(groupId, sceneName, putCalls);
+    }
+
+    private static String removeSpaces(@Language("JSON") String expectedBody) {
+        return expectedBody.replaceAll("\\s+|\\n", "");
+    }
+
+    private static State createExampleState(String entityId, String friendlyName) {
+        State state = new State();
+        state.setEntity_id(entityId);
+        StateAttributes attributes = new StateAttributes();
+        attributes.setFriendly_name(friendlyName);
+        state.setAttributes(attributes);
+        return state;
     }
 }

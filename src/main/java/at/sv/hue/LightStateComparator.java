@@ -11,8 +11,14 @@ public class LightStateComparator {
 
     private final PutCall lastPutCall;
     private final LightState currentState;
+    private final int brightnessOverrideThreshold;
+    private final int colorTemperatureOverrideThresholdKelvin;
+    private final double colorOverrideThreshold;
 
     public boolean lightStateDiffers() {
+        if (currentState.isUnavailable()) {
+            return false; // don't compare state if light is unavailable
+        }
         if (currentState.isOff() && !isOnAndStateDiffers()) {
             return false; // don't compare state if light is off, unless it's an on state
         }
@@ -27,7 +33,7 @@ public class LightStateComparator {
     }
 
     private boolean brightnessIsNotSimilar() {
-        return Math.abs(lastPutCall.getBri() - currentState.getBrightness()) >= 5;
+        return Math.abs(lastPutCall.getBri() - currentState.getBrightness()) >= brightnessOverrideThreshold;
     }
 
     private boolean colorModeOrValuesDiffer() {
@@ -44,9 +50,10 @@ public class LightStateComparator {
         return switch (colorMode) {
             case CT -> ctDiffers();
             case HS -> ColorComparator.colorDiffers(currentState.getX(), currentState.getY(),
-                    lastPutCall.getHue(), lastPutCall.getSat());
+                    lastPutCall.getHue(), lastPutCall.getSat(), colorOverrideThreshold);
             case XY -> ColorComparator.colorDiffers(currentState.getX(), currentState.getY(),
-                    lastPutCall.getX(), lastPutCall.getY(), currentState.getLightCapabilities().getColorGamut());
+                    lastPutCall.getX(), lastPutCall.getY(), currentState.getLightCapabilities().getColorGamut(),
+                    colorOverrideThreshold);
             default -> false;
         };
     }
@@ -70,7 +77,9 @@ public class LightStateComparator {
     }
 
     private boolean colorTemperatureIsNotSimilar() {
-        return Math.abs(getAdjustedLastCt() - currentState.getColorTemperature()) >= 5;
+        int lastKelvin = convertToKelvin(getAdjustedLastCt());
+        int currentKelvin = convertToKelvin(currentState.getColorTemperature());
+        return Math.abs(lastKelvin - currentKelvin) >= colorTemperatureOverrideThresholdKelvin;
     }
 
     private int getAdjustedLastCt() {
@@ -82,6 +91,10 @@ public class LightStateComparator {
         } else {
             return lastPutCall.getCt();
         }
+    }
+
+    private int convertToKelvin(int mired) {
+        return 1_000_000 / mired;
     }
 
     private boolean effectDiffers() {
@@ -100,6 +113,6 @@ public class LightStateComparator {
      * off lights inside a group, when the "on:true" state is enforced via the state.
      */
     private boolean isOnAndStateDiffers() {
-        return lastPutCall.getOn() != null && currentState.isOnOffSupported() && lastPutCall.isOn() && !currentState.isOn();
+        return lastPutCall.isOn() && currentState.isOnOffSupported() && !currentState.isOn();
     }
 }

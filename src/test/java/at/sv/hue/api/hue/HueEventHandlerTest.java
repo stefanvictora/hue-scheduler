@@ -152,6 +152,23 @@ class HueEventHandlerTest {
                         "type": "scene"
                       },
                       {
+                        "id": "3df1b8e5-0ab5-4454-94da-c55bf3748713",
+                        "id_v1": "/scenes/cul4KMCB2nlJSNPa",
+                        "status": {
+                          "last_recall": "2025-02-22T08:43:24.151Z"
+                        },
+                        "type": "scene"
+                      },
+                      {
+                        "id": "618208cb-4c4a-46d5-91bb-e578344013ee",
+                        "id_v1": "/scenes/VV3txu0MX7ImDNZ4",
+                        "status": {
+                          "active": "static",
+                          "last_recall": "2025-02-22T09:08:09.193Z"
+                        },
+                        "type": "scene"
+                      },
+                      {
                         "id": "098b2c13-6402-447f-ba63-8aab9b1df55b",
                         "id_v1": "/scenes/v5Q0GsblLw4Ytxx4",
                         "type": "scene"
@@ -178,6 +195,8 @@ class HueEventHandlerTest {
 
         verify(sceneEventListener).onSceneActivated("f9b4085b-1409-4b12-ae0d-4ffe2be28b79");
         verify(sceneEventListener).onSceneActivated("0314f5ad-b424-4f63-aa2e-f55cac83e306");
+        verify(sceneEventListener).onSceneActivated("618208cb-4c4a-46d5-91bb-e578344013ee");
+        verify(sceneEventListener).onSceneActivated("3df1b8e5-0ab5-4454-94da-c55bf3748713");
         verifyNoInteractions(lightEventListener);
         verifyNoMoreInteractions(sceneEventListener);
         verifyResourceModification("ANOTHER_TYPE", "ANOTHER_ID");
@@ -933,6 +952,6 @@ class HueEventHandlerTest {
     }
 
     private void verifyResourceModification(String type, String id) {
-        verify(resourceModificationEventListener).onModification(type, id);
+        verify(resourceModificationEventListener).onModification(type, id, null);
     }
 }

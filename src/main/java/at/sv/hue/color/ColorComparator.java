@@ -2,21 +2,22 @@ package at.sv.hue.color;
 
 public final class ColorComparator {
 
-    private static final double NOTABLE_DIFFERENCE = 2.3;
-
     private ColorComparator() {
     }
 
-    // D65 reference white point
+    // CIE standard constants for XYZ->LAB conversion
+    private static final double EPSILON = 216.0 / 24389.0; // ~ 0.008856
+    private static final double KAPPA   = 24389.0 / 27.0;  // ~ 903.3
+
+    // D65 reference white point (sRGB)
     private static final double REF_X = 95.047;
     private static final double REF_Y = 100.0;
     private static final double REF_Z = 108.883;
 
-    public static boolean colorDiffers(double x, double y, int hue, int sat) {
+    public static boolean colorDiffers(double x, double y, int hue, int sat, double threshold) {
         XYZ xyz1 = xyToXYZ(x, y);
         XYZ xyz2 = hueSatToXYZ(hue, sat);
-
-        return colorDiffers(xyz1, xyz2);
+        return deltaE76(xyz1, xyz2) >= threshold;
     }
 
     private static XYZ hueSatToXYZ(int hue, int sat) {
@@ -25,11 +26,10 @@ public final class ColorComparator {
         return new XYZ(xyz[0], xyz[1], xyz[2]);
     }
 
-    public static boolean colorDiffers(double x1, double y1, double x2, double y2, Double[][] gamut) {
+    public static boolean colorDiffers(double x1, double y1, double x2, double y2, Double[][] gamut, double threshold) {
         XY xy1 = getAdjustedXY(x1, y1, gamut);
         XY xy2 = getAdjustedXY(x2, y2, gamut);
-
-        return colorDiffers(xy1, xy2);
+        return deltaE76(xy1, xy2) >= threshold;
     }
 
     private static XY getAdjustedXY(double x, double y, Double[][] gamut) {
@@ -40,10 +40,14 @@ public final class ColorComparator {
         return new XY(correction.getX(), correction.getY());
     }
 
-    private static boolean colorDiffers(XY xy1, XY xy2) {
-        XYZ xyz1 = xyToXYZ(xy1);
-        XYZ xyz2 = xyToXYZ(xy2);
-        return colorDiffers(xyz1, xyz2);
+    private static double deltaE76(XY xy1, XY xy2) {
+        return deltaE76(xyToXYZ(xy1), xyToXYZ(xy2));
+    }
+
+    private static double deltaE76(XYZ xyz1, XYZ xyz2) {
+        LAB lab1 = xyzToLab(xyz1);
+        LAB lab2 = xyzToLab(xyz2);
+        return calculateDistance(lab1, lab2);
     }
 
     private static XYZ xyToXYZ(XY xy) {
@@ -57,28 +61,25 @@ public final class ColorComparator {
         return new XYZ(X, Y, Z);
     }
 
-    private static boolean colorDiffers(XYZ xyz1, XYZ xyz2) {
-        LAB lab1 = xyzToLab(xyz1);
-        LAB lab2 = xyzToLab(xyz2);
-
-        double distance = calculateDistance(lab1, lab2);
-        return distance >= NOTABLE_DIFFERENCE;
-    }
-
     private static LAB xyzToLab(XYZ colorXYZ) {
-        double x = colorXYZ.X() / REF_X;
-        double y = colorXYZ.Y() / REF_Y;
-        double z = colorXYZ.Z() / REF_Z;
+        // Normalize by reference white (assumes D65 and same XYZ scaling as REF_*)
+        double xr = colorXYZ.X() / REF_X;
+        double yr = colorXYZ.Y() / REF_Y;
+        double zr = colorXYZ.Z() / REF_Z;
 
-        x = (x > 0.008856) ? Math.cbrt(x) : (7.787 * x + 16.0 / 116.0);
-        y = (y > 0.008856) ? Math.cbrt(y) : (7.787 * y + 16.0 / 116.0);
-        z = (z > 0.008856) ? Math.cbrt(z) : (7.787 * z + 16.0 / 116.0);
+        double fx = fXYZ(xr);
+        double fy = fXYZ(yr);
+        double fz = fXYZ(zr);
 
-        double L = (116.0 * y) - 16.0;
-        double a = 500.0 * (x - y);
-        double b = 200.0 * (y - z);
+        double L = 116.0 * fy - 16.0;
+        double a = 500.0 * (fx - fy);
+        double b = 200.0 * (fy - fz);
 
         return new LAB(L, a, b);
+    }
+
+    private static double fXYZ(double t) {
+        return (t > EPSILON) ? Math.cbrt(t) : (KAPPA * t + 16.0) / 116.0;
     }
 
     private static double calculateDistance(LAB lab1, LAB lab2) {

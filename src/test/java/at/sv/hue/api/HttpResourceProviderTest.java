@@ -1,5 +1,6 @@
 package at.sv.hue.api;
 
+import lombok.extern.slf4j.Slf4j;
 import okhttp3.OkHttpClient;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
@@ -13,6 +14,7 @@ import java.net.URL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+@Slf4j
 class HttpResourceProviderTest {
     private HttpResourceProviderImpl provider;
     private MockWebServer mockServer;
@@ -28,8 +30,16 @@ class HttpResourceProviderTest {
     }
 
     @AfterEach
-    void tearDown() throws IOException {
-        mockServer.shutdown();
+    void tearDown() {
+        shutdownIgnoringException();
+    }
+
+    private void shutdownIgnoringException() {
+        try {
+            mockServer.shutdown();
+        } catch (IOException e) {
+            log.debug("MockWebServer shutdown error (ignored): {}", e.getMessage());
+        }
     }
 
     @Test
@@ -60,8 +70,8 @@ class HttpResourceProviderTest {
     }
 
     @Test
-    void get_exception() throws IOException {
-        mockServer.shutdown();
+    void get_exception() {
+        shutdownIgnoringException();
 
         assertThatThrownBy(() -> provider.getResource(url)).isInstanceOf(BridgeConnectionFailure.class);
     }
@@ -88,10 +98,10 @@ class HttpResourceProviderTest {
     }
 
     @Test
-    void code_429_rateLimit_throwsApiFailure() {
+    void code_429_rateLimit_throwsApiFailure_ignoresDescription() {
         mockStatusCode(429, "Description");
 
-        assertThrowsError(ApiFailure.class, "Rate limit exceeded: Description");
+        assertThrowsError(ApiFailure.class, "Rate limit exceeded");
     }
 
     @Test

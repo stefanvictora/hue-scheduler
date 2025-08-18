@@ -1,26 +1,46 @@
 # Philips Hue Authentication
 
-If you do not yet know your bridge's IP address, you can discover it by navigating to [https://discovery.meethue.com](https://discovery.meethue.com/) and copying the returned IP address. For example:
+If you don't know your bridge's IP address, visit [https://discovery.meethue.com](https://discovery.meethue.com/) and copy the `internalipaddress` value. Example:
 
-~~~json
+```json
 [{"id":"<id>","internalipaddress":"192.168.0.59"}]
-~~~
+```
 
-Next, to authenticate a new user on your bridge, navigate to `http://<BRIDGE_IP_ADDRESS>/debug/clip.html` in your browser and enter the following in the corresponding fields, replacing ``<name>`` with any value of 26 characters or fewer:
+## Create a Hue username (API key)
 
-~~~
-URL:	/api
-Body:	{"devicetype":"hue_scheduler#<name>"}
-~~~
+1. Open the Hue CLIP debug tool in your browser: `http://<BRIDGE_IP_ADDRESS>/debug/clip.html`
 
-Now press the large physical button on your bridge and within 30 seconds press the ``POST`` button on the web form.
+2. In the form, enter:
+    ```text
+    URL:	/api
+    Body:	{"devicetype":"hue_scheduler#<name>"}
+    ```
+   Use any `<name>` label up to **26 characters** so the full `devicetype` (including the `hue_scheduler#` prefix) stays within Hue’s limit.
 
-You should get your new username as a response. For example:
+3. Press the **link button** on the Hue Bridge (the big round button). Within **30 seconds**, click **POST** in the CLIP tool.
+4. You should receive a success response containing your **username** (Hue API key). Example:
+    
+    ```json
+    [{"success":{"username": "83b7780291a6ceffbe0bd049104df"}}]
+    ```
+    
+    Copy and store this value securely. You’ll use it as your **Hue Scheduler access token** (e.g., `ACCESS_TOKEN` env var or the second CLI argument). You only need to do this once per bridge.
 
-~~~json
-[{"success":{"username": "83b7780291a6ceffbe0bd049104df"}}]
-~~~
+If you see `"link button not pressed"`, press the bridge button again and re-submit **POST** within 30 seconds.
 
-Copy and save that username for further use with Hue Scheduler. You only need to perform this authentication process once.
+### Alternative (curl)
 
-If you get the error message ``"link button not pressed"``, try to repeat the process of pressing the button on your bridge and the ``POST`` button in the web interface within 30 seconds.
+If you prefer curl:
+
+```bash
+# 1) Press the bridge link button first
+# 2) Then run within 30 seconds:
+curl -X POST "http://<BRIDGE_IP_ADDRESS>/api" \
+  -H "Content-Type: application/json" \
+  -d '{"devicetype":"hue_scheduler#<name>"}'
+```
+
+The response will include the `"username"` as above.
+
+> [!TIP]
+> If your bridge still uses a self-signed certificate you will need to use the `--insecure` for running Hue Scheduler.

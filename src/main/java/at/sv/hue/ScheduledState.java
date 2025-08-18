@@ -57,12 +57,16 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
     private final LightCapabilities capabilities;
     private final int minTrBeforeGapInMinutes;
     private final Cache<ZonedDateTime, ScheduledStateSnapshot> snapshotCache;
+    private final int brightnessOverrideThreshold;
+    private final int colorTemperatureOverrideThresholdKelvin;
+    private final double colorOverrideThreshold;
     @Getter
     @Setter
     private boolean retryAfterPowerOnState;
     @Getter
     private ZonedDateTime lastSeen;
     private ScheduledState originalState;
+    @Getter
     private PutCall lastPutCall;
     @Setter
     private Function<ScheduledStateSnapshot, ScheduledStateSnapshot> previousStateLookup;
@@ -73,7 +77,8 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
     public ScheduledState(Identifier identifier, String startString, Integer brightness, Integer ct, Double x, Double y,
                           Integer hue, Integer sat, String effect, Boolean on, String transitionTimeBeforeString, Integer definedTransitionTime,
                           Set<DayOfWeek> daysOfWeek, StartTimeProvider startTimeProvider, LightCapabilities capabilities,
-                          int minTrBeforeGapInMinutes, Boolean force, Boolean interpolate, boolean groupState, boolean temporary) {
+                          int minTrBeforeGapInMinutes, int brightnessOverrideThreshold, int colorTemperatureOverrideThresholdKelvin,
+                          double colorOverrideThreshold, Boolean force, Boolean interpolate, boolean groupState, boolean temporary) {
         this.identifier = identifier;
         this.startString = startString;
         this.interpolate = interpolate;
@@ -97,6 +102,9 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
         this.transitionTimeBeforeString = transitionTimeBeforeString;
         this.startTimeProvider = startTimeProvider;
         this.minTrBeforeGapInMinutes = minTrBeforeGapInMinutes;
+        this.brightnessOverrideThreshold = brightnessOverrideThreshold;
+        this.colorTemperatureOverrideThresholdKelvin = colorTemperatureOverrideThresholdKelvin;
+        this.colorOverrideThreshold = colorOverrideThreshold;
         this.force = force;
         this.temporary = temporary;
         originalState = this;
@@ -117,7 +125,8 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
         ScheduledState copy = new ScheduledState(state.identifier, start,
                 state.brightness, state.ct, state.x, state.y, state.hue, state.sat, state.effect, state.on,
                 state.transitionTimeBeforeString, state.definedTransitionTime, state.daysOfWeek, state.startTimeProvider,
-                state.capabilities, state.minTrBeforeGapInMinutes, state.force, state.interpolate, state.groupState, true);
+                state.capabilities, state.minTrBeforeGapInMinutes, state.brightnessOverrideThreshold, state.colorTemperatureOverrideThresholdKelvin,
+                state.colorOverrideThreshold, state.force, state.interpolate, state.groupState, true);
         copy.lastSeen = state.lastSeen;
         copy.originalState = state.originalState;
         copy.previousStateLookup = state.previousStateLookup;
@@ -217,7 +226,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
 
     private Integer assertValidTransitionTime(Integer transitionTime) {
         if (transitionTime != null && (transitionTime > MAX_TRANSITION_TIME || transitionTime < 0)) {
-            throw new InvalidTransitionTime("Invalid transition time '" + transitionTime + ". Allowed integer range: 0-" + MAX_TRANSITION_TIME);
+            throw new InvalidTransitionTime("Invalid transition time '" + transitionTime + "'. Allowed integer range: 0-" + MAX_TRANSITION_TIME);
         }
         return transitionTime;
     }
@@ -348,7 +357,8 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
     }
 
     public boolean lightStateDiffers(LightState currentState) {
-        return new LightStateComparator(lastPutCall, currentState).lightStateDiffers();
+        return new LightStateComparator(lastPutCall, currentState, brightnessOverrideThreshold,
+                colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold).lightStateDiffers();
     }
 
     public void setLastSeen(ZonedDateTime lastSeen) {
@@ -432,13 +442,6 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
             context += " (temporary)";
         }
         return context;
-    }
-
-    private String getFormattedTransitionTimeBefore() {
-        if (transitionTimeBeforeString == null) {
-            return "";
-        }
-        return formatPropertyName("tr-before") + transitionTimeBeforeString;
     }
 
     private String getFormattedPropertyIfSet(String name, Object property) {

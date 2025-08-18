@@ -4,6 +4,7 @@ import at.sv.hue.ColorMode;
 import at.sv.hue.api.ApiFailure;
 import at.sv.hue.api.Capability;
 import at.sv.hue.api.EmptyGroupException;
+import at.sv.hue.api.GroupInfo;
 import at.sv.hue.api.GroupNotFoundException;
 import at.sv.hue.api.HttpResourceProvider;
 import at.sv.hue.api.HueApi;
@@ -138,24 +139,39 @@ public final class HueApiImpl implements HueApi {
 
     @Override
     public LightState getLightState(String lightId) {
-        return lookupLight(lightId).getLightState();
+        Light light = lookupLight(lightId);
+        return light.getLightState(isUnavailable(light, this::lookupZigbeeConnectivity));
     }
 
     @Override
     public List<LightState> getGroupStates(String groupedLightId) {
         Map<String, Light> currentLights = lookupLights();
+        Map<String, ZigbeeConnectivity> connectivity = lookupZigbeeConnectivity();
         return getGroupLights(groupedLightId).stream()
-                                             .map(lightId -> getLightState(currentLights, lightId))
+                                             .map(lightId -> getLightState(currentLights, connectivity, lightId))
                                              .filter(Objects::nonNull)
                                              .collect(Collectors.toList());
     }
 
-    private LightState getLightState(Map<String, Light> lights, String lightId) {
+    private LightState getLightState(Map<String, Light> lights, Map<String, ZigbeeConnectivity> connectivity,
+                                     String lightId) {
         Light light = lights.get(lightId);
         if (light == null) {
             return null;
         }
-        return light.getLightState();
+        return light.getLightState(isUnavailable(light, connectivity::get));
+    }
+
+    private boolean isUnavailable(Light light, Function<String, ZigbeeConnectivity> lookupZigbeeConnectivity) {
+        String owner = light.getOwner().getRid();
+        Device device = getAvailableDevices().get(owner);
+        if (device == null) {
+            return false;
+        }
+        return device.getZigbeeConnectivityResource()
+                     .map(lookupZigbeeConnectivity)
+                     .map(ZigbeeConnectivity::isUnavailable)
+                     .orElse(false);
     }
 
     private URL createUrl(String url) {
@@ -228,12 +244,18 @@ public final class HueApiImpl implements HueApi {
 
     private List<String> getAffectedIdsByScene(Scene scene) {
         List<String> resourceIds = new ArrayList<>(scene.getActions().stream()
+                                                        .filter(HueApiImpl::isOn)
                                                         .map(SceneAction::getTarget)
                                                         .map(ResourceReference::getRid)
                                                         .toList());
         String groupedLightId = getAndAssertGroupExists(scene.getGroup()).getGroupedLightId();
         resourceIds.add(groupedLightId);
         return resourceIds;
+    }
+
+    private static boolean isOn(SceneAction action) {
+        On on = action.getAction().on;
+        return on != null && on.isOn();
     }
 
     @Override
@@ -258,6 +280,11 @@ public final class HueApiImpl implements HueApi {
                                    .filter(group -> getContainedLightIds(group).contains(lightId))
                                    .map(Group::getGroupedLightId)
                                    .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<GroupInfo> getAdditionalAreas(List<String> lightIds) {
+        return List.of();
     }
 
     @Override
@@ -525,9 +552,19 @@ public final class HueApiImpl implements HueApi {
         }, Light::getId).get(id);
     }
 
+    private ZigbeeConnectivity lookupZigbeeConnectivity(String id) {
+        return lookup("/zigbee_connectivity/" + id, new TypeReference<ZigbeeConnectivityResponse>() {
+        }, ZigbeeConnectivity::getId).get(id);
+    }
+
     private Map<String, Light> lookupLights() {
         return lookup("/light", new TypeReference<LightResponse>() {
         }, Light::getId);
+    }
+
+    private Map<String, ZigbeeConnectivity> lookupZigbeeConnectivity() {
+        return lookup("/zigbee_connectivity", new TypeReference<ZigbeeConnectivityResponse>() {
+        }, ZigbeeConnectivity::getId);
     }
 
     private Map<String, Scene> lookupScenes() {
@@ -552,6 +589,7 @@ public final class HueApiImpl implements HueApi {
 
     private <T, C extends DataListContainer<T>> Map<String, T> lookup(String endpoint, TypeReference<C> typeReference,
                                                                       Function<T, String> idFunction) {
+        rateLimiter.acquire(1);
         String response = resourceProvider.getResource(createUrl(endpoint));
         try {
             C container = mapper.readValue(response, typeReference);
@@ -599,7 +637,7 @@ public final class HueApiImpl implements HueApi {
     }
 
     @Override
-    public void onModification(String type, String id) {
+    public void onModification(String type, String id, Object content) {
         // todo: maybe switch to different caching logic so we can invalidate individual entries instead of the full cache
         switch (type) {
             case "light" -> availableLightsCache.invalidateAll();
@@ -618,6 +656,11 @@ public final class HueApiImpl implements HueApi {
     @Data
     private static final class LightResponse implements DataListContainer<Light> {
         List<Light> data;
+    }
+
+    @Data
+    private static final class ZigbeeConnectivityResponse implements DataListContainer<ZigbeeConnectivity> {
+        List<ZigbeeConnectivity> data;
     }
 
     @Data

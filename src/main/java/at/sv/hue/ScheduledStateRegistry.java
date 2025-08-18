@@ -9,7 +9,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,7 +26,7 @@ public class ScheduledStateRegistry {
     public ScheduledStateRegistry(Supplier<ZonedDateTime> currentTime, HueApi api) {
         this.currentTime = currentTime;
         this.api = api;
-        lightStates = new HashMap<>();
+        lightStates = new LinkedHashMap<>();
     }
 
     public void addState(ScheduledState state) {
@@ -104,7 +103,12 @@ public class ScheduledStateRegistry {
     }
 
     public List<GroupInfo> getAssignedGroups(ScheduledStateSnapshot state) {
-        return getAssignedGroupsSortedBySizeDesc(getGroupLights(state));
+        List<String> groupLights = getGroupLights(state);
+        List<GroupInfo> assignedGroups = getAssignedGroupsSortedBySizeDesc(groupLights);
+        List<GroupInfo> additionalAreas = api.getAdditionalAreas(groupLights);
+        return Stream.concat(assignedGroups.stream(), additionalAreas.stream())
+                     .distinct()
+                     .toList();
     }
 
     private List<GroupInfo> getAssignedGroupsSortedBySizeDesc(List<String> lightIds) {
@@ -134,41 +138,46 @@ public class ScheduledStateRegistry {
      * @return a list of active PutCall objects corresponding to the provided light IDs
      */
     public List<PutCall> getPutCalls(List<String> groupLights) {
-        Map<String, PutCall> putCalls = getActivePutCallsFromGroups(groupLights);
-        findActivePutCalls(groupLights).forEach(putCall -> putCalls.put(putCall.getId(), putCall));
+        ZonedDateTime now = currentTime.get();
+        Map<String, PutCall> putCalls = getActivePutCallsFromGroups(groupLights, now);
+        findActivePutCalls(groupLights, now).forEach(putCall -> putCalls.put(putCall.getId(), putCall));
         return new ArrayList<>(putCalls.values());
     }
 
-    private Map<String, PutCall> getActivePutCallsFromGroups(List<String> groupLights) {
+    private Map<String, PutCall> getActivePutCallsFromGroups(List<String> groupLights, ZonedDateTime now) {
         return getAssignedGroupsSortedBySizeDesc(groupLights)
                 .stream()
                 .map(GroupInfo::groupId)
-                .flatMap(groupId -> findActivePutCall(groupId).stream())
+                .flatMap(groupId -> findActivePutCall(groupId, now).stream())
                 .flatMap(putCall -> createOverriddenLightPutCalls(putCall, groupLights))
                 .collect(Collectors.toMap(PutCall::getId, putCall -> putCall, (existing, replacement) -> replacement, LinkedHashMap::new));
     }
 
-    private List<PutCall> findActivePutCalls(List<String> ids) {
+    private List<PutCall> findActivePutCalls(List<String> ids, ZonedDateTime now) {
         return ids.stream()
-                  .map(this::findActivePutCall)
+                  .map(id -> findActivePutCall(id, now))
                   .flatMap(Optional::stream)
                   .toList();
     }
 
-    private Optional<PutCall> findActivePutCall(String id) {
-        return Optional.ofNullable(findStatesForId(id)).flatMap(this::findActivePutCall);
+    private Optional<PutCall> findActivePutCall(String id, ZonedDateTime now) {
+        return Optional.ofNullable(findStatesForId(id))
+                       .flatMap(lightStatesForId -> findActivePutCall(lightStatesForId, now));
     }
 
-    private Optional<PutCall> findActivePutCall(List<ScheduledState> lightStatesForId) {
-        ZonedDateTime now = currentTime.get();
+    private Optional<PutCall> findActivePutCall(List<ScheduledState> lightStatesForId, ZonedDateTime now) {
+        return findActiveSnapshot(lightStatesForId, now)
+                .map(snapshot -> snapshot.getInterpolatedFullPicturePutCall(now));
+    }
+
+    private Optional<ScheduledStateSnapshot> findActiveSnapshot(List<ScheduledState> lightStatesForId, ZonedDateTime now) {
         ZonedDateTime theDayBefore = now.minusDays(1);
         ZonedDateTime theDayAfter = now.plusDays(1);
         return lightStatesForId.stream()
                                .flatMap(state -> Stream.of(state.getSnapshot(theDayBefore),
                                        state.getSnapshot(now), state.getSnapshot(theDayAfter)))
                                .filter(snapshot -> snapshot.isCurrentlyActive(now))
-                               .findFirst()
-                               .map(snapshot -> snapshot.getInterpolatedFullPicturePutCall(now));
+                               .findFirst();
     }
 
     private Stream<PutCall> createOverriddenLightPutCalls(PutCall otherGroupPutCall, List<String> groupLights) {
@@ -198,5 +207,13 @@ public class ScheduledStateRegistry {
 
     public Collection<List<ScheduledState>> values() {
         return lightStates.values();
+    }
+
+    public List<ScheduledStateSnapshot> findCurrentlyActiveStates() {
+        ZonedDateTime now = currentTime.get();
+        return values().stream()
+                .map(lightStatesForId -> findActiveSnapshot(lightStatesForId, now))
+                .flatMap(Optional::stream)
+                .toList();
     }
 }

@@ -25,9 +25,9 @@ final class Light implements Resource {
     Effects effects;
     String type;
 
-    LightState getLightState() {
+    LightState getLightState(boolean unavailable) {
         return new LightState(id, getBrightnessV1(), getCt(), getX(), getY(), getEffect(), getColorMode(), isOn(),
-                getCapabilities());
+                unavailable, getCapabilities());
     }
 
     boolean isOn() {

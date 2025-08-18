@@ -1,20 +1,20 @@
 # Light Configuration
 
-Hue Scheduler uses a simple **text-based file format** for configuring your light schedules. Each line corresponds to one light configuration. Comments can start with either `#` or `//`, and empty lines are ignored.
+Hue Scheduler uses a simple **text-based** format. Each non-empty line is one schedule entry. Lines starting with `#` or `//` are comments; empty lines are ignored.
 
-Each line contains the following parts, separated either by a tab character or at least two spaces (recommended):
+Each line has three parts separated by a tab **or** at least two spaces (recommended):
 
-~~~yacas
+```yacas
 <Light/Group Name or ID>  <Start Time Expression>  [<Property>:<Value>]*
-~~~
+```
 
 ## `<Light/Group Name or ID>`
 
-The light or group (i.e., room or zone) to control, defined either through its name or ID. To simplify the configuration for multiple groups or lights, you can combine their names or IDs with a comma (`,`). The following Home Assistant entity types are currently supported: `light`, `input_boolean`, `switch`, `fan`.
+The light or group (room or zone) to control, given by name or ID. You can target multiple items by separating names/IDs with commas (`,`). Supported Home Assistant entity types: `light`, `input_boolean`, `switch`, `fan`.
          
 **Philips Hue example:**
                         
-~~~yacas
+```yacas
 Kitchen, Living room, Desk lamp    civil_dusk  ct:2400
 
 # Is equal to:
@@ -24,172 +24,162 @@ g1, g2, 1                          civil_dusk  ct:2400
 g1                                 civil_dusk  ct:2400
 g2                                 civil_dusk  ct:2400
 1                                  civil_dusk  ct:2400
-~~~
+```
 
-You can look up Philips Hue IDs by manually sending a GET request to either the `/api/<username>/lights` or `/api/<username>/groups` endpoint of your bridge. The response will contain a list of all your lights and groups in your system. For Hue Scheduler to distinguish between light and group IDs, group IDs must be prefixed with the lowercase letter `g`.
+You can look up Hue IDs by sending `GET /api/<username>/lights` or `GET /api/<username>/groups` to your bridge. The response lists all lights and groups. To distinguish IDs, **prefix group IDs with `g`** (lowercase).
 
-Note: If you have a group and light with the same name, Hue Scheduler prefers the group. Use IDs instead if you want to change this behavior.
+Note: If a group and a light share the same name, Hue Scheduler prefers the **group**. Use IDs to target the light explicitly.
 
 **Home Assistant example:**
 
-~~~yacas
+```yacas
 Kitchen, Test Switch, TV Mute      civil_dusk  on:true
 
 # Is equal to:
 light.kitchen                      civil_dusk  on:true
 input_boolean.test_switch          civil_dusk  on:true
 switch.tv_mute                     civil_dusk  on:true
-~~~
+```
 
 ## `<Start Time Expression>`
 
-Each state requires a start time, specified either as a fixed time in the 24-hour format (``HH:mm:ss``) or a dynamic solar time expression. The following dynamic **solar time constants** are available, in chronological order:
+Each state has a start time, specified either as a fixed time (24-hour `HH:mm[:ss]`, e.g., `06:00`, `23:30:15`) or a **dynamic solar time**. Available solar constants, in chronological order:
 
-- ``astronomical_dawn``: e.g. `03:26`
-- ``nautical_dawn``: e.g. `04:17`
-- ``civil_dawn``: e.g. `05:00`
-- ``sunrise``: e.g. `05:33`
-- ``noon``: e.g. `12:00`
-- ``golden_hour``: e.g. `19:24`
-- ``sunset``: e.g. `20:11`
-- ``blue_hour``: e.g. `20:29`
-- ``civil_dusk``: e.g. `20:43`
-- ``night_hour``: e.g. `20:57`
-- ``nautical_dusk``: e.g. `21:28`
-- ``astronomical_dusk``: e.g. `22:19`
+- `astronomical_dawn` (e.g., `03:26`)
+- `nautical_dawn` (e.g., `04:17`)
+- `civil_dawn` (e.g., `05:00`)
+- `sunrise` (e.g., `05:33`)
+- `noon` (e.g., `12:00`)
+- `golden_hour` (e.g., `19:24`)
+- `sunset` (e.g., `20:11`)
+- `blue_hour` (e.g., `20:29`)
+- `civil_dusk` (e.g., `20:43`)
+- `night_hour` (e.g., `20:57`)
+- `nautical_dusk` (e.g., `21:28`)
+- `astronomical_dusk` (e.g., `22:19`)
 
-These examples vary greatly depending on your current location and the current time of year. To get the current times for your location, start Hue Scheduler with an empty input file.
+These times vary by location and date. To see your current values, start Hue Scheduler with an empty input file.
 
-Additionally, you can **adjust the start time relative to these solar times** using the format:
+You can also **offset** solar times:
 
-~~~yacas
-<sun_constant>[+-]<adjustment_in_minutes>
-~~~
+```yacas
+<sun_constant>[+-]<minutes>
+```
 
-For example: ``sunset-30`` starts 30 minutes before sunset, and ``sunrise+60`` starts one hour after sunrise. These expressions are dynamically updated each day to reflect the current solar times at your location.
+Examples: `sunset-30` (30 minutes before sunset), `sunrise+60` (one hour after sunrise). Offsets update daily with the sun.
 
-> Note: Further background info about the different solar times can be found at [Twilight - Wikipedia](https://en.wikipedia.org/wiki/Twilight) and [Twilight - commons-suncalc](https://shredzone.org/maven/commons-suncalc/usage.html#twilight).
+> Note: Background on twilight terms: [Twilight - Wikipedia](https://en.wikipedia.org/wiki/Twilight) and [Twilight - commons-suncalc](https://shredzone.org/maven/commons-suncalc/usage.html#twilight).
 
-#### FAQ: How Does Hue Scheduler Determine the End of States?
+### FAQ: How is the end of a state determined?
 
-Hue Scheduler automatically sets the end time based on the start time of the next state for the same light.
+Hue Scheduler ends a state at the **start time of the next state for the same target**.
 
-Consider the following example:
+Example:
 
-  ~~~yacas
+  ```yacas
 Hallway  07:00       bri:254
 Hallway  civil_dusk  bri:150
-  ~~~
+  ```
 
-This results in the following **dynamic intervals**, adjusted daily:
+This results in two **dynamic intervals** (adjusted daily):
 
-- **07:00–civil_dusk**: bri:254
-- **civil_dusk–07:00**: bri:150
+- **07:00 → civil_dusk**: `bri:254`
+- **civil_dusk → 07:00**: `bri:150`
 
-To **create gaps** in your schedule, define a state with no properties:
+To **create gaps**, define a state with no properties:
 
-  ~~~yacas
+  ```yacas
 Hallway  07:00  bri:254
 Hallway  10:00
-  ~~~
+  ```
 
-In this case, only the interval **07:00–10:00** is created. If you turn your lights outside this interval, Hue Scheduler does not enforce any state for the light.
+Only **07:00–10:00** is scheduled. If the light is turned on outside this window, Hue Scheduler does **not** enforce any state.
 
 ## `[<Property>:<Value>]*`
 
-Specify properties to control the state of your lights during the given interval.
+Properties define the state applied during the interval.
 
-### Basic Properties
+### Basic
 
-- ``bri``: Modifies the **brightness** of the light: [``1``-``254``] or [``1%``-``100%``]. From dim to bright.
+- `bri` — **brightness** (`1–254` or `1%–100%`), from dim to bright.
+- `ct` — **color temperature** in **[Kelvin](https://en.wikipedia.org/wiki/Color_temperature)** (`6500–1000`) or **[Mired](https://en.wikipedia.org/wiki/Mired)** (`153–500`), cool → warm. Ranges can vary by bulb model. At startup, Hue Scheduler validates and clamps unsupported values. Note: Only color-capable lights support Kelvin values below 2000 K.
 
-- ``ct``: Modifies the **color temperature** of the light, either in [Kelvin](https://en.wikipedia.org/wiki/Color_temperature) [``6500``-``1000``] or [Mired](https://en.wikipedia.org/wiki/Mired) [``153``-``500``], from cool to warm white. The supported range may vary for older light bulb models. Hue Scheduler checks at startup if the given color temperature is supported by the light, automatically adjusting it to the nearest valid value if not. Note: Color lights are the only ones supporting a Kelvin value lower than 2000.
+- `on` — **power state** (`true|false`). Hue Scheduler does not change power unless `on:` is specified. If a light is off or unreachable, it waits until the light becomes reachable.
 
-- ``on``: Modifies the **on state** of the light: [``true``|``false``]. Hue Scheduler does not modify a light's on state unless explicitly specified. If a light is off or unreachable, Hue Scheduler waits until the light is turned on or reachable again.
+  > Note: To *smoothly* turn a light **on**, include another property (e.g., `bri` or `ct`) with a transition. Otherwise, turning on uses the previous/default state immediately (transition ignored). This does **not** apply when turning lights **off**.
 
-  > Note: To smoothly turn on a light using a transition, specify another property like brightness or color temperature. Otherwise, the light will turn on immediately with the previous or default light state, ignoring the defined transition time. This is not an issue when turning the lights off.
+- `days` — **days of week**. Supported aliases:
+    - `Mo|Mon`, `Tu|Tue|Di`, `We|Wed|Mi`, `Th|Thu|Do`, `Fr|Fri`, `Sa|Sat`, `Su|Sun|So`
 
-- `days`: Defines the **days of the week** when the state is active. Supported values: [`Mo|Mon` | `Tu|Tue|Di` | `We|Wen|Mi` | `Th|Thu|Do` | `Fr|Fri` | `Sa|Sat` | `Su|Sun|So`]. Separate days with `,`, or use `-` for a range. For example: `days:Mo-We,Fr-Su`, `days:Sa-Tu` (shorthand for `Mo,Tu,Sa,Su`).
+      Separate with `,` or use a range with `-`. Ranges **wrap** across the week.
 
-    ~~~yacas
+    - Examples: `days:Mo-We,Fr-Su`, `days:Sa-Tu` (i.e., `Sa,Su,Mo,Tu`)
+
+    ```yacas
     Office        sunrise     bri:254  ct:6500  tr:10s  days:Mo-Fr
     Office        sunset      bri:200  ct:3000  tr-before:20min  days:Mo-Fr
 
     Living room   22:00       bri:100   effect:prism  days:Fr,Sa
     Living room   23:59       days:Fr,Sa
-    ~~~
+    ```
 
-### Color-Related Properties
+### Color
 
-Hue Scheduler offers several ways to define the color of supported lights:
+Hue Scheduler supports several ways to set color:
 
-- ``color``: Modifies the color of the light use **hex** (e.g. ``color:#3CD0E2``) or **RGB** (e.g. ``color:60, 208, 226``). Cannot be combined with other color properties. If no brightness (``bri``) is specified, Hue Scheduler calculates an appropriate brightness level for the given color.
+- `color` — **hex** (e.g., `#3CD0E2`) or **RGB** (e.g., `60,208,226`). Cannot be combined with other color properties. If `bri` is omitted, Hue Scheduler derives a suitable brightness for the color.
+- `hue` — **hue** (`0–65535`). Wraps around (`0` and `65535` are both red). **Requires** `sat`.
+- `sat` — **saturation** (`0–254` or `0%–100%`), white → fully colored. **Requires** `hue`.
+- `effect` — Activates a light/group effect. Cannot be combined with other color properties or `ct`. The effect persists until the light is turned off or `effect:none`. Brightness can still be adjusted. Supported effects vary by model. Examples (Hue color lights): `candle`, `fire`, `prism`, `sparkle`, `opal`, `glisten`.
+- `x` / `y` — **[CIE xy](https://en.wikipedia.org/wiki/CIE_1931_color_space)** coordinates (`0.0–1.0`). Useful for exact colors read from the Hue API. Cannot be combined with other color properties.
 
-- ``hue``: Defines the **hue** color value of the light: [``0``-``65535``]. The value "wraps" around, so both `0` and `65535` are red. Requires ``sat``.
-
-- ``sat``: Defines the **saturation** color value of the light: [``0``-``254``] or [``0%``-``100%``], from white to fully colored. Requires ``hue``.
-
-- ``effect``: Activates the given effect for the light or group. Can't be combined with other color properties or `ct`. The effect is active until the light is turned off or the effect set to `none`. This means you can adjust the brightness, while the effect remains active. The supported effects depend on the light model. Some supported values for Philips Hue color lights are `candle`, `fire`, `prism`, `sparkle`, `opal`, `glisten`.
-
-- ``x`` and ``y``: (advanced) Modifies the **color** using x and y coordinates in the [CIE color space](https://en.wikipedia.org/wiki/CIE_1931_color_space): [``0.0``-``1.0``]. Useful for setting an exact color value obtained from the Hue API. For example: `x:0.1652  y=0.3103`. Cannot be combined with other color properties.
-
-**Examples**:
-~~~yacas
+Examples:
+```yacas
 Desk  10:00  color:#3CD0E2
 Desk  11:00  color:60, 208, 226
 Desk  12:00  hue:2000  sat:100
 Desk  13:00  effect:candle  bri:50%
 Desk  14:00  effect:none
-Desk  15:00  x:0.1652  y=0.3103
-~~~
+Desk  15:00  x:0.1652  y:0.3103
+```
 
-### Transition-Related Properties
+### Transitions & Interpolations
 
 > [!WARNING]
-> Due to a [firmware bug](https://www.reddit.com/r/tradfri/comments/au903n/firmware_bugs_in_ikea_bulbs/) (see https://github.com/stefanvictora/hue-scheduler/issues/5),
-> Ikea Tradfri light bulbs may not support setting multiple properties (e.g., `bri` and `ct`) with a transition time > 0.
-> Since the Hue bridge applies a default transition time of 400ms (`tr:4`)
-> if not specified otherwise, you have to explicitly set `tr:0` for Tradfri light bulbs, when setting multiple properties.
-> Another workaround is to set only one property per state and offset the state changes accordingly.
+> Due to a known [firmware bug](https://www.reddit.com/r/tradfri/comments/au903n/firmware_bugs_in_ikea_bulbs/) (see https://github.com/stefanvictora/hue-scheduler/issues/5) with some **Ikea Tradfri**, setting **multiple properties** (e.g., `bri` + `ct`) with a **non-zero transition** may fail. Because the Hue Bridge applies a default 400 ms transition (`tr:4`) if none is given, explicitly set `tr:0` for Tradfri bulbs when changing multiple properties. Alternatively, change one property per state and offset the times.
 
-Hue Scheduler offers various transition-related properties to create the desired transition and interpolation behavior:
+- `tr` — **transition duration** *at* the state's start time. Base unit is 100 ms; default is `4` (= 400 ms). Max `60000` (= 100 min).
 
-- ``tr``: Defines the transition time when the start time of a state is reached [``0``-``60000``]. Default: `4` (400ms). The value is a multiple of 100ms. For example, `tr:1` equals 100ms. The maximum value ``60000`` equals 100 minutes.
+  > Tip: Units are supported and can be combined, e.g., `tr:10s`, `tr:2min`, `tr:1h20min5s`.
 
-  > Tip: Use `s` (seconds), `min` (minutes) and `h` (hours) units. Examples: `tr:10s`, `tr:2min`, `tr:1h`. Combinations are also possible (e.g., `1h20min5s10`).
+- `tr-before` — **pre-transition** that starts **before** the state's start time (Hue Scheduler feature). Practically capped at 24 h. Supports relative durations, absolute times, and solar times:
 
-- ``tr-before``: Defines the transition time *before* the start time. The additional transition type provided by Hue Scheduler. Realistically, the maximum value is 24 hours. Supports the same units but also absolute times, and dynamic solar times (see _Start Time Expression_):
-
-  ~~~yacas
+  ```yacas
   Office  sunrise  on:true  bri:254  tr-before:30min
   Office  sunrise  on:true  bri:254  tr-before:06:00
   Office  sunrise  on:true  bri:254  tr-before:civil_dawn+5
-  ~~~
+  ```
 
   In the first example, the transition starts 30 minutes before sunrise, while in the last example, it starts 5 minutes after ``civil_dawn`` to smoothly turn on the light to full brightness until sunrise.
 
-  > Note: The start time expression for ``tr-before`` must be before the defined state start, otherwise the property is ignored. Setting ``tr-before`` to more than 24 hours is not supported and leads to unexpected scheduling results.
+  > Note: The `tr-before` reference must be **earlier** than the state's start, otherwise it's ignored. Values > 24 h are unsupported and produce undefined schedules.
 
-  `tr-before` adjusts the transition time to the remaining duration if the light is turned on later. It calculates the mid-transition state based on the elapsed time, effectively interpolating from the previous state. For example:
+    **Late turn-on behavior:** If lights are turned on after a `tr-before` has already started, Hue Scheduler shortens the remaining fade and **interpolates** from the previous state:
 
-  ~~~yacas
+  ```yacas
   Office  06:00  ct:400  tr:2s
   Office  09:00  ct:200  tr-before:30min  tr:10s
-  ~~~
+  ```
 
-    1. If you turn on the lights at `08:30` (exact start of `tr-before`), or if they are already on, they will transition from the previous `ct:400` to the given `ct:200` over 30 minutes.
+    1. At **08:30**, the full 30-min fade runs from `ct:400` → `ct:200`.
+    2. At **08:45**, the remaining 15 min run, starting near `ct:300`.
+    3. After **09:00**, `tr-before` is ignored; `tr` (10 s, or the default) applies.
 
-    2. If you turn on the lights at `08:45`, Hue Scheduler shortens the transition to the remaining 15 minutes and interpolates the ``ct`` value to `300`, making sure the lights always have the desired color temperature regardless when they are turned on during the transition.
+  > Note: Hue Scheduler uses the **previous state's** `tr` for the per-step interpolation calls. Set the previous state's `tr:0` to disable those transitions. If no `tr` is defined, the global default `--default-interpolation-transition-time` is used (default: `4` = 400 ms). If interpolation between two states is **not possible**, `tr-before` and `interpolate:true` are ignored.
 
-    3. If you turn on the lights after `09:00`, `tr-before` is ignored and `tr` is used (default: 400ms if not specified).
+- `interpolate:true` — Start transitions **automatically** from the previous state (a shorthand for common `tr-before` patterns):
 
-  > Note: Hue Scheduler uses the previous state's ``tr`` property to determine the transition time for the interpolated calls. Set `tr:0` for the previous state to disable transitions for interpolated calls. If no ``tr`` property is defined, Hue Scheduler uses the default value defined via the ``--default-interpolation-transition-time`` (default: `4` = 400ms) global command line option.
-  > If the previous and current states have incompatible to interpolate between, Hue Scheduler ignores any ``tr-before`` and ``interpolate:true`` properties.
-
-  **To summarize**: `tr-before` allows longer, smoother transitions that match the desired state, regardless of when they are turned on. Interpolations are available for all color modes (CT, XY/RGB, Hue/Sat), and Hue Scheduler converts between them for smooth transitions (e.g., from color temperature to a color value).
-
-- ``interpolate:true``: Extends ``tr-before`` by automatically starting transitions from the previous state:
-  ~~~yacas
+  ```yacas
   # Instead of:
   Office  sunrise  bri:100
   Office  noon     bri:254  tr-before:sunrise
@@ -198,26 +188,32 @@ Hue Scheduler offers various transition-related properties to create the desired
   Office  sunrise  bri:100
   Office  noon     bri:254  interpolate:true
   Office  sunset   bri:50   interpolate:true
-  ~~~ 
-  It also allows interpolations between states across days:
-  ~~~yacas
+  ```
+   
+    Interpolations also **span days**:
+ 
+  ```yacas
   Office  sunrise  bri:100  interpolate:true
   Office  noon     bri:254  interpolate:true
   Office  sunset   bri:50   interpolate:true
-  ~~~ 
-  In this example, Hue Scheduler also interpolates between `sunset` and `sunrise`.
+  ```
+   
+    In this example, Hue Scheduler also interpolates from `sunset` → next day's `sunrise`.
 
-  > Tip: Enable ``interpolate:true`` for all states by using the ``--interpolate-all`` command line flag. Customize this behavior by explicitly setting ``interpolate:false`` for individual states or by defining a custom ``tr-before`` which takes precedence over the ``interpolate`` property.
+  > Tip: Enable interpolation globally with `--interpolate-all`, then override per state using `interpolate:false` or a custom `tr-before` (which takes precedence).
 
-### Advanced Properties
+### Advanced
 
-- `force`: Defines whether Hue Scheduler should **enforce the state despite user modifications**: [`true`|`false`]. This is only relevant if user modification tracking is not disabled (see `--disable-user-modification-tracking`). Default: `false`.
+- `force:true` — **enforce** the state even if the user manually changed the light since the last scheduled state (`true|false`, default `false`). Relevant only if user-modification tracking is enabled (default).
 
-  ~~~yacas
+  ```yacas
   Office  09:00  bri:254  ct:6500
   Office  sunset bri:200  ct:3000  force:true
-  ~~~
+  ```
 
-  In this example, the sunset state would always be set, even if the light has been manually adjusted since the morning.
+    Here, the sunset state is always applied—even if the user changed the light during the day.
 
-  **Note**: The `force` property can also enforce the ``on:false`` state, which otherwise is not rescheduled when turning a light off and on again. Warning: This means such lights can't be turned on at all during these schedules, as they will immediately turned off again.
+    **Note**: `force:true` can also enforce `on:false`. In that case, lights **cannot** be turned on during the interval (they'll be turned off immediately).
+
+    With `--require-scene-activation`, `force:true` still applies the state even if a synced scene wasn't activated.
+

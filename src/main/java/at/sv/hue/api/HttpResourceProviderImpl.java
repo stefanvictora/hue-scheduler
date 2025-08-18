@@ -34,7 +34,7 @@ public class HttpResourceProviderImpl implements HttpResourceProvider {
     }
 
     private static String getTruncatedBody(String body) {
-        return body.length() > 100 ? body.substring(0, 100) + "..." : body;
+        return body.length() > 150 ? body.substring(0, 150) + "..." : body;
     }
 
     @Override
@@ -70,7 +70,7 @@ public class HttpResourceProviderImpl implements HttpResourceProvider {
             assertSuccessful(response);
             return getBody(response);
         } catch (IOException e) {
-            log.error("Failed '{}'", request, e);
+            log.error("Failed '{}'", request);
             throw new BridgeConnectionFailure("Failed '" + request + "'", e);
         }
     }
@@ -87,7 +87,7 @@ public class HttpResourceProviderImpl implements HttpResourceProvider {
             throw new ResourceNotFoundException("Resource not found: " + getBody(response));
         }
         if (response.code() == 429) {
-            throw new ApiFailure("Rate limit exceeded: " + getBody(response));
+            throw new ApiFailure("Rate limit exceeded");
         }
         if (response.code() >= 500) {
             throw new ApiFailure("Server error: " + getBody(response));

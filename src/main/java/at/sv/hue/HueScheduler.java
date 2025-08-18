@@ -16,8 +16,12 @@ import at.sv.hue.api.SceneEventListener;
 import at.sv.hue.api.SceneEventListenerImpl;
 import at.sv.hue.api.hass.HassApiImpl;
 import at.sv.hue.api.hass.HassApiUtils;
+import at.sv.hue.api.hass.HassAvailabilityListener;
 import at.sv.hue.api.hass.HassEventHandler;
 import at.sv.hue.api.hass.HassEventStreamReader;
+import at.sv.hue.api.hass.area.HassAreaRegistry;
+import at.sv.hue.api.hass.area.HassAreaRegistryImpl;
+import at.sv.hue.api.hass.area.HassWebSocketClientImpl;
 import at.sv.hue.api.hue.HueApiImpl;
 import at.sv.hue.api.hue.HueEventHandler;
 import at.sv.hue.api.hue.HueEventStreamReader;
@@ -45,39 +49,48 @@ import java.time.Duration;
 import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 
-@Command(name = "HueScheduler", version = "0.12.3", mixinStandardHelpOptions = true, sortOptions = false)
+@Command(name = "HueScheduler", version = "0.13.0", mixinStandardHelpOptions = true, sortOptions = false)
 public final class HueScheduler implements Runnable {
 
     private static final Logger LOG = LoggerFactory.getLogger(HueScheduler.class);
 
+    @CommandLine.Spec
+    CommandLine.Model.CommandSpec spec;
+
     @Parameters(
+            index = "0",
             defaultValue = "${env:API_HOST}",
             description = "The host for your Philips Hue Bridge or origin (i.e. scheme, host, port) for your Home Assistant instance. " +
                           "Examples: Philips Hue: 192.168.0.157; " +
                           "Home Assistant: http://localhost:8123, or https://UNIQUE_ID.ui.nabu.casa")
     String apiHost;
     @Parameters(
+            index = "1",
             defaultValue = "${env:ACCESS_TOKEN}",
             description = "The Philips Hue Bridge or Home Assistant access token used for authentication.")
     String accessToken;
-    @Parameters(paramLabel = "CONFIG_FILE",
+    @Parameters(
+            index = "2",
+            paramLabel = "CONFIG_FILE",
             defaultValue = "${env:CONFIG_FILE}",
             description = "The configuration file containing your schedules.")
     Path configFile;
     @Option(names = "--lat", required = true,
             defaultValue = "${env:LAT}",
-            description = "The latitude of your location.")
+            description = "The latitude of your location in degrees [-90..90].")
     double latitude;
     @Option(names = "--long", required = true,
             defaultValue = "${env:LONG}",
-            description = "The longitude of your location.")
+            description = "The longitude of your location in degrees [-180..180].")
     double longitude;
     @Option(names = "--elevation", paramLabel = "<meters>",
             defaultValue = "${env:ELEVATION:-0.0}",
@@ -99,6 +112,13 @@ public final class HueScheduler implements Runnable {
             description = "Globally disable tracking of user modifications which would pause their schedules until they are turned off and on again." +
                           " Default: ${DEFAULT-VALUE}")
     boolean disableUserModificationTracking;
+    @Option(names = "--require-scene-activation",
+            defaultValue = "${env:REQUIRE_SCENE_ACTIVATION:-false}",
+            description = "When enabled, states will only be applied when triggered by a synced scene activation. " +
+                          "After scene activation, the current state and subsequent states will be applied until " +
+                          "lights are turned off or manually modified. Use in combination with --enable-scene-sync. " +
+                          "Default: ${DEFAULT-VALUE}")
+    boolean requireSceneActivation;
     @Option(names = "--enable-scene-sync",
             defaultValue = "${env:ENABLE_SCENE_SYNC:-false}",
             description = "Enable the creating of Hue scenes that always match the state of a scheduled room or zone." +
@@ -110,7 +130,7 @@ public final class HueScheduler implements Runnable {
                           " Default: ${DEFAULT-VALUE}")
     String sceneSyncName;
     @Option(names = "--scene-sync-interval",
-            defaultValue = "${env:SCENE_SYNC_INTERVAL:-2}",
+            defaultValue = "${env:SCENE_SYNC_INTERVAL:-3}",
             description = "The interval for syncing interpolated states to scenes in minutes. Related to '--enable-scene-sync'." +
                           " Default: ${DEFAULT-VALUE}")
     int sceneSyncIntervalInMinutes;
@@ -139,7 +159,7 @@ public final class HueScheduler implements Runnable {
             description = "The delay in seconds for retrying an API call, if the bridge could not be reached due to " +
                           "network failure, or if it returned an API error code. Default: ${DEFAULT-VALUE} seconds.")
     int bridgeFailureRetryDelayInSeconds;
-    @Option(names = "--event-stream-read-timeout", paramLabel = "<timout>",
+    @Option(names = "--event-stream-read-timeout", paramLabel = "<timeout>",
             defaultValue = "${env:EVENT_STREAM_READ_TIMEOUT:-120}",
             description = "The read timeout of the API v2 SSE event stream in minutes. " +
                           "The connection is automatically restored after a timeout. Default: ${DEFAULT-VALUE} minutes.")
@@ -160,8 +180,35 @@ public final class HueScheduler implements Runnable {
                           "tr-before states. Default: ${DEFAULT-VALUE} minutes."
     )
     int minTrBeforeGapInMinutes;
+    @Option(
+            names = "--brightness-override-threshold", paramLabel = "<percent>",
+            defaultValue = "${env:BRIGHTNESS_OVERRIDE_THRESHOLD:-10}",
+            description = "The brightness difference threshold (percentage points) above which a light's brightness " +
+                          "is considered manually overridden. For example, 10 means a change from 50%% to 60%% " +
+                          "brightness would trigger override detection. Typical range: 5-20. " +
+                          "Default: ${DEFAULT-VALUE}."
+    )
+    int brightnessOverrideThresholdPercentage;
+    @Option(
+            names = "--ct-override-threshold", paramLabel = "<kelvin>",
+            defaultValue = "${env:CT_OVERRIDE_THRESHOLD:-350}",
+            description = "The color temperature difference threshold (Kelvin) above which a light's temperature " +
+                          "is considered manually overridden. For example, 350 means a change from 3000K to 3350K " +
+                          "would trigger detection. Typical range: 100-500. Default: ${DEFAULT-VALUE}."
+    )
+    int colorTemperatureOverrideThresholdKelvin;
+    @Option(
+            names = "--color-override-threshold", paramLabel = "<delta>",
+            defaultValue = "${env:COLOR_OVERRIDE_THRESHOLD:-6.0}",
+            description = "The color difference threshold (Delta-E CIE76) above which a light's color is considered " +
+                          "manually overridden. Lower values detect smaller color changes but may trigger during " +
+                          "transitions. Higher values ignore transition noise but may miss subtle adjustments. " +
+                          "Typical range: 5-15. Default: ${DEFAULT-VALUE}."
+    )
+    double colorOverrideThreshold;
+
     @Option(names = "--scene-activation-ignore-window", paramLabel = "<duration>",
-            defaultValue = "${env:SCENE_ACTIVATION_IGNORE_WINDOW:-5}",
+            defaultValue = "${env:SCENE_ACTIVATION_IGNORE_WINDOW:-8}",
             description = "The delay in seconds during which turn-on events for affected lights and groups are ignored " +
                           "after a scene activation has been detected. Default: ${DEFAULT-VALUE} seconds.")
     int sceneActivationIgnoreWindowInSeconds;
@@ -174,8 +221,8 @@ public final class HueScheduler implements Runnable {
     private StateScheduler stateScheduler;
     private final ManualOverrideTracker manualOverrideTracker;
     private final LightEventListener lightEventListener;
-    private StartTimeProvider startTimeProvider;
     private Supplier<ZonedDateTime> currentTime;
+    private StartTimeProvider startTimeProvider;
     private SceneEventListenerImpl sceneEventListener;
     private ScheduledStateRegistry stateRegistry;
     private int sceneSyncDelayInSeconds = 5;
@@ -183,33 +230,39 @@ public final class HueScheduler implements Runnable {
     public HueScheduler() {
         currentTime = ZonedDateTime::now;
         manualOverrideTracker = new ManualOverrideTrackerImpl();
-        lightEventListener = new LightEventListenerImpl(manualOverrideTracker, deviceId -> api.getAffectedIdsByDevice(deviceId));
+        lightEventListener = new LightEventListenerImpl(manualOverrideTracker,
+                deviceId -> api.getAffectedIdsByDevice(deviceId),
+                id -> sceneEventListener.wasRecentlyAffectedBySyncedScene(id));
     }
 
     public HueScheduler(HueApi api, StateScheduler stateScheduler,
                         StartTimeProvider startTimeProvider, Supplier<ZonedDateTime> currentTime,
                         double requestsPerSecond, boolean controlGroupLightsIndividually,
-                        boolean disableUserModificationTracking, String defaultInterpolationTransitionTimeString,
+                        boolean disableUserModificationTracking, boolean requireSceneActivation,
+                        String defaultInterpolationTransitionTimeString,
                         int powerOnRescheduleDelayInMs, int bridgeFailureRetryDelayInSeconds,
-                        int minTrBeforeGapInMinutes, int sceneActivationIgnoreWindowInSeconds, boolean interpolateAll,
-                        boolean enableSceneSync, String sceneSyncName, int sceneSyncIntervalInMinutes,
-                        int sceneSyncDelayInSeconds) {
+                        int minTrBeforeGapInMinutes, int brightnessOverrideThresholdPercentage,
+                        int colorTemperatureOverrideThresholdKelvin, double colorOverrideThreshold,
+                        int sceneActivationIgnoreWindowInSeconds, boolean interpolateAll, boolean enableSceneSync,
+                        String sceneSyncName, int sceneSyncIntervalInMinutes, int sceneSyncDelayInSeconds) {
         this();
         this.api = api;
         ZonedDateTime initialTime = currentTime.get();
-        this.sceneEventListener = new SceneEventListenerImpl(api,
-                sceneSyncName, () -> Duration.between(initialTime, currentTime.get()).toNanos(),
-                sceneActivationIgnoreWindowInSeconds, lightEventListener);
+        Ticker fakeTicker = () -> Duration.between(initialTime, currentTime.get()).toNanos();
         this.stateScheduler = stateScheduler;
         this.startTimeProvider = startTimeProvider;
         this.currentTime = currentTime;
         this.requestsPerSecond = requestsPerSecond;
         this.controlGroupLightsIndividually = controlGroupLightsIndividually;
         this.disableUserModificationTracking = disableUserModificationTracking;
+        this.requireSceneActivation = requireSceneActivation;
         this.defaultInterpolationTransitionTimeString = defaultInterpolationTransitionTimeString;
         this.powerOnRescheduleDelayInMs = powerOnRescheduleDelayInMs;
         this.bridgeFailureRetryDelayInSeconds = bridgeFailureRetryDelayInSeconds;
         this.minTrBeforeGapInMinutes = minTrBeforeGapInMinutes;
+        this.brightnessOverrideThresholdPercentage = brightnessOverrideThresholdPercentage;
+        this.colorTemperatureOverrideThresholdKelvin = colorTemperatureOverrideThresholdKelvin;
+        this.colorOverrideThreshold = colorOverrideThreshold;
         this.sceneActivationIgnoreWindowInSeconds = sceneActivationIgnoreWindowInSeconds;
         defaultInterpolationTransitionTime = parseInterpolationTransitionTime(defaultInterpolationTransitionTimeString);
         this.interpolateAll = interpolateAll;
@@ -219,6 +272,8 @@ public final class HueScheduler implements Runnable {
         this.sceneSyncDelayInSeconds = sceneSyncDelayInSeconds;
         apiCacheInvalidationIntervalInMinutes = 15;
         stateRegistry = new ScheduledStateRegistry(currentTime, api);
+        this.sceneEventListener = new SceneEventListenerImpl(api, fakeTicker, sceneActivationIgnoreWindowInSeconds,
+                sceneSyncName::equals, lightEventListener);
     }
 
     private Integer parseInterpolationTransitionTime(String interpolationTransitionTimeString) {
@@ -242,6 +297,7 @@ public final class HueScheduler implements Runnable {
     @Override
     public void run() {
         MDC.put("context", "init");
+        assertConfigurationParameters();
         if (HassApiUtils.isHassConnection(accessToken)) {
             setupHassApi();
         } else {
@@ -260,11 +316,16 @@ public final class HueScheduler implements Runnable {
                 })
                 .build();
         RateLimiter rateLimiter = RateLimiter.create(requestsPerSecond);
-        api = new HassApiImpl(apiHost, new HttpResourceProviderImpl(httpClient), rateLimiter);
-        sceneEventListener = new SceneEventListenerImpl(api, sceneSyncName, Ticker.systemTicker(),
-                sceneActivationIgnoreWindowInSeconds, lightEventListener);
-        new HassEventStreamReader(HassApiUtils.getHassWebsocketOrigin(apiHost), accessToken, httpClient,
-                new HassEventHandler(lightEventListener, sceneEventListener)).start();
+        String websocketOrigin = HassApiUtils.getHassWebsocketOrigin(apiHost);
+        HassAreaRegistry areaRegistry = new HassAreaRegistryImpl(
+                new HassWebSocketClientImpl(websocketOrigin, accessToken, httpClient, 5));
+        HassAvailabilityListener availabilityListener = new HassAvailabilityListener(this::clearCachesAndReSyncScenes);
+        api = new HassApiImpl(apiHost, new HttpResourceProviderImpl(httpClient), areaRegistry, availabilityListener, rateLimiter);
+        sceneEventListener = new SceneEventListenerImpl(api, Ticker.systemTicker(),
+                sceneActivationIgnoreWindowInSeconds,
+                sceneName -> HassApiUtils.matchesSceneSyncName(sceneName, sceneSyncName), lightEventListener);
+        new HassEventStreamReader(websocketOrigin, accessToken, httpClient,
+                new HassEventHandler(lightEventListener, sceneEventListener, availabilityListener, api)).start();
         stateRegistry = new ScheduledStateRegistry(currentTime, api);
     }
 
@@ -272,8 +333,8 @@ public final class HueScheduler implements Runnable {
         OkHttpClient httpsClient = createHueHttpsClient();
         RateLimiter rateLimiter = RateLimiter.create(requestsPerSecond);
         api = new HueApiImpl(new HttpResourceProviderImpl(httpsClient), apiHost, rateLimiter, apiCacheInvalidationIntervalInMinutes);
-        sceneEventListener = new SceneEventListenerImpl(api, sceneSyncName, Ticker.systemTicker(),
-                sceneActivationIgnoreWindowInSeconds, lightEventListener);
+        sceneEventListener = new SceneEventListenerImpl(api, Ticker.systemTicker(),
+                sceneActivationIgnoreWindowInSeconds, sceneSyncName::equals, lightEventListener);
         new HueEventStreamReader(apiHost, accessToken, httpsClient, new HueEventHandler(lightEventListener, sceneEventListener, api),
                 eventStreamReadTimeoutInMinutes).start();
         stateRegistry = new ScheduledStateRegistry(currentTime, api);
@@ -305,6 +366,82 @@ public final class HueScheduler implements Runnable {
         return new StateSchedulerImpl(Executors.newSingleThreadScheduledExecutor(), ZonedDateTime::now);
     }
 
+    private void assertConfigurationParameters() {
+        assertGeographicConfigurations();
+        assertRateLimitingConfiguration();
+        assertSceneSyncConfigurations();
+        assertManualOverrideThresholds();
+        assertApiConfigurations();
+        assertTimingConfigurations();
+    }
+
+    private void assertGeographicConfigurations() {
+        if (latitude < -90 || latitude > 90) {
+            fail("--lat must be between -90 and 90 degrees");
+        }
+        if (longitude < -180 || longitude > 180) {
+            fail("--long must be between -180 and 180 degrees");
+        }
+    }
+
+    private void assertRateLimitingConfiguration() {
+        if (requestsPerSecond <= 0) {
+            fail("--max-requests-per-second must be > 0");
+        }
+    }
+
+    private void assertSceneSyncConfigurations() {
+        if (requireSceneActivation && !enableSceneSync) {
+            fail("--require-scene-activation requires --enable-scene-sync");
+        }
+        if (enableSceneSync && (sceneSyncName == null || sceneSyncName.isBlank())) {
+            fail("--scene-sync-name must be non-empty when --enable-scene-sync is set");
+        }
+        if (enableSceneSync && sceneSyncIntervalInMinutes <= 0) {
+            fail("--scene-sync-interval must be > 0");
+        }
+    }
+
+    private void assertManualOverrideThresholds() {
+        if (brightnessOverrideThresholdPercentage < 1 || brightnessOverrideThresholdPercentage > 100) {
+            fail("--brightness-override-threshold must be within [1,100]");
+        }
+        if (colorTemperatureOverrideThresholdKelvin <= 0) {
+            fail("--ct-override-threshold must be > 0");
+        }
+        if (colorOverrideThreshold <= 0) {
+            fail("--color-override-threshold must be > 0.0");
+        }
+    }
+
+    private void assertApiConfigurations() {
+        if (eventStreamReadTimeoutInMinutes <= 0) {
+            fail("--event-stream-read-timeout must be > 0");
+        }
+        if (apiCacheInvalidationIntervalInMinutes <= 0) {
+            fail("--api-cache-invalidation-interval must be > 0");
+        }
+    }
+
+    private void assertTimingConfigurations() {
+        if (powerOnRescheduleDelayInMs < 0) {
+            fail("--power-on-reschedule-delay must be >= 0");
+        }
+        if (minTrBeforeGapInMinutes < 0) {
+            fail("--min-tr-before-gap must be >= 0");
+        }
+        if (sceneActivationIgnoreWindowInSeconds < 0) {
+            fail("--scene-activation-ignore-window must be >= 0");
+        }
+    }
+
+    private void fail(String msg) {
+        if (spec != null) {
+            throw new CommandLine.ParameterException(spec.commandLine(), msg);
+        }
+        throw new IllegalArgumentException(msg);
+    }
+
     private void assertInputIsReadable() {
         if (!Files.isReadable(configFile)) {
             System.err.println("Given config file '" + configFile.toAbsolutePath() + "' does not exist or is not readable!");
@@ -322,11 +459,12 @@ public final class HueScheduler implements Runnable {
     }
 
     private boolean assertConnection() {
+        MDC.put("context", "init");
         try {
             api.assertConnection();
             LOG.info("Connected to {}.", apiHost);
         } catch (BridgeConnectionFailure e) {
-            LOG.warn("Api not reachable: '{}'. Retrying in 5s.", e.getCause().getLocalizedMessage());
+            LOG.warn("Api not reachable: '{}'. Retrying in 5s.", getCauseMessage(e));
             return false;
         } catch (BridgeAuthenticationFailure e) {
             System.err.println("Api connection rejected: 'Unauthorized user'. Please make sure you use the correct" +
@@ -336,10 +474,13 @@ public final class HueScheduler implements Runnable {
         return true;
     }
 
+    private static String getCauseMessage(Exception e) {
+        return Objects.requireNonNullElse(e.getCause(), e).getLocalizedMessage();
+    }
+
     private void parseInput() {
-        try {
-            Files.lines(configFile)
-                 .filter(s -> !s.isEmpty())
+        try (Stream<String> lines = Files.lines(configFile)) {
+            lines.filter(s -> !s.isBlank())
                  .filter(s -> !s.startsWith("//") && !s.startsWith("#"))
                  .forEachOrdered(input -> {
                      try {
@@ -356,7 +497,8 @@ public final class HueScheduler implements Runnable {
     }
 
     public void addState(String input) {
-        new InputConfigurationParser(startTimeProvider, api, minTrBeforeGapInMinutes, interpolateAll)
+        new InputConfigurationParser(startTimeProvider, api, minTrBeforeGapInMinutes, brightnessOverrideThresholdPercentage,
+                colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold, interpolateAll)
                 .parse(input)
                 .forEach(stateRegistry::addState);
     }
@@ -407,54 +549,67 @@ public final class HueScheduler implements Runnable {
         LOG.debug("Schedule: {} in {}", snapshot, Duration.ofMillis(delayInMs + overlappingDelayInMs).withNanos(0));
         stateScheduler.schedule(() -> {
             MDC.put("context", snapshot.getContextName());
-            if (snapshot.endsBefore(currentTime.get())) {
+            ZonedDateTime now = currentTime.get();
+            if (snapshot.endsBefore(now)) {
                 LOG.debug("Already ended: {}", snapshot);
                 reschedule(snapshot);
                 return;
             }
-            LOG.info("Set: {}", snapshot);
             if (shouldSyncScene(snapshot)) {
-                scheduleAsyncSceneSync(snapshot);
+                scheduleAsyncSceneSync(snapshot, false);
+                MDC.put("context", snapshot.getContextName());
             }
-            MDC.put("context", snapshot.getContextName());
+            if (shouldIgnoreState(snapshot)) {
+                LOG.debug("Ignore state: {}", snapshot);
+                createOnPowerOnCopyAndReschedule(snapshot);
+                return;
+            }
+            LOG.info("Set: {}", snapshot);
             try {
                 if (wasNotJustTurnedOn(snapshot) &&     // todo: wasJustTurnedOn is not working if we have gaps in the schedule
                     (lightHasBeenManuallyOverriddenBefore(snapshot) || lightIsOffAndDoesNotTurnOn(snapshot))) {
-                    if (shouldRetryOnPowerOn(snapshot)) {
-                        LOG.info("Off or manually overridden: Skip update and retry when back online");
-                        retryWhenBackOn(snapshot);
-                    } else {
-                        LOG.info("Off or manually overridden: Skip state for this day.");
-                        reschedule(snapshot);
-                    }
+                    LOG.info("Off or manually overridden: Skip update");
+                    createOnPowerOnCopyAndReschedule(snapshot);
                     return;
                 }
                 if (shouldTrackUserModification(snapshot) &&
-                    (turnedOnThroughScene(snapshot) || stateHasBeenManuallyOverriddenSinceLastSeen(snapshot))) {
+                    (turnedOnThroughNormalScene(snapshot) || stateHasBeenManuallyOverriddenSinceLastSeen(snapshot))) {
                     LOG.info("Manually overridden or scene turn-on: Pause updates until turned off and on again");
                     manualOverrideTracker.onManuallyOverridden(snapshot.getId());
-                    retryWhenBackOn(snapshot);
+                    createOnPowerOnCopyAndReschedule(snapshot);
                     return;
                 }
-                boolean performedInterpolation = putAdditionalInterpolatedStateIfNeeded(snapshot);
-                putState(snapshot, performedInterpolation);
+                boolean performedInterpolation = putAdditionalInterpolatedStateIfNeeded(snapshot, now);
+                putState(snapshot, performedInterpolation, now);
             } catch (BridgeConnectionFailure | ApiFailure e) {
                 logException(e);
                 retry(snapshot, getMs(bridgeFailureRetryDelayInSeconds));
                 return;
             }
-            snapshot.recordLastSeen(currentTime.get());
-            manualOverrideTracker.onAutomaticallyAssigned(snapshot.getId());
+            snapshot.recordLastSeen(now);
             if (snapshot.isOff()) {
                 LOG.info("Turned off");
             }
-            if (shouldRetryOnPowerOn(snapshot)) {
-                ScheduledStateSnapshot powerOnCopy = createPowerOnCopy(snapshot);
-                LOG.trace("Created power-on runnable: {}", powerOnCopy);
-                retryWhenBackOn(powerOnCopy);
-            }
-            reschedule(snapshot);
+            createOnPowerOnCopyAndReschedule(snapshot);
         }, currentTime.get().plus(delayInMs + overlappingDelayInMs, ChronoUnit.MILLIS), snapshot.getEnd());
+    }
+
+    private void createOnPowerOnCopyAndReschedule(ScheduledStateSnapshot snapshot) {
+        if (snapshot.isRetryAfterPowerOnState()) {
+            retryWhenBackOn(snapshot);
+            return;
+        }
+        ZonedDateTime now = currentTime.get();
+        if (snapshot.isInsideSplitCallWindow(now)) {
+            ScheduledStateSnapshot nextSplitSnapshot = createTemporaryFollowUpSplitState(snapshot);
+            schedule(nextSplitSnapshot, snapshot.getNextInterpolationSplitDelayInMs(now));
+        }
+        if (shouldRetryOnPowerOn(snapshot)) {
+            ScheduledStateSnapshot powerOnCopy = createPowerOnCopy(snapshot);
+            LOG.trace("Created power-on runnable: {}", powerOnCopy);
+            retryWhenBackOn(powerOnCopy);
+        }
+        reschedule(snapshot);
     }
 
     private long getPotentialOverlappingDelayInMs(ScheduledStateSnapshot snapshot) {
@@ -466,7 +621,7 @@ public final class HueScheduler implements Runnable {
     }
 
     private boolean shouldSyncScene(ScheduledStateSnapshot state) {
-        return enableSceneSync && !state.isTemporary() && !state.isSkipSceneSync();
+        return enableSceneSync && !state.isTemporary();
     }
 
     private boolean wasNotJustTurnedOn(ScheduledStateSnapshot state) {
@@ -474,44 +629,45 @@ public final class HueScheduler implements Runnable {
     }
 
     private boolean wasJustTurnedOn(ScheduledStateSnapshot state) {
-        return manualOverrideTracker.wasJustTurnedOn(state.getId());
+        return state.isRetryAfterPowerOnState();
     }
 
-    private void scheduleAsyncSceneSync(ScheduledStateSnapshot state) {
+    private void scheduleAsyncSceneSync(ScheduledStateSnapshot state, boolean justOnce) {
         if (sceneSyncDelayInSeconds == 0) {
-            syncScene(state);
+            syncScene(state, justOnce);
         } else {
             stateScheduler.schedule(() -> {
-                syncScene(state);
+                syncScene(state, justOnce);
             }, currentTime.get().plusSeconds(sceneSyncDelayInSeconds), state.getEnd());
         }
     }
 
-    private void syncScene(ScheduledStateSnapshot state) {
+    private void syncScene(ScheduledStateSnapshot state, boolean justOnce) {
         MDC.put("context", state.getContextName() + " (scene sync)");
         try {
             stateRegistry.getAssignedGroups(state)
                          .forEach(groupInfo -> syncScene(groupInfo.groupId(), stateRegistry.getPutCalls(groupInfo.groupLights())));
-            if (state.performsInterpolation(currentTime.get())) {
-                scheduleNextSceneSync(state);
+            if (!justOnce && state.performsInterpolation(currentTime.get())) {
+                scheduleNextSceneSync(state, false);
             }
         } catch (Exception e) {
-            LOG.error("Scene sync failed: '{}'. Retry in {}min", e.getLocalizedMessage(), sceneSyncIntervalInMinutes);
-            scheduleNextSceneSync(state);
+            LOG.error("Scene sync failed: '{}'. Retry in {}min", e.getLocalizedMessage(), sceneSyncIntervalInMinutes, e);
+            scheduleNextSceneSync(state, justOnce);
         }
+        MDC.remove("context");
     }
 
     private void syncScene(String groupId, List<PutCall> putCalls) {
         api.createOrUpdateScene(groupId, sceneSyncName, putCalls);
     }
 
-    private void scheduleNextSceneSync(ScheduledStateSnapshot stateSnapshot) {
+    private void scheduleNextSceneSync(ScheduledStateSnapshot stateSnapshot, boolean justOnce) {
         ZonedDateTime end = stateSnapshot.getEnd();
         stateScheduler.schedule(() -> {
             if (currentTime.get().isAfter(end)) {
                 return;
             }
-            syncScene(stateSnapshot);
+            syncScene(stateSnapshot, justOnce);
         }, currentTime.get().plusMinutes(sceneSyncIntervalInMinutes), end);
     }
 
@@ -549,8 +705,16 @@ public final class HueScheduler implements Runnable {
         return !disableUserModificationTracking && !state.isForced();
     }
 
-    private boolean turnedOnThroughScene(ScheduledStateSnapshot state) {
-        return wasJustTurnedOn(state) && sceneEventListener.wasRecentlyAffectedByAScene(state.getId());
+    private boolean shouldIgnoreState(ScheduledStateSnapshot snapshot) {
+        return requireSceneActivation && !snapshot.isForced() && wasNotTurnedOnBySyncedScene(snapshot);
+    }
+
+    private boolean wasNotTurnedOnBySyncedScene(ScheduledStateSnapshot snapshot) {
+        return !manualOverrideTracker.wasTurnedOnBySyncedScene(snapshot.getId());
+    }
+
+    private boolean turnedOnThroughNormalScene(ScheduledStateSnapshot state) {
+        return wasJustTurnedOn(state) && sceneEventListener.wasRecentlyAffectedByNormalScene(state.getId());
     }
 
     private boolean stateHasBeenManuallyOverriddenSinceLastSeen(ScheduledStateSnapshot state) {
@@ -565,9 +729,19 @@ public final class HueScheduler implements Runnable {
             return false;
         }
         if (state.isGroupState()) {
-            return api.getGroupStates(state.getId()).stream().anyMatch(this::isGroupStateDifferent);
+            List<LightState> groupStates = api.getGroupStates(state.getId());
+            boolean anyOverridden = groupStates.stream().anyMatch(this::isGroupStateDifferent);
+            if (anyOverridden && LOG.isTraceEnabled()) {
+                logGroupOverridden(state, groupStates);
+            }
+            return anyOverridden;
         } else {
-            return lastSeenState.lightStateDiffers(api.getLightState(state.getId()));
+            LightState lightState = api.getLightState(state.getId());
+            boolean differs = lastSeenState.lightStateDiffers(lightState);
+            if (differs && LOG.isTraceEnabled()) {
+                logLightOverridden(state, lightState, lastSeenState);
+            }
+            return differs;
         }
     }
 
@@ -587,18 +761,17 @@ public final class HueScheduler implements Runnable {
                   .allMatch(lastSeenGroupState -> lastSeenGroupState.lightStateDiffers(lightState));
     }
 
-    private boolean putAdditionalInterpolatedStateIfNeeded(ScheduledStateSnapshot state) {
-        PutCall interpolatedPutCall = state.getInterpolatedPutCallIfNeeded(currentTime.get());
+    private boolean putAdditionalInterpolatedStateIfNeeded(ScheduledStateSnapshot state, ZonedDateTime now) {
+        PutCall interpolatedPutCall = state.getInterpolatedPutCallIfNeeded(now);
         if (interpolatedPutCall == null) {
             return false;
         }
         ScheduledStateSnapshot previousState = state.getPreviousState();
         ScheduledState lastSeenState = stateRegistry.getLastSeenState(state);
-        if ((lastSeenState == previousState.getScheduledState() || state.isSameState(lastSeenState) && state.isSplitState())
-            && wasNotJustTurnedOn(state)) {
-            return false; // skip interpolations if the previous or current state was the last state set without any power cycles
+        if (lastSeenState != null && lastSeenState.getLastPutCall().hasSameLightState(interpolatedPutCall) && wasNotJustTurnedOn(state)) {
+            return false; // skip interpolation, last put call is the same as the current one; and no power cycle
         }
-        LOG.trace("Perform interpolation from previous state: {}", previousState);
+        LOG.debug("Perform interpolation from previous state: {}", previousState);
         Integer interpolationTransitionTime = getInterpolationTransitionTime(previousState);
         interpolatedPutCall.setTransitionTime(interpolationTransitionTime);
         putState(previousState, interpolatedPutCall);
@@ -636,18 +809,13 @@ public final class HueScheduler implements Runnable {
         return seconds * 1000L;
     }
 
-    private void putState(ScheduledStateSnapshot state, boolean performedInterpolation) {
-        ZonedDateTime now = currentTime.get();
+    private void putState(ScheduledStateSnapshot state, boolean performedInterpolation, ZonedDateTime now) {
         if (state.isInsideSplitCallWindow(now)) {
             PutCall interpolatedSplitPutCall = state.getNextInterpolatedSplitPutCall(now);
             if (interpolatedSplitPutCall == null) {
                 return;
             }
             performPutApiCall(state, interpolatedSplitPutCall);
-            if (!state.isRetryAfterPowerOnState()) { // schedule follow-up split
-                ScheduledStateSnapshot nextSplitSnapshot = createTemporaryFollowUpSplitState(state);
-                schedule(nextSplitSnapshot, state.getNextInterpolationSplitDelayInMs(now));
-            }
         } else {
             putState(state, getPutCallWithAdjustedTr(state, now, performedInterpolation));
         }
@@ -675,9 +843,9 @@ public final class HueScheduler implements Runnable {
     }
 
     private void performPutApiCall(ScheduledStateSnapshot state, PutCall putCall) {
-        LOG.trace("{}", putCall);
-        state.recordLastPutCall(putCall);
+        LOG.debug("{}", putCall);
         api.putState(putCall);
+        state.recordLastPutCall(putCall);
     }
 
     private PutCall getPutCallWithAdjustedTr(ScheduledStateSnapshot state, ZonedDateTime now, boolean performedInterpolation) {
@@ -691,12 +859,12 @@ public final class HueScheduler implements Runnable {
             return putCall;
         }
         ScheduledStateSnapshot nextState = state.getNextState();
-        Duration duration = Duration.between(now, nextState.getStart()).abs();
-        Duration tr = Duration.ofMillis(putCall.getTransitionTime() * 100);
-        long differenceInMinutes = duration.minus(tr).toMinutes();
+        Duration availableDuration = Duration.between(now, nextState.getStart());
+        Duration requestedTransition = Duration.ofMillis(putCall.getTransitionTime() * 100L);
+        long differenceInSeconds = availableDuration.minus(requestedTransition).toSeconds();
         int requiredGap = state.getRequiredGap();
-        if (differenceInMinutes < requiredGap) {
-            putCall.setTransitionTime(getAdjustedTransitionTime(duration, requiredGap, nextState));
+        if (differenceInSeconds < requiredGap * 60L) {
+            putCall.setTransitionTime(getAdjustedTransitionTime(availableDuration, requiredGap, nextState));
         }
         return putCall;
     }
@@ -728,7 +896,7 @@ public final class HueScheduler implements Runnable {
 
     private void logException(RuntimeException e) {
         if (e instanceof BridgeConnectionFailure) {
-            LOG.warn("Api not reachable, retrying in {}s.", bridgeFailureRetryDelayInSeconds);
+            LOG.warn("Api not reachable: '{}'. Retrying in {}s.", getCauseMessage(e), bridgeFailureRetryDelayInSeconds);
         } else {
             LOG.error("Api call failed: '{}'. Retrying in {}s.", e.getLocalizedMessage(), bridgeFailureRetryDelayInSeconds);
         }
@@ -751,7 +919,6 @@ public final class HueScheduler implements Runnable {
     }
 
     private void retryWhenBackOn(ScheduledStateSnapshot snapshot) {
-        snapshot.setSkipSceneSync(true);
         lightEventListener.runWhenTurnedOn(snapshot.getId(), () -> schedule(snapshot, powerOnRescheduleDelayInMs));
     }
 
@@ -766,6 +933,7 @@ public final class HueScheduler implements Runnable {
     private void logSolarDataInfo() {
         MDC.put("context", "info");
         LOG.info("Current solar times:\n{}", startTimeProvider.toDebugString(currentTime.get()));
+        MDC.remove("context");
     }
 
     private void scheduleApiCacheClear() {
@@ -774,6 +942,81 @@ public final class HueScheduler implements Runnable {
                 api::clearCaches, apiCacheInvalidationIntervalInMinutes, apiCacheInvalidationIntervalInMinutes, TimeUnit.MINUTES);
         stateScheduler.scheduleAtFixedRate(
                 startTimeProvider::clearCaches, 3, 3, TimeUnit.DAYS);
+    }
+
+    /**
+     * Since Home Assistant synced scenes are only temporary, we have to re-sync them on each HA restart we detect.
+     */
+    void clearCachesAndReSyncScenes() {
+        api.clearCaches();
+        if (enableSceneSync) {
+            stateRegistry.findCurrentlyActiveStates()
+                         .forEach(state -> scheduleAsyncSceneSync(state, true));
+        }
+    }
+
+    private void logGroupOverridden(ScheduledStateSnapshot state, List<LightState> groupStates) {
+        LOG.trace("Override detected for group {}. Checking individual lights...", state.getId());
+        groupStates.forEach(lightState -> {
+            ScheduledState lastSeenLightState = stateRegistry.getLastSeenState(lightState.getId());
+            if (lastSeenLightState != null) {
+                boolean differs = lastSeenLightState.lightStateDiffers(lightState);
+                if (differs) {
+                    LOG.trace("\t- Actual:   {}", formatLightState(lightState));
+                    LOG.trace("\t  Expected: {}", formatLastPutCall(lastSeenLightState.getLastPutCall()));
+                }
+            } else {
+                boolean allGroupStatesDiffer = allSeenGroupStatesDiffer(lightState);
+                if (allGroupStatesDiffer) {
+                    LOG.trace("\t- Actual:   {}", formatLightState(lightState));
+                    api.getAssignedGroups(lightState.getId())
+                       .stream()
+                       .map(stateRegistry::getLastSeenState)
+                       .filter(Objects::nonNull)
+                       .forEach(lastSeenGroupState -> {
+                           LOG.trace("\t  Expected: {}", formatLastPutCall(lastSeenGroupState.getLastPutCall()));
+                       });
+                }
+            }
+        });
+    }
+
+    private void logLightOverridden(ScheduledStateSnapshot state, LightState lightState, ScheduledState lastSeenState) {
+        LOG.trace("Override detected for light {}.", state.getId());
+        LOG.trace("\tActual:   {}", formatLightState(lightState));
+        LOG.trace("\tExpected: {}", formatLastPutCall(lastSeenState.getLastPutCall()));
+    }
+
+    private String formatLightState(LightState lightState) {
+        List<String> properties = new ArrayList<>();
+
+        if (lightState.getId() != null) properties.add("id=" + lightState.getId());
+        properties.add("on=" + lightState.isOn());
+        if (lightState.getBrightness() != null) properties.add("bri=" + lightState.getBrightness());
+        if (lightState.getColorTemperature() != null) properties.add("ct=" + lightState.getColorTemperature());
+        if (lightState.getX() != null) properties.add("x=" + lightState.getX());
+        if (lightState.getY() != null) properties.add("y=" + lightState.getY());
+        if (lightState.getEffect() != null) properties.add("effect=" + lightState.getEffect());
+
+        return "{" + String.join(", ", properties) + "}";
+    }
+
+    private String formatLastPutCall(PutCall putCall) {
+        if (putCall == null) return "null";
+
+        List<String> properties = new ArrayList<>();
+
+        if (putCall.isGroupState()) properties.add("id=" + putCall.getId());
+        if (putCall.getOn() != null) properties.add("on=" + putCall.getOn());
+        if (putCall.getBri() != null) properties.add("bri=" + putCall.getBri());
+        if (putCall.getCt() != null) properties.add("ct=" + putCall.getCt());
+        if (putCall.getHue() != null) properties.add("hue=" + putCall.getHue());
+        if (putCall.getSat() != null) properties.add("sat=" + putCall.getSat());
+        if (putCall.getX() != null) properties.add("x=" + putCall.getX());
+        if (putCall.getY() != null) properties.add("y=" + putCall.getY());
+        if (putCall.getEffect() != null) properties.add("effect=" + putCall.getEffect());
+
+        return "{" + String.join(", ", properties) + "}";
     }
 
     LightEventListener getHueEventListener() {

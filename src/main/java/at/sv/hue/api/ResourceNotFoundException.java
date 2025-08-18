@@ -1,9 +1,6 @@
 package at.sv.hue.api;
 
-public class ResourceNotFoundException extends RuntimeException {
-    public ResourceNotFoundException() {
-    }
-
+public class ResourceNotFoundException extends ApiFailure {
     public ResourceNotFoundException(String message) {
         super(message);
     }

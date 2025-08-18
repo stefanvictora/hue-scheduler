@@ -3,23 +3,23 @@ package at.sv.hue.api;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class ManualOverrideTrackerImpl implements ManualOverrideTracker {
 
     private static final TrackedState DEFAULT_STATE = new TrackedState();
 
-    private final HashMap<String, TrackedState> trackedStatesPerId;
+    private final ConcurrentHashMap<String, TrackedState> trackedStatesPerId;
 
     public ManualOverrideTrackerImpl() {
-        trackedStatesPerId = new HashMap<>();
+        trackedStatesPerId = new ConcurrentHashMap<>();
     }
 
     @Override
     public void onManuallyOverridden(String id) {
         TrackedState trackedState = getOrCreateTrackedState(id);
         trackedState.setManuallyOverridden(true);
-        trackedState.setJustTurnedOn(false);
+        trackedState.setTurnedOnBySyncedScene(false);
     }
 
     @Override
@@ -32,12 +32,19 @@ public class ManualOverrideTrackerImpl implements ManualOverrideTracker {
         TrackedState trackedState = getOrCreateTrackedState(id);
         trackedState.setManuallyOverridden(false);
         trackedState.setLightIsOff(false);
-        trackedState.setJustTurnedOn(true);
+    }
+
+    @Override
+    public void onLightTurnedOnBySyncedScene(String id) {
+        TrackedState trackedState = getOrCreateTrackedState(id);
+        trackedState.setTurnedOnBySyncedScene(true);
     }
 
     @Override
     public void onLightOff(String id) {
-        getOrCreateTrackedState(id).setLightIsOff(true);
+        TrackedState trackedState = getOrCreateTrackedState(id);
+        trackedState.setLightIsOff(true);
+        trackedState.setTurnedOnBySyncedScene(false);
     }
 
     @Override
@@ -46,15 +53,8 @@ public class ManualOverrideTrackerImpl implements ManualOverrideTracker {
     }
 
     @Override
-    public boolean wasJustTurnedOn(String id) {
-        return getOrDefaultState(id).isJustTurnedOn();
-    }
-
-    @Override
-    public void onAutomaticallyAssigned(String id) {
-        TrackedState trackedState = getOrCreateTrackedState(id);
-        trackedState.setManuallyOverridden(false);  // maybe not needed, as this flag is overridden also on light-on events
-        trackedState.setJustTurnedOn(false);
+    public boolean wasTurnedOnBySyncedScene(String id) {
+        return getOrDefaultState(id).isTurnedOnBySyncedScene();
     }
 
     private TrackedState getOrCreateTrackedState(String id) {
@@ -68,8 +68,8 @@ public class ManualOverrideTrackerImpl implements ManualOverrideTracker {
     @Getter
     @Setter
     private static final class TrackedState {
-        private boolean manuallyOverridden;
-        private boolean justTurnedOn;
-        private boolean lightIsOff;
+        private volatile boolean manuallyOverridden;
+        private volatile boolean turnedOnBySyncedScene;
+        private volatile boolean lightIsOff;
     }
 }

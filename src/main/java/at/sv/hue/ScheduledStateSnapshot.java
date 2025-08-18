@@ -1,10 +1,8 @@
 package at.sv.hue;
 
-import at.sv.hue.api.LightCapabilities;
 import at.sv.hue.api.PutCall;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import lombok.Setter;
 
 import java.time.DayOfWeek;
 import java.time.Duration;
@@ -29,9 +27,6 @@ public class ScheduledStateSnapshot {
     private volatile ZonedDateTime cachedEnd;
     private volatile ScheduledStateSnapshot cachedPreviousState;
     private volatile ScheduledStateSnapshot cachedNextState;
-    @Getter
-    @Setter
-    private volatile boolean skipSceneSync;
 
     public String getId() {
         return scheduledState.getId();
@@ -122,7 +117,7 @@ public class ScheduledStateSnapshot {
     }
 
     public boolean isCurrentlyActive(ZonedDateTime now) {
-        return (getStart().isBefore(now) || getStart().isEqual(now)) && getEnd() != null && getEnd().isAfter(now);
+        return (getStart().isBefore(now) || getStart().isEqual(now)) && getEnd().isAfter(now);
     }
 
     public boolean hasGapBefore() {
@@ -197,10 +192,6 @@ public class ScheduledStateSnapshot {
         return nextState.getStart().isBefore(now) || nextState.getStart().isEqual(now);
     }
 
-    public boolean isSplitState() {
-        return Duration.between(getStart(), definedStart).compareTo(Duration.ofMillis(MAX_TRANSITION_TIME_MS)) > 0;
-    }
-
     public boolean isInsideSplitCallWindow(ZonedDateTime now) {
         return getNextTransitionTimeSplitStart(now).isBefore(definedStart);
     }
@@ -209,7 +200,7 @@ public class ScheduledStateSnapshot {
         if (isInsideSplitCallWindow(now)) {
             return getNextTransitionTimeSplitStart(now).minusSeconds(1);
         } else {
-            return getEnd();
+            return null; // will be calculated on demand
         }
     }
 
@@ -219,7 +210,7 @@ public class ScheduledStateSnapshot {
     }
 
     private ZonedDateTime getNextTransitionTimeSplitStart(ZonedDateTime now) {
-        ZonedDateTime splitStart = getStart().plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS);
+        ZonedDateTime splitStart = getStart().plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS); // directly start with next
         while (splitStart.isBefore(now) || splitStart.isEqual(now)) {
             splitStart = splitStart.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS);
         }
@@ -260,7 +251,7 @@ public class ScheduledStateSnapshot {
             return putCall;
         }
         ScheduledStateSnapshot previousState = this;
-        while (putCall.getBri() == null || putCall.getColorMode() == ColorMode.NONE) {
+        while (putCall.getBri() == null || putCall.getColorMode() == ColorMode.NONE) { // stop as soon as we have brightness and color mode
             previousState = previousState.getPreviousState();
             if (previousState == null || isSameState(previousState) || previousState.isNullState()) {
                 break;
@@ -312,10 +303,6 @@ public class ScheduledStateSnapshot {
 
     public boolean performsInterpolation(ZonedDateTime now) {
         return getInterpolatedPutCallIfNeeded(now) != null;
-    }
-
-    public LightCapabilities getCapabilities() {
-        return scheduledState.getCapabilities();
     }
 
     public void recordLastPutCall(PutCall putCall) {

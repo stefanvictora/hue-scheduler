@@ -38,12 +38,14 @@ public final class HueEventHandler implements BackgroundEventHandler {
     public void onOpen() {
         MDC.put("context", "events");
         log.trace("Hue event stream handler opened.");
+        MDC.remove("context");
     }
 
     @Override
     public void onClosed() {
         MDC.put("context", "events");
         log.trace("Hue event stream handler closed.");
+        MDC.remove("context");
     }
 
     @Override
@@ -54,7 +56,6 @@ public final class HueEventHandler implements BackgroundEventHandler {
                 if (hueEvent.isLightOrGroup() && hueEvent.isOffEvent()) {
                     lightEventListener.onLightOff(hueEvent.getId());
                 } else if (hueEvent.isLightOrGroup() && hueEvent.isOnEvent()) {
-                    MDC.put("context", "events");
                     if (hueEvent.isPhysical()) {
                         lightEventListener.onPhysicalOn(hueEvent.getOwner().getRid());
                     } else {
@@ -69,7 +70,7 @@ public final class HueEventHandler implements BackgroundEventHandler {
                         continue;
                     }
                 }
-                resourceModificationEventListener.onModification(hueEvent.getType(), hueEvent.getId());
+                resourceModificationEventListener.onModification(hueEvent.getType(), hueEvent.getId(), null);
             }
         }
     }
@@ -86,6 +87,7 @@ public final class HueEventHandler implements BackgroundEventHandler {
     public void onError(Throwable t) {
         MDC.put("context", "events");
         log.error("An error occurred during event stream processing: {}", t.getLocalizedMessage());
+        MDC.remove("context");
     }
 
     @Data
@@ -144,15 +146,19 @@ public final class HueEventHandler implements BackgroundEventHandler {
         }
 
         public boolean isSceneActivated() {
-            String sceneStatus = getSceneStatus();
-            return "static".equals(sceneStatus) || "dynamic_palette".equals(sceneStatus);
+            String sceneStatus = getSceneActiveStatus();
+            return "static".equals(sceneStatus) || "dynamic_palette".equals(sceneStatus) || isSceneRecall();
         }
 
-        private String getSceneStatus() {
-            if (status != null && status.get("active") != null) {
+        private String getSceneActiveStatus() {
+            if (status != null && status.has("active")) {
                 return status.get("active").asText();
             }
             return null;
+        }
+
+        private boolean isSceneRecall() {
+            return status != null && status.hasNonNull("last_recall");
         }
 
         public boolean notRelevantSceneModification() {
