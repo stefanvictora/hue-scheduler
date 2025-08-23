@@ -20,8 +20,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.benmanes.caffeine.cache.AsyncLoadingCache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.LoadingCache;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 
@@ -53,12 +53,12 @@ public final class HueApiImpl implements HueApi {
     private final ObjectMapper mapper;
     private final String baseApi;
     private final RateLimiter rateLimiter;
-    private final LoadingCache<String, Map<String, Light>> availableLightsCache;
-    private final LoadingCache<String, Map<String, Device>> availableDevicesCache;
-    private final LoadingCache<String, Map<String, Light>> availableGroupedLightsCache;
-    private final LoadingCache<String, Map<String, Scene>> availableScenesCache;
-    private final LoadingCache<String, Map<String, Group>> availableZonesCache;
-    private final LoadingCache<String, Map<String, Group>> availableRoomsCache;
+    private final AsyncLoadingCache<String, Map<String, Light>> availableLightsCache;
+    private final AsyncLoadingCache<String, Map<String, Device>> availableDevicesCache;
+    private final AsyncLoadingCache<String, Map<String, Light>> availableGroupedLightsCache;
+    private final AsyncLoadingCache<String, Map<String, Scene>> availableScenesCache;
+    private final AsyncLoadingCache<String, Map<String, Group>> availableZonesCache;
+    private final AsyncLoadingCache<String, Map<String, Group>> availableRoomsCache;
 
     public HueApiImpl(HttpResourceProvider resourceProvider, String host, RateLimiter rateLimiter,
                       int apiCacheInvalidationIntervalInMinutes) {
@@ -83,11 +83,12 @@ public final class HueApiImpl implements HueApi {
         }
     }
 
-    private static <T> LoadingCache<String, Map<String, T>> createCache(Supplier<Map<String, T>> supplier,
+    private static <T> AsyncLoadingCache<String, Map<String, T>> createCache(Supplier<Map<String, T>> supplier,
                                                                         int apiCacheInvalidationIntervalInMinutes) {
         return Caffeine.newBuilder()
-                       .expireAfterWrite(Duration.ofMinutes(apiCacheInvalidationIntervalInMinutes))
-                       .build(key -> supplier.get());
+                       .refreshAfterWrite(Duration.ofMinutes(apiCacheInvalidationIntervalInMinutes))
+                       .expireAfterWrite(Duration.ofMinutes(apiCacheInvalidationIntervalInMinutes * 2L))
+                       .buildAsync(key -> supplier.get());
     }
 
     @Override
@@ -316,12 +317,12 @@ public final class HueApiImpl implements HueApi {
             Scene newScene = new Scene(sceneSyncName, group.toResourceReference(), actions);
             String response = createScene(newScene);
             log.trace("Created scene: {}", response != null ? response.trim() : "");
-            availableScenesCache.invalidateAll();
+            availableScenesCache.synchronous().invalidateAll();
         } else if (actionsDiffer(existingScene, actions)) {
             Scene updatedScene = new Scene(actions);
             String response = updateScene(existingScene, updatedScene);
             log.trace("Updated scene: {}", response != null ? response.trim() : "");
-            availableScenesCache.invalidateAll();
+            availableScenesCache.synchronous().invalidateAll();
         }
     }
 
@@ -506,11 +507,11 @@ public final class HueApiImpl implements HueApi {
     }
 
     private Map<String, Light> getAvailableLights() {
-        return availableLightsCache.get("allLights");
+        return availableLightsCache.synchronous().get("allLights");
     }
 
     private Map<String, Light> getAvailableGroupedLights() {
-        return availableGroupedLightsCache.get("allGroupedLights");
+        return availableGroupedLightsCache.synchronous().get("allGroupedLights");
     }
 
     private Map<String, Group> getAvailableGroups() {
@@ -522,19 +523,19 @@ public final class HueApiImpl implements HueApi {
     }
 
     private Map<String, Scene> getAvailableScenes() {
-        return availableScenesCache.get("allScenes");
+        return availableScenesCache.synchronous().get("allScenes");
     }
 
     private Map<String, Device> getAvailableDevices() {
-        return availableDevicesCache.get("allDevices");
+        return availableDevicesCache.synchronous().get("allDevices");
     }
 
     private Map<String, Group> getAvailableZones() {
-        return availableZonesCache.get("allZones");
+        return availableZonesCache.synchronous().get("allZones");
     }
 
     private Map<String, Group> getAvailableRooms() {
-        return availableRoomsCache.get("allRooms");
+        return availableRoomsCache.synchronous().get("allRooms");
     }
 
     private Light lookupGroupedLight(String id) {
@@ -640,12 +641,12 @@ public final class HueApiImpl implements HueApi {
     public void onModification(String type, String id, Object content) {
         // todo: maybe switch to different caching logic so we can invalidate individual entries instead of the full cache
         switch (type) {
-            case "light" -> availableLightsCache.invalidateAll();
-            case "grouped_light" -> availableGroupedLightsCache.invalidateAll();
-            case "scene" -> availableScenesCache.invalidateAll();
-            case "device" -> availableDevicesCache.invalidateAll();
-            case "zone" -> availableZonesCache.invalidateAll();
-            case "room" -> availableRoomsCache.invalidateAll();
+            case "light" -> availableLightsCache.synchronous().invalidateAll();
+            case "grouped_light" -> availableGroupedLightsCache.synchronous().invalidateAll();
+            case "scene" -> availableScenesCache.synchronous().invalidateAll();
+            case "device" -> availableDevicesCache.synchronous().invalidateAll();
+            case "zone" -> availableZonesCache.synchronous().invalidateAll();
+            case "room" -> availableRoomsCache.synchronous().invalidateAll();
         }
     }
 
