@@ -11,7 +11,7 @@ COPY --from=dependencies /root/.m2 /root/.m2
 WORKDIR /build/
 COPY pom.xml .
 COPY src ./src
-RUN mvn --batch-mode --fail-fast package
+RUN mvn --batch-mode -ntp --fail-fast package
 
 # Stage 3: Create the runtime image
 FROM eclipse-temurin:24-jre-alpine AS runtime
