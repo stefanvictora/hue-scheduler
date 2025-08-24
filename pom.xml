@@ -171,7 +171,7 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.14.0</version>
                 <configuration>
-                    <release>24</release>
+                    <release>21</release>
                     <proc>full</proc>
                     <annotationProcessorPaths>
                         <path>
