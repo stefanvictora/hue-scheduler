@@ -9,28 +9,34 @@ import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 
 @RequiredArgsConstructor
 public final class StateInterpolator {
 
+    private static final int MAX_HUE_VALUE = 65535;
+    private static final int MIDDLE_HUE_VALUE = 32768;
+
     private final ScheduledStateSnapshot state;
     private final ScheduledStateSnapshot previousState;
     private final ZonedDateTime dateTime;
     private final boolean keepPreviousPropertiesForNullTargets;
 
-    public PutCall getInterpolatedPutCall() {
+    public PutCalls getInterpolatedPutCalls() {
         if (state.isAlreadyReached(dateTime)) {
             return null; // the state is already reached
         }
-        PutCall interpolatedPutCall;
+        PutCalls interpolatedPutCalls;
         if (isDirectlyAtStartOfState()) {
-            interpolatedPutCall = previousState.getFullPicturePutCall(dateTime); // directly at start, just use previous put call
+            interpolatedPutCalls = previousState.getFullPicturePutCalls(dateTime); // directly at start, just use previous put call
         } else {
-            interpolatedPutCall = interpolate();
+            interpolatedPutCalls = interpolate();
         }
-        return modifyProperties(interpolatedPutCall);
+        interpolatedPutCalls.map(this::modifyProperties);
+        return interpolatedPutCalls; // todo: previously we returned null in some cases where an interpolation was not needed
     }
 
     private boolean isDirectlyAtStartOfState() {
@@ -41,7 +47,7 @@ public final class StateInterpolator {
     private PutCall modifyProperties(PutCall interpolatedPutCall) {
         interpolatedPutCall.setOn(null); // do not per default reuse "on" property for interpolation
         if (interpolatedPutCall.isNullCall()) {
-            return null; // no relevant properties set, don't perform interpolations
+            return null; // no relevant properties set, don't perform interpolations todo: check if we need to filter the null values now
         }
         if (state.isOn()) {
             interpolatedPutCall.setOn(true); // the current state is turning lights on, also set "on" property for interpolated state
@@ -52,25 +58,56 @@ public final class StateInterpolator {
     /**
      * P = P0 + t(P1 - P0)
      */
-    private PutCall interpolate() {
+    private PutCalls interpolate() {
         BigDecimal interpolatedTime = getInterpolatedTime();
-        PutCall previous = previousState.getFullPicturePutCall(dateTime);
-        PutCall target = state.getFullPicturePutCall(dateTime);
+        PutCalls previous = previousState.getFullPicturePutCalls(dateTime);
+        PutCalls target = state.getFullPicturePutCalls(dateTime);
 
         return interpolate(previous, target, interpolatedTime, keepPreviousPropertiesForNullTargets);
     }
 
+    private PutCalls interpolate(PutCalls previous, PutCalls target, BigDecimal interpolatedTime,
+                             boolean previousPropertiesForNullTargets) {
+        List<PutCall> putCalls = new ArrayList<>();
+        if (previous.isGeneralGroup()) {
+            PutCall previousPutCall = previous.toList().getFirst();
+            target.toList().forEach(targetPutCall -> {
+                PutCall putCall = interpolate(previousPutCall, targetPutCall, interpolatedTime, previousPropertiesForNullTargets);
+                putCall.setId(targetPutCall.getId());
+                putCalls.add(putCall);
+            });
+        } else if (target.isGeneralGroup()) {
+            PutCall targetPutCall = target.toList().getFirst();
+            previous.toList().forEach(previousPutCall -> {
+                PutCall putCall = interpolate(previousPutCall, targetPutCall, interpolatedTime, previousPropertiesForNullTargets);
+                putCalls.add(putCall);
+            });
+        } else {
+            previous.toList().forEach(previousPutCall -> {
+                PutCall targetPutCall = target.get(previousPutCall.getId());
+                PutCall putCall = interpolate(previousPutCall, targetPutCall, interpolatedTime, previousPropertiesForNullTargets);
+                putCalls.add(putCall);
+            });
+        }
+        return new PutCalls(previous.getId(), putCalls, previous.getTransitionTime(), previous.isGroupUpdate());
+    }
+
     private static PutCall interpolate(PutCall previous, PutCall target, BigDecimal interpolatedTime,
                                        boolean previousPropertiesForNullTargets) {
-        convertColorModeIfNeeded(previous, target);
+        PutCall putCall = copy(previous);
+        convertColorModeIfNeeded(putCall, target);
 
-        previous.setBri(interpolateInteger(interpolatedTime, target.getBri(), previous.getBri(), previousPropertiesForNullTargets));
-        previous.setCt(interpolateInteger(interpolatedTime, target.getCt(), previous.getCt(), previousPropertiesForNullTargets));
-        previous.setHue(interpolateHue(interpolatedTime, target.getHue(), previous.getHue(), previousPropertiesForNullTargets));
-        previous.setSat(interpolateInteger(interpolatedTime, target.getSat(), previous.getSat(), previousPropertiesForNullTargets));
-        previous.setX(interpolateDouble(interpolatedTime, target.getX(), previous.getX(), previousPropertiesForNullTargets));
-        previous.setY(interpolateDouble(interpolatedTime, target.getY(), previous.getY(), previousPropertiesForNullTargets));
-        return previous;
+        putCall.setBri(interpolateInteger(interpolatedTime, target.getBri(), putCall.getBri(), previousPropertiesForNullTargets));
+        putCall.setCt(interpolateInteger(interpolatedTime, target.getCt(), putCall.getCt(), previousPropertiesForNullTargets));
+        putCall.setHue(interpolateHue(interpolatedTime, target.getHue(), putCall.getHue(), previousPropertiesForNullTargets));
+        putCall.setSat(interpolateInteger(interpolatedTime, target.getSat(), putCall.getSat(), previousPropertiesForNullTargets));
+        putCall.setX(interpolateDouble(interpolatedTime, target.getX(), putCall.getX(), previousPropertiesForNullTargets));
+        putCall.setY(interpolateDouble(interpolatedTime, target.getY(), putCall.getY(), previousPropertiesForNullTargets));
+        return putCall;
+    }
+
+    private static PutCall copy(PutCall putCall) {
+        return putCall.toBuilder().build();
     }
 
     /**
@@ -175,10 +212,10 @@ public final class StateInterpolator {
         if (previous == null) {
             return null;
         }
-        if (previous == 0 && target == ScheduledState.MAX_HUE_VALUE || previous == ScheduledState.MAX_HUE_VALUE && target == 0) {
+        if (previous == 0 && target == MAX_HUE_VALUE || previous == MAX_HUE_VALUE && target == 0) {
             return 0;
         }
-        int diff = ((target - previous + ScheduledState.MIDDLE_HUE_VALUE) % (ScheduledState.MAX_HUE_VALUE + 1)) - ScheduledState.MIDDLE_HUE_VALUE;
+        int diff = ((target - previous + MIDDLE_HUE_VALUE) % (MAX_HUE_VALUE + 1)) - MIDDLE_HUE_VALUE;
         return BigDecimal.valueOf(previous)
                          .add(interpolatedTime.multiply(BigDecimal.valueOf(diff)))
                          .setScale(0, RoundingMode.HALF_UP)

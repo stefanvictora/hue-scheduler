@@ -4,7 +4,6 @@ import at.sv.hue.api.Capability;
 import at.sv.hue.api.Identifier;
 import at.sv.hue.api.LightCapabilities;
 import at.sv.hue.api.LightState;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.ZonedDateTime;
@@ -46,26 +45,10 @@ class ScheduledStateTest {
             .colorGamutType("C")
             .build();
 
-    private LightCapabilities defaultCapabilities;
-
-    @BeforeEach
-    void setUp() {
-        defaultCapabilities = LightCapabilities.builder()
-                                               .ctMin(153)
-                                               .ctMax(500)
-                                               .colorGamutType("C")
-                                               .colorGamut(GAMUT_C)
-                                               .effects(List.of("colorloop"))
-                                               .capabilities(EnumSet.allOf(Capability.class))
-                                               .build();
-    }
-
     @Test
     void lightStateDiffers_ct_sameColorTemperatureAndBrightness_false() {
-        ScheduledState scheduledState = scheduledState().ct(153)
-                                                        .brightness(200)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().ct(153)
+                                                              .bri(200));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .colorTemperature(153)
@@ -79,10 +62,8 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_ct_differentColorTemperature_sameBrightness_true() {
-        ScheduledState scheduledState = scheduledState().ct(153)
-                                                        .brightness(200)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().ct(153)
+                                                              .bri(200));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .colorTemperature(200)
@@ -96,9 +77,7 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_ct_differentColorTemperature_belowThreshold_false() {
-        ScheduledState scheduledState = scheduledState().ct(200)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().ct(200));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .colorTemperature(215)
@@ -111,9 +90,7 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_ct_differentColorTemperature_aboveThreshold_true() {
-        ScheduledState scheduledState = scheduledState().ct(200)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().ct(200));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .colorTemperature(216)
@@ -126,10 +103,8 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_ct_sameColorTemperature_differentBrightness_true() {
-        ScheduledState scheduledState = scheduledState().ct(200)
-                                                        .brightness(1)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().ct(200)
+                                                              .bri(1));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .colorTemperature(200)
@@ -143,11 +118,9 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_ct_sameColorTemperature_differentEffect_true() {
-        ScheduledState scheduledState = scheduledState().ct(300)
-                                                        .brightness(200)
-                                                        .effect("none")
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().ct(300)
+                                                              .bri(200)
+                                                              .effect("none"));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .colorTemperature(300)
@@ -164,10 +137,8 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_ct_sameColorTemperatureAndBrightness_withAdditionalPropertiesOnLightState_sameColorMode_false() {
-        ScheduledState scheduledState = scheduledState().ct(153)
-                                                        .brightness(200)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().ct(153)
+                                                              .bri(200));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .colorTemperature(153)
@@ -184,10 +155,8 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_ct_sameColorTemperatureAndBrightness_differentColorMode_xy_true() {
-        ScheduledState scheduledState = scheduledState().ct(153)
-                                                        .brightness(200)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().ct(153)
+                                                              .bri(200));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .colorTemperature(153)
@@ -204,9 +173,7 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_ct_sameCT_differentColorMode_hs_true() {
-        ScheduledState scheduledState = scheduledState().ct(153)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().ct(153));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .brightness(200)
@@ -221,9 +188,7 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_ct_missingColorTemperatureValue_onCurrent_true() {
-        ScheduledState scheduledState = scheduledState().ct(153)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().ct(153));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .colormode(ColorMode.CT)
@@ -235,10 +200,8 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_xy_sameXAndY_usesXYForComparison_ignoresAdditionalProperties_false() {
-        ScheduledState scheduledState = scheduledState().x(0.123)
-                                                        .y(0.456)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().x(0.123)
+                                                              .y(0.456));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .x(0.123)
@@ -255,10 +218,8 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_xy_sameXAndY_hsColorMode_stillUsesXAndY_sameValue_false() {
-        ScheduledState scheduledState = scheduledState().x(0.123)
-                                                        .y(0.456)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().x(0.123)
+                                                              .y(0.456));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .x(0.123)
@@ -274,11 +235,9 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_xy_sameXAndY_differentBrightness_true() {
-        ScheduledState scheduledState = scheduledState().x(0.123)
-                                                        .y(0.456)
-                                                        .brightness(100)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().x(0.123)
+                                                              .y(0.456)
+                                                              .bri(100));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .x(0.123)
@@ -293,10 +252,8 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_xy_similarXAndY_moreDigitsForScheduledState_similarValues_false() {
-        ScheduledState scheduledState = scheduledState().x(0.5789)
-                                                        .y(0.1234)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().x(0.5789)
+                                                              .y(0.1234));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .x(0.579)
@@ -310,10 +267,8 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_xy_similarXAndY_moreDigitsForLightState_similarValues_false() {
-        ScheduledState scheduledState = scheduledState().x(0.985)
-                                                        .y(0.233)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().x(0.985)
+                                                              .y(0.233));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .x(0.9845)
@@ -327,10 +282,8 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_xy_differentX_notSimilar_true() {
-        ScheduledState scheduledState = scheduledState().x(0.600)
-                                                        .y(0.334)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().x(0.600)
+                                                              .y(0.334));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .x(0.340)
@@ -344,10 +297,8 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_xy_differentX_stillSimilar_false() {
-        ScheduledState scheduledState = scheduledState().x(0.606)
-                                                        .y(0.334)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().x(0.606)
+                                                              .y(0.334));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .x(0.565)
@@ -361,11 +312,8 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_xy_differentY_notSimilar_true() {
-        ScheduledState scheduledState = scheduledState()
-                .x(0.123)
-                .y(0.777)
-                .capabilities(defaultCapabilities)
-                .build();
+        ScheduledState scheduledState = scheduledState(state().x(0.123)
+                                                              .y(0.777));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .x(0.123)
@@ -379,10 +327,8 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_xy_differentY_stillSimilar_false() {
-        ScheduledState scheduledState = scheduledState().x(0.123)
-                                                        .y(0.777)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().x(0.123)
+                                                              .y(0.777));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .x(0.123)
@@ -396,10 +342,8 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_hs_sameColorMode_usesXYForComparison_similarValues_ignoresOtherProperties_false() {
-        ScheduledState scheduledState = scheduledState().hue(3936)
-                                                        .sat(110)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().hue(3936)
+                                                              .sat(110));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .x(0.4376) // used
@@ -416,10 +360,8 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_hs_differentColorMode_XY_noCurrentHsValues_similarXYValues_false() {
-        ScheduledState scheduledState = scheduledState().hue(3936)
-                                                        .sat(110)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().hue(3936)
+                                                              .sat(110));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .x(0.4376)
@@ -434,10 +376,8 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_hs_sameHueAndSaturation_butDifferentColorMode_ct_true() {
-        ScheduledState scheduledState = scheduledState().hue(1000)
-                                                        .sat(50)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().hue(1000)
+                                                              .sat(50));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .brightness(200)
@@ -452,10 +392,8 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_hs_usesXYForComparison_noCurrentHsValues_true() {
-        ScheduledState scheduledState = scheduledState().hue(1000)
-                                                        .sat(50)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build(); // ~ x=0.385; y=0.329
+        ScheduledState scheduledState = scheduledState(state().hue(1000)
+                                                              .sat(50)); // ~ x=0.385; y=0.329
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .x(0.261)
@@ -469,10 +407,8 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_hs_usesXYForComparison_differentValue_true() {
-        ScheduledState scheduledState = scheduledState().hue(1000)
-                                                        .sat(50)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().hue(1000)
+                                                              .sat(50));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .x(0.9999)
@@ -486,10 +422,8 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_hs_lightRespondsWithXyColorMode_similarColorValue_false() {
-        ScheduledState scheduledState = scheduledState().hue(19470)
-                                                        .sat(160)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().hue(19470)
+                                                              .sat(160));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .x(0.333)
@@ -503,12 +437,10 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_xy_lightRespondsWithHsColorMode_sameColorValue_false() {
-        ScheduledState scheduledState = scheduledState().hue(1763)
-                                                        .sat(205)
-                                                        .x(0.6025)
-                                                        .y(0.3433)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().hue(1763)
+                                                              .sat(205)
+                                                              .x(0.6025)
+                                                              .y(0.3433));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .x(0.6025)
@@ -522,9 +454,7 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_noneEffect_lightHasNoEffect_treatedAsEqual_false() {
-        ScheduledState scheduledState = scheduledState().effect("none")
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().effect("none"));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .lightCapabilities(COLOR_LIGHT_ONLY)
@@ -535,9 +465,7 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_effect_lightHasNoEffect_true() {
-        ScheduledState scheduledState = scheduledState().effect("colorloop")
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().effect("colorloop"));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .lightCapabilities(COLOR_LIGHT_ONLY)
@@ -548,9 +476,7 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_colorloop_lightHasSameEffect_false() {
-        ScheduledState scheduledState = scheduledState().effect("colorloop")
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().effect("colorloop"));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .effect("colorloop")
@@ -562,9 +488,7 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_colorloop_lightHasDifferentEffect_true() {
-        ScheduledState scheduledState = scheduledState().effect("colorloop")
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().effect("colorloop"));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .effect("none")
@@ -576,9 +500,7 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_sameBrightness_sameColorMode_ignoresAnyEffectAndOtherProperties_false() {
-        ScheduledState scheduledState = scheduledState().brightness(10)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().bri(10));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .brightness(10)
@@ -594,9 +516,7 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_sameBrightness_differentColorMode_doesNotMatter_false() {
-        ScheduledState scheduledState = scheduledState().brightness(10)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().bri(10));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .brightness(10)
@@ -611,9 +531,7 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_defaultCapabilities_sameBrightness_differentColorMode_doesNotMatter_false() {
-        ScheduledState scheduledState = scheduledState().brightness(10)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().bri(10));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .brightness(10)
@@ -626,9 +544,7 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_differentBrightness_aboveThreshold_true() {
-        ScheduledState scheduledState = scheduledState().brightness(10)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().bri(10));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .brightness(10 + BRIGHTNESS_THRESHOLD)
@@ -640,9 +556,7 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_differentBrightness_belowThreshold_false() {
-        ScheduledState scheduledState = scheduledState().brightness(10)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().bri(10));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .brightness(10 + BRIGHTNESS_THRESHOLD - 1)
@@ -654,9 +568,7 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_onState_stateIsOn_sameState_false() {
-        ScheduledState scheduledState = scheduledState().on(true)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().on(true));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .lightCapabilities(ON_OFF_ONLY)
@@ -667,9 +579,7 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_onState_stateIsOff_differentState_true() {
-        ScheduledState scheduledState = scheduledState().on(true)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().on(true));
         LightState lightState = LightState.builder()
                                           .on(false)
                                           .lightCapabilities(ON_OFF_ONLY)
@@ -680,9 +590,7 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_offState_stateIsOn_differentState_ignored_false() {
-        ScheduledState scheduledState = scheduledState().on(false)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().on(false));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .lightCapabilities(ON_OFF_ONLY)
@@ -693,12 +601,10 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_stateIsOff_noOtherProperties_false() {
-        ScheduledState scheduledState = scheduledState().brightness(10)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().bri(10));
         LightState lightState = LightState.builder()
                                           .on(false)
-                                          .lightCapabilities(defaultCapabilities)
+                                          .lightCapabilities(BRIGHTNESS_ONLY)
                                           .build();
 
         assertLightStateDiffers(scheduledState, lightState, false);
@@ -706,9 +612,7 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_stateIsOff_propertyDifferenceIsIgnoredInComparison_false() {
-        ScheduledState scheduledState = scheduledState().brightness(1)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().bri(1));
         LightState lightState = LightState.builder()
                                           .on(false)
                                           .brightness(100)
@@ -720,12 +624,10 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_stateIsOff_propertyDifferenceIsIgnoredInComparison2_false() {
-        ScheduledState scheduledState = scheduledState().brightness(10)
-                                                        .hue(1000)
-                                                        .sat(100)
-                                                        .ct(153)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().bri(10)
+                                                              .hue(1000)
+                                                              .sat(100)
+                                                              .ct(153));
         LightState lightState = LightState.builder()
                                           .on(false)
                                           .brightness(123)
@@ -739,9 +641,7 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_differentCapabilities_doesNotSupportOnOff_stateHasNoOnStateDefined_false() {
-        ScheduledState scheduledState = scheduledState().capabilities(defaultCapabilities)
-                                                        .on(true)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().on(true));
         LightState lightState = LightState.builder()
                                           .lightCapabilities(LightCapabilities.builder().build())
                                           .build();
@@ -751,9 +651,7 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_differentCapabilities_doesNotSupportOnOff_stateHasOnFalseAnyways_false() {
-        ScheduledState scheduledState = scheduledState().capabilities(defaultCapabilities)
-                                                        .on(true)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().on(true));
         LightState lightState = LightState.builder()
                                           .on(false)
                                           .lightCapabilities(LightCapabilities.builder().build())
@@ -764,9 +662,7 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_differentCapabilities_doesNotSupportBrightness_false() {
-        ScheduledState scheduledState = scheduledState().brightness(10)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().bri(10));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .lightCapabilities(ON_OFF_ONLY)
@@ -777,9 +673,7 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_differentCapabilities_doesNotSupportColorTemperature_false() {
-        ScheduledState scheduledState = scheduledState().ct(153)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().ct(153));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .brightness(100)
@@ -791,10 +685,8 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_differentCapabilities_doesNotSupportColor_hs_false() {
-        ScheduledState scheduledState = scheduledState().hue(100)
-                                                        .sat(100)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().hue(100)
+                                                              .sat(100));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .brightness(100)
@@ -808,10 +700,8 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_differentCapabilities_doesNotSupportColor_xy_false() {
-        ScheduledState scheduledState = scheduledState().x(1.0)
-                                                        .y(0.5)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().x(1.0)
+                                                              .y(0.5));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .brightness(100)
@@ -825,10 +715,8 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_differentColorGamut_targetAlreadyApplied_sameValueAfterConversion_false() {
-        ScheduledState scheduledState = scheduledState().x(1.0)
-                                                        .y(0.5)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().x(1.0)
+                                                              .y(0.5));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .x(0.704)
@@ -846,10 +734,8 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_differentColorGamut_targetNotYetApplied_sameValueAfterConversion_false() {
-        ScheduledState scheduledState = scheduledState().x(1.0)
-                                                        .y(0.5)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().x(1.0)
+                                                              .y(0.5));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .x(1.0)
@@ -867,10 +753,8 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_differentColorGamut_targetAppliedAgain_consideredSame_false() {
-        ScheduledState scheduledState = scheduledState().x(0.1)
-                                                        .y(0.5)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().x(0.1)
+                                                              .y(0.5));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .x(0.1828)
@@ -888,10 +772,8 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_differentColorGamut_valuesOnlySimilar_consideredSame_false() {
-        ScheduledState scheduledState = scheduledState().x(0.6024)
-                                                        .y(0.3433)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().x(0.6024)
+                                                              .y(0.3433));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .x(0.6023)
@@ -909,9 +791,7 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_differentCtMin_belowTargetMin_consideredSame_false() {
-        ScheduledState scheduledState = scheduledState().ct(153)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().ct(153));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .colorTemperature(200)
@@ -928,9 +808,7 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_differentCtMax_aboveTargetMax_consideredSame_false() {
-        ScheduledState scheduledState = scheduledState().ct(500)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().ct(500));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .colorTemperature(300)
@@ -947,9 +825,7 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_onlyCtMinGiven_ignored_true() {
-        ScheduledState scheduledState = scheduledState().ct(500)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().ct(500));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .colorTemperature(300)
@@ -965,9 +841,7 @@ class ScheduledStateTest {
 
     @Test
     void lightStateDiffers_onlyCtMaxGiven_ignored_true() {
-        ScheduledState scheduledState = scheduledState().ct(500)
-                                                        .capabilities(defaultCapabilities)
-                                                        .build();
+        ScheduledState scheduledState = scheduledState(state().ct(500));
         LightState lightState = LightState.builder()
                                           .on(true)
                                           .colorTemperature(300)
@@ -981,16 +855,31 @@ class ScheduledStateTest {
         assertLightStateDiffers(scheduledState, lightState, true);
     }
 
-    private static ScheduledState.ScheduledStateBuilder scheduledState() {
-        return ScheduledState.builder().identifier(new Identifier("ID", "name"))
+    private ScheduledState scheduledState(ScheduledLightState.ScheduledLightStateBuilder lightState) {
+        return ScheduledState.builder()
+                             .identifier(new Identifier("ID", "name"))
+                             .capabilities(LightCapabilities.builder()
+                                                            .ctMin(153)
+                                                            .ctMax(500)
+                                                            .colorGamutType("C")
+                                                            .colorGamut(GAMUT_C)
+                                                            .effects(List.of("colorloop"))
+                                                            .capabilities(EnumSet.allOf(Capability.class))
+                                                            .build())
+                             .lightStates(List.of(lightState.build()))
                              .brightnessOverrideThreshold(BRIGHTNESS_THRESHOLD)
                              .colorTemperatureOverrideThresholdKelvin(COLOR_TEMPERATURE_THRESHOLD_KELVIN)
-                             .colorOverrideThreshold(COLOR_THRESHOLD);
+                             .colorOverrideThreshold(COLOR_THRESHOLD)
+                             .build();
+    }
+
+    private static ScheduledLightState.ScheduledLightStateBuilder state() {
+        return ScheduledLightState.builder();
     }
 
     private static void assertLightStateDiffers(ScheduledState scheduledState, LightState lightState, boolean expected) {
         ZonedDateTime now = ZonedDateTime.now();
-        scheduledState.setLastPutCall(scheduledState.getPutCall(now, now)); // fake last execution
+        scheduledState.setLastPutCalls(scheduledState.getPutCalls(now, now)); // fake last execution
         assertThat(scheduledState.lightStateDiffers(lightState)).isEqualTo(expected);
     }
 }

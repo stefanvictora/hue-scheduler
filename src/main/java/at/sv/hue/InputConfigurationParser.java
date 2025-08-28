@@ -90,6 +90,7 @@ public final class InputConfigurationParser {
             String transitionTimeBefore = null;
             Integer transitionTime = null;
             String effect = null;
+            String scene = null;
             if (interpolateAll) {
                 interpolate = Boolean.TRUE;
             }
@@ -180,12 +181,27 @@ public final class InputConfigurationParser {
                     case "interpolate":
                         interpolate = parseBoolean(value, parameter);
                         break;
+                    case "scene":
+                        scene = value;
+                        break;
                     default:
                         throw new UnknownStateProperty("Unknown state property '" + parameter + "' with value '" + value + "'");
                 }
             }
             String start = parts[1];
-            states.add(new ScheduledState(identifier, start, bri, ct, x, y, hue, sat, effect, on, transitionTimeBefore,
+
+            List<ScheduledLightState> scheduledLightStates;
+            if (scene != null) {
+                // todo: assert no other light state properties set except brightness
+                scheduledLightStates = api.getSceneLightState(identifier.id(), scene);
+                // todo: remap brightness if needed
+            } else {
+                ScheduledLightStateValidator validator = new ScheduledLightStateValidator(identifier, groupState, capabilities,
+                        bri, ct, x, y, hue, sat, on, effect);
+                scheduledLightStates = List.of(validator.getScheduledLightState());
+            }
+
+            states.add(new ScheduledState(identifier, start, scheduledLightStates, transitionTimeBefore,
                     transitionTime, dayOfWeeks, startTimeProvider, capabilities, minTrBeforeGapInMinutes, brightnessOverrideThreshold,
                     colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold, force, interpolate, groupState, false));
         }
