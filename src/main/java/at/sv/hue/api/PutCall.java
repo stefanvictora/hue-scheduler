@@ -24,7 +24,6 @@ public final class PutCall {
     Boolean on;
     String effect;
     Integer transitionTime;
-    boolean groupState;
     @EqualsAndHashCode.Exclude
     Double[][] gamut;
 
@@ -47,13 +46,9 @@ public final class PutCall {
         return on == Boolean.TRUE;
     }
 
-    public boolean hasNonDefaultTransitionTime() {
-        return transitionTime != null && transitionTime != 4;
-    }
-
     @Override
     public String toString() {
-        return "PutCall {" +
+        return "{" +
                "id=" + id +
                getFormattedPropertyIfSet("on", on) +
                getFormattedBriIfSet() +
@@ -64,7 +59,6 @@ public final class PutCall {
                getFormattedPropertyIfSet("sat", sat) +
                getFormattedPropertyIfSet("effect", effect) +
                getFormattedTransitionTimeIfSet() +
-               (groupState ? ", group=true" : "") +
                "}";
     }
 

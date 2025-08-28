@@ -1,6 +1,7 @@
 package at.sv.hue.api.hue;
 
 import at.sv.hue.ColorMode;
+import at.sv.hue.ScheduledLightState;
 import at.sv.hue.api.ApiFailure;
 import at.sv.hue.api.Capability;
 import at.sv.hue.api.EmptyGroupException;
@@ -206,15 +207,24 @@ public final class HueApiImpl implements HueApi {
 
     @Override
     public void putState(PutCall putCall) {
-        URL url;
-        if (putCall.isGroupState()) {
-            rateLimiter.acquire(10);
-            url = createUrl("/grouped_light/" + putCall.getId());
-        } else {
-            rateLimiter.acquire(1);
-            url = createUrl("/light/" + putCall.getId());
-        }
+        rateLimiter.acquire(1);
+        putStateInternal("/light/", putCall);
+    }
+
+    @Override
+    public void putGroupState(PutCall putCall) {
+        rateLimiter.acquire(10);
+        putStateInternal("/grouped_light/", putCall);
+    }
+
+    private void putStateInternal(String path, PutCall putCall) {
+        URL url = createUrl(path + putCall.getId());
         resourceProvider.putResource(url, getBody(getAction(putCall)));
+    }
+
+    @Override
+    public void putGroupState(String groupId, List<PutCall> list) {
+        // todo
     }
 
     private String getBody(Object object) {
@@ -227,8 +237,7 @@ public final class HueApiImpl implements HueApi {
 
     @Override
     public List<String> getGroupLights(String groupedLightId) {
-        Light groupedLight = getAndAssertGroupedLightExists(groupedLightId);
-        Group group = getAndAssertGroupExists(groupedLight.getOwner());
+        Group group = getAndAssertGroupExists(groupedLightId);
         List<String> lightIds = getContainedLightIds(group);
         if (lightIds.isEmpty()) {
             throw new EmptyGroupException("Group with id '" + groupedLightId + "' has no lights to control!");
@@ -319,9 +328,21 @@ public final class HueApiImpl implements HueApi {
     }
 
     @Override
+    public List<ScheduledLightState> getSceneLightState(String groupedLightId, String sceneName) {
+        Group group = getAndAssertGroupExists(groupedLightId);
+        Scene existingScene = getScene(group, sceneName);
+        if (existingScene == null) {
+            return List.of();
+        }
+        return existingScene.getActions()
+                            .stream()
+                            .map(HueApiImpl::createScheduledLightState)
+                            .toList();
+    }
+
+    @Override
     public synchronized void createOrUpdateScene(String groupedLightId, String sceneSyncName, List<PutCall> putCalls) {
-        Light groupedLight = getAndAssertGroupedLightExists(groupedLightId);
-        Group group = getAndAssertGroupExists(groupedLight.getOwner());
+        Group group = getAndAssertGroupExists(groupedLightId);
         Scene existingScene = getScene(group, sceneSyncName);
         List<SceneAction> actions = createSceneActions(group, putCalls);
         if (existingScene == null) {
@@ -393,7 +414,7 @@ public final class HueApiImpl implements HueApi {
         if (on != null) {
             actionBuilder.on(new On(on));
         }
-        if (putCall.hasNonDefaultTransitionTime()) {
+        if (hasNonDefaultTransitionTime(putCall.getTransitionTime())) {
             actionBuilder.dynamics(new Action.Dynamics(putCall.getTransitionTime() * 100));
         }
         if (on == Boolean.FALSE) {
@@ -422,6 +443,10 @@ public final class HueApiImpl implements HueApi {
             actionBuilder.color(null);
         }
         return actionBuilder.build();
+    }
+
+    private boolean hasNonDefaultTransitionTime(Integer transitionTime) {
+        return transitionTime != null && transitionTime != 4;
     }
 
     private static String getEffectWithNoneConverted(PutCall putCall) {
@@ -472,6 +497,39 @@ public final class HueApiImpl implements HueApi {
         resourceProvider.putResource(createUrl("/scene/" + scene.getId()), getBody(updatedScene));
     }
 
+    private static ScheduledLightState createScheduledLightState(SceneAction sceneAction) {
+        ScheduledLightState.ScheduledLightStateBuilder state = ScheduledLightState.builder();
+        state.id(sceneAction.getTarget().getRid());
+        Action action = sceneAction.getAction();
+        if (action.getOn() != null) {
+            state.on(action.getOn().isOn());
+        }
+        if (action.getDimming() != null) {
+            int bri = BigDecimal.valueOf(action.getDimming().getBrightness())
+                                .multiply(BigDecimal.valueOf(254))
+                                .divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP)
+                                .intValue();
+            state.bri(bri);
+        }
+        if (action.getColor_temperature() != null && action.getColor_temperature().getMirek() != null) {
+            state.ct(action.getColor_temperature().getMirek());
+        }
+        if (action.getColor() != null && action.getColor().getXy() != null) {
+            XY xy = action.getColor().getXy();
+            state.x(xy.getX());
+            state.y(xy.getY());
+        }
+        if (action.getEffects() != null && action.getEffects().getEffect() != null) {
+            String effect = action.getEffects().getEffect();
+            if ("no_effect".equals(effect)) {
+                effect = "none";
+            }
+            state.effect(effect);
+        }
+        // todo: transition time?
+        return state.build();
+    }
+
     private List<String> getContainedLightIds(Group group) {
         return getContainedLights(group).stream()
                                         .map(ResourceReference::getRid)
@@ -499,6 +557,11 @@ public final class HueApiImpl implements HueApi {
             throw new LightNotFoundException("Light with id '" + lightId + "' was not found!");
         }
         return light;
+    }
+
+    private Group getAndAssertGroupExists(String groupedLightId) {
+        Light groupedLight = getAndAssertGroupedLightExists(groupedLightId);
+        return getAndAssertGroupExists(groupedLight.getOwner());
     }
 
     private Light getAndAssertGroupedLightExists(String groupedLightId) {

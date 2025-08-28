@@ -719,9 +719,8 @@ public final class HueScheduler implements Runnable {
         if (sceneSyncDelayInSeconds == 0) {
             syncScene(state, justOnce);
         } else {
-            stateScheduler.schedule(() -> {
-                syncScene(state, justOnce);
-            }, currentTime.get().plusSeconds(sceneSyncDelayInSeconds), state.getEnd());
+            stateScheduler.schedule(() -> syncScene(state, justOnce),
+                    currentTime.get().plusSeconds(sceneSyncDelayInSeconds), state.getEnd());
         }
     }
 
@@ -910,12 +909,12 @@ public final class HueScheduler implements Runnable {
     }
 
     private boolean putAdditionalInterpolatedStateIfNeeded(ScheduledStateSnapshot state, ZonedDateTime now) {
-        PutCall interpolatedPutCall = state.getInterpolatedPutCallIfNeeded(now);
-        if (interpolatedPutCall == null) {
+        PutCalls interpolatedPutCalls = state.getInterpolatedPutCallsIfNeeded(now);
+        if (interpolatedPutCalls == null) {
             return false;
         }
         ScheduledState lastSeenState = stateRegistry.getLastSeenState(state);
-        if (shouldSkipInterpolation(lastSeenState, interpolatedPutCall, state)) {
+        if (shouldSkipInterpolation(lastSeenState, interpolatedPutCalls, state)) {
             if (justTurnedOnBySyncedScene(state)) {
                 // if turned on via synced scene, we still need to wait for the transition time used by the scene (= tr of state)
                 sleepIfNeeded(getInterpolationTransitionTime(state));
@@ -925,14 +924,14 @@ public final class HueScheduler implements Runnable {
         ScheduledStateSnapshot previousState = state.getPreviousState();
         LOG.debug("Perform interpolation from previous state: {}", previousState);
         Integer interpolationTransitionTime = getInterpolationTransitionTime(previousState);
-        interpolatedPutCall.setTransitionTime(interpolationTransitionTime);
-        putState(state, interpolatedPutCall);
+        interpolatedPutCalls.setTransitionTime(interpolationTransitionTime);
+        putState(state, interpolatedPutCalls);
         sleepIfNeeded(interpolationTransitionTime);
         return true;
     }
 
-    private boolean shouldSkipInterpolation(ScheduledState lastSeenState, PutCall interpolatedPutCall, ScheduledStateSnapshot state) {
-        return lastSeenState != null && lastSeenState.getLastPutCall().hasSameLightState(interpolatedPutCall) &&
+    private boolean shouldSkipInterpolation(ScheduledState lastSeenState, PutCalls interpolatedPutCalls, ScheduledStateSnapshot state) {
+        return lastSeenState != null && lastSeenState.getLastPutCalls().hasSameLightStates(interpolatedPutCalls) &&
                (isTimeSlotTriggered(state) || justTurnedOnBySyncedScene(state)) && isConsideredOn(state);
     }
 
@@ -972,13 +971,13 @@ public final class HueScheduler implements Runnable {
 
     private void putState(ScheduledStateSnapshot state, boolean performedInterpolation, ZonedDateTime now) {
         if (state.isInsideSplitCallWindow(now)) {
-            PutCall interpolatedSplitPutCall = state.getNextInterpolatedSplitPutCall(now);
-            if (interpolatedSplitPutCall == null) {
+            PutCalls interpolatedSplitPutCalls = state.getNextInterpolatedSplitPutCalls(now);
+            if (interpolatedSplitPutCalls == null) {
                 return;
             }
-            performPutApiCall(state, interpolatedSplitPutCall);
+            performPutApiCall(state, interpolatedSplitPutCalls);
         } else {
-            putState(state, getPutCallWithAdjustedTr(state, now, performedInterpolation));
+            putState(state, getPutCallsWithAdjustedTr(state, now, performedInterpolation));
         }
     }
 
@@ -989,48 +988,55 @@ public final class HueScheduler implements Runnable {
         return nextSplitSnapshot;
     }
 
-    private void putState(ScheduledStateSnapshot state, PutCall putCall) {
-        if (state.isGroupState() && (controlGroupLightsIndividually || isConsideredOffAndDoesNotTurnOn(state))) {
-            for (PutCall call : stateRegistry.getPutCalls(state)) {
-                try {
-                    performPutApiCall(state, call);
-                } catch (ApiFailure e) {
-                    LOG.trace("Unsupported api call for light id {}: {}", call.getId(), e.getLocalizedMessage());
-                }
-            }
-        } else {
-            performPutApiCall(state, putCall);
-        }
+    private void putState(ScheduledStateSnapshot state, PutCalls putCalls) {
+//        if (state.isGroupState() && (controlGroupLightsIndividually || isConsideredOffAndDoesNotTurnOn(state))) {
+//            for (PutCall call : stateRegistry.getPutCalls(state)) {
+//                try {
+//                    performPutApiCall(state, call);
+//                } catch (ApiFailure e) {
+//                    LOG.trace("Unsupported api call for light id {}: {}", call.getId(), e.getLocalizedMessage());
+//                }
+//            }
+//        } else {
+//        }
+        performPutApiCall(state, putCalls);
     }
 
-    private void performPutApiCall(ScheduledStateSnapshot state, PutCall putCall) {
-        LOG.debug("{}", putCall);
+    private void performPutApiCall(ScheduledStateSnapshot state, PutCalls putCalls) {
+        LOG.debug("{}", putCalls);
         if (isConsideredOffAndDoesNotTurnOn(state)) {
-            putCall.setTransitionTime(null);
+            putCalls.setTransitionTime(null);
         }
-        api.putState(putCall);
-        state.recordLastPutCall(putCall);
+        state.recordLastPutCalls(putCalls);
+        List<PutCall> list = putCalls.toList();
+        if (putCalls.isGeneralGroup()) {
+            api.putGroupState(list.getFirst());
+        } else if (putCalls.isGroupUpdate()) {
+            api.putGroupState(putCalls.getId(), list);
+        } else {
+            api.putState(list.getFirst());
+        }
     }
 
-    private PutCall getPutCallWithAdjustedTr(ScheduledStateSnapshot state, ZonedDateTime now, boolean performedInterpolation) {
-        PutCall putCall;
+    private PutCalls getPutCallsWithAdjustedTr(ScheduledStateSnapshot state, ZonedDateTime now, boolean performedInterpolation) {
+        PutCalls putCalls;
         if (shouldUseFullPicture(state, performedInterpolation)) {
-            putCall = state.getFullPicturePutCall(now);
+            putCalls = state.getFullPicturePutCalls(now);
         } else {
-            putCall = state.getPutCall(now);
+            putCalls = state.getPutCalls(now);
         }
-        if (putCall.getTransitionTime() == null) {
-            return putCall;
+        if (putCalls.getTransitionTime() == null) {
+            return putCalls;
         }
         ScheduledStateSnapshot nextState = state.getNextState();
         Duration availableDuration = Duration.between(now, nextState.getStart());
-        Duration requestedTransition = Duration.ofMillis(putCall.getTransitionTime() * 100L);
+        Duration requestedTransition = Duration.ofMillis(putCalls.getTransitionTime() * 100L);
         long differenceInSeconds = availableDuration.minus(requestedTransition).toSeconds();
         int requiredGap = state.getRequiredGap();
         if (differenceInSeconds < requiredGap * 60L) {
-            putCall.setTransitionTime(getAdjustedTransitionTime(availableDuration, requiredGap, nextState));
+            putCalls.setTransitionTime(getAdjustedTransitionTime(availableDuration, requiredGap, nextState));
         }
-        return putCall;
+        return putCalls;
     }
 
     private boolean shouldUseFullPicture(ScheduledStateSnapshot state, boolean performedInterpolation) {
@@ -1127,7 +1133,7 @@ public final class HueScheduler implements Runnable {
                 boolean differs = lastSeenLightState.lightStateDiffers(lightState);
                 if (differs) {
                     LOG.trace("\t- Actual:   {}", formatLightState(lightState));
-                    LOG.trace("\t  Expected: {}", formatLastPutCall(lastSeenLightState.getLastPutCall()));
+//                    LOG.trace("\t  Expected: {}", formatLastPutCall(lastSeenLightState.getLastPutCall()));
                 }
             } else {
                 boolean allGroupStatesDiffer = allSeenGroupStatesDiffer(lightState);
@@ -1138,7 +1144,7 @@ public final class HueScheduler implements Runnable {
                        .map(stateRegistry::getLastSeenState)
                        .filter(Objects::nonNull)
                        .forEach(lastSeenGroupState -> {
-                           LOG.trace("\t  Expected: {}", formatLastPutCall(lastSeenGroupState.getLastPutCall()));
+//                           LOG.trace("\t  Expected: {}", formatLastPutCall(lastSeenGroupState.getLastPutCall()));
                        });
                 }
             }
@@ -1148,7 +1154,7 @@ public final class HueScheduler implements Runnable {
     private void logLightOverridden(ScheduledStateSnapshot state, LightState lightState, ScheduledState lastSeenState) {
         LOG.trace("Override detected for light {}.", state.getId());
         LOG.trace("\tActual:   {}", formatLightState(lightState));
-        LOG.trace("\tExpected: {}", formatLastPutCall(lastSeenState.getLastPutCall()));
+//        LOG.trace("\tExpected: {}", formatLastPutCall(lastSeenState.getLastPutCall()));
     }
 
     private String formatLightState(LightState lightState) {
@@ -1170,7 +1176,7 @@ public final class HueScheduler implements Runnable {
 
         List<String> properties = new ArrayList<>();
 
-        if (putCall.isGroupState()) properties.add("id=" + putCall.getId());
+        properties.add("id=" + putCall.getId());
         if (putCall.getOn() != null) properties.add("on=" + putCall.getOn());
         if (putCall.getBri() != null) properties.add("bri=" + putCall.getBri());
         if (putCall.getCt() != null) properties.add("ct=" + putCall.getCt());

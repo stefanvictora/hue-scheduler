@@ -1,6 +1,7 @@
 package at.sv.hue.api.hue;
 
 import at.sv.hue.ColorMode;
+import at.sv.hue.ScheduledLightState;
 import at.sv.hue.api.ApiFailure;
 import at.sv.hue.api.BridgeAuthenticationFailure;
 import at.sv.hue.api.BridgeConnectionFailure;
@@ -29,6 +30,7 @@ import java.util.List;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -1064,6 +1066,21 @@ class HueApiTest {
 
     @Test
     void getAffectedIdsByScene_getSceneName_returnsLightIdsAndGroupLightId_correctIdsAffectedByScene() {
+        setGetResponse("/grouped_light", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "3cfd5fad-2811-430a-a099-ae692b2185f8",
+                      "id_v1": "/groups/3",
+                      "owner": {
+                        "rid": "75ee4e3b-cacb-4b87-923b-d11d2480e8ff",
+                        "rtype": "zone"
+                      },
+                      "type": "grouped_light"
+                    }
+                  ]
+                }""");
         setGetResponse("/room", """
                 {
                   "errors": [],
@@ -1199,12 +1216,9 @@ class HueApiTest {
                             "on": {
                               "on": true
                             },
-                            "dimming": {
-                              "brightness": 7.51
-                            },
                             "color": {
                               "xy": {
-                                "x": 0.5451999999999998,
+                                "x": 0.5452,
                                 "y": 0.2408
                               }
                             }
@@ -1219,6 +1233,14 @@ class HueApiTest {
                             "on": {
                               "on": true
                             },
+                            "color_temperature": {
+                                "mirek": 199,
+                                "mirek_valid": true,
+                                "mirek_schema": {
+                                  "mirek_minimum": 153,
+                                  "mirek_maximum": 454
+                                }
+                              },
                             "dimming": {
                               "brightness": 44.51
                             }
@@ -1249,6 +1271,27 @@ class HueApiTest {
 
         assertThat(api.getSceneName("4b5a905c-cc5e-48be-bc15-84da7deb5da7")).isEqualTo("Scene_1");
         assertThat(api.getSceneName("f96f02db-9765-401c-9aa5-86d59fbdde8e")).isEqualTo("Scene_2");
+
+        List<ScheduledLightState> sceneLightStates = api.getSceneLightState("3cfd5fad-2811-430a-a099-ae692b2185f8", "Scene_2");
+        assertThat(sceneLightStates).hasSize(2);
+        
+        ScheduledLightState state1 = sceneLightStates.getFirst();
+        assertThat(state1.getId()).isEqualTo("1aa6083d-3692-49e5-92f7-b926b302dd49");
+        assertThat(state1.isOn()).isTrue();
+        assertThat(state1.getBri()).isNull();
+        assertThat(state1.getCt()).isNull();
+        assertThat(state1.getX()).isCloseTo(0.5452, within(1e-4));
+        assertThat(state1.getY()).isCloseTo(0.2408, within(1e-4));
+
+        ScheduledLightState state2 = sceneLightStates.get(1);
+        assertThat(state2.getId()).isEqualTo("1271bf6f-be63-42fc-b18c-3ad462914d8e");
+        assertThat(state2.isOn()).isTrue();
+        assertThat(state2.getBri()).isEqualTo(113);
+        assertThat(state2.getCt()).isEqualTo(199);
+        assertThat(state2.getX()).isNull();
+        assertThat(state2.getY()).isNull();
+
+        // todo: what about effects (maybe use effects_v2 already)
     }
 
     @Test
@@ -2551,9 +2594,10 @@ class HueApiTest {
 
     @Test
     void putState_group_usesCorrectUrl() {
-        performPutCall(PutCall.builder().id("eeb336d9-243b-4756-8455-1c69f50efd31").bri(127).groupState(true).build());
+        String groupedLightId = "eeb336d9-243b-4756-8455-1c69f50efd31";
+        performGroupPutCall(PutCall.builder().id(groupedLightId).bri(127).build());
 
-        verifyPut("/grouped_light/eeb336d9-243b-4756-8455-1c69f50efd31", """
+        verifyPut("/grouped_light/" + groupedLightId, """
                 {
                   "dimming": {
                     "brightness": 50.0
@@ -4257,6 +4301,10 @@ class HueApiTest {
 
     private void performPutCall(PutCall putCall) {
         api.putState(putCall);
+    }
+
+    private void performGroupPutCall(PutCall putCall) {
+        api.putGroupState(putCall);
     }
 
     private List<String> getGroupLights(String groupedLightId) {
