@@ -1,6 +1,7 @@
 package at.sv.hue.api.hass;
 
 import at.sv.hue.ColorMode;
+import at.sv.hue.ScheduledLightState;
 import at.sv.hue.api.ApiFailure;
 import at.sv.hue.api.BridgeAuthenticationFailure;
 import at.sv.hue.api.BridgeConnectionFailure;
@@ -137,13 +138,24 @@ public class HassApiImpl implements HueApi {
 
     @Override
     public void putState(PutCall putCall) {
+        rateLimiter.acquire(1);
+        putStateInternal(putCall);
+    }
+
+    @Override
+    public void putGroupState(PutCall putCall) {
+        rateLimiter.acquire(10);
+        putStateInternal(putCall);
+    }
+
+    @Override
+    public void putGroupState(String groupId, List<PutCall> list) {
+        list.forEach(this::putState);
+    }
+
+    private void putStateInternal(PutCall putCall) {
         String id = putCall.getId();
         assertSupportedStateType(id);
-        if (putCall.isGroupState()) {
-            rateLimiter.acquire(10);
-        } else {
-            rateLimiter.acquire(1);
-        }
         ChangeState changeState = getChangeState(putCall);
         changeState.setEntity_id(id);
         httpResourceProvider.postResource(getUpdateUrl(putCall), getBody(changeState));
@@ -297,6 +309,11 @@ public class HassApiImpl implements HueApi {
     @Override
     public LightCapabilities getGroupCapabilities(String id) {
         return getLightCapabilities(id);
+    }
+
+    @Override
+    public List<ScheduledLightState> getSceneLightState(String groupId, String sceneName) {
+        return List.of(); // nut supported by Home Assistant
     }
 
     @Override

@@ -2518,6 +2518,38 @@ public class HassApiTest {
     }
 
     @Test
+    void putGroupState_noDifference() {
+        api.putGroupState(PutCall.builder()
+                                 .on(true)
+                                 .id("light.id")
+                                 .bri(38)
+                                 .ct(153)
+                                 .transitionTime(5).build());
+
+        verify(http).postResource(getUrl("/services/light/turn_on"),
+                "{\"entity_id\":\"light.id\",\"brightness\":37,\"color_temp\":153,\"transition\":0.5}");
+    }
+
+    @Test
+    void putGroupStateList_sendsEachRequestSeparately() {
+        api.putGroupState("1",
+                List.of(PutCall.builder()
+                               .on(true)
+                               .id("light.id1")
+                               .bri(38)
+                               .build(),
+                        PutCall.builder()
+                               .id("light.id2")
+                               .bri(38)
+                               .build()));
+
+        verify(http).postResource(getUrl("/services/light/turn_on"),
+                "{\"entity_id\":\"light.id1\",\"brightness\":37}");
+        verify(http).postResource(getUrl("/services/light/turn_on"),
+                "{\"entity_id\":\"light.id2\",\"brightness\":37}");
+    }
+
+    @Test
     void putState_supportsOtherOrigin() {
         setupApi("https://123456789.ui.nabu.casa");
 
