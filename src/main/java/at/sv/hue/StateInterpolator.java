@@ -122,6 +122,7 @@ public final class StateInterpolator {
     public static boolean hasNoOverlappingProperties(PutCall previous, PutCall target) {
         PutCall putCall = copy(previous);
         putCall.setOn(null); // do not reuse on property
+        putCall.setEffect(null); // interpolation between effects not supported
         convertColorModeIfNeeded(putCall, target);
         removeEqualProperties(putCall, target);
         return putCall.isNullCall();
