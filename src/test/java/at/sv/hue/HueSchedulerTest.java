@@ -2743,6 +2743,38 @@ class HueSchedulerTest {
     }
 
     @Test
+    void parse_transitionTimeBefore_multipleStates_currentIsOffState_interpolatesBrightness() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now, "bri:10");
+        addState(1, now.plusMinutes(10), "on:false", "interpolate:true", "force:true");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1)),
+                expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).bri(10),
+                expectedPutCall(1).on(false).transitionTime(tr("10min"))
+        );
+
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(2)); // next day
+
+        advanceCurrentTime(Duration.ofMinutes(5));
+
+        ScheduledRunnable powerOnRunnable = simulateLightOnEvent(
+                expectedPowerOnEnd(initialNow.plusDays(1))
+        ).getFirst();
+
+        powerOnRunnable.run();
+
+        assertPutCalls(
+                expectedPutCall(1).bri(5),
+                expectedPutCall(1).on(false).transitionTime(tr("5min"))
+        );
+    }
+
+    @Test
     void parse_transitionTimeBefore_multipleStates_ct_lightTurnedOnExactlyAtTrBeforeStart_performsNoInterpolation_setsExactPreviousStateAgain() {
         addKnownLightIdsWithDefaultCapabilities(1);
         addStateNow(1, "bri:" + DEFAULT_BRIGHTNESS, "ct:" + DEFAULT_CT);
@@ -9248,7 +9280,7 @@ class HueSchedulerTest {
                 expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
         );
 
-        // after 5 minutes power on -> interplates from simple group state to multiple put calls
+        // after 5 minutes power on -> interpolates from simple group state to multiple put calls
 
         advanceCurrentTime(Duration.ofMinutes(5));
 
@@ -9309,7 +9341,7 @@ class HueSchedulerTest {
                 expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
         );
 
-        // after 5 minutes power on -> interplates from scene group state
+        // after 5 minutes power on -> interpolates from scene group state
 
         advanceCurrentTime(Duration.ofMinutes(5));
 
@@ -9373,12 +9405,13 @@ class HueSchedulerTest {
                 expectedPutCall(4).bri(200).ct(400).transitionTime(tr("10min")),
                 expectedPutCall(5).bri(250).ct(500).transitionTime(tr("10min"))
         );
+        assertAllGroupPutListCallsAsserted();
 
         ensureScheduledStates(
                 expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
         );
 
-        // after 5 minutes power on -> interplates from scene group state
+        // after 5 minutes power on -> interpolates from scene group state
 
         advanceCurrentTime(Duration.ofMinutes(5));
 
@@ -9395,6 +9428,67 @@ class HueSchedulerTest {
         assertGroupPutListCalls(2,
                 expectedPutCall(4).bri(200).ct(400).transitionTime(tr("5min")),
                 expectedPutCall(5).bri(250).ct(500).transitionTime(tr("5min"))
+        );
+
+        assertAllGroupPutListCallsAsserted();
+    }
+
+    @Test
+    void sceneControl_interpolate_groupToScene_sceneHasOffLights_interpolatesBrightness_alsoForOffState_correctPutCalls() {
+        mockDefaultGroupCapabilities(2);
+        mockGroupLightsForId(2, 4, 5);
+        mockSceneLightStates(2, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .on(false),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(100)
+                                   .x(0.6024)
+                                   .y(0.3433));
+        addState("g2", now, "bri:40", "x:0.6024", "y:0.3433", "tr:2s");
+        addState("g2", now.plusMinutes(10), "scene:TestScene", "interpolate:true");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1)),
+                expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
+        );
+
+        ScheduledRunnable runnable = runnables.getFirst();
+        setCurrentTimeTo(runnable);
+        runnable.run();
+
+        assertGroupPutCalls(
+                expectedGroupPutCall(2).bri(40).x(0.6024).y(0.3433).transitionTime(tr("2s"))
+        );
+
+        assertGroupPutListCalls(2,
+                expectedPutCall(4).on(false).transitionTime(tr("10min")),
+                expectedPutCall(5).bri(100).x(0.6024).y(0.3433).transitionTime(tr("10min"))
+        );
+        assertAllGroupPutListCallsAsserted();
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
+        );
+
+        // after 5 minutes power on -> interpolates from scene group state
+
+        advanceCurrentTime(Duration.ofMinutes(5));
+
+        List<ScheduledRunnable> powerOnRunnables = simulateLightOnEvent("/groups/2",
+                expectedPowerOnEnd(initialNow.plusDays(1))
+        );
+
+        powerOnRunnables.getFirst().run();
+
+        assertGroupPutListCalls(2,
+                expectedPutCall(4).bri(20).x(0.6024).y(0.3433).transitionTime(tr("2s")),  // interpolated off brightness (implicit target = 0)
+                expectedPutCall(5).bri(70).x(0.6024).y(0.3433).transitionTime(tr("2s"))  // interpolated
+        );
+        assertGroupPutListCalls(2,
+                expectedPutCall(4).on(false).transitionTime(tr("5min")),
+                expectedPutCall(5).bri(100).x(0.6024).y(0.3433).transitionTime(tr("5min"))
         );
 
         assertAllGroupPutListCallsAsserted();

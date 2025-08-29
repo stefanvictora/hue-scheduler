@@ -46,6 +46,10 @@ public final class PutCall {
         return on == Boolean.TRUE;
     }
 
+    public boolean isOff() {
+        return on == Boolean.FALSE;
+    }
+
     @Override
     public String toString() {
         return "{" +
