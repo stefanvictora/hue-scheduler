@@ -63,47 +63,52 @@ public final class StateInterpolator {
         PutCalls previous = previousState.getFullPicturePutCalls(dateTime);
         PutCalls target = state.getFullPicturePutCalls(dateTime);
 
-        return interpolate(previous, target, interpolatedTime, keepPreviousPropertiesForNullTargets);
+        return interpolate(previous, target, interpolatedTime);
     }
 
-    private PutCalls interpolate(PutCalls previous, PutCalls target, BigDecimal interpolatedTime,
-                             boolean previousPropertiesForNullTargets) {
+    private PutCalls interpolate(PutCalls previous, PutCalls target, BigDecimal interpolatedTime) {
         List<PutCall> putCalls = new ArrayList<>();
         if (previous.isGeneralGroup()) {
             PutCall previousPutCall = previous.toList().getFirst();
             target.toList().forEach(targetPutCall -> {
-                PutCall putCall = interpolate(previousPutCall, targetPutCall, interpolatedTime, previousPropertiesForNullTargets);
+                PutCall putCall = interpolate(previousPutCall, targetPutCall, interpolatedTime);
                 putCall.setId(targetPutCall.getId());
                 putCalls.add(putCall);
             });
         } else if (target.isGeneralGroup()) {
             PutCall targetPutCall = target.toList().getFirst();
             previous.toList().forEach(previousPutCall -> {
-                PutCall putCall = interpolate(previousPutCall, targetPutCall, interpolatedTime, previousPropertiesForNullTargets);
+                PutCall putCall = interpolate(previousPutCall, targetPutCall, interpolatedTime);
                 putCalls.add(putCall);
             });
         } else {
             previous.toList().forEach(previousPutCall -> {
                 PutCall targetPutCall = target.get(previousPutCall.getId());
-                PutCall putCall = interpolate(previousPutCall, targetPutCall, interpolatedTime, previousPropertiesForNullTargets);
+                PutCall putCall = interpolate(previousPutCall, targetPutCall, interpolatedTime);
                 putCalls.add(putCall);
             });
         }
         return new PutCalls(previous.getId(), putCalls, previous.getTransitionTime(), previous.isGroupUpdate());
     }
 
-    private static PutCall interpolate(PutCall previous, PutCall target, BigDecimal interpolatedTime,
-                                       boolean previousPropertiesForNullTargets) {
+    private PutCall interpolate(PutCall previous, PutCall target, BigDecimal interpolatedTime) {
         PutCall putCall = copy(previous);
         convertColorModeIfNeeded(putCall, target);
 
-        putCall.setBri(interpolateInteger(interpolatedTime, target.getBri(), putCall.getBri(), previousPropertiesForNullTargets));
-        putCall.setCt(interpolateInteger(interpolatedTime, target.getCt(), putCall.getCt(), previousPropertiesForNullTargets));
-        putCall.setHue(interpolateHue(interpolatedTime, target.getHue(), putCall.getHue(), previousPropertiesForNullTargets));
-        putCall.setSat(interpolateInteger(interpolatedTime, target.getSat(), putCall.getSat(), previousPropertiesForNullTargets));
-        putCall.setX(interpolateDouble(interpolatedTime, target.getX(), putCall.getX(), previousPropertiesForNullTargets));
-        putCall.setY(interpolateDouble(interpolatedTime, target.getY(), putCall.getY(), previousPropertiesForNullTargets));
+        putCall.setBri(interpolateInteger(interpolatedTime, getTargetBri(target), putCall.getBri()));
+        putCall.setCt(interpolateInteger(interpolatedTime, target.getCt(), putCall.getCt()));
+        putCall.setHue(interpolateHue(interpolatedTime, target.getHue(), putCall.getHue()));
+        putCall.setSat(interpolateInteger(interpolatedTime, target.getSat(), putCall.getSat()));
+        putCall.setX(interpolateDouble(interpolatedTime, target.getX(), putCall.getX()));
+        putCall.setY(interpolateDouble(interpolatedTime, target.getY(), putCall.getY()));
         return putCall;
+    }
+
+    private static Integer getTargetBri(PutCall target) {
+        if (target.isOff()) {
+            return 0;
+        }
+        return target.getBri();
     }
 
     private static PutCall copy(PutCall putCall) {
@@ -115,14 +120,15 @@ public final class StateInterpolator {
      * would be possible. Here we don't care about the time differences, but just the available properties of the put calls.
      */
     public static boolean hasNoOverlappingProperties(PutCall previous, PutCall target) {
-        previous.setOn(null); // do not reuse on property
-        convertColorModeIfNeeded(previous, target);
-        removeEqualProperties(previous, target);
-        return previous.isNullCall();
+        PutCall putCall = copy(previous);
+        putCall.setOn(null); // do not reuse on property
+        convertColorModeIfNeeded(putCall, target);
+        removeEqualProperties(putCall, target);
+        return putCall.isNullCall();
     }
 
     private static void removeEqualProperties(PutCall putCall, PutCall target) {
-        if (isEqualOrNotAvailableAtTarget(putCall, target, PutCall::getBri)) {
+        if (isEqualOrNotAvailableAtTarget(putCall, getTargetConsideringOff(target), PutCall::getBri)) {
             putCall.setBri(null);
         }
         if (isEqualOrNotAvailableAtTarget(putCall, target, PutCall::getCt)) {
@@ -140,6 +146,15 @@ public final class StateInterpolator {
         if (isEqualOrNotAvailableAtTarget(putCall, target, PutCall::getY)) {
             putCall.setY(null);
         }
+    }
+
+    private static PutCall getTargetConsideringOff(PutCall target) {
+        if (target.isOff()) {
+            PutCall modifiedTarget = copy(target);
+            modifiedTarget.setBri(0);
+            return modifiedTarget;
+        }
+        return target;
     }
 
     private static boolean isEqualOrNotAvailableAtTarget(PutCall putCall, PutCall target, Function<PutCall, Object> function) {
@@ -161,9 +176,8 @@ public final class StateInterpolator {
         ColorModeConverter.convertIfNeeded(previousPutCall, target.getColorMode());
     }
 
-    private static Integer interpolateInteger(BigDecimal interpolatedTime, Integer target, Integer previous,
-                                              boolean previousPropertiesForNullTargets) {
-        if (shouldReturnPrevious(target, previousPropertiesForNullTargets)) {
+    private Integer interpolateInteger(BigDecimal interpolatedTime, Integer target, Integer previous) {
+        if (shouldReturnPrevious(target)) {
             return previous;
         }
         if (target == null) {
@@ -179,9 +193,8 @@ public final class StateInterpolator {
                          .intValue();
     }
 
-    private static Double interpolateDouble(BigDecimal interpolatedTime, Double target, Double previous,
-                                            boolean previousPropertiesForNullTargets) {
-        if (shouldReturnPrevious(target, previousPropertiesForNullTargets)) {
+    private Double interpolateDouble(BigDecimal interpolatedTime, Double target, Double previous) {
+        if (shouldReturnPrevious(target)) {
             return previous;
         }
         if (target == null) {
@@ -201,9 +214,8 @@ public final class StateInterpolator {
      * Perform special interpolation for hue values, as they wrap around i.e. 0 and 65535 are both considered red.
      * This means that we need to decide in which direction we want to interpolate, to get the smoothest transition.
      */
-    private static Integer interpolateHue(BigDecimal interpolatedTime, Integer target, Integer previous,
-                                          boolean previousPropertiesForNullTargets) {
-        if (shouldReturnPrevious(target, previousPropertiesForNullTargets)) {
+    private Integer interpolateHue(BigDecimal interpolatedTime, Integer target, Integer previous) {
+        if (shouldReturnPrevious(target)) {
             return previous;
         }
         if (target == null) {
@@ -222,7 +234,7 @@ public final class StateInterpolator {
                          .intValue();
     }
 
-    private static boolean shouldReturnPrevious(Object target, boolean previousPropertiesForNullTargets) {
-        return target == null && previousPropertiesForNullTargets;
+    private boolean shouldReturnPrevious(Object target) {
+        return target == null && keepPreviousPropertiesForNullTargets;
     }
 }
