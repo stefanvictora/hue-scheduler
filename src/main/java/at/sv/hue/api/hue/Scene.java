@@ -25,7 +25,7 @@ final class Scene implements Resource {
     }
 
     Scene(String name, ResourceReference group, List<SceneAction> actions) {
-        this.metadata = new Metadata(name, null);
+        this.metadata = new Metadata(name, "huescheduler:app");
         this.group = group;
         this.actions = actions;
     }

@@ -223,8 +223,16 @@ public final class HueApiImpl implements HueApi {
     }
 
     @Override
-    public void putSceneState(String groupId, List<PutCall> list) {
-        // todo
+    public void putSceneState(String groupedLightId, List<PutCall> putCalls) {
+        String sceneId = createOrUpdateSceneInternal(groupedLightId, "•", putCalls);
+        recallScene(sceneId);
+        log.trace("Recalled temp scene for {}", groupedLightId);
+    }
+
+    private void recallScene(String sceneId) {
+        RecallRequest recallBody = new RecallRequest(new Recall("active", null));
+        rateLimiter.acquire(10);
+        resourceProvider.putResource(createUrl("/scene/" + sceneId), getBody(recallBody));
     }
 
     private String getBody(Object object) {
@@ -342,20 +350,27 @@ public final class HueApiImpl implements HueApi {
 
     @Override
     public synchronized void createOrUpdateScene(String groupedLightId, String sceneSyncName, List<PutCall> putCalls) {
+        createOrUpdateSceneInternal(groupedLightId, sceneSyncName, putCalls);
+    }
+
+    private String createOrUpdateSceneInternal(String groupedLightId, String sceneSyncName, List<PutCall> putCalls) {
         Group group = getAndAssertGroupExists(groupedLightId);
         Scene existingScene = getScene(group, sceneSyncName);
         List<SceneAction> actions = createSceneActions(group, putCalls);
+        String sceneId;
         if (existingScene == null) {
             Scene newScene = new Scene(sceneSyncName, group.toResourceReference(), actions);
-            String sceneId = createScene(newScene);
+            sceneId = createScene(newScene);
             log.trace("Created scene id={}", sceneId);
-            newScene.setId(sceneId);
-            getAvailableScenes().put(sceneId, newScene); // prepopulate cache
         } else if (actionsDiffer(existingScene, actions)) {
             Scene updatedScene = new Scene(actions);
             updateScene(existingScene, updatedScene);
             log.trace("Updated scene id={}", existingScene.getId());
+            sceneId = existingScene.getId();
+        } else {
+            sceneId = existingScene.getId();
         }
+        return sceneId;
     }
 
     private List<SceneAction> createSceneActions(Group group, List<PutCall> putCalls) {
@@ -467,12 +482,7 @@ public final class HueApiImpl implements HueApi {
 
     private String createScene(Scene newScene) {
         rateLimiter.acquire(10);
-        String response = resourceProvider.postResource(createUrl("/scene"), getBody(newScene));
-        String id = getAffectedResourceId(response);
-        if (id == null) {
-            throw new ApiFailure("Failed to create scene, no id returned in response: " + response);
-        }
-        return id;
+        return getAffectedResourceId(resourceProvider.postResource(createUrl("/scene"), getBody(newScene)));
     }
 
     private String getAffectedResourceId(String response) {
@@ -502,7 +512,10 @@ public final class HueApiImpl implements HueApi {
         state.id(sceneAction.getTarget().getRid());
         Action action = sceneAction.getAction();
         if (action.getOn() != null) {
-            state.on(action.getOn().isOn());
+            // don't set on=true, as lights are per default on when recalling a scene
+            if (!action.getOn().isOn()) {
+                state.on(false);
+            }
         }
         if (action.getDimming() != null) {
             int bri = BigDecimal.valueOf(action.getDimming().getBrightness())
