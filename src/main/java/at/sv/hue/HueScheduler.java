@@ -874,7 +874,7 @@ public final class HueScheduler implements Runnable {
         if (putCalls.isGeneralGroup()) {
             api.putGroupState(list.getFirst());
         } else if (putCalls.isGroupUpdate()) {
-            api.putGroupState(putCalls.getId(), list);
+            api.putSceneState(putCalls.getId(), list);
         } else {
             api.putState(list.getFirst());
         }

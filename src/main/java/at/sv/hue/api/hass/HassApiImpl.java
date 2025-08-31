@@ -145,7 +145,7 @@ public class HassApiImpl implements HueApi {
     }
 
     @Override
-    public void putGroupState(String groupId, List<PutCall> list) {
+    public void putSceneState(String groupId, List<PutCall> list) {
         list.forEach(this::putState);
     }
 

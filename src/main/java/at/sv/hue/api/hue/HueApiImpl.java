@@ -212,7 +212,7 @@ public final class HueApiImpl implements HueApi {
     }
 
     @Override
-    public void putGroupState(String groupId, List<PutCall> list) {
+    public void putSceneState(String groupId, List<PutCall> list) {
         // todo
     }
 
@@ -486,7 +486,7 @@ public final class HueApiImpl implements HueApi {
             state.x(xy.getX());
             state.y(xy.getY());
         }
-        if (action.getEffects() != null && action.getEffects().getEffect() != null) {
+        if (action.getEffects() != null && action.getEffects().getEffect() != null) { // todo: adapt to effects_v2; add tests
             String effect = action.getEffects().getEffect();
             if ("no_effect".equals(effect)) {
                 effect = "none";
