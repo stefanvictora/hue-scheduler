@@ -2798,6 +2798,8 @@ class HueSchedulerTest {
 
         ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(2)); // next day
 
+        // turn lights on after 5 minutes
+
         advanceCurrentTime(Duration.ofMinutes(5));
 
         ScheduledRunnable powerOnRunnable = simulateLightOnEvent(
@@ -2807,8 +2809,120 @@ class HueSchedulerTest {
         powerOnRunnable.run();
 
         assertPutCalls(
-                expectedPutCall(1).bri(5),
+                expectedPutCall(1).bri(5), // interpolated
                 expectedPutCall(1).on(false).transitionTime(tr("5min"))
+        );
+    }
+
+    @Test
+    void parse_interpolate_offState_treatedAsZeroBrightness_interpolates() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now, "bri:100", "ct:200");
+        addState(1, now.plusHours(2), "on:false", "interpolate:true");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1)),
+                expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).bri(100).ct(200),
+                expectedPutCall(1).bri(17).ct(200).transitionTime(MAX_TRANSITION_TIME) // repeats unchanged ct, no "on:false"
+        );
+
+        List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(
+                expectedRunnable(initialNow.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)), // next split
+                expectedRunnable(initialNow.plusDays(1), initialNow.plusDays(2)) // next day
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(followUpRunnables.getFirst(),
+                expectedPutCall(1).on(false).transitionTime(tr("20min"))
+        );
+    }
+
+    @Test
+    void parse_interpolate_offState_withAdditionalCTProperty_interpolates() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now, "bri:100", "ct:200");
+        addState(1, now.plusHours(2), "on:false", "ct:500", "interpolate:true");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1)),
+                expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).bri(100).ct(200),
+                expectedPutCall(1).bri(17).ct(450).transitionTime(MAX_TRANSITION_TIME)
+        );
+
+        List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(
+                expectedRunnable(initialNow.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)), // next split
+                expectedRunnable(initialNow.plusDays(1), initialNow.plusDays(2)) // next day
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(followUpRunnables.getFirst(),
+                expectedPutCall(1).on(false).ct(500).transitionTime(tr("20min"))
+        );
+    }
+
+    @Test
+    void parse_offState_noTransition_noFullPictureUsed() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now, "on:false");
+        addState(1, now.plusMinutes(10), "bri:100", "ct:200");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).on(false)
+        );
+
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(10)); // next day
+    }
+
+    @Test
+    void parse_offState_zeroTransition_noFullPictureUsed() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now, "on:false", "tr:0");
+        addState(1, now.plusMinutes(10), "bri:100", "ct:200");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).on(false).transitionTime(0)
+        );
+
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(10)); // next day
+    }
+
+    // todo: what about on:false but with no previous property; can we still interpolate? Do we need to fetch the current state of the light? Or should we just ignore it?
+
+    @Test
+    void parse_interpolate_noCTAtTarget_stillIncludedInSplitCall() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now, "bri:10", "ct:200");
+        addState(1, now.plusHours(2), "bri:100", "interpolate:true");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1)),
+                expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).bri(10).ct(200),
+                expectedPutCall(1).bri(85).ct(200).transitionTime(MAX_TRANSITION_TIME) // still include unchanged; don't perform optimzations
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)), // next split
+                expectedRunnable(initialNow.plusDays(1), initialNow.plusDays(2)) // next day
         );
     }
 
@@ -9251,7 +9365,7 @@ class HueSchedulerTest {
     // todo: Fall berücksichtigen, falls es mehr als eine Szene gibt mit dem gleichen Namen innerhalb der Gruppe. Weil das durchaus der Fall sein kann.
 
     @Test
-    void sceneControl_canBeParsed_loadsLightPropertiesBySceneForGroupByName() {
+    void sceneControl_init_loadsLightPropertiesForGroupByName() {
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
         mockSceneLightStates(1, "TestScene",
@@ -9280,7 +9394,104 @@ class HueSchedulerTest {
     }
 
     @Test
-    void sceneControl_interpolateFromSimpleGroupState_correctPutCalls() {
+    void sceneControl_sceneThenGroup_calculatesFullPicture_correctPutCalls() {
+        mockDefaultGroupCapabilities(2);
+        mockGroupLightsForId(2, 4, 5);
+        mockSceneLightStates(2, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .ct(300),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .ct(400));
+        addState("g2", now, "scene:TestScene");
+        addState("g2", now.plusMinutes(10), "bri:50", "ct:200");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertGroupPutListCalls(runnables.getFirst(), 2,
+                expectedPutCall(4).bri(50).ct(300), // bri taken from group
+                expectedPutCall(5).bri(50).ct(400)  // bri taken from group
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(10)) // next day
+        );
+    }
+
+    @Test
+    void sceneControl_groupThenScene_noFullPicturePossible_keepsOwnProperties_correctPutCalls() {
+        mockDefaultGroupCapabilities(2);
+        mockGroupLightsForId(2, 4, 5);
+        mockSceneLightStates(2, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100)
+                                   .ct(300),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(150)
+                                   .ct(400));
+        addState("g2", now, "ct:200");
+        addState("g2", now.plusMinutes(10), "scene:TestScene");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertGroupPutCalls(runnables.getFirst(),
+                expectedGroupPutCall(2).ct(200)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(10)) // next day
+        );
+    }
+
+    @Test
+    void sceneControl_sceneThenScene_calculatesFullPicture_correctPutCalls() {
+        mockDefaultGroupCapabilities(2);
+        mockGroupLightsForId(2, 4, 5);
+        mockSceneLightStates(2, "TestScene1",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .ct(100),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .ct(200));
+        mockSceneLightStates(2, "TestScene2",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100)
+                                   .ct(300),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(150)
+                                   .ct(400));
+        addState("g2", now, "scene:TestScene1");
+        addState("g2", now.plusMinutes(10), "scene:TestScene2");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertGroupPutListCalls(runnables.getFirst(), 2,
+                expectedPutCall(4).bri(100).ct(100),
+                expectedPutCall(5).bri(150).ct(200)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(10)) // next day
+        );
+    }
+
+    @Test
+    void sceneControl_interpolate_groupToScene_sameProperties_correctPutCalls() {
         mockDefaultGroupCapabilities(2);
         mockGroupLightsForId(2, 4, 5);
         mockSceneLightStates(2, "AnotherTestScene",
@@ -9304,8 +9515,9 @@ class HueSchedulerTest {
         setCurrentTimeTo(runnable);
         runnable.run();
 
-        assertGroupPutCalls(
-                expectedGroupPutCall(2).bri(50).ct(200)
+        assertGroupPutListCalls(2,
+                expectedPutCall(4).bri(50).ct(200),
+                expectedPutCall(5).bri(50).ct(200)
         );
 
         assertGroupPutListCalls(2,
@@ -9341,7 +9553,69 @@ class HueSchedulerTest {
     }
 
     @Test
-    void sceneControl_interpolateFromSceneGroupStateToSimple_correctPutCalls() {
+    void sceneControl_interpolate_groupToScene_sceneHasOffLights_interpolatesBrightness_alsoForOffState_correctPutCalls() {
+        mockDefaultGroupCapabilities(2);
+        mockGroupLightsForId(2, 4, 5);
+        mockSceneLightStates(2, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .on(false), // treated as bri:0
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(100)
+                                   .x(0.6024)
+                                   .y(0.3433));
+        addState("g2", now, "bri:40", "x:0.6024", "y:0.3433", "tr:2s");
+        addState("g2", now.plusMinutes(10), "scene:TestScene", "interpolate:true");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1)),
+                expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
+        );
+
+        ScheduledRunnable runnable = runnables.getFirst();
+        setCurrentTimeTo(runnable);
+        runnable.run();
+
+        assertGroupPutListCalls(2,
+                expectedPutCall(4).bri(40).x(0.6024).y(0.3433).transitionTime(tr("2s")),
+                expectedPutCall(5).bri(40).x(0.6024).y(0.3433).transitionTime(tr("2s"))
+        );
+
+        assertGroupPutListCalls(2,
+                expectedPutCall(4).on(false).transitionTime(tr("10min")),
+                expectedPutCall(5).bri(100).x(0.6024).y(0.3433).transitionTime(tr("10min"))
+        );
+        assertAllGroupPutListCallsAsserted();
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
+        );
+
+        // after 5 minutes power on -> interpolates from scene group state
+
+        advanceCurrentTime(Duration.ofMinutes(5));
+
+        List<ScheduledRunnable> powerOnRunnables = simulateLightOnEvent("/groups/2",
+                expectedPowerOnEnd(initialNow.plusDays(1))
+        );
+
+        powerOnRunnables.getFirst().run();
+
+        assertGroupPutListCalls(2,
+                expectedPutCall(4).bri(20).x(0.6024).y(0.3433).transitionTime(tr("2s")),  // interpolated brightness (implicit target = 0)
+                expectedPutCall(5).bri(70).x(0.6024).y(0.3433).transitionTime(tr("2s"))  // interpolated
+        );
+        assertGroupPutListCalls(2,
+                expectedPutCall(4).on(false).transitionTime(tr("5min")),
+                expectedPutCall(5).bri(100).x(0.6024).y(0.3433).transitionTime(tr("5min"))
+        );
+
+        assertAllGroupPutListCallsAsserted();
+    }
+
+    @Test
+    void sceneControl_interpolate_sceneToGroup_correctPutCalls() {
         mockDefaultGroupCapabilities(2);
         mockGroupLightsForId(2, 4, 5);
         mockSceneLightStates(2, "TestScene",
@@ -9401,7 +9675,7 @@ class HueSchedulerTest {
     }
 
     @Test
-    void sceneControl_interpolateFromSceneGroupStateToAnotherSceneGroupState_correctPutCalls() {
+    void sceneControl_interpolate_sceneToScene_correctPutCalls() {
         mockDefaultGroupCapabilities(2);
         mockGroupLightsForId(2, 4, 5);
         mockSceneLightStates(2, "TestScene",
@@ -9472,68 +9746,7 @@ class HueSchedulerTest {
     }
 
     @Test
-    void sceneControl_interpolate_groupToScene_sceneHasOffLights_interpolatesBrightness_alsoForOffState_correctPutCalls() {
-        mockDefaultGroupCapabilities(2);
-        mockGroupLightsForId(2, 4, 5);
-        mockSceneLightStates(2, "TestScene",
-                ScheduledLightState.builder()
-                                   .id("/lights/4")
-                                   .on(false),
-                ScheduledLightState.builder()
-                                   .id("/lights/5")
-                                   .bri(100)
-                                   .x(0.6024)
-                                   .y(0.3433));
-        addState("g2", now, "bri:40", "x:0.6024", "y:0.3433", "tr:2s");
-        addState("g2", now.plusMinutes(10), "scene:TestScene", "interpolate:true");
-
-        List<ScheduledRunnable> runnables = startScheduler(
-                expectedRunnable(now, now.plusDays(1)),
-                expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
-        );
-
-        ScheduledRunnable runnable = runnables.getFirst();
-        setCurrentTimeTo(runnable);
-        runnable.run();
-
-        assertGroupPutCalls(
-                expectedGroupPutCall(2).bri(40).x(0.6024).y(0.3433).transitionTime(tr("2s"))
-        );
-
-        assertGroupPutListCalls(2,
-                expectedPutCall(4).on(false).transitionTime(tr("10min")),
-                expectedPutCall(5).bri(100).x(0.6024).y(0.3433).transitionTime(tr("10min"))
-        );
-        assertAllGroupPutListCallsAsserted();
-
-        ensureScheduledStates(
-                expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
-        );
-
-        // after 5 minutes power on -> interpolates from scene group state
-
-        advanceCurrentTime(Duration.ofMinutes(5));
-
-        List<ScheduledRunnable> powerOnRunnables = simulateLightOnEvent("/groups/2",
-                expectedPowerOnEnd(initialNow.plusDays(1))
-        );
-
-        powerOnRunnables.getFirst().run();
-
-        assertGroupPutListCalls(2,
-                expectedPutCall(4).bri(20).x(0.6024).y(0.3433).transitionTime(tr("2s")),  // interpolated off brightness (implicit target = 0)
-                expectedPutCall(5).bri(70).x(0.6024).y(0.3433).transitionTime(tr("2s"))  // interpolated
-        );
-        assertGroupPutListCalls(2,
-                expectedPutCall(4).on(false).transitionTime(tr("5min")),
-                expectedPutCall(5).bri(100).x(0.6024).y(0.3433).transitionTime(tr("5min"))
-        );
-
-        assertAllGroupPutListCallsAsserted();
-    }
-
-    @Test
-    void sceneControl_interpolate_sceneToScene_notCompatibleProperties_noInterpolation_doesNotUseFullPictureForSecondListCall() {
+    void sceneControl_interpolate_sceneToScene_noOverlappingProperties_noInterpolation() {
         mockDefaultGroupCapabilities(2);
         mockGroupLightsForId(2, 4, 5);
         mockSceneLightStates(2, "TestScene1",
@@ -9567,7 +9780,8 @@ class HueSchedulerTest {
                 expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
         );
 
-        // second state: no full picture used
+        // second state
+
         advanceTimeAndRunAndAssertGroupPutListCalls(runnables.get(1), 2,
                 expectedPutCall(4).bri(100),
                 expectedPutCall(5).bri(200)
@@ -9579,13 +9793,103 @@ class HueSchedulerTest {
     }
 
     @Test
-    void sceneControl_interpolate_sceneToScene_usingEffects_noInterpolation() {
+    void sceneControl_interpolate_sceneToScene_longDuration_someOverlappingProperties_interpolatesTheOnesOverlapping() {
         mockDefaultGroupCapabilities(2);
         mockGroupLightsForId(2, 4, 5);
         mockSceneLightStates(2, "TestScene1",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
-                                   .effect("effect"),
+                                   .on(true),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(100));
+        mockSceneLightStates(2, "TestScene2",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .on(true),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(200));
+        addState("g2", now, "scene:TestScene1");
+        addState("g2", now.plusHours(10), "scene:TestScene2", "interpolate:true");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1)),
+                expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
+        );
+
+        runnables.getFirst().run();
+
+        assertGroupPutListCalls(2,
+                expectedPutCall(4).on(true), // a bit of a constructed case, but if we don't provide any state, the scene would set the light to off
+                expectedPutCall(5).bri(100)
+        );
+
+        assertGroupPutListCalls(2,
+                expectedPutCall(4).on(true).transitionTime(MAX_TRANSITION_TIME),
+                expectedPutCall(5).bri(117).transitionTime(MAX_TRANSITION_TIME)
+        );
+        assertAllGroupPutListCallsAsserted();
+
+        ensureScheduledStates(
+                expectedRunnable(now.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)), // next split
+                expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
+        );
+    }
+
+    @Test
+    void sceneControl_interpolate_sceneToScene_longDuration_keepsEqualProperties() {
+        mockDefaultGroupCapabilities(2);
+        mockGroupLightsForId(2, 4, 5);
+        mockSceneLightStates(2, "TestScene1",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .ct(100));
+        mockSceneLightStates(2, "TestScene2",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100), // unchanged
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .ct(200));
+        addState("g2", now, "scene:TestScene1");
+        addState("g2", now.plusHours(2), "scene:TestScene2", "interpolate:true");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1)),
+                expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
+        );
+
+        runnables.getFirst().run();
+
+        assertGroupPutListCalls(2,
+                expectedPutCall(4).bri(100),
+                expectedPutCall(5).ct(100)
+        );
+
+        assertGroupPutListCalls(2,
+                expectedPutCall(4).bri(100).transitionTime(MAX_TRANSITION_TIME), // unchanged, but still kept
+                expectedPutCall(5).ct(183).transitionTime(MAX_TRANSITION_TIME)
+        );
+        assertAllGroupPutListCallsAsserted();
+
+        ensureScheduledStates(
+                expectedRunnable(now.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)), // next split
+                expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
+        );
+    }
+
+    @Test
+    void sceneControl_interpolate_sceneToScene_justEffect_noInterpolationPossible() {
+        mockDefaultGroupCapabilities(2);
+        mockGroupLightsForId(2, 4, 5);
+        mockSceneLightStates(2, "TestScene1",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .effect("effect"), // only effect
                 ScheduledLightState.builder()
                                    .id("/lights/5")
                                    .ct(300));

@@ -8,7 +8,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.ZonedDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -29,30 +28,7 @@ public final class StateInterpolator {
         if (state.isAlreadyReached(dateTime)) {
             return null; // the state is already reached
         }
-        PutCalls interpolatedPutCalls;
-        if (isDirectlyAtStartOfState()) {
-            interpolatedPutCalls = previousState.getFullPicturePutCalls(dateTime); // directly at start, just use previous put call
-        } else {
-            interpolatedPutCalls = interpolate();
-        }
-        interpolatedPutCalls.map(this::modifyProperties);
-        return interpolatedPutCalls; // todo: previously we returned null in some cases where an interpolation was not needed
-    }
-
-    private boolean isDirectlyAtStartOfState() {
-        return state.getStart().truncatedTo(ChronoUnit.SECONDS)
-                    .isEqual(dateTime.truncatedTo(ChronoUnit.SECONDS));
-    }
-
-    private PutCall modifyProperties(PutCall interpolatedPutCall) {
-        interpolatedPutCall.setOn(null); // do not per default reuse "on" property for interpolation
-        if (interpolatedPutCall.isNullCall()) {
-            return null; // no relevant properties set, don't perform interpolations todo: check if we need to filter the null values now
-        }
-        if (state.isOn()) {
-            interpolatedPutCall.setOn(true); // the current state is turning lights on, also set "on" property for interpolated state
-        }
-        return interpolatedPutCall;
+        return interpolate(); // todo: previously we returned null in some cases where an interpolation was not needed
     }
 
     /**
@@ -83,7 +59,7 @@ public final class StateInterpolator {
             });
         } else {
             previous.toList().forEach(previousPutCall -> {
-                PutCall targetPutCall = target.get(previousPutCall.getId());
+                PutCall targetPutCall = target.get(previousPutCall.getId()); // todo: what about cases where we can't find a target?
                 PutCall putCall = interpolate(previousPutCall, targetPutCall, interpolatedTime);
                 putCalls.add(putCall);
             });
@@ -101,6 +77,15 @@ public final class StateInterpolator {
         putCall.setSat(interpolateInteger(interpolatedTime, target.getSat(), putCall.getSat()));
         putCall.setX(interpolateDouble(interpolatedTime, target.getX(), putCall.getX()));
         putCall.setY(interpolateDouble(interpolatedTime, target.getY(), putCall.getY()));
+
+        putCall.setOn(null); // do not per default reuse "on" property for interpolation
+//        if (putCall.isNullCall()) {
+//            return null; // no relevant properties set, don't perform interpolations
+//        }
+        if (target.isOn()) {
+            putCall.setOn(true); // the current state is turning lights on, also set "on" property for interpolated state
+        }
+
         return putCall;
     }
 
