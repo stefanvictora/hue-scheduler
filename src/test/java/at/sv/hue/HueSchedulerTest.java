@@ -4290,13 +4290,31 @@ class HueSchedulerTest {
     }
 
     @Test
-    void parse_invalidBrightnessValue_tooLow_exception() {
-        assertThrows(InvalidBrightnessValue.class, () -> addState(1, now, 0, null));
+    void parse_invalidBrightnessValue_tooLow_usesMinValue() {
+        mockDefaultLightCapabilities(1);
+        addStateNow(1, "bri:0");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
+                expectedPutCall(1).bri(1)
+        );
+
+        ensureRunnable(initialNow.plusDays(1));
     }
 
     @Test
-    void parse_invalidBrightnessValue_tooHigh_exception() {
-        assertThrows(InvalidBrightnessValue.class, () -> addState(1, now, 255, null));
+    void parse_invalidBrightnessValue_tooHigh_usesMaxValue() {
+        mockDefaultLightCapabilities(1);
+        addStateNow(1, "bri:255");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
+                expectedPutCall(1).bri(254)
+        );
+
+        ensureRunnable(initialNow.plusDays(1));
     }
 
     @Test
@@ -9390,6 +9408,295 @@ class HueSchedulerTest {
 
         ensureScheduledStates(
                 expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
+        );
+    }
+
+    @Test
+    void sceneControl_withBrightnessOverride_appliesProportionalScaling() {
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        mockSceneLightStates(1, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(200)  // bright light
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(100)  // mid brightness
+                                   .ct(40));
+        addState("g1", now, "scene:TestScene", "bri:127");  // ~50%
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1))
+        );
+
+        // With scaleFactor = 127/254 = 0.5
+        // Light 4: 200 * 0.5 = 100
+        // Light 5: 100 * 0.5 = 50
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+                expectedPutCall(4).bri(100).ct(20),
+                expectedPutCall(5).bri(50).ct(40)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(2))
+        );
+    }
+
+    @Test
+    void sceneControl_withBrightnessOverride_preservesRelativeProportions() {
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        mockSceneLightStates(1, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(254)  // max brightness
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(64)   // 1/4 of max
+                                   .ct(40));
+        addState("g1", now, "scene:TestScene", "bri:100");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1))
+        );
+
+        // With scaleFactor = 100/254 ≈ 0.394
+        // Light 4: 254 * 0.394 = 100
+        // Light 5: 64 * 0.394 = 25 (maintains 1:4 ratio)
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+                expectedPutCall(4).bri(100).ct(20),
+                expectedPutCall(5).bri(25).ct(40)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(2))
+        );
+    }
+
+    @Test
+    void sceneControl_withMaxBrightnessOverride_leavesSceneUnchanged() {
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        mockSceneLightStates(1, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(200)
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(100)
+                                   .ct(40));
+        addState("g1", now, "scene:TestScene", "bri:254");  // 100%
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1))
+        );
+
+        // With scaleFactor = 254/254 = 1.0 (no change)
+        // Light 4: 200 * 1.0 = 200
+        // Light 5: 100 * 1.0 = 100
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+                expectedPutCall(4).bri(200).ct(20),
+                expectedPutCall(5).bri(100).ct(40)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(2))
+        );
+    }
+
+    @Test
+    void sceneControl_withLowBrightnessOverride_dimsProportionally() {
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5, 6);
+        mockSceneLightStates(1, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(200)
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(100)
+                                   .ct(40),
+                ScheduledLightState.builder()
+                                   .id("/lights/6")
+                                   .bri(50)
+                                   .ct(60));
+        addState("g1", now, "scene:TestScene", "bri:25");  // ~10%
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1))
+        );
+
+        // With scaleFactor = 25/254 ≈ 0.098
+        // Light 4: 200 * 0.098 = 20
+        // Light 5: 100 * 0.098 = 10
+        // Light 6: 50 * 0.098 = 5
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+                expectedPutCall(4).bri(20).ct(20),
+                expectedPutCall(5).bri(10).ct(40),
+                expectedPutCall(6).bri(5).ct(60)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(2))
+        );
+    }
+
+    @Test
+    void sceneControl_withBrightnessOverride_enforcesMinimumBrightness() {
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        mockSceneLightStates(1, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(10)   // very dim
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(5)    // extremely dim
+                                   .ct(40));
+        addState("g1", now, "scene:TestScene", "bri:25");  // ~10%
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1))
+        );
+
+        // With scaleFactor = 25/254 ≈ 0.098
+        // Light 4: 10 * 0.098 = 1 (rounded, minimum enforced)
+        // Light 5: 5 * 0.098 = 0.49 → 1 (minimum enforced)
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+                expectedPutCall(4).bri(1).ct(20),
+                expectedPutCall(5).bri(1).ct(40)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(2))
+        );
+    }
+
+    @Test
+    void sceneControl_withBrightnessOverride_canExceedOriginalBrightness() {
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        mockSceneLightStates(1, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100)
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(50)
+                                   .ct(40));
+        addState("g1", now, "scene:TestScene", "bri:300");  // >100%
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1))
+        );
+
+        // With scaleFactor = 300/254 ≈ 1.18
+        // Light 4: 100 * 1.18 = 118
+        // Light 5: 50 * 1.18 = 59
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+                expectedPutCall(4).bri(118).ct(20),
+                expectedPutCall(5).bri(59).ct(40)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(2))
+        );
+    }
+
+    @Test
+    void sceneControl_withBrightnessOverride_capsAtMaximum() {
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        mockSceneLightStates(1, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(200)
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(230)
+                                   .ct(40));
+        addState("g1", now, "scene:TestScene", "bri:300");  // >100%
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1))
+        );
+
+        // With scaleFactor = 300/254 ≈ 1.18
+        // Light 4: 200 * 1.18 = 236
+        // Light 5: 230 * 1.18 = 271 → 254 (capped at maximum)
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+                expectedPutCall(4).bri(236).ct(20),
+                expectedPutCall(5).bri(254).ct(40)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(2))
+        );
+    }
+
+    @Test
+    void sceneControl_withBrightnessOverride_ignoresMissingBrightnessInScene() {
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        mockSceneLightStates(1, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100)
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   // no bri property
+                                   .ct(40));
+        addState("g1", now, "scene:TestScene", "bri:150");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1))
+        );
+
+        // Light 4 gets scaled, Light 5 gets the override brightness directly
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+                expectedPutCall(4).bri(59).ct(20),  // 100 * (150/254) ≈ 59
+                expectedPutCall(5).ct(40) // ignored
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(2))
+        );
+    }
+
+    @Test
+    void sceneControl_withBrightnessOverride_over100Percent_cappedAtMax() {
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        mockSceneLightStates(1, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(200)
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(100)
+                                   .ct(40));
+        addState("g1", now, "scene:TestScene", "bri:200%");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+                expectedPutCall(4).bri(254).ct(20),
+                expectedPutCall(5).bri(201).ct(40)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(2))
         );
     }
 

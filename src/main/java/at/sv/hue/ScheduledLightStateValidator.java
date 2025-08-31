@@ -81,9 +81,6 @@ public final class ScheduledLightStateValidator {
             return null;
         }
         assertBrightnessSupported();
-        if (brightness > 254 || brightness < 1) {
-            throw new InvalidBrightnessValue("Invalid brightness value '" + brightness + "'. Allowed integer range: 1-254");
-        }
         return brightness;
     }
 

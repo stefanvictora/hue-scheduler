@@ -194,10 +194,12 @@ public final class InputConfigurationParser {
             if (scene != null) {
                 // todo: assert no other light state properties set except brightness
                 scheduledLightStates = api.getSceneLightState(identifier.id(), scene);
-                // todo: remap brightness if needed
+                if (bri != null) {
+                    scheduledLightStates = scaleBrightness(bri, scheduledLightStates);
+                }
             } else {
                 ScheduledLightStateValidator validator = new ScheduledLightStateValidator(identifier, groupState, capabilities,
-                        bri, ct, x, y, hue, sat, on, effect);
+                        capBrightness(bri), ct, x, y, hue, sat, on, effect);
                 scheduledLightStates = List.of(validator.getScheduledLightState());
             }
 
@@ -206,6 +208,27 @@ public final class InputConfigurationParser {
                     colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold, force, interpolate, groupState, false));
         }
         return states;
+    }
+
+    private static List<ScheduledLightState> scaleBrightness(Integer targetBrightness, List<ScheduledLightState> scheduledLightStates) {
+        return scheduledLightStates.stream()
+                                   .map(state -> {
+                                       if (state.getBri() != null) {
+                                           // Proportional scaling: targetBrightness acts as percentage of maximum
+                                           double scaleFactor = targetBrightness / 254.0;
+                                           int newBri = capBrightness((int) Math.round(state.getBri() * scaleFactor));
+                                           return state.toBuilder().bri(newBri).build();
+                                       }
+                                       return state;
+                                   })
+                                   .toList();
+    }
+
+    private static Integer capBrightness(Integer targetBrightness) {
+        if (targetBrightness == null) {
+            return null;
+        }
+        return Math.max(1, Math.min(254, targetBrightness));
     }
 
     private Integer parseBrightness(String value) {
@@ -235,9 +258,6 @@ public final class InputConfigurationParser {
     static int parseBrightnessPercentValue(double percent) {
         if (percent < 1) {
             return 1;
-        }
-        if (percent > 100) {
-            return 254;
         }
         return (int) Math.round((254.0 - 1.0) * (percent - 1) / 99.0 + 1.0);
     }

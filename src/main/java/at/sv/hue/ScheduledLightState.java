@@ -3,7 +3,7 @@ package at.sv.hue;
 import lombok.Builder;
 import lombok.Getter;
 
-@Builder
+@Builder(toBuilder = true)
 @Getter
 public final class ScheduledLightState {
     private final String id;
