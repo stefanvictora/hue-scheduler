@@ -251,30 +251,41 @@ public class ScheduledStateSnapshot {
         }
         PutCalls putCalls = getPutCalls(now);
         return putCalls.map(putCall -> {
-                    if (putCall.getOn() == Boolean.FALSE) {
-                        return putCall;
-                    }
-                    ScheduledStateSnapshot previousState = this;
-                    while (putCall.getBri() == null || putCall.getColorMode() == ColorMode.NONE) { // stop as soon as we have brightness and color mode
-                        previousState = previousState.getPreviousState();
-                        if (previousState == null || isSameState(previousState) || previousState.isNullState()) {
-                            break;
-                        }
-                        PutCalls previousPutCalls = previousState.getPutCallsIgnoringTransition();
-                        PutCall previousPutCall = previousPutCalls.get(putCall.getId());
-                        if (putCall.getBri() == null) {
-                            putCall.setBri(previousPutCall.getBri());
-                        }
-                        if (putCall.getColorMode() == ColorMode.NONE) {
-                            putCall.setCt(previousPutCall.getCt());
-                            putCall.setHue(previousPutCall.getHue());
-                            putCall.setSat(previousPutCall.getSat());
-                            putCall.setX(previousPutCall.getX());
-                            putCall.setY(previousPutCall.getY());
-                        }
-                    }
-                    return putCall;
-                });
+            if (putCall.getOn() == Boolean.FALSE && hasNoTransition(putCalls)) {
+                return putCall;
+            }
+            ScheduledStateSnapshot previousState = this;
+            while (putCall.getBri() == null || putCall.getColorMode() == ColorMode.NONE) { // stop as soon as we have brightness and color mode
+                previousState = previousState.getPreviousState();
+                if (previousState == null || isSameState(previousState) || previousState.isNullState()) {
+                    break;
+                }
+                PutCalls previousPutCalls = previousState.getPutCallsIgnoringTransition();
+                PutCall previousPutCall;
+                if (previousPutCalls.isGeneralGroup()) {
+                    previousPutCall = previousPutCalls.toList().getFirst();
+                } else if (putCalls.isGeneralGroup()) {
+                    break; // we cannot map specific lights to a general group
+                } else {
+                    previousPutCall = previousPutCalls.get(putCall.getId());
+                }
+                if (putCall.getBri() == null) {
+                    putCall.setBri(previousPutCall.getBri());
+                }
+                if (putCall.getColorMode() == ColorMode.NONE) {
+                    putCall.setCt(previousPutCall.getCt());
+                    putCall.setHue(previousPutCall.getHue());
+                    putCall.setSat(previousPutCall.getSat());
+                    putCall.setX(previousPutCall.getX());
+                    putCall.setY(previousPutCall.getY());
+                }
+            }
+            return putCall;
+        });
+    }
+
+    private static boolean hasNoTransition(PutCalls putCalls) {
+        return putCalls.getTransitionTime() == null || putCalls.getTransitionTime() == 0;
     }
 
     public PutCalls getInterpolatedPutCallsIfNeeded(ZonedDateTime now) {
