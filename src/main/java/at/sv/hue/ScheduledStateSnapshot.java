@@ -268,6 +268,9 @@ public class ScheduledStateSnapshot {
                     break; // we cannot map specific lights to a general group
                 } else {
                     previousPutCall = previousPutCalls.get(putCall.getId());
+                    if (previousPutCall == null) {
+                        break; // no previous put call found, stop here
+                    }
                 }
                 if (putCall.getBri() == null) {
                     putCall.setBri(previousPutCall.getBri());
@@ -288,17 +291,13 @@ public class ScheduledStateSnapshot {
         return putCalls.getTransitionTime() == null || putCalls.getTransitionTime() == 0;
     }
 
-    public PutCalls getInterpolatedPutCallsIfNeeded(ZonedDateTime now) {
-        return getInterpolatedPutCallsIfNeeded(now, true);
-    }
-
     public PutCalls getNextInterpolatedSplitPutCalls(ZonedDateTime now) {
         ZonedDateTime nextSplitStart = getNextTransitionTimeSplitStart(now).minusMinutes(getRequiredGap()); // add buffer;
         Duration between = Duration.between(now, nextSplitStart);
         if (between.isZero() || between.isNegative()) {
             return null; // we are inside the required gap, skip split call;
         }
-        PutCalls interpolatedSplitPutCalls = getInterpolatedPutCallsIfNeeded(nextSplitStart, false);
+        PutCalls interpolatedSplitPutCalls = getInterpolatedPutCallsIfNeeded(nextSplitStart);
         if (interpolatedSplitPutCalls == null) {
             return null; // no interpolation possible; todo: write test or remove if not needed anymore
         }
@@ -306,7 +305,7 @@ public class ScheduledStateSnapshot {
         return interpolatedSplitPutCalls;
     }
 
-    private PutCalls getInterpolatedPutCallsIfNeeded(ZonedDateTime dateTime, boolean keepPreviousPropertiesForNullTargets) {
+    public PutCalls getInterpolatedPutCallsIfNeeded(ZonedDateTime dateTime) {
         if (!hasTransitionBefore()) {
             return null;
         }
@@ -314,8 +313,7 @@ public class ScheduledStateSnapshot {
         if (previousState == null) {
             return null;
         }
-        return new StateInterpolator(this, previousState, dateTime, keepPreviousPropertiesForNullTargets)
-                .getInterpolatedPutCalls();
+        return new StateInterpolator(this, previousState, dateTime).getInterpolatedPutCalls();
     }
 
     public boolean performsInterpolation(ZonedDateTime now) {

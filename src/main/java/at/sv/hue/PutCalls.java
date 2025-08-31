@@ -27,10 +27,19 @@ public final class PutCalls {
 
     public PutCalls(String id, List<PutCall> putCalls, Integer transitionTime, boolean groupUpdate) {
         this.id = id;
-        this.putCalls = putCalls;
+        this.putCalls = convertPutCallsIfNeeded(id, putCalls, groupUpdate);
         this.transitionTime = transitionTime;
         this.groupUpdate = groupUpdate;
-        map = putCalls.stream().collect(Collectors.toMap(PutCall::getId, Function.identity()));
+        map = this.putCalls.stream().collect(Collectors.toMap(PutCall::getId, Function.identity()));
+    }
+
+    private static List<PutCall> convertPutCallsIfNeeded(String id, List<PutCall> putCalls, boolean groupUpdate) {
+        if (groupUpdate && putCalls.size() == 1) {
+            return List.of(putCalls.getFirst().toBuilder()
+                                   .id(id) // use group id instead of light id
+                                   .build());
+        }
+        return putCalls;
     }
 
     public Stream<PutCall> stream() {
@@ -52,8 +61,7 @@ public final class PutCalls {
     public PutCalls map(Function<PutCall, PutCall> mapper) {
         return new PutCalls(id, putCalls.stream()
                                         .map(mapper)
-                                        .collect(Collectors.toList()),
-                transitionTime, groupUpdate); // todo: we might generate null values with this
+                                        .collect(Collectors.toList()), transitionTime, groupUpdate);
     }
 
     public boolean isGeneralGroup() {
@@ -87,7 +95,7 @@ public final class PutCalls {
         return "PutCalls{" +
                putCalls +
                ", group=" + groupUpdate +
-                getFormattedTransitionTimeIfSet() +
+               getFormattedTransitionTimeIfSet() +
                '}';
     }
 

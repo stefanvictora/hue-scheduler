@@ -2531,8 +2531,8 @@ public class HassApiTest {
     }
 
     @Test
-    void putGroupStateList_sendsEachRequestSeparately() {
-        api.putGroupState("1",
+    void putSceneState_sendsEachRequestSeparately() {
+        api.putSceneState("1",
                 List.of(PutCall.builder()
                                .on(true)
                                .id("light.id1")
