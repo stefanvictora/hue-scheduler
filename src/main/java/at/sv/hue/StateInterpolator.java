@@ -22,13 +22,12 @@ public final class StateInterpolator {
     private final ScheduledStateSnapshot state;
     private final ScheduledStateSnapshot previousState;
     private final ZonedDateTime dateTime;
-    private final boolean keepPreviousPropertiesForNullTargets;
 
     public PutCalls getInterpolatedPutCalls() {
         if (state.isAlreadyReached(dateTime)) {
             return null; // the state is already reached
         }
-        return interpolate(); // todo: previously we returned null in some cases where an interpolation was not needed
+        return interpolate();
     }
 
     /**
@@ -59,7 +58,10 @@ public final class StateInterpolator {
             });
         } else {
             previous.toList().forEach(previousPutCall -> {
-                PutCall targetPutCall = target.get(previousPutCall.getId()); // todo: what about cases where we can't find a target?
+                PutCall targetPutCall = target.get(previousPutCall.getId());
+                if (targetPutCall == null) {
+                    return; // skip lights that are not part of the target state
+                }
                 PutCall putCall = interpolate(previousPutCall, targetPutCall, interpolatedTime);
                 putCalls.add(putCall);
             });
@@ -79,9 +81,6 @@ public final class StateInterpolator {
         putCall.setY(interpolateDouble(interpolatedTime, target.getY(), putCall.getY()));
 
         putCall.setOn(null); // do not per default reuse "on" property for interpolation
-//        if (putCall.isNullCall()) {
-//            return null; // no relevant properties set, don't perform interpolations
-//        }
         if (target.isOn()) {
             putCall.setOn(true); // the current state is turning lights on, also set "on" property for interpolated state
         }
@@ -163,11 +162,8 @@ public final class StateInterpolator {
     }
 
     private Integer interpolateInteger(BigDecimal interpolatedTime, Integer target, Integer previous) {
-        if (shouldReturnPrevious(target)) {
-            return previous;
-        }
         if (target == null) {
-            return null;
+            return previous;
         }
         if (previous == null) {
             return null;
@@ -180,11 +176,8 @@ public final class StateInterpolator {
     }
 
     private Double interpolateDouble(BigDecimal interpolatedTime, Double target, Double previous) {
-        if (shouldReturnPrevious(target)) {
-            return previous;
-        }
         if (target == null) {
-            return null;
+            return previous;
         }
         if (previous == null) {
             return null;
@@ -201,11 +194,8 @@ public final class StateInterpolator {
      * This means that we need to decide in which direction we want to interpolate, to get the smoothest transition.
      */
     private Integer interpolateHue(BigDecimal interpolatedTime, Integer target, Integer previous) {
-        if (shouldReturnPrevious(target)) {
-            return previous;
-        }
         if (target == null) {
-            return null;
+            return previous;
         }
         if (previous == null) {
             return null;
@@ -220,7 +210,4 @@ public final class StateInterpolator {
                          .intValue();
     }
 
-    private boolean shouldReturnPrevious(Object target) {
-        return target == null && keepPreviousPropertiesForNullTargets;
-    }
 }

@@ -70,7 +70,7 @@ public interface HueApi extends ResourceModificationEventListener {
 
     void putGroupState(PutCall putCall);
 
-    void putGroupState(String groupId, List<PutCall> list);
+    void putSceneState(String groupId, List<PutCall> list);
 
     /**
      * @return the lights associated with the group of the given id. Not null.
