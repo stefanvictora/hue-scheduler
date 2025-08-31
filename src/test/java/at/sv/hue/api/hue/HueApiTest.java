@@ -1274,10 +1274,10 @@ class HueApiTest {
 
         List<ScheduledLightState> sceneLightStates = api.getSceneLightState("3cfd5fad-2811-430a-a099-ae692b2185f8", "Scene_2");
         assertThat(sceneLightStates).hasSize(2);
-        
+
         ScheduledLightState state1 = sceneLightStates.getFirst();
         assertThat(state1.getId()).isEqualTo("1aa6083d-3692-49e5-92f7-b926b302dd49");
-        assertThat(state1.isOn()).isTrue();
+        assertThat(state1.isOn()).isFalse(); // don't copy on state
         assertThat(state1.getBri()).isNull();
         assertThat(state1.getCt()).isNull();
         assertThat(state1.getX()).isCloseTo(0.5452, within(1e-4));
@@ -1285,7 +1285,7 @@ class HueApiTest {
 
         ScheduledLightState state2 = sceneLightStates.get(1);
         assertThat(state2.getId()).isEqualTo("1271bf6f-be63-42fc-b18c-3ad462914d8e");
-        assertThat(state2.isOn()).isTrue();
+        assertThat(state2.isOn()).isFalse();
         assertThat(state2.getBri()).isEqualTo(113);
         assertThat(state2.getCt()).isEqualTo(199);
         assertThat(state2.getX()).isNull();
@@ -3330,6 +3330,7 @@ class HueApiTest {
                     }
                   ]
                 }""");
+        mockSceneCreationResult("SCENE_ID");
 
         // "Scene_3" does not yet exist for Room -> create it
         createOrUpdateScene("GROUPED_LIGHT_1",
@@ -3342,7 +3343,8 @@ class HueApiTest {
         verifyPost("/scene", """
                 {
                   "metadata": {
-                    "name": "Scene_3"
+                    "name": "Scene_3",
+                    "appdata": "huescheduler:app"
                   },
                   "group": {
                     "rid": "ROOM_1",
@@ -3714,6 +3716,8 @@ class HueApiTest {
 
         // Color and brightness (uses min mirek):
 
+        mockSceneCreationResult("SCENE_ID");
+
         createOrUpdateScene("GROUPED_LIGHT", "SCENE",
                 PutCall.builder().id("COLOR").x(0.280).y(0.280).bri(20),
                 PutCall.builder().id("CT_ONLY").x(0.280).y(0.280).bri(20),
@@ -3724,7 +3728,8 @@ class HueApiTest {
         verifyPost("/scene", """
                 {
                   "metadata": {
-                    "name": "SCENE"
+                    "name": "SCENE",
+                    "appdata": "huescheduler:app"
                   },
                   "group": {
                     "rid": "ZONE",
@@ -3809,7 +3814,8 @@ class HueApiTest {
         verifyPost("/scene", """
                 {
                   "metadata": {
-                    "name": "SCENE"
+                    "name": "SCENE",
+                    "appdata": "huescheduler:app"
                   },
                   "group": {
                     "rid": "ZONE",
@@ -3891,7 +3897,8 @@ class HueApiTest {
         verifyPost("/scene", """
                 {
                   "metadata": {
-                    "name": "SCENE"
+                    "name": "SCENE",
+                    "appdata": "huescheduler:app"
                   },
                   "group": {
                     "rid": "ZONE",
@@ -4247,6 +4254,204 @@ class HueApiTest {
                     }
                   ]
                 }""");
+    }
+
+    @Test
+    void putSceneState_noExistingTempScene_createAndRecall() {
+        setGetResponse("/grouped_light", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "GL_ZONE_1",
+                      "owner": {
+                        "rid": "ZONE_1",
+                        "rtype": "zone"
+                      },
+                      "type": "grouped_light"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/zone", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "ZONE_1",
+                      "id_v1": "/groups/3",
+                      "children": [
+                        {
+                          "rid": "LIGHT_A",
+                          "rtype": "light"
+                        },
+                        {
+                          "rid": "LIGHT_B",
+                          "rtype": "light"
+                        }
+                      ],
+                      "services": [
+                        {
+                          "rid": "GL_ZONE_1",
+                          "rtype": "grouped_light"
+                        }
+                      ],
+                      "metadata": {
+                        "name": "Zone One",
+                        "archetype": "lounge"
+                      },
+                      "type": "zone"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/light", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "LIGHT_A",
+                      "metadata": {
+                        "name": "LA"
+                      },
+                      "owner": {
+                        "rid": "DEV_A",
+                        "rtype": "device"
+                      },
+                      "on": {
+                        "on": true
+                      },
+                      "dimming": {
+                        "brightness": 100.0
+                      },
+                      "color_temperature": {
+                        "mirek": 250,
+                        "mirek_valid": true,
+                        "mirek_schema": {
+                          "mirek_minimum": 153,
+                          "mirek_maximum": 500
+                        }
+                      },
+                      "color": {
+                        "xy": {
+                          "x": 0.3,
+                          "y": 0.3
+                        }
+                      },
+                      "type": "light"
+                    },
+                    {
+                      "id": "LIGHT_B",
+                      "metadata": {
+                        "name": "LB"
+                      },
+                      "owner": {
+                        "rid": "DEV_B",
+                        "rtype": "device"
+                      },
+                      "on": {
+                        "on": true
+                      },
+                      "dimming": {
+                        "brightness": 100.0
+                      },
+                      "color_temperature": {
+                        "mirek": 250,
+                        "mirek_valid": true,
+                        "mirek_schema": {
+                          "mirek_minimum": 153,
+                          "mirek_maximum": 500
+                        }
+                      },
+                      "color": {
+                        "xy": {
+                          "x": 0.3,
+                          "y": 0.3
+                        }
+                      },
+                      "type": "light"
+                    }
+                  ]
+                }
+                """);
+
+        setGetResponse("/scene", EMPTY_RESPONSE);
+        mockSceneCreationResult("SCENE_NEW");
+
+        api.putSceneState("GL_ZONE_1", List.of(
+                PutCall.builder().id("LIGHT_A").ct(300).bri(100).transitionTime(5).build(),
+                PutCall.builder().id("LIGHT_B").on(true).transitionTime(2).build()
+        ));
+
+        verifyPost("/scene", """
+                {
+                  "metadata": {
+                    "name": "•",
+                    "appdata": "huescheduler:app"
+                  },
+                  "group": {
+                    "rid": "ZONE_1",
+                    "rtype": "zone"
+                  },
+                  "actions": [
+                    {
+                      "target": {
+                        "rid": "LIGHT_A",
+                        "rtype": "light"
+                      },
+                      "action": {
+                        "on": {
+                          "on": true
+                        },
+                        "dimming": {
+                          "brightness": 39.37
+                        },
+                        "color_temperature": {
+                          "mirek": 300
+                        },
+                        "dynamics": {
+                          "duration": 500
+                        }
+                      }
+                    },
+                    {
+                      "target": {
+                        "rid": "LIGHT_B",
+                        "rtype": "light"
+                      },
+                      "action": {
+                        "on": {
+                          "on": true
+                        },
+                        "dynamics": {
+                          "duration": 200
+                        }
+                      }
+                    }
+                  ]
+                }
+                """);
+
+        verifyPut("/scene/SCENE_NEW", """
+                {
+                  "recall": {
+                    "action": "active"
+                  }
+                }
+                """);
+    }
+
+    private void mockSceneCreationResult(String sceneId) {
+        when(resourceProviderMock.postResource(eq(getUrl("/scene")), any()))
+                .thenReturn("{\n" +
+                            "  \"data\": [\n" +
+                            "    {\n" +
+                            "      \"rid\": \"" + sceneId + "\",\n" +
+                            "      \"rtype\": \"scene\"\n" +
+                            "    }\n" +
+                            "  ],\n" +
+                            "  \"errors\": []\n" +
+                            "}\n");
     }
 
     private boolean isLightOff(String lightId) {
