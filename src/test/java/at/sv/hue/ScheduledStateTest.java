@@ -499,6 +499,44 @@ class ScheduledStateTest {
     }
 
     @Test
+    void lightStateDiffers_effectWithParameters_different_true() {
+        ScheduledState scheduledState = scheduledState(state().effect(Effect.builder()
+                                                                            .effect("colorloop")
+                                                                            .speed(0.5)
+                                                                            .build()));
+        LightState lightState = LightState.builder()
+                                          .on(true)
+                                          .effect(Effect.builder()
+                                                        .effect("colorloop")
+                                                        .speed(0.7)
+                                                        .build())
+                                          .lightCapabilities(COLOR_LIGHT_ONLY)
+                                          .build();
+
+        assertLightStateDiffers(scheduledState, lightState, true);
+    }
+
+    @Test
+    void lightStateDiffers_effectWithParameters_same_false() {
+        ScheduledState scheduledState = scheduledState(state().effect(Effect.builder()
+                                                                            .effect("colorloop")
+                                                                            .x(0.123456)
+                                                                            .y(0.789)
+                                                                            .build()));
+        LightState lightState = LightState.builder()
+                                          .on(true)
+                                          .effect(Effect.builder()
+                                                        .effect("colorloop")
+                                                        .x(0.123456)
+                                                        .y(0.789)
+                                                        .build())
+                                          .lightCapabilities(COLOR_LIGHT_ONLY)
+                                          .build();
+
+        assertLightStateDiffers(scheduledState, lightState, false);
+    }
+
+    @Test
     void lightStateDiffers_sameBrightness_sameColorMode_ignoresAnyEffectAndOtherProperties_false() {
         ScheduledState scheduledState = scheduledState(state().bri(10));
         LightState lightState = LightState.builder()

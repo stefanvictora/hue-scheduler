@@ -43,17 +43,35 @@ public final class ScheduledLightStateValidator {
     }
 
     public ScheduledLightState getScheduledLightState() {
-        return ScheduledLightState.builder()
-                                  .id(identifier.id())
-                                  .bri(brightness)
-                                  .ct(ct)
-                                  .x(x)
-                                  .y(y)
-                                  .hue(hue)
-                                  .sat(sat)
-                                  .on(on)
-                                  .effect(effect)
-                                  .build();
+        if (isEffectState()) {
+            return ScheduledLightState.builder()
+                                      .id(identifier.id())
+                                      .bri(brightness)
+                                      .on(on)
+                                      .effect(Effect.builder()
+                                                    .effect(effect)
+                                                    .ct(ct)
+                                                    .x(x)
+                                                    .y(y)
+                                                    .build())
+                                      .build();
+        } else {
+            return ScheduledLightState.builder()
+                                      .id(identifier.id())
+                                      .bri(brightness)
+                                      .ct(ct)
+                                      .x(x)
+                                      .y(y)
+                                      .hue(hue)
+                                      .sat(sat)
+                                      .on(on)
+                                      .effect(effect)
+                                      .build();
+        }
+    }
+
+    private boolean isEffectState() {
+        return effect != null && !"none".equals(effect);
     }
 
     private String assertValidEffectValue(String effect) {

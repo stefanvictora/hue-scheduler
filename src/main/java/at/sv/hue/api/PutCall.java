@@ -1,6 +1,7 @@
 package at.sv.hue.api;
 
 import at.sv.hue.ColorMode;
+import at.sv.hue.Effect;
 import at.sv.hue.FormatUtil;
 import lombok.Builder;
 import lombok.Data;
@@ -21,7 +22,7 @@ public final class PutCall {
     Integer hue;
     Integer sat;
     Boolean on;
-    String effect;
+    Effect effect;
     Integer transitionTime;
     @EqualsAndHashCode.Exclude
     Double[][] gamut;
