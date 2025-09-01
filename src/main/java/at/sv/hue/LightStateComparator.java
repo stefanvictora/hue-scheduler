@@ -98,11 +98,11 @@ public class LightStateComparator {
     }
 
     private boolean effectDiffers() {
-        String lastEffect = lastPutCall.getEffect();
+        Effect lastEffect = lastPutCall.getEffect();
         if (lastEffect == null) {
             return false; // if no effect scheduled, always treat as equal
         } else if (currentState.getEffect() == null) {
-            return !"none".equals(lastEffect); // if effect scheduled, but none set, only consider "none" to be equal
+            return !"none".equals(lastEffect.getEffect()); // if effect scheduled, but none set, only consider "none" to be equal
         } else {
             return !lastEffect.equals(currentState.getEffect()); // otherwise, effects have to be exactly the same
         }

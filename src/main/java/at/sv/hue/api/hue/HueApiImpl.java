@@ -1,6 +1,7 @@
 package at.sv.hue.api.hue;
 
 import at.sv.hue.ColorMode;
+import at.sv.hue.Effect;
 import at.sv.hue.ScheduledLightState;
 import at.sv.hue.api.ApiFailure;
 import at.sv.hue.api.Capability;
@@ -451,9 +452,10 @@ public final class HueApiImpl implements HueApi {
                                        .doubleValue();
             actionBuilder.dimming(new Dimming(dimming));
         }
-        String effect = getEffectWithNoneConverted(putCall);
+        Effect effect = getEffectWithNoneConverted(putCall);
         if (effect != null) {
-            actionBuilder.effects(new Action.Effects(effect));
+            Action.Effects effects = getEffectsAction(effect);
+            actionBuilder.effects_v2(effects);
             actionBuilder.color_temperature(null);
             actionBuilder.color(null);
         }
@@ -464,15 +466,38 @@ public final class HueApiImpl implements HueApi {
         return transitionTime != null && transitionTime != 4;
     }
 
-    private static String getEffectWithNoneConverted(PutCall putCall) {
-        String effect = putCall.getEffect();
+    private static Effect getEffectWithNoneConverted(PutCall putCall) {
+        Effect effect = putCall.getEffect();
         if (effect == null) {
             return null;
         }
-        if ("none".equals(effect)) {
-            return "no_effect";
+        if (effect.isNone()) {
+            return effect.toBuilder()
+                         .effect("no_effect")
+                         .build();
         }
         return effect;
+    }
+
+    private static Action.Effects getEffectsAction(Effect effect) {
+        Action.EffectsParameters parameters = getEffectsParameters(effect);
+        Action.EffectsAction action = new Action.EffectsAction(effect.getEffect(), parameters);
+        return new Action.Effects(action);
+    }
+
+    private static Action.EffectsParameters getEffectsParameters(Effect effect) {
+        if (effect.hasNoParameters()) {
+            return null;
+        }
+        Action.EffectsParameters parameters = new Action.EffectsParameters();
+        if (effect.getY() != null) {
+            parameters.setColor(new Color(new XY(effect.getX(), effect.getY())));
+        }
+        if (effect.getCt() != null) {
+            parameters.setColor_temperature(new ColorTemperature(effect.getCt()));
+        }
+        parameters.setSpeed(effect.getSpeed());
+        return parameters;
     }
 
     private static boolean actionsDiffer(Scene scene, List<SceneAction> actions) {
@@ -524,23 +549,42 @@ public final class HueApiImpl implements HueApi {
                                 .intValue();
             state.bri(bri);
         }
-        if (action.getColor_temperature() != null && action.getColor_temperature().getMirek() != null) {
+        if (action.getColor_temperature() != null) {
             state.ct(action.getColor_temperature().getMirek());
         }
-        if (action.getColor() != null && action.getColor().getXy() != null) {
+        if (action.getColor() != null) {
             XY xy = action.getColor().getXy();
             state.x(xy.getX());
             state.y(xy.getY());
         }
-        if (action.getEffects() != null && action.getEffects().getEffect() != null) { // todo: adapt to effects_v2; add tests
-            String effect = action.getEffects().getEffect();
+        if (action.getEffects_v2() != null) {
+            Action.EffectsAction effectsAction = action.getEffects_v2().getAction();
+            String effect = effectsAction.getEffect();
             if ("no_effect".equals(effect)) {
                 effect = "none";
             }
-            state.effect(effect);
+            state.effect(getEffectState(effect, effectsAction.getParameters()));
         }
         // todo: transition time?
         return state.build();
+    }
+
+    private static Effect getEffectState(String effect, Action.EffectsParameters parameters) {
+        Effect.EffectBuilder effectBuilder = Effect.builder().effect(effect);
+        if (parameters != null) {
+            Color color = parameters.getColor();
+            if (color != null) {
+                XY xy = color.getXy();
+                effectBuilder.x(xy.getX());
+                effectBuilder.y(xy.getY());
+            }
+            ColorTemperature colorTemperature = parameters.getColor_temperature();
+            if (colorTemperature != null) {
+                effectBuilder.ct(colorTemperature.getMirek());
+            }
+            effectBuilder.speed(parameters.getSpeed());
+        }
+        return effectBuilder.build();
     }
 
     private List<String> getContainedLightIds(Group group) {

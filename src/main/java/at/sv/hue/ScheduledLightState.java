@@ -14,7 +14,7 @@ public final class ScheduledLightState {
     private final Integer hue;
     private final Integer sat;
     private final Boolean on;
-    private final String effect;
+    private final Effect effect;
 
     public boolean isNullState() {
         return on == null && hasNoOtherPropertiesThanOn();
@@ -57,5 +57,21 @@ public final class ScheduledLightState {
 
     private String formatPropertyName(String name) {
         return ", " + name + "=";
+    }
+
+    public static class ScheduledLightStateBuilder {
+        public ScheduledLightStateBuilder effect(String effect) {
+            if (effect == null) {
+                this.effect = null;
+                return this;
+            }
+            this.effect = Effect.builder().effect(effect).build();
+            return this;
+        }
+
+        public ScheduledLightStateBuilder effect(Effect effect) {
+            this.effect = effect;
+            return this;
+        }
     }
 }

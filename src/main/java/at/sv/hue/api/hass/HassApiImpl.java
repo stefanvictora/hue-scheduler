@@ -1,6 +1,7 @@
 package at.sv.hue.api.hass;
 
 import at.sv.hue.ColorMode;
+import at.sv.hue.Effect;
 import at.sv.hue.ScheduledLightState;
 import at.sv.hue.api.ApiFailure;
 import at.sv.hue.api.BridgeAuthenticationFailure;
@@ -165,7 +166,7 @@ public class HassApiImpl implements HueApi {
         ChangeState changeState = new ChangeState();
         changeState.setBrightness(hueToHassBrightness(putCall.getBri()));
         changeState.setColor_temp(putCall.getCt());
-        changeState.setEffect(putCall.getEffect());
+        changeState.setEffect(getEffect(putCall));
         // transition in seconds (float ≥ 0); HA applies no global max (device integration may enforce limits)
         changeState.setTransition(convertToSeconds(putCall.getTransitionTime()));
         if (putCall.getHue() != null && putCall.getSat() != null) {
@@ -174,6 +175,17 @@ public class HassApiImpl implements HueApi {
             changeState.setXy_color(getXyColor(putCall));
         }
         return changeState;
+    }
+
+    private static String getEffect(PutCall putCall) {
+        Effect effect = putCall.getEffect();
+        if (effect == null) {
+            return null;
+        }
+        if ("none".equals(effect.getEffect())) {
+            return "off"; // "none" has been deprecated in HA
+        }
+        return effect.getEffect();
     }
 
     private Integer[] getHsColor(PutCall putCall) {
@@ -412,11 +424,14 @@ public class HassApiImpl implements HueApi {
         return null;
     }
 
-    private static String getEffect(String effect) {
+    private static Effect getEffect(String effect) {
         if (effect == null) {
             return null;
         }
-        return effect.toLowerCase(Locale.ROOT);
+        if ("off".equals(effect)) {
+            return Effect.builder().effect("none").build(); // treat "off" as "none" internally
+        }
+        return Effect.builder().effect(effect.toLowerCase(Locale.ROOT)).build();
     }
 
     private static ColorMode getColorMode(String colorMode) {

@@ -1773,7 +1773,7 @@ class HueSchedulerTest {
         );
 
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
-                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).effect("effect")
+                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).effect(Effect.builder().effect("effect").build())
         );
 
         ensureRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(30)); // next day
@@ -1791,7 +1791,7 @@ class HueSchedulerTest {
         );
 
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
-                expectedPutCall(1).bri(50).effect("effect"),
+                expectedPutCall(1).bri(50).effect(Effect.builder().effect("effect").build()),
                 expectedPutCall(1).bri(100).transitionTime(tr("30min"))
         );
 
@@ -3915,23 +3915,42 @@ class HueSchedulerTest {
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
-                expectedPutCall(ID).effect("colorloop")
+                expectedPutCall(ID).effect(Effect.builder().effect("colorloop").build())
         );
 
         ensureRunnable(initialNow.plusDays(1));
     }
 
     @Test
-    void parse_canHandleEffect_anotherEffect() {
-        mockLightCapabilities("/lights/1", LightCapabilities.builder()
-                                                            .effects(List.of("effect1", "effect2", "effect3"))
-                                                            .build());
-        addStateNow(1, "effect:effect2");
+    void parse_canHandleEffect_withParameters_ct() {
+        mockDefaultLightCapabilities(1);
+        addStateNow(1, "ct:350", "effect:effect");
 
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
-                expectedPutCall(ID).effect("effect2")
+                expectedPutCall(ID).effect(Effect.builder()
+                                                 .effect("effect")
+                                                 .ct(350)
+                                                 .build())
+        );
+
+        ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
+    void parse_canHandleEffect_withParameters_xy() {
+        mockDefaultLightCapabilities(1);
+        addStateNow(1, "x:0.123", "y:0.456", "effect:effect");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
+                expectedPutCall(ID).effect(Effect.builder()
+                                                 .effect("effect")
+                                                 .x(0.123)
+                                                 .y(0.456)
+                                                 .build())
         );
 
         ensureRunnable(initialNow.plusDays(1));
@@ -3954,7 +3973,7 @@ class HueSchedulerTest {
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
-                expectedPutCall(ID).effect("none")
+                expectedPutCall(ID).effect(Effect.builder().effect("none").build())
         );
 
         ensureRunnable(initialNow.plusDays(1));
@@ -10230,7 +10249,7 @@ class HueSchedulerTest {
         mockSceneLightStates(2, "TestScene1",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
-                                   .effect("effect"), // only effect
+                                   .effect(Effect.builder().effect("effect").build()), // only effect
                 ScheduledLightState.builder()
                                    .id("/lights/5")
                                    .ct(300));
@@ -10250,7 +10269,7 @@ class HueSchedulerTest {
         );
 
         advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 2,
-                expectedPutCall(4).bri(100).effect("effect"),
+                expectedPutCall(4).bri(100).effect(Effect.builder().effect("effect").build()),
                 expectedPutCall(5).bri(200).ct(300)
         );
 

@@ -1,6 +1,7 @@
 package at.sv.hue.api.hue;
 
 import at.sv.hue.ColorMode;
+import at.sv.hue.Effect;
 import at.sv.hue.api.Capability;
 import at.sv.hue.api.LightCapabilities;
 import at.sv.hue.api.LightState;
@@ -22,7 +23,7 @@ final class Light implements Resource {
     Dimming dimming;
     ColorTemperature color_temperature;
     Color color;
-    Effects effects;
+    Effects effects_v2;
     String type;
 
     LightState getLightState(boolean unavailable) {
@@ -49,14 +50,10 @@ final class Light implements Resource {
     }
 
     private Integer getCt() {
-        if (!isMirekValid()) {
+        if (color_temperature == null) {
             return null;
         }
-        return color_temperature.mirek;
-    }
-
-    private boolean isMirekValid() {
-        return color_temperature != null && color_temperature.mirek_valid;
+        return color_temperature.getMirekIfValid();
     }
 
     private Double getX() {
@@ -73,11 +70,11 @@ final class Light implements Resource {
         return color.xy.y;
     }
 
-    private String getEffect() {
-        if (effects == null) {
+    private Effect getEffect() {
+        if (effects_v2 == null) {
             return null;
         }
-        return effects.getStatus();
+        return effects_v2.getEffect();
     }
 
     LightCapabilities getCapabilities() {
@@ -96,8 +93,8 @@ final class Light implements Resource {
         if (dimming != null) {
             capabilities.add(Capability.BRIGHTNESS);
         }
-        if (effects != null) {
-            builder.effects(effects.getAvailableEffects());
+        if (effects_v2 != null) {
+            builder.effects(effects_v2.getAvailableEffects());
         }
         return builder.capabilities(capabilities).build();
     }
@@ -114,22 +111,88 @@ final class Light implements Resource {
 
     @Data
     private static final class Effects {
-        String[] status_values;
-        String status;
-        String[] effect_values;
+        EffectsStatus status;
+        EffectsAction action;
 
-        String getStatus() {
-            if ("no_effect".equals(status)) {
-                return "none";
+        Effect getEffect() {
+            Integer ct = getCt();
+            if (ct != null) { // don't allow both ct and xy to be set
+                return new Effect(status.getActiveEffect(), ct, null, null, getSpeed());
+            } else {
+                return new Effect(status.getActiveEffect(), null, getX(), getY(), getSpeed());
             }
-            return status;
+        }
+
+        Integer getCt() {
+            if (status.parameters == null) {
+                return null;
+            }
+            ColorTemperature colorTemperature = status.parameters.color_temperature;
+            if (colorTemperature == null) {
+                return null;
+            }
+            return colorTemperature.getMirekIfValid();
+        }
+
+        Double getX() {
+            if (status.parameters == null) {
+                return null;
+            }
+            Color color = status.parameters.color;
+            if (color == null) {
+                return null;
+            }
+            return color.xy.x;
+        }
+
+        Double getY() {
+            if (status.parameters == null) {
+                return null;
+            }
+            Color color = status.parameters.color;
+            if (color == null) {
+                return null;
+            }
+            return color.xy.y;
+        }
+
+        Double getSpeed() {
+            if (status.parameters == null) {
+                return null;
+            }
+            return status.parameters.speed;
         }
 
         List<String> getAvailableEffects() {
-            return Arrays.stream(effect_values)
+            return Arrays.stream(action.effect_values)
                          .filter(effect -> !"no_effect".equals(effect))
                          .toList();
         }
+    }
+
+    @Data
+    private static final class EffectsAction {
+        String[] effect_values;
+    }
+
+    @Data
+    private static final class EffectsStatus {
+        String effect;
+        EffectsParameters parameters;
+
+        String getActiveEffect() {
+            if ("no_effect".equals(effect)) {
+                return "none";
+            }
+            return effect;
+        }
+    }
+
+    @Data
+    private static final class EffectsParameters {
+        Color color;
+        ColorTemperature color_temperature;
+        Double speed;
     }
 }
 

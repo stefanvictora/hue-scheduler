@@ -1,6 +1,7 @@
 package at.sv.hue.api;
 
 import at.sv.hue.ColorMode;
+import at.sv.hue.Effect;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -16,7 +17,7 @@ public final class LightState {
     private final Integer colorTemperature;
     private final Double x;
     private final Double y;
-    private final String effect;
+    private final Effect effect;
     private final ColorMode colormode;
     private final boolean on;
     private final boolean unavailable;
@@ -45,5 +46,21 @@ public final class LightState {
 
     public boolean isOff() {
         return !on;
+    }
+
+    public static class LightStateBuilder {
+        public LightStateBuilder effect(String effect) {
+            if (effect == null) {
+                this.effect = null;
+                return this;
+            }
+            this.effect = Effect.builder().effect(effect).build();
+            return this;
+        }
+
+        public LightStateBuilder effect(Effect effect) {
+            this.effect = effect;
+            return this;
+        }
     }
 }
