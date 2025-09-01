@@ -471,6 +471,9 @@ class HueSchedulerTest {
         expectedPutCalls = 0;
         expectedGroupPutCalls = 0;
         expectedScenePutCalls = 0;
+        expectedSceneUpdates = 0;
+        orderVerifier = inOrder(mockedHueApi);
+        sceneSyncOrderVerifier = inOrder(mockedHueApi);
     }
 
     private void assertAllPutCallsAsserted() {
@@ -496,12 +499,7 @@ class HueSchedulerTest {
     @BeforeEach
     void setUp() {
         mockedHueApi = mock(HueApi.class);
-        orderVerifier = inOrder(mockedHueApi);
-        sceneSyncOrderVerifier = inOrder(mockedHueApi);
-        expectedPutCalls = 0;
-        expectedGroupPutCalls = 0;
-        expectedScenePutCalls = 0;
-        expectedSceneUpdates = 0;
+        resetMockedApi();
         setCurrentAndInitialTimeTo(ZonedDateTime.of(2021, 1, 1, 0, 0, 0,
                 0, ZoneId.of("Europe/Vienna")));
         startTimeProvider = new StartTimeProviderImpl(new SunTimesProviderImpl(48.20, 16.39, 165));
@@ -4502,6 +4500,18 @@ class HueSchedulerTest {
     void parse_invalidXAndYValue_tooLow_exception() {
         addKnownLightIdsWithDefaultCapabilities(1);
         assertThrows(InvalidXAndYValue.class, () -> addStateNow("1", "y:" + -0.1));
+    }
+
+    @Test
+    void parse_invalidXAndY_onlyX_exception() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        assertThrows(InvalidPropertyValue.class, () -> addStateNow("1", "x:" + 0.1));
+    }
+
+    @Test
+    void parse_invalidXAndY_onlyY_exception() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        assertThrows(InvalidPropertyValue.class, () -> addStateNow("1", "y:" + 0.1));
     }
 
     @Test

@@ -37,6 +37,7 @@ public final class ScheduledLightStateValidator {
         this.sat = assertValidSaturationValue(sat);
         this.on = on;
         this.effect = assertValidEffectValue(effect);
+        assertValidXyPair();
         assertValidHueAndSat();
         assertColorCapabilities();
     }
@@ -134,6 +135,12 @@ public final class ScheduledLightStateValidator {
             throw new InvalidSaturationValue("Invalid saturation value '" + sat + "'. Allowed integer range: 0-254");
         }
         return sat;
+    }
+
+    private void assertValidXyPair() {
+        if ((x == null) != (y == null)) {
+            throw new InvalidPropertyValue("x and y must be provided together.");
+        }
     }
 
     private void assertValidHueAndSat() {
