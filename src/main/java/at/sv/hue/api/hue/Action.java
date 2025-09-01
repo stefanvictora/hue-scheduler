@@ -15,7 +15,7 @@ final class Action {
     Color color;
     ColorTemperature color_temperature;
     Dynamics dynamics;
-    Effects effects;
+    Effects effects_v2;
 
     @AllArgsConstructor
     @NoArgsConstructor
@@ -28,6 +28,23 @@ final class Action {
     @NoArgsConstructor
     @Data
     static class Effects {
+        EffectsAction action;
+    }
+
+    @AllArgsConstructor
+    @NoArgsConstructor
+    @Data
+    static class EffectsAction {
         String effect;
+        EffectsParameters parameters;
+    }
+
+    @AllArgsConstructor
+    @NoArgsConstructor
+    @Data
+    static class EffectsParameters {
+        Color color;
+        ColorTemperature color_temperature;
+        Double speed;
     }
 }

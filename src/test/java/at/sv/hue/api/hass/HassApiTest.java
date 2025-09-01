@@ -1,6 +1,7 @@
 package at.sv.hue.api.hass;
 
 import at.sv.hue.ColorMode;
+import at.sv.hue.Effect;
 import at.sv.hue.api.ApiFailure;
 import at.sv.hue.api.BridgeAuthenticationFailure;
 import at.sv.hue.api.BridgeConnectionFailure;
@@ -342,7 +343,7 @@ public class HassApiTest {
                       0.6024,
                       0.3433
                     ],
-                    "effect": "None",
+                    "effect": "off",
                     "mode": "normal",
                     "dynamics": "none",
                     "friendly_name": "Schreibtisch R",
@@ -372,7 +373,7 @@ public class HassApiTest {
                                                    .on(true)
                                                    .x(0.6024)
                                                    .y(0.3433)
-                                                   .effect("none")
+                                                   .effect("none") // "off" treated as "none"
                                                    .colormode(ColorMode.XY)
                                                    .brightness(127)
                                                    .lightCapabilities(lightCapabilities)
@@ -2602,10 +2603,21 @@ public class HassApiTest {
         putState(PutCall.builder()
                         .id("light.id")
                         .bri(1)
-                        .effect("prism"));
+                        .effect(Effect.builder().effect("prism").build()));
 
         verify(http).postResource(getUrl("/services/light/turn_on"),
                 "{\"entity_id\":\"light.id\",\"brightness\":1,\"effect\":\"prism\"}");
+    }
+
+    @Test
+    void putState_turnOn_effect_none_treatedAsOff() {
+        putState(PutCall.builder()
+                        .id("light.id")
+                        .bri(1)
+                        .effect(Effect.builder().effect("none").build()));
+
+        verify(http).postResource(getUrl("/services/light/turn_on"),
+                "{\"entity_id\":\"light.id\",\"brightness\":1,\"effect\":\"off\"}");
     }
 
     @Test

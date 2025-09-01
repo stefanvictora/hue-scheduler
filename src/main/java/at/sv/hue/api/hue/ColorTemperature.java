@@ -28,6 +28,13 @@ final class ColorTemperature {
         return mirek_schema.getMirek_maximum();
     }
 
+    Integer getMirekIfValid() {
+        if (mirek_valid == null || !mirek_valid) {
+            return null;
+        }
+        return mirek;
+    }
+
     @Data
     static final class MirekSchema {
         int mirek_minimum;
