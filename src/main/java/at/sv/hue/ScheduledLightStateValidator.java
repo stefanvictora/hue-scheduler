@@ -105,7 +105,7 @@ public final class ScheduledLightStateValidator {
 
     private void assertBrightnessSupported() {
         if (!capabilities.isBrightnessSupported()) {
-            throw new BrightnessNotSupported(getFormattedName() + "' does not support setting brightness! "
+            throw new BrightnessNotSupported(getFormattedName() + " does not support setting brightness! "
                                              + "Capabilities: " + capabilities.getCapabilities());
         }
     }
@@ -129,7 +129,7 @@ public final class ScheduledLightStateValidator {
 
     private void assertCtSupported() {
         if (!capabilities.isCtSupported()) {
-            throw new ColorTemperatureNotSupported(getFormattedName() + "' does not support setting color temperature! "
+            throw new ColorTemperatureNotSupported(getFormattedName() + " does not support setting color temperature! "
                                                    + "Capabilities: " + capabilities.getCapabilities());
         }
     }
@@ -169,7 +169,7 @@ public final class ScheduledLightStateValidator {
 
     private void assertColorCapabilities() {
         if (isColorState() && !capabilities.isColorSupported()) {
-            throw new ColorNotSupported(getFormattedName() + "' does not support setting color! "
+            throw new ColorNotSupported(getFormattedName() + " does not support setting color! "
                                         + "Capabilities: " + capabilities.getCapabilities());
         }
     }

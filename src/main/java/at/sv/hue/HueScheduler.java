@@ -1085,7 +1085,11 @@ public final class HueScheduler implements Runnable {
     }
 
     private static boolean shouldApplyOnPowerTransition(ScheduledStateSnapshot state) {
-        return !state.isOff() && state.hasOtherPropertiesThanOn() || state.isForced();
+        return (isNotOffOrInterpolates(state) && (state.hasOtherPropertiesThanOn() || state.isOff())) || state.isForced();
+    }
+
+    private static boolean isNotOffOrInterpolates(ScheduledStateSnapshot state) {
+        return !state.isOff() || state.hasTransitionBefore();
     }
 
     private void scheduleOnPowerTransition(ScheduledStateSnapshot snapshot) {
