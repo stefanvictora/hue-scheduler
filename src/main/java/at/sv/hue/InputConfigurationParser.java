@@ -192,7 +192,11 @@ public final class InputConfigurationParser {
 
             List<ScheduledLightState> scheduledLightStates;
             if (scene != null) {
-                // todo: assert no other light state properties set except brightness
+                if (ct != null || x != null || y != null || hue != null || sat != null || effect != null) {
+                    throw new InvalidConfigurationLine(
+                            "When 'scene' is used, only 'on', 'bri', 'tr', 'tr-before', 'days', 'force', 'interpolate' are allowed.");
+                }
+
                 scheduledLightStates = api.getSceneLightState(identifier.id(), scene);
                 if (bri != null) {
                     scheduledLightStates = scaleBrightness(bri, scheduledLightStates);
