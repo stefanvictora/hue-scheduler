@@ -9471,17 +9471,69 @@ class HueSchedulerTest {
     @Test
     void sceneControl_init_withOffProperty_exception() {
         mockDefaultGroupCapabilities(1);
-        mockGroupLightsForId(1, 4, 5);
+        mockGroupLightsForId(1, 4);
         mockSceneLightStates(1, "TestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(100)
-                                   .ct(20),
-                ScheduledLightState.builder()
-                                   .id("/lights/5")
-                                   .on(false));
+                                   .ct(20));
 
         assertThrows(InvalidConfigurationLine.class, () -> addState("g1", now, "on:false", "scene:TestScene"));
+    }
+
+    @Test
+    void sceneControl_init_withCt_exception() {
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4);
+        mockSceneLightStates(1, "TestScene", ScheduledLightState.builder().id("/lights/4").bri(100));
+
+
+        assertThrows(InvalidConfigurationLine.class, () -> addState("g1", now, "ct:250", "scene:TestScene"));
+    }
+
+    @Test
+    void sceneControl_init_withX_exception() {
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4);
+        mockSceneLightStates(1, "TestScene", ScheduledLightState.builder().id("/lights/4").bri(100));
+
+        assertThrows(InvalidConfigurationLine.class, () -> addState("g1", now, "x:0.5", "scene:TestScene"));
+    }
+
+    @Test
+    void sceneControl_init_withY_exception() {
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4);
+        mockSceneLightStates(1, "TestScene", ScheduledLightState.builder().id("/lights/4").bri(100));
+
+        assertThrows(InvalidConfigurationLine.class, () -> addState("g1", now, "y:0.5", "scene:TestScene"));
+    }
+
+    @Test
+    void sceneControl_init_withHue_exception() {
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4);
+        mockSceneLightStates(1, "TestScene", ScheduledLightState.builder().id("/lights/4").bri(100));
+
+        assertThrows(InvalidConfigurationLine.class, () -> addState("g1", now, "hue:2000", "scene:TestScene"));
+    }
+
+    @Test
+    void sceneControl_init_withSat_exception() {
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4);
+        mockSceneLightStates(1, "TestScene", ScheduledLightState.builder().id("/lights/4").bri(100));
+
+        assertThrows(InvalidConfigurationLine.class, () -> addState("g1", now, "sat:100", "scene:TestScene"));
+    }
+
+    @Test
+    void sceneControl_init_withEffect_exception() {
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4);
+        mockSceneLightStates(1, "TestScene", ScheduledLightState.builder().id("/lights/4").bri(100));
+
+        assertThrows(InvalidConfigurationLine.class, () -> addState("g1", now, "effect:effect", "scene:TestScene"));
     }
 
     @Test
