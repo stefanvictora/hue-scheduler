@@ -200,6 +200,8 @@ public class ScheduledStateSnapshot {
     public ZonedDateTime calculateNextPowerOnEnd(ZonedDateTime now) {
         if (isInsideSplitCallWindow(now)) {
             return getNextTransitionTimeSplitStart(now).minusSeconds(1);
+        } else if (isOff() && hasTransitionBefore()) {
+            return getDefinedStart().minusSeconds(1);
         } else {
             return null; // will be calculated on demand
         }
