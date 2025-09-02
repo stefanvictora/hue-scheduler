@@ -2801,7 +2801,7 @@ class HueSchedulerTest {
         advanceCurrentTime(Duration.ofMinutes(5));
 
         ScheduledRunnable powerOnRunnable = simulateLightOnEvent(
-                expectedPowerOnEnd(initialNow.plusDays(1))
+                expectedPowerOnEnd(initialNow.plusMinutes(10)) // only until defined start
         ).getFirst();
 
         powerOnRunnable.run();
@@ -4941,6 +4941,29 @@ class HueSchedulerTest {
         ensureNextDayRunnable();
 
         simulateLightOnEvent();
+    }
+
+    @Test
+    void run_execution_offState_interpolate_doesRetry_butOnlyUntilStateIsReached() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, "00:00", "bri:100");
+        addState(1, "00:30", "on:false", "interpolate:true");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1)),
+                expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).bri(100),
+                expectedPutCall(1).on(false).transitionTime(tr("30min"))
+        );
+
+        ensureRunnable(now.plusDays(1), now.plusDays(2)); // next day
+
+        advanceCurrentTime(Duration.ofMinutes(15));
+
+        ScheduledRunnable powerOnRunnable = simulateLightOnEvent(expectedPowerOnEnd(initialNow.plusMinutes(30))).getFirst();
     }
 
     @Test
