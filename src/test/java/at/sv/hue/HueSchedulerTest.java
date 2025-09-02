@@ -8799,7 +8799,51 @@ class HueSchedulerTest {
     }
 
     @Test
-    void sceneControl_withBrightnessOverride_appliesProportionalScaling() {
+    void sceneControl_init_withOnProperty_addsOnToIndividualLights_unlessTheyAreOff() {
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        mockSceneLightStates(1, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100)
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .on(false));
+        addState("g1", now, "on:true", "scene:TestScene");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+                expectedPutCall(4).on(true).bri(100).ct(20),
+                expectedPutCall(5).on(false)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
+        );
+    }
+
+    @Test
+    void sceneControl_init_withOffProperty_exception() {
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        mockSceneLightStates(1, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100)
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .on(false));
+
+        assertThrows(InvalidConfigurationLine.class, () -> addState("g1", now, "on:false", "scene:TestScene"));
+    }
+
+    @Test
+    void sceneControl_init_withBrightnessOverride_appliesProportionalScaling() {
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
         mockSceneLightStates(1, "TestScene",
@@ -8831,7 +8875,7 @@ class HueSchedulerTest {
     }
 
     @Test
-    void sceneControl_withBrightnessOverride_preservesRelativeProportions() {
+    void sceneControl_init_withBrightnessOverride_preservesRelativeProportions() {
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
         mockSceneLightStates(1, "TestScene",
@@ -8863,7 +8907,7 @@ class HueSchedulerTest {
     }
 
     @Test
-    void sceneControl_withMaxBrightnessOverride_leavesSceneUnchanged() {
+    void sceneControl_init_withMaxBrightnessOverride_leavesSceneUnchanged() {
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
         mockSceneLightStates(1, "TestScene",
@@ -8895,7 +8939,7 @@ class HueSchedulerTest {
     }
 
     @Test
-    void sceneControl_withLowBrightnessOverride_dimsProportionally() {
+    void sceneControl_init_withLowBrightnessOverride_dimsProportionally() {
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5, 6);
         mockSceneLightStates(1, "TestScene",
@@ -8933,7 +8977,7 @@ class HueSchedulerTest {
     }
 
     @Test
-    void sceneControl_withBrightnessOverride_enforcesMinimumBrightness() {
+    void sceneControl_init_withBrightnessOverride_enforcesMinimumBrightness() {
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
         mockSceneLightStates(1, "TestScene",
@@ -8965,7 +9009,7 @@ class HueSchedulerTest {
     }
 
     @Test
-    void sceneControl_withBrightnessOverride_canExceedOriginalBrightness() {
+    void sceneControl_init_withBrightnessOverride_canExceedOriginalBrightness() {
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
         mockSceneLightStates(1, "TestScene",
@@ -8997,7 +9041,7 @@ class HueSchedulerTest {
     }
 
     @Test
-    void sceneControl_withBrightnessOverride_capsAtMaximum() {
+    void sceneControl_init_withBrightnessOverride_capsAtMaximum() {
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
         mockSceneLightStates(1, "TestScene",
@@ -9029,7 +9073,7 @@ class HueSchedulerTest {
     }
 
     @Test
-    void sceneControl_withBrightnessOverride_ignoresMissingBrightnessInScene() {
+    void sceneControl_init_withBrightnessOverride_ignoresMissingBrightnessInScene() {
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
         mockSceneLightStates(1, "TestScene",
@@ -9059,7 +9103,7 @@ class HueSchedulerTest {
     }
 
     @Test
-    void sceneControl_withBrightnessOverride_over100Percent_cappedAtMax() {
+    void sceneControl_init_withBrightnessOverride_over100Percent_cappedAtMax() {
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
         mockSceneLightStates(1, "TestScene",

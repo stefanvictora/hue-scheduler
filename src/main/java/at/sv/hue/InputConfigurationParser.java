@@ -197,6 +197,12 @@ public final class InputConfigurationParser {
                 if (bri != null) {
                     scheduledLightStates = scaleBrightness(bri, scheduledLightStates);
                 }
+                if (on == Boolean.TRUE) {
+                    scheduledLightStates = turnOnIfNotOff(scheduledLightStates);
+                }
+                if (on == Boolean.FALSE) {
+                    throw new InvalidConfigurationLine("Can't combine 'on:false' with a scene: " + Arrays.toString(parts));
+                }
             } else {
                 ScheduledLightStateValidator validator = new ScheduledLightStateValidator(identifier, groupState, capabilities,
                         capBrightness(bri), ct, x, y, hue, sat, on, effect);
@@ -229,6 +235,17 @@ public final class InputConfigurationParser {
             return null;
         }
         return Math.max(1, Math.min(254, targetBrightness));
+    }
+
+    private static List<ScheduledLightState> turnOnIfNotOff(List<ScheduledLightState> scheduledLightStates) {
+        return scheduledLightStates.stream().map(InputConfigurationParser::turnOnIfNotOff).toList();
+    }
+
+    private static ScheduledLightState turnOnIfNotOff(ScheduledLightState state) {
+        if (state.isOff()) {
+            return state;
+        }
+        return state.toBuilder().on(true).build();
     }
 
     private Integer parseBrightness(String value) {
