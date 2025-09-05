@@ -30,6 +30,8 @@ public final class ColorModeConverter {
             int[] rgb = convertHueAndSatToRgb(putCall);
             setCtFromRgb(putCall, rgb);
         }
+        // todo add conversion from and to Gradient. Should be simple, because a gradient contains >= 2 colors in XY
+
     }
 
     private static int[] convertCtToRgb(PutCall putCall) {

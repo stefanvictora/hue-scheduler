@@ -15,6 +15,8 @@ public final class LightCapabilities {
     private final Double[][] colorGamut;
     private final Integer ctMin;
     private final Integer ctMax;
+    private final List<String> gradientModes;
+    private final Integer maxGradientPoints;
     @Builder.Default
     private final EnumSet<Capability> capabilities = EnumSet.noneOf(Capability.class);
     private final List<String> effects;

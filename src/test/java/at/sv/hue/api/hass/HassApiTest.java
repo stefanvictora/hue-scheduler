@@ -1728,7 +1728,9 @@ public class HassApiTest {
                                                               .ctMin(153)
                                                               .ctMax(500)
                                                               .effects(List.of("candle", "fire"))
-                                                              .capabilities(EnumSet.allOf(Capability.class))
+                                                              .capabilities(EnumSet.of(Capability.COLOR,
+                                                                      Capability.BRIGHTNESS, Capability.ON_OFF,
+                                                                      Capability.COLOR_TEMPERATURE))
                                                               .build())
                           .build(),
                 LightState.builder()
@@ -1744,7 +1746,9 @@ public class HassApiTest {
                                                               .ctMin(153)
                                                               .ctMax(500)
                                                               .effects(List.of("candle", "fire"))
-                                                              .capabilities(EnumSet.allOf(Capability.class))
+                                                              .capabilities(EnumSet.of(Capability.COLOR,
+                                                                      Capability.BRIGHTNESS, Capability.ON_OFF,
+                                                                      Capability.COLOR_TEMPERATURE))
                                                               .build())
                           .build()
         );

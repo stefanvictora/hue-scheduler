@@ -283,6 +283,7 @@ public class ScheduledStateSnapshot {
                     putCall.setSat(previousPutCall.getSat());
                     putCall.setX(previousPutCall.getX());
                     putCall.setY(previousPutCall.getY());
+                    putCall.setGradient(previousPutCall.getGradient());
                 }
             }
             return putCall;

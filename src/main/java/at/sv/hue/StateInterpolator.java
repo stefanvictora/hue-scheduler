@@ -79,6 +79,7 @@ public final class StateInterpolator {
         putCall.setSat(interpolateInteger(interpolatedTime, target.getSat(), putCall.getSat()));
         putCall.setX(interpolateDouble(interpolatedTime, target.getX(), putCall.getX()));
         putCall.setY(interpolateDouble(interpolatedTime, target.getY(), putCall.getY()));
+        putCall.setGradient(interpolateGradient(interpolatedTime, target.getGradient(), putCall.getGradient()));
 
         putCall.setOn(null); // do not per default reuse "on" property for interpolation
         if (target.isOn()) {
@@ -208,6 +209,62 @@ public final class StateInterpolator {
                          .add(interpolatedTime.multiply(BigDecimal.valueOf(diff)))
                          .setScale(0, RoundingMode.HALF_UP)
                          .intValue();
+    }
+
+    private Gradient interpolateGradient(BigDecimal t, Gradient target, Gradient previous) {
+        if (target == null) {
+            return previous;
+        }
+        if (previous == null) {
+            return null;
+        }
+        // todo: empty mode == interpolated_palette; consider this
+        if (!Objects.equals(previous.mode(), target.mode())) {
+            return null; // invariant for now
+        }
+
+        final var previousPoints = previous.points();
+        final var targetPoints = target.points();
+        final int n = Math.max(previousPoints.size(), targetPoints.size());
+        List<Pair<Double, Double>> out = new ArrayList<>(n);
+        for (int i = 0; i < n; i++) {
+            // Evaluate both gradients at the same normalized position
+            double pos;
+            if (n == 1) {
+                pos = 0.0;
+            } else {
+                pos = (double) i / (double) (n - 1);
+            }
+
+            Pair<Double, Double> p = evalAt(previousPoints, pos); // previous at pos
+            Pair<Double, Double> q = evalAt(targetPoints, pos); // target at pos
+
+            Double x = interpolateDouble(t, q.first(), p.first());
+            Double y = interpolateDouble(t, q.second(), p.second());
+            out.add(Pair.of(x, y));
+        }
+        return new Gradient(out, target.mode());
+    }
+
+    /**
+     * Linear evaluate an XY pair list at normalized position pos ∈ [0,1].
+     */
+    private static Pair<Double, Double> evalAt(List<Pair<Double, Double>> points, double position) {
+        int n = points.size();
+        if (n == 1) {
+            return points.getFirst();
+        }
+
+        double f = position * (n - 1);
+        int i0 = (int) Math.floor(f);
+        int i1 = Math.min(i0 + 1, n - 1);
+        double w = f - i0;
+
+        var a = points.get(i0);
+        var b = points.get(i1);
+        double x = a.first() + w * (b.first() - a.first());
+        double y = a.second() + w * (b.second() - a.second());
+        return Pair.of(x, y);
     }
 
 }
