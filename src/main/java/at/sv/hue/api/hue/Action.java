@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
@@ -14,8 +16,9 @@ final class Action {
     Dimming dimming;
     Color color;
     ColorTemperature color_temperature;
-    Dynamics dynamics;
     Effects effects_v2;
+    Gradient gradient;
+    Dynamics dynamics;
 
     @AllArgsConstructor
     @NoArgsConstructor
@@ -46,5 +49,21 @@ final class Action {
         Color color;
         ColorTemperature color_temperature;
         Double speed;
+    }
+
+    @AllArgsConstructor
+    @NoArgsConstructor
+    @Data
+    static class Gradient {
+        List<GradientPoint> points;
+        String mode;
+    }
+
+
+    @AllArgsConstructor
+    @NoArgsConstructor
+    @Data
+    static class GradientPoint {
+        Color color;
     }
 }
