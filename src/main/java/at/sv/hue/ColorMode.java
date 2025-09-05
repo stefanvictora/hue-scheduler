@@ -6,6 +6,7 @@ public enum ColorMode {
     CT,
     XY,
     HS,
+    GRADIENT,
     NONE;
 
     public static ColorMode parse(String value) {

@@ -2,6 +2,7 @@ package at.sv.hue.api.hue;
 
 import at.sv.hue.ColorMode;
 import at.sv.hue.Effect;
+import at.sv.hue.Pair;
 import at.sv.hue.api.Capability;
 import at.sv.hue.api.LightCapabilities;
 import at.sv.hue.api.LightState;
@@ -24,10 +25,11 @@ final class Light implements Resource {
     ColorTemperature color_temperature;
     Color color;
     Effects effects_v2;
+    Gradient gradient;
     String type;
 
     LightState getLightState(boolean unavailable) {
-        return new LightState(id, getBrightnessV1(), getCt(), getX(), getY(), getEffect(), getColorMode(), isOn(),
+        return new LightState(id, getBrightnessV1(), getCt(), getX(), getY(), getEffect(), getGradient(), getColorMode(), isOn(),
                 unavailable, getCapabilities());
     }
 
@@ -77,6 +79,13 @@ final class Light implements Resource {
         return effects_v2.getEffect();
     }
 
+    private at.sv.hue.Gradient getGradient() {
+        if (gradient == null) {
+            return null;
+        }
+        return gradient.getGradient();
+    }
+
     LightCapabilities getCapabilities() {
         LightCapabilities.LightCapabilitiesBuilder builder = LightCapabilities.builder();
         EnumSet<Capability> capabilities = EnumSet.of(Capability.ON_OFF);
@@ -96,12 +105,20 @@ final class Light implements Resource {
         if (effects_v2 != null) {
             builder.effects(effects_v2.getAvailableEffects());
         }
+        if (gradient != null) {
+            capabilities.add(Capability.GRADIENT);
+            builder.gradientModes(gradient.mode_values);
+            builder.maxGradientPoints(gradient.points_capable);
+        }
         return builder.capabilities(capabilities).build();
     }
 
     private ColorMode getColorMode() {
         if (getCt() != null) {
             return ColorMode.CT;
+        }
+        if (getGradient() != null) {
+            return ColorMode.GRADIENT;
         }
         if (color != null) {
             return ColorMode.XY;
@@ -193,6 +210,31 @@ final class Light implements Resource {
         Color color;
         ColorTemperature color_temperature;
         Double speed;
+    }
+
+    @Data
+    private static final class Gradient {
+        List<GradientPoint> points;
+        String mode;
+        Integer points_capable;
+        List<String> mode_values;
+
+        public at.sv.hue.Gradient getGradient() {
+            if (points == null) {
+                return null;
+            }
+            List<Pair<Double, Double>> points = this.points.stream()
+                                                           .map(point ->
+                                                                   Pair.of(point.color.xy.x, point.color.xy.y)
+                                                           )
+                                                           .toList();
+            return new at.sv.hue.Gradient(points, mode);
+        }
+    }
+
+    @Data
+    static class GradientPoint {
+        Color color;
     }
 }
 

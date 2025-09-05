@@ -2,6 +2,7 @@ package at.sv.hue.api;
 
 import at.sv.hue.ColorMode;
 import at.sv.hue.Effect;
+import at.sv.hue.Gradient;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -18,6 +19,7 @@ public final class LightState {
     private final Double x;
     private final Double y;
     private final Effect effect;
+    private final Gradient gradient;
     private final ColorMode colormode;
     private final boolean on;
     private final boolean unavailable;

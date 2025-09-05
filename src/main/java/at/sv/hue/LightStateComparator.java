@@ -54,6 +54,7 @@ public class LightStateComparator {
             case XY -> ColorComparator.colorDiffers(currentState.getX(), currentState.getY(),
                     lastPutCall.getX(), lastPutCall.getY(), currentState.getLightCapabilities().getColorGamut(),
                     colorOverrideThreshold);
+            // todo: add gradient comparison
             default -> false;
         };
     }
@@ -102,7 +103,7 @@ public class LightStateComparator {
         if (lastEffect == null) {
             return false; // if no effect scheduled, always treat as equal
         } else if (currentState.getEffect() == null) {
-            return !"none".equals(lastEffect.getEffect()); // if effect scheduled, but none set, only consider "none" to be equal
+            return !"none".equals(lastEffect.effect()); // if effect scheduled, but none set, only consider "none" to be equal
         } else {
             return !lastEffect.equals(currentState.getEffect()); // otherwise, effects have to be exactly the same
         }

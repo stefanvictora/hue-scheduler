@@ -182,10 +182,10 @@ public class HassApiImpl implements HueApi {
         if (effect == null) {
             return null;
         }
-        if ("none".equals(effect.getEffect())) {
+        if ("none".equals(effect.effect())) {
             return "off"; // "none" has been deprecated in HA
         }
-        return effect.getEffect();
+        return effect.effect();
     }
 
     private Integer[] getHsColor(PutCall putCall) {
@@ -413,7 +413,7 @@ public class HassApiImpl implements HueApi {
         StateAttributes attributes = state.getAttributes();
         return new LightState(state.entity_id, hassToHueBrightness(attributes.brightness), attributes.color_temp, getXY(attributes.xy_color, 0),
                 getXY(attributes.xy_color, 1),
-                getEffect(attributes.effect), getColorMode(attributes.color_mode),
+                getEffect(attributes.effect), null, getColorMode(attributes.color_mode),
                 getOn(state.state), getUnavailable(state.state), createLightCapabilities(state));
     }
 
@@ -457,6 +457,7 @@ public class HassApiImpl implements HueApi {
     private static LightCapabilities createLightCapabilities(State state) {
         StateAttributes attributes = state.attributes;
         return new LightCapabilities(null, null, attributes.min_mireds, attributes.max_mireds,
+                null, null,
                 getCapabilities(state), getEffects(state));
     }
 

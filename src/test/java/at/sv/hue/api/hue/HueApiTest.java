@@ -2,6 +2,8 @@ package at.sv.hue.api.hue;
 
 import at.sv.hue.ColorMode;
 import at.sv.hue.Effect;
+import at.sv.hue.Gradient;
+import at.sv.hue.Pair;
 import at.sv.hue.ScheduledLightState;
 import at.sv.hue.api.ApiFailure;
 import at.sv.hue.api.BridgeAuthenticationFailure;
@@ -27,7 +29,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.stream.Stream;
@@ -100,6 +101,191 @@ class HueApiTest {
         when(resourceProviderMock.getResource(getUrl("/light"))).thenThrow(new ResourceNotFoundException(""));
 
         assertThrows(ResourceNotFoundException.class, () -> getLightState("ABCD-1234"));
+    }
+
+    @Test
+    void getState_hasGradientSupport() {
+        setGetResponse("/light/cb6f54e8-5071-478e-9c0a-949a51b117a2", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "cb6f54e8-5071-478e-9c0a-949a51b117a2",
+                      "id_v1": "/lights/55",
+                      "owner": {
+                        "rid": "2d019cd6-7de4-46dc-b8af-963add43a000",
+                        "rtype": "device"
+                      },
+                      "metadata": {
+                        "name": "Fernseher Play",
+                        "archetype": "hue_lightstrip_tv",
+                        "function": "decorative"
+                      },
+                      "product_data": {
+                        "function": "decorative"
+                      },
+                      "identify": {},
+                      "service_id": 0,
+                      "on": {
+                        "on": true
+                      },
+                      "dimming": {
+                        "brightness": 7.91,
+                        "min_dim_level": 0.01
+                      },
+                      "dimming_delta": {},
+                      "color_temperature": {
+                        "mirek": null,
+                        "mirek_valid": false,
+                        "mirek_schema": {
+                          "mirek_minimum": 153,
+                          "mirek_maximum": 500
+                        }
+                      },
+                      "color_temperature_delta": {},
+                      "color": {
+                        "xy": {
+                          "x": 0.1969,
+                          "y": 0.0688
+                        },
+                        "gamut": {
+                          "red": {
+                            "x": 0.6915,
+                            "y": 0.3083
+                          },
+                          "green": {
+                            "x": 0.17,
+                            "y": 0.7
+                          },
+                          "blue": {
+                            "x": 0.1532,
+                            "y": 0.0475
+                          }
+                        },
+                        "gamut_type": "C"
+                      },
+                      "dynamics": {
+                        "status": "none",
+                        "status_values": [
+                          "none",
+                          "dynamic_palette"
+                        ],
+                        "speed": 0.0,
+                        "speed_valid": false
+                      },
+                      "mode": "normal",
+                      "gradient": {
+                        "points": [
+                          {
+                            "color": {
+                              "xy": {
+                                "x": 0.1969,
+                                "y": 0.0688
+                              }
+                            }
+                          },
+                          {
+                            "color": {
+                              "xy": {
+                                "x": 0.3352,
+                                "y": 0.1357
+                              }
+                            }
+                          },
+                          {
+                            "color": {
+                              "xy": {
+                                "x": 0.5501,
+                                "y": 0.2398
+                              }
+                            }
+                          },
+                          {
+                            "color": {
+                              "xy": {
+                                "x": 0.6079,
+                                "y": 0.3554
+                              }
+                            }
+                          },
+                          {
+                            "color": {
+                              "xy": {
+                                "x": 0.4813,
+                                "y": 0.45
+                              }
+                            }
+                          }
+                        ],
+                        "mode": "interpolated_palette",
+                        "points_capable": 5,
+                        "mode_values": [
+                          "interpolated_palette",
+                          "interpolated_palette_mirrored",
+                          "random_pixelated"
+                        ],
+                        "pixel_count": 24
+                      },
+                      "effects_v2": {
+                        "action": {
+                          "effect_values": [
+                            "no_effect",
+                            "candle"
+                          ]
+                        },
+                        "status": {
+                          "effect": "no_effect",
+                          "effect_values": [
+                            "no_effect",
+                            "candle"
+                          ]
+                        }
+                      },
+                      "type": "light"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/device", EMPTY_RESPONSE);
+
+        LightState lightState = getLightState("cb6f54e8-5071-478e-9c0a-949a51b117a2");
+
+        assertLightState(
+                lightState,
+                LightState.builder()
+                          .id("cb6f54e8-5071-478e-9c0a-949a51b117a2")
+                          .on(true)
+                          .brightness(20)
+                          .colorTemperature(null)
+                          .x(0.1969)
+                          .y(0.0688)
+                          .colormode(ColorMode.GRADIENT)
+                          .effect("none")
+                          .gradient(Gradient.builder()
+                                            .points(List.of(
+                                                    Pair.of(0.1969, 0.0688),
+                                                    Pair.of(0.3352, 0.1357),
+                                                    Pair.of(0.5501, 0.2398),
+                                                    Pair.of(0.6079, 0.3554),
+                                                    Pair.of(0.4813, 0.45)
+                                            ))
+                                            .mode("interpolated_palette")
+                                            .build())
+                          .lightCapabilities(LightCapabilities.builder()
+                                                              .colorGamutType("C")
+                                                              .colorGamut(GAMUT_C)
+                                                              .ctMin(153)
+                                                              .ctMax(500)
+                                                              .gradientModes(List.of("interpolated_palette", "interpolated_palette_mirrored",
+                                                                      "random_pixelated"))
+                                                              .maxGradientPoints(5)
+                                                              .effects(List.of("candle"))
+                                                              .capabilities(EnumSet.of(Capability.GRADIENT, Capability.COLOR, Capability.COLOR_TEMPERATURE,
+                                                                      Capability.BRIGHTNESS, Capability.ON_OFF))
+                                                              .build()
+                          )
+                          .build()
+        );
     }
 
     @Test
@@ -234,7 +420,12 @@ class HueApiTest {
                         .colormode(ColorMode.XY)
                         .lightCapabilities(LightCapabilities.builder()
                                                             .effects(List.of("opal"))
-                                                            .capabilities(EnumSet.allOf(Capability.class))
+                                                            .capabilities(EnumSet.of(
+                                                                    Capability.COLOR,
+                                                                    Capability.BRIGHTNESS,
+                                                                    Capability.COLOR_TEMPERATURE,
+                                                                    Capability.ON_OFF)
+                                                            )
                                                             .build())
                         .build()
         );
@@ -337,7 +528,12 @@ class HueApiTest {
                         .colormode(ColorMode.CT)
                         .lightCapabilities(LightCapabilities.builder()
                                                             .effects(List.of("candle"))
-                                                            .capabilities(EnumSet.allOf(Capability.class))
+                                                            .capabilities(EnumSet.of(
+                                                                    Capability.COLOR,
+                                                                    Capability.BRIGHTNESS,
+                                                                    Capability.COLOR_TEMPERATURE,
+                                                                    Capability.ON_OFF)
+                                                            )
                                                             .ctMin(153)
                                                             .ctMax(500)
                                                             .build())
@@ -465,7 +661,12 @@ class HueApiTest {
                                                     .ctMin(153)
                                                     .ctMax(500)
                                                     .effects(List.of("fire"))
-                                                    .capabilities(EnumSet.allOf(Capability.class))
+                                                    .capabilities(EnumSet.of(
+                                                            Capability.COLOR,
+                                                            Capability.BRIGHTNESS,
+                                                            Capability.COLOR_TEMPERATURE,
+                                                            Capability.ON_OFF)
+                                                    )
                                                     .build())
                 .build()
         );
@@ -1678,6 +1879,73 @@ class HueApiTest {
                         "active": "inactive"
                       },
                       "type": "scene"
+                    },
+                    {
+                      "id": "SCENE_5",
+                      "actions": [
+                        {
+                          "target": {
+                            "rid": "LIGHT_1",
+                            "rtype": "light"
+                          },
+                          "action": {
+                            "on": {
+                              "on": true
+                            },
+                            "gradient": {
+                              "points": [
+                                {
+                                  "color": {
+                                    "xy": {
+                                      "x": 0.15352,
+                                      "y": 0.06006
+                                    }
+                                  }
+                                },
+                                {
+                                  "color": {
+                                    "xy": {
+                                      "x": 0.18649,
+                                      "y": 0.09751
+                                    }
+                                  }
+                                },
+                                {
+                                  "color": {
+                                    "xy": {
+                                      "x": 0.2256,
+                                      "y": 0.09818
+                                    }
+                                  }
+                                }
+                              ],
+                              "mode": "interpolated_palette"
+                            }
+                          }
+                        },
+                        {
+                          "target": {
+                            "rid": "LIGHT_2",
+                            "rtype": "light"
+                          },
+                          "action": {
+                            "on": {
+                              "on": true
+                            }
+                          }
+                        }
+                      ],
+                      "metadata": {
+                        "name": "Scene_5"
+                      },
+                      "group": {
+                        "rid": "ZONE_ID",
+                        "rtype": "zone"
+                      },
+                      "status": {
+                        "active": "inactive"
+                      },
+                      "type": "scene"
                     }
                   ]
                 }
@@ -1741,6 +2009,21 @@ class HueApiTest {
                                    .effect(Effect.builder()
                                                  .effect("prism")
                                                  .build())
+        );
+
+        assertSceneLightStates("GROUPED_LIGHT_1", "Scene_5",
+                ScheduledLightState.builder()
+                                   .id("LIGHT_1")
+                                   .gradient(Gradient.builder()
+                                                     .points(List.of(
+                                                             Pair.of(0.15352, 0.06006),
+                                                             Pair.of(0.18649, 0.09751),
+                                                             Pair.of(0.2256, 0.09818)
+                                                     ))
+                                                     .mode("interpolated_palette")
+                                                     .build()),
+                ScheduledLightState.builder()
+                                   .id("LIGHT_2")
         );
 
         assertSceneLightStates("GROUPED_LIGHT_1", "UNKNOWN_SCENE"); // empty list for unknown scene
@@ -2345,7 +2628,8 @@ class HueApiTest {
                                  .ctMax(500)
                                  .effects(List.of("candle", "fire", "prism", "sparkle", "opal", "glisten", "underwater",
                                          "cosmos", "sunbeam", "enchant"))
-                                 .capabilities(EnumSet.allOf(Capability.class))
+                                 .capabilities(EnumSet.of(Capability.COLOR, Capability.COLOR_TEMPERATURE,
+                                         Capability.BRIGHTNESS, Capability.ON_OFF))
                                  .build()
         );
         assertThat(capabilities.isColorSupported()).isTrue();
@@ -3013,7 +3297,8 @@ class HueApiTest {
                                  .colorGamut(GAMUT_C)
                                  .ctMin(100)
                                  .ctMax(500)
-                                 .capabilities(EnumSet.allOf(Capability.class))
+                                 .capabilities(EnumSet.of(Capability.COLOR, Capability.COLOR_TEMPERATURE, Capability.BRIGHTNESS,
+                                         Capability.ON_OFF))
                                  .build()
         );
         assertCapabilities(
@@ -3278,6 +3563,85 @@ class HueApiTest {
                         "speed": 0.7
                       }
                     }
+                  }
+                }""");
+    }
+
+    @Test
+    void putState_gradient_noModeGiven() {
+        performPutCall(PutCall.builder().id("ID").gradient(Gradient.builder()
+                                                                   .points(List.of(
+                                                                           Pair.of(0.123, 0.456),
+                                                                           Pair.of(0.234, 0.567)
+                                                                   ))
+                                                                   .build()).build());
+
+        verifyPut("/light/ID", """
+                {
+                  "gradient": {
+                    "points": [
+                      {
+                        "color": {
+                          "xy": {
+                            "x": 0.123,
+                            "y": 0.456
+                          }
+                        }
+                      },
+                      {
+                        "color": {
+                          "xy": {
+                            "x": 0.234,
+                            "y": 0.567
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }""");
+    }
+
+    @Test
+    void putState_gradient_withMode() {
+        performPutCall(PutCall.builder().id("ID").gradient(Gradient.builder()
+                                                                   .points(List.of(
+                                                                           Pair.of(0.123, 0.456),
+                                                                           Pair.of(0.234, 0.567),
+                                                                           Pair.of(0.345, 0.678)
+                                                                   ))
+                                                                   .mode("random_pixelated")
+                                                                   .build()).build());
+
+        verifyPut("/light/ID", """
+                {
+                  "gradient": {
+                    "points": [
+                      {
+                        "color": {
+                          "xy": {
+                            "x": 0.123,
+                            "y": 0.456
+                          }
+                        }
+                      },
+                      {
+                        "color": {
+                          "xy": {
+                            "x": 0.234,
+                            "y": 0.567
+                          }
+                        }
+                      },
+                      {
+                        "color": {
+                          "xy": {
+                            "x": 0.345,
+                            "y": 0.678
+                          }
+                        }
+                      }
+                    ],
+                    "mode": "random_pixelated"
                   }
                 }""");
     }
@@ -4935,7 +5299,11 @@ class HueApiTest {
 
         api.putSceneState("GL_ZONE_1", List.of(
                 PutCall.builder().id("LIGHT_A").ct(300).bri(100).transitionTime(5).build(),
-                PutCall.builder().id("LIGHT_B").on(true).transitionTime(2).build()
+                PutCall.builder().id("LIGHT_B").on(true).gradient(Gradient.builder()
+                                                                          .points(List.of(Pair.of(0.123, 0.456),
+                                                                                  Pair.of(0.234, 0.567)))
+                                                                          .mode("interpolated_palette_mirrored")
+                                                                          .build()).transitionTime(2).build()
         ));
 
         verifyPost("/scene", """
@@ -4977,6 +5345,27 @@ class HueApiTest {
                       "action": {
                         "on": {
                           "on": true
+                        },
+                        "gradient": {
+                          "points": [
+                            {
+                              "color": {
+                                "xy": {
+                                  "x": 0.123,
+                                  "y": 0.456
+                                }
+                              }
+                            },
+                            {
+                              "color": {
+                                "xy": {
+                                  "x": 0.234,
+                                  "y": 0.567
+                                }
+                              }
+                            }
+                          ],
+                          "mode": "interpolated_palette_mirrored"
                         },
                         "dynamics": {
                           "duration": 200
@@ -5054,7 +5443,7 @@ class HueApiTest {
     }
 
     private void assertLightState(LightState lightState, LightState expected) {
-        assertThat(lightState).isEqualTo(expected);
+        assertThat(lightState).usingRecursiveComparison().isEqualTo(expected);
     }
 
     private void performPutCall(PutCall putCall) {
@@ -5074,7 +5463,7 @@ class HueApiTest {
     }
 
     private void assertCapabilities(LightCapabilities capabilities, LightCapabilities expected) {
-        assertThat(capabilities).isEqualTo(expected);
+        assertThat(capabilities).usingRecursiveComparison().isEqualTo(expected);
     }
 
     private void assertGroupIdentifier(String idv1, String groupedLightId, String name) {
@@ -5100,15 +5489,6 @@ class HueApiTest {
     private void assertSceneLightStates(String groupId, String sceneName, ScheduledLightState.ScheduledLightStateBuilder... states) {
         assertThat(api.getSceneLightState(groupId, sceneName))
                 .usingRecursiveComparison()
-                .withComparatorForFields(compareDoubles(), "x", "y")
                 .isEqualTo(Arrays.stream(states).map(ScheduledLightState.ScheduledLightStateBuilder::build).toList());
-    }
-
-    private static Comparator<Double> compareDoubles() {
-        return (Double d1, Double d2) -> {
-            if (d1 == null && d2 == null) return 0;
-            if (d1 == null || d2 == null) return -1;
-            return Math.abs(d1 - d2) < 1e-4 ? 0 : Double.compare(d1, d2);
-        };
     }
 }

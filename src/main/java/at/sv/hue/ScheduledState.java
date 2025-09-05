@@ -278,6 +278,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
                       .sat(lightState.getSat())
                       .on(lightState.getOn())
                       .effect(lightState.getEffect())
+                      .gradient(lightState.getGradient())
                       .gamut(capabilities != null ? capabilities.getColorGamut() : null)  // todo: make it light specific
                       .build();
     }

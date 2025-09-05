@@ -2,6 +2,7 @@ package at.sv.hue.api;
 
 import at.sv.hue.ColorMode;
 import at.sv.hue.Effect;
+import at.sv.hue.Gradient;
 import at.sv.hue.FormatUtil;
 import at.sv.hue.color.ColorComparator;
 import lombok.Builder;
@@ -24,6 +25,7 @@ public final class PutCall {
     Integer sat;
     Boolean on;
     Effect effect;
+    Gradient gradient;
     Integer transitionTime;
     @EqualsAndHashCode.Exclude
     Double[][] gamut;
@@ -39,6 +41,8 @@ public final class PutCall {
             return ColorMode.XY;
         } else if (hue != null || sat != null) {
             return ColorMode.HS;
+        } else if (gradient != null) {
+            return ColorMode.GRADIENT;
         }
         return ColorMode.NONE;
     }
@@ -63,6 +67,7 @@ public final class PutCall {
                getFormattedPropertyIfSet("hue", hue) +
                getFormattedPropertyIfSet("sat", sat) +
                getFormattedPropertyIfSet("effect", effect) +
+               getFormattedPropertyIfSet("gradient", gradient) +
                getFormattedTransitionTimeIfSet() +
                "}";
     }
@@ -97,7 +102,7 @@ public final class PutCall {
                Objects.equals(this.bri, other.bri) &&
                Objects.equals(this.hue, other.hue) &&
                Objects.equals(this.sat, other.sat) &&
-               Objects.equals(this.effect, other.effect) &&
+               Objects.equals(this.effect, other.effect) && // todo: add gradient
                Objects.equals(this.x, other.x) &&
                Objects.equals(this.y, other.y) &&
                Objects.equals(this.ct, other.ct);

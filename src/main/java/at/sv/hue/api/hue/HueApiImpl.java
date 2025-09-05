@@ -2,6 +2,8 @@ package at.sv.hue.api.hue;
 
 import at.sv.hue.ColorMode;
 import at.sv.hue.Effect;
+import at.sv.hue.Gradient;
+import at.sv.hue.Pair;
 import at.sv.hue.ScheduledLightState;
 import at.sv.hue.api.ApiFailure;
 import at.sv.hue.api.Capability;
@@ -445,6 +447,14 @@ public final class HueApiImpl implements HueApi {
         if (putCall.getColorMode() == ColorMode.XY) {
             actionBuilder.color(new Color(new XY(putCall.getX(), putCall.getY())));
         }
+        if (putCall.getColorMode() == ColorMode.GRADIENT) {
+            Gradient gradient = putCall.getGradient();
+            List<Action.GradientPoint> points = gradient.points()
+                                                        .stream()
+                                                        .map(HueApiImpl::createGradientPoint)
+                                                        .toList();
+            actionBuilder.gradient(new Action.Gradient(points, gradient.mode()));
+        }
         if (putCall.getBri() != null) {
             double dimming = BigDecimal.valueOf(putCall.getBri())
                                        .multiply(BigDecimal.valueOf(100))
@@ -481,7 +491,7 @@ public final class HueApiImpl implements HueApi {
 
     private static Action.Effects getEffectsAction(Effect effect) {
         Action.EffectsParameters parameters = getEffectsParameters(effect);
-        Action.EffectsAction action = new Action.EffectsAction(effect.getEffect(), parameters);
+        Action.EffectsAction action = new Action.EffectsAction(effect.effect(), parameters);
         return new Action.Effects(action);
     }
 
@@ -490,14 +500,18 @@ public final class HueApiImpl implements HueApi {
             return null;
         }
         Action.EffectsParameters parameters = new Action.EffectsParameters();
-        if (effect.getY() != null) {
-            parameters.setColor(new Color(new XY(effect.getX(), effect.getY())));
+        if (effect.y() != null) {
+            parameters.setColor(new Color(new XY(effect.x(), effect.y())));
         }
-        if (effect.getCt() != null) {
-            parameters.setColor_temperature(new ColorTemperature(effect.getCt()));
+        if (effect.ct() != null) {
+            parameters.setColor_temperature(new ColorTemperature(effect.ct()));
         }
-        parameters.setSpeed(effect.getSpeed());
+        parameters.setSpeed(effect.speed());
         return parameters;
+    }
+
+    private static Action.GradientPoint createGradientPoint(Pair<Double, Double> pair) {
+        return new Action.GradientPoint(new Color(new XY(pair.first(), pair.second())));
     }
 
     private static boolean actionsDiffer(Scene scene, List<SceneAction> actions) {
@@ -564,6 +578,16 @@ public final class HueApiImpl implements HueApi {
                 effect = "none";
             }
             state.effect(getEffectState(effect, effectsAction.getParameters()));
+        }
+        if (action.getGradient() != null) {
+            Action.Gradient gradient = action.getGradient();
+            List<Pair<Double, Double>> points = gradient.getPoints()
+                                                        .stream()
+                                                        .map(point ->
+                                                                Pair.of(point.getColor().getXy().getX(),
+                                                                        point.getColor().getXy().getY()))
+                                                        .toList();
+            state.gradient(new Gradient(points, gradient.getMode()));
         }
         // todo: transition time?
         return state.build();
