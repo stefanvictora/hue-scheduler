@@ -1,7 +1,11 @@
 package at.sv.hue.color;
 
 import at.sv.hue.ColorMode;
+import at.sv.hue.Gradient;
+import at.sv.hue.Pair;
 import at.sv.hue.api.PutCall;
+
+import java.util.List;
 
 import static at.sv.hue.ColorMode.*;
 
@@ -29,9 +33,26 @@ public final class ColorModeConverter {
         } else if (source == HS && target == CT) {
             int[] rgb = convertHueAndSatToRgb(putCall);
             setCtFromRgb(putCall, rgb);
+        } else if (source == GRADIENT && target == XY) {
+            gradientToXY(putCall);
+        } else if (source == XY && target == GRADIENT) {
+            Pair<Double, Double> point = Pair.of(putCall.getX(), putCall.getY());
+            putCall.setGradient(Gradient.builder()
+                                        .points(List.of(point, point))
+                                        .build());
+            putCall.setX(null);
+            putCall.setY(null);
+        } else if (source == GRADIENT && (target == CT || target == HS)) {
+            gradientToXY(putCall);
+            convertIfNeeded(putCall, target);
         }
-        // todo add conversion from and to Gradient. Should be simple, because a gradient contains >= 2 colors in XY
+    }
 
+    private static void gradientToXY(PutCall putCall) {
+        Pair<Double, Double> firstPoint = putCall.getGradient().points().getFirst();
+        putCall.setGradient(null);
+        putCall.setX(firstPoint.first());
+        putCall.setY(firstPoint.second());
     }
 
     private static int[] convertCtToRgb(PutCall putCall) {
