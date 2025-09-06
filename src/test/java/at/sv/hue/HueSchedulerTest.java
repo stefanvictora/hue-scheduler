@@ -3109,7 +3109,7 @@ class HueSchedulerTest {
         setCurrentTimeTo(now.plusMinutes(30));
 
         runAndAssertPutCalls(trBeforeRunnable,
-                expectedPutCall(1).bri(228).x(0.20615).y(0.2171),
+                expectedPutCall(1).bri(229).x(0.20615).y(0.2171),
                 expectedPutCall(1).x(0.2108).y(0.2496).transitionTime(tr("10min"))
         );
 

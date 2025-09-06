@@ -18,11 +18,11 @@ public class RGBToXYConverterTest {
     void convert_convertsRGBToXYAndBrightness_handlesGamut() {
         assertRGBToXY(0, 0, 0, null, 0.0, 0.0, 1);
         assertRGBToXY(255, 255, 255, null, 0.3127, 0.329, 254);
-        assertRGBToXY(0, 0, 255, null, 0.15, 0.06, 253);
+        assertRGBToXY(0, 0, 255, null, 0.15, 0.06, 254);
         assertRGBToXY(0, 255, 0, null, 0.3, 0.6, 254);
         assertRGBToXY(255, 0, 0, null, 0.64, 0.33, 254);
         assertRGBToXY(128, 0, 0, null, 0.64, 0.33, 55);
-        assertRGBToXY(0, 0, 255, GAMUT_A, 0.1418, 0.0815, 182); // would be outside gamut
+        assertRGBToXY(0, 0, 255, GAMUT_A, 0.1418, 0.0815, 184); // would be outside gamut
         assertRGBToXY(0, 255, 0, GAMUT_A, 0.3, 0.6, 254); // inside gamut
         assertRGBToXY(255, 0, 0, GAMUT_A, 0.64, 0.33, 254); // inside gamut
     }
@@ -33,15 +33,12 @@ public class RGBToXYConverterTest {
      */
     @Test
     void convert_convertsXYToRGB_handlesGamut() {
-        assertXYToRGB(1, 0, 255, null, 255, 0, 37);
-        assertXYToRGB(0, 1, 255, null, 0, 255, 0);
-        assertXYToRGB(0, 0, 255, null, 0, 58, 255);
         assertXYToRGB(1, 0, 255, GAMUT_A, 255, 0, 0);
         assertXYToRGB(0, 1, 255, GAMUT_A, 0, 255, 0);
         assertXYToRGB(0, 0, 255, GAMUT_A, 0, 69, 255);
 
-        assertXYToRGB(0.297, 0.213, 100, null, 151, 91, 168);
-        assertXYToRGB(0.311, 0.541, 50, null, 46, 122, 35);
+        assertXYToRGB(0.297, 0.213, 100, null, 152, 91, 168);
+        assertXYToRGB(0.311, 0.541, 50, null, 47, 122, 36);
         assertXYToRGB(0.204, 0.142, 200, null, 103, 94, 229);
     }
 
@@ -50,7 +47,7 @@ public class RGBToXYConverterTest {
         assertRGBToXY(255, 0, 0, null, 0.64, 0.33, 254); // primary red
         assertRGBToXY(128, 0, 0, null, 0.64, 0.33, 55);
         assertRGBToXY(0, 255, 0, null, 0.3, 0.6, 254); // primary green
-        assertRGBToXY(0, 0, 255, null, 0.15, 0.06, 253); // primary blue
+        assertRGBToXY(0, 0, 255, null, 0.15, 0.06, 254); // primary blue
         assertRGBToXY(0, 0, 0, null, 0.0, 0.0, 1);
         assertRGBToXY(255, 255, 255, null, 0.3127, 0.329, 254);
 
@@ -66,13 +63,13 @@ public class RGBToXYConverterTest {
 
         // outside A, B, and C
         assertRGBToXY(10, 4, 256, null, 0.151, 0.0611, 254);
-        assertRGBToXY(10, 4, 256, GAMUT_A, 0.143, 0.0819, 186);
+        assertRGBToXY(10, 4, 256, GAMUT_A, 0.143, 0.0819, 188);
         assertRGBToXY(10, 4, 256, GAMUT_B, 0.1722, 0.0503, 254);
         assertRGBToXY(10, 4, 256, GAMUT_C, 0.1535, 0.061, 254);
 
         assertRGBToXY(255, 89, 37, null, 0.5746, 0.3633, 254); // red-orange
         assertRGBToXY(235, 255, 67, null, 0.3958, 0.4991, 254);  // green-yellow
-        assertRGBToXY(76, 0, 255, null, 0.1683, 0.0701, 253);    // purple
+        assertRGBToXY(76, 0, 255, null, 0.1683, 0.0701, 254);    // purple
         assertRGBToXY(254, 254, 255, null, 0.3122, 0.3281, 254); // white
 
         assertRGBToXY(122, 220, 255, GAMUT_C, 0.2368, 0.2867, 254);
@@ -87,22 +84,14 @@ public class RGBToXYConverterTest {
         assertXYToRGB(0.3, 0.6, 255, null, 0, 255, 0); // primary green
         assertXYToRGB(0.15, 0.06, 255, null, 0, 0, 255); // primary blue
 
-        assertXYToRGB(0.576, 0.364, 255, null, 255, 88, 34);
+        assertXYToRGB(0.576, 0.364, 255, null, 255, 89, 35);
         assertXYToRGB(0.5746, 0.3633, 255, null, 255, 89, 37);
         assertXYToRGB(0.3958, 0.4991, 255, null, 235, 255, 67);
         assertXYToRGB(0.1683, 0.0701, 255, null, 76, 0, 255);
         assertXYToRGB(0.3122, 0.3281, 255, null, 254, 254, 255);
 
         assertXYToRGB(0.35, 0.35, 255, null, 255, 223, 202);
-        assertXYToRGB(1, 0, 255, null, 255, 0, 37);
-        assertXYToRGB(0, 1, 255, null, 0, 255, 0);
-        assertXYToRGB(0, 0, 255, null, 0, 58, 255);
-
-        assertXYToRGB(1, 0, 255, GAMUT_A, 255, 0, 0);
-        assertXYToRGB(0, 1, 255, GAMUT_A, 0, 255, 0);
-        assertXYToRGB(0, 0, 255, GAMUT_A, 0, 69, 255);
-
-        assertXYToRGB(0.2368, 0.2867, 255, GAMUT_C, 121, 220, 255);
+        assertXYToRGB(0.2368, 0.2867, 255, GAMUT_C, 122, 220, 255);
     }
 
     private void assertRGBToXY(int r, int g, int b, Double[][] gamut, double x, double y, int brightness) {

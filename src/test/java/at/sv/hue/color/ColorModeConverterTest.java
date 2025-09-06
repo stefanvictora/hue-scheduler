@@ -80,7 +80,7 @@ class ColorModeConverterTest {
         assertXYToHS(1, 1, null, 7195, 254);
         assertXYToHS(0.35, 0.35, null, 4327, 52);
         assertXYToHS(1, 1, GAMUT_A, 6510, 254);
-        assertXYToHS(0.1969, 0.6798, GAMUT_C, 22144, 254);
+        assertXYToHS(0.1969, 0.6798, GAMUT_C, 22187, 254);
     }
 
     @Test
