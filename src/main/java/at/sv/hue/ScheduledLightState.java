@@ -11,8 +11,6 @@ public final class ScheduledLightState {
     private final Integer ct;
     private final Double x;
     private final Double y;
-    private final Integer hue;
-    private final Integer sat;
     private final Boolean on;
     private final Effect effect;
     private final Gradient gradient;
@@ -22,7 +20,7 @@ public final class ScheduledLightState {
     }
 
     private boolean hasNoOtherPropertiesThanOn() {
-        return bri == null && ct == null && x == null && y == null && hue == null && sat == null && effect == null;
+        return bri == null && ct == null && x == null && y == null && effect == null;
     }
 
     public boolean hasOtherPropertiesThanOn() {
@@ -44,8 +42,6 @@ public final class ScheduledLightState {
                getFormattedPropertyIfSet("ct", ct) +
                getFormattedPropertyIfSet("x", x) +
                getFormattedPropertyIfSet("y", y) +
-               getFormattedPropertyIfSet("hue", hue) +
-               getFormattedPropertyIfSet("sat", sat) +
                getFormattedPropertyIfSet("on", on) +
                getFormattedPropertyIfSet("effect", effect) +
                getFormattedPropertyIfSet("gradient", gradient)

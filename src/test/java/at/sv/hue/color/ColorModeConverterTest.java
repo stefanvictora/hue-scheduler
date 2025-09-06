@@ -27,24 +27,6 @@ class ColorModeConverterTest {
     }
 
     @Test
-    void covert_CT_HS() {
-        assertCtToHS(153, 8738, 4); // cold white
-        assertCtToHS(200, 5024, 49);
-        assertCtToHS(300, 4941, 125);
-        assertCtToHS(400, 5254, 184);
-        assertCtToHS(500, 5551, 241); // warm white
-    }
-
-    @Test
-    void convert_HS_CT() {
-        assertHsToCt(8738, 4, 153); // cold white
-        assertHsToCt(5024, 49, 200);
-        assertHsToCt(4941, 125, 303);
-        assertHsToCt(5254, 184, 400);
-        assertHsToCt(5551, 241, 500); // warm white
-    }
-
-    @Test
     void covert_CT_XY() {
         assertCtToXY(153, 0.3157, 0.3329);
         assertCtToXY(200, 0.3473, 0.3523);
@@ -66,21 +48,6 @@ class ColorModeConverterTest {
         assertXYToCt(0.4448, 0.4066, 1_000_000 / 2893);
         assertXYToCt(0.1, 0.8, 1_000_000 / 8645);
         assertXYToCt(0.5, 0.4, 1_000_000 / 2140);
-    }
-
-    @Test
-    void convert_HS_XY() {
-        assertHSToXY(65535, 254, GAMUT_A, 0.64, 0.33); // red
-        assertHSToXY(0, 254, GAMUT_A, 0.64, 0.33); // red
-        assertHSToXY(32767, 100, GAMUT_A, 0.2583, 0.3289); // light blue
-    }
-
-    @Test
-    void convert_XY_HS() {
-        assertXYToHS(1, 1, null, 7195, 254);
-        assertXYToHS(0.35, 0.35, null, 4327, 52);
-        assertXYToHS(1, 1, GAMUT_A, 6510, 254);
-        assertXYToHS(0.1969, 0.6798, GAMUT_C, 22187, 254);
     }
 
     @Test
@@ -137,24 +104,6 @@ class ColorModeConverterTest {
     }
 
     @Test
-    void convert_Gradient_HS_takesFirstPoint() {
-        PutCall putCall = PutCall.builder()
-                                 .gradient(Gradient.builder()
-                                                   .points(List.of(Pair.of(0.1532, 0.0475),
-                                                           Pair.of(0.6915, 0.3083),
-                                                           Pair.of(0.17, 0.7)))
-                                                   .build())
-                                 .build();
-
-        ColorModeConverter.convertIfNeeded(putCall, ColorMode.HS);
-
-        assertThat(putCall).isEqualTo(PutCall.builder()
-                                             .hue(45746)
-                                             .sat(254)
-                                             .build());
-    }
-
-    @Test
     void convert_Gradient_None_keepsInput() {
         PutCall putCall = PutCall.builder()
                                  .gradient(Gradient.builder()
@@ -186,32 +135,6 @@ class ColorModeConverterTest {
         assertThat(putCall).isEqualTo(copy);
     }
 
-    private static void assertCtToHS(int ct, int hue, int sat) {
-        PutCall call = PutCall.builder()
-                              .ct(ct)
-                              .build();
-
-        ColorModeConverter.convertIfNeeded(call, ColorMode.HS);
-
-        assertThat(call).isEqualTo(PutCall.builder()
-                                          .hue(hue)
-                                          .sat(sat)
-                                          .build());
-    }
-
-    private static void assertHsToCt(int hue, int sat, int ct) {
-        PutCall call = PutCall.builder()
-                              .hue(hue)
-                              .sat(sat)
-                              .build();
-
-        ColorModeConverter.convertIfNeeded(call, ColorMode.CT);
-
-        assertThat(call).isEqualTo(PutCall.builder()
-                                          .ct(ct)
-                                          .build());
-    }
-
     private static void assertCtToXY(int ct, double x, double y) {
         PutCall call = PutCall.builder()
                               .ct(ct)
@@ -237,36 +160,6 @@ class ColorModeConverterTest {
 
         assertThat(call).isEqualTo(PutCall.builder()
                                           .ct(ct)
-                                          .build());
-    }
-
-    private static void assertHSToXY(int hue, int sat, Double[][] gamut, double x, double y) {
-        PutCall call = PutCall.builder()
-                              .hue(hue)
-                              .sat(sat)
-                              .gamut(gamut)
-                              .build();
-
-        ColorModeConverter.convertIfNeeded(call, ColorMode.XY);
-
-        assertThat(call).isEqualTo(PutCall.builder()
-                                          .x(x)
-                                          .y(y)
-                                          .build());
-    }
-
-    private static void assertXYToHS(double x, double y, Double[][] gamut, int hue, int sat) {
-        PutCall call = PutCall.builder()
-                              .x(x)
-                              .y(y)
-                              .gamut(gamut)
-                              .build();
-
-        ColorModeConverter.convertIfNeeded(call, ColorMode.HS);
-
-        assertThat(call).isEqualTo(PutCall.builder()
-                                          .hue(hue)
-                                          .sat(sat)
                                           .build());
     }
 }

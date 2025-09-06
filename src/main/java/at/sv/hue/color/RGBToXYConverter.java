@@ -39,7 +39,7 @@ public final class RGBToXYConverter {
             y = corr.getY();
         }
 
-        double maxY = findMaximumYAlreadyCorrected(x, y); // Y in [0..1]
+        double maxY = findMaximumY(x, y); // Y in [0..1]
         int brightness = (int) Math.round((maxY > 0 ? Y / maxY : 0.0) * 255.0);
 
         return new XYColor(round4(x), round4(y), clampBrightness(brightness));
@@ -49,7 +49,7 @@ public final class RGBToXYConverter {
         return Math.max(1, Math.min(254, brightness)); // 1..254
     }
 
-    public static double[] rgbToXYZ(int r, int g, int b) {
+    private static double[] rgbToXYZ(int r, int g, int b) {
         double red = GammaCorrection.sRGBToLinear(r / 255.0);
         double green = GammaCorrection.sRGBToLinear(g / 255.0);
         double blue = GammaCorrection.sRGBToLinear(b / 255.0);
@@ -61,45 +61,10 @@ public final class RGBToXYConverter {
     }
 
     /**
-     * xy + brightness [1..254] -> sRGB (0..255). Uses linear Y scaling; gamma only at the end.
-     */
-    public static int[] xyToRgb(double x, double y, int brightness, Double[][] gamut) {
-        if (gamut != null) {
-            XYColorGamutCorrection corr = new XYColorGamutCorrection(x, y, gamut);
-            x = corr.getX();
-            y = corr.getY();
-        }
-        brightness = clampBrightness(brightness);
-
-        double maxY = findMaximumYAlreadyCorrected(x, y); // Y=1 scale limit in linear space
-        double Y = maxY * (brightness / 255.0);
-
-        double[] rgbLin = xyYToLinearRgb(x, y, Y);
-        double r = GammaCorrection.linearToSRGB(rgbLin[0]);
-        double g = GammaCorrection.linearToSRGB(rgbLin[1]);
-        double b = GammaCorrection.linearToSRGB(rgbLin[2]);
-
-        int ri = (int) Math.round(Math.max(0.0, Math.min(1.0, r)) * 255.0);
-        int gi = (int) Math.round(Math.max(0.0, Math.min(1.0, g)) * 255.0);
-        int bi = (int) Math.round(Math.max(0.0, Math.min(1.0, b)) * 255.0);
-
-        return new int[]{ri, gi, bi};
-    }
-
-    public static double findMaximumY(double x, double y, Double[][] gamut) {
-        if (gamut != null) {
-            XYColorGamutCorrection corr = new XYColorGamutCorrection(x, y, gamut);
-            x = corr.getX();
-            y = corr.getY();
-        }
-        return findMaximumYAlreadyCorrected(x, y);
-    }
-
-    /**
      * Largest Y in [0..1] such that xyY -> linear sRGB stays within [0..1].
      * Assumes xy is already gamut-corrected.
      */
-    private static double findMaximumYAlreadyCorrected(double x, double y) {
+    private static double findMaximumY(double x, double y) {
         if (y <= EPS_Y) return 0.0;
 
         // XYZ at Y=1.0
@@ -124,29 +89,6 @@ public final class RGBToXYConverter {
         return 1.0 / maxLin;             // scale to bring the peak to 1
     }
 
-    /**
-     * xyY -> linear sRGB (no gamma). Assumes valid xy and Y >= 0.
-     */
-    private static double[] xyYToLinearRgb(double x, double y, double Y) {
-        if (Y <= 0.0) return new double[]{0.0, 0.0, 0.0};
-        double ySafe = Math.max(y, EPS_Y);
-
-        double z = 1.0 - x - ySafe;
-        double X = (Y / ySafe) * x;
-        double Z = (Y / ySafe) * z;
-
-        double r = IM11 * X + IM12 * Y + IM13 * Z;
-        double g = IM21 * X + IM22 * Y + IM23 * Z;
-        double b = IM31 * X + IM32 * Y + IM33 * Z;
-
-        // Clip small negatives from numeric noise
-        if (r < 0.0) r = 0.0;
-        if (g < 0.0) g = 0.0;
-        if (b < 0.0) b = 0.0;
-
-        return new double[]{r, g, b};
-    }
-
     private static double round4(double v) {
         return BigDecimal.valueOf(v).setScale(4, RoundingMode.HALF_UP).doubleValue();
     }
@@ -154,22 +96,14 @@ public final class RGBToXYConverter {
     public record XYColor(double x, double y, int brightness) {
     }
 
-    static final class GammaCorrection {
+    private static final class GammaCorrection {
         private static final double gamma = 2.4;
         private static final double transition = 0.0031308; // linear domain
         private static final double slope = 12.92;
         private static final double offset = 0.055;
 
-        static double linearToSRGB(double value) {
-            if (value <= transition) {
-                return slope * value;
-            }
-            return (1 + offset) * Math.pow(value, 1 / gamma) - offset;
-        }
-
         static double sRGBToLinear(double value) {
-            // Inverse of the above transfer (value in [0..1] sRGB)
-            double transitionInv = linearToSRGB(transition); // ~ 0.04045
+            double transitionInv = slope * GammaCorrection.transition; // ~ 0.04045
             if (value <= transitionInv) {
                 return value / slope;
             }

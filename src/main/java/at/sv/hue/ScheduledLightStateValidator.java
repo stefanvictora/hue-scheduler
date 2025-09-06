@@ -7,8 +7,6 @@ import java.util.List;
 
 public final class ScheduledLightStateValidator {
 
-    private static final int MAX_HUE_VALUE = 65535;
-
     private final Identifier identifier;
     private final boolean groupState;
     private final LightCapabilities capabilities;
@@ -17,15 +15,12 @@ public final class ScheduledLightStateValidator {
     private final Integer ct;
     private final Double x;
     private final Double y;
-    private final Integer hue;
-    private final Integer sat;
     private final Boolean on;
     private final String effect;
 
 
     public ScheduledLightStateValidator(Identifier identifier, boolean groupState, LightCapabilities capabilities,
-                                        Integer brightness, Integer ct, Double x, Double y, Integer hue, Integer sat,
-                                        Boolean on, String effect) {
+                                        Integer brightness, Integer ct, Double x, Double y, Boolean on, String effect) {
         this.identifier = identifier;
         this.groupState = groupState;
         this.capabilities = capabilities;
@@ -33,12 +28,9 @@ public final class ScheduledLightStateValidator {
         this.ct = assertCtSupportAndValue(ct);
         this.x = assertValidXAndY(x);
         this.y = assertValidXAndY(y);
-        this.hue = assertValidHueValue(hue);
-        this.sat = assertValidSaturationValue(sat);
         this.on = on;
         this.effect = assertValidEffectValue(effect);
         assertValidXyPair();
-        assertValidHueAndSat();
         assertColorCapabilities();
     }
 
@@ -62,8 +54,6 @@ public final class ScheduledLightStateValidator {
                                       .ct(ct)
                                       .x(x)
                                       .y(y)
-                                      .hue(hue)
-                                      .sat(sat)
                                       .on(on)
                                       .effect(effect)
                                       .build();
@@ -141,29 +131,9 @@ public final class ScheduledLightStateValidator {
         return xOrY;
     }
 
-    private Integer assertValidHueValue(Integer hue) {
-        if (hue != null && (hue > MAX_HUE_VALUE || hue < 0)) {
-            throw new InvalidHueValue("Invalid hue value '" + hue + "'. Allowed integer range: 0-65535");
-        }
-        return hue;
-    }
-
-    private Integer assertValidSaturationValue(Integer sat) {
-        if (sat != null && (sat > 254 || sat < 0)) {
-            throw new InvalidSaturationValue("Invalid saturation value '" + sat + "'. Allowed integer range: 0-254");
-        }
-        return sat;
-    }
-
     private void assertValidXyPair() {
         if ((x == null) != (y == null)) {
             throw new InvalidPropertyValue("x and y must be provided together.");
-        }
-    }
-
-    private void assertValidHueAndSat() {
-        if (hue != null && sat == null || hue == null && sat != null) {
-            throw new InvalidPropertyValue("Hue and sat can only occur at the same time.");
         }
     }
 
@@ -175,7 +145,7 @@ public final class ScheduledLightStateValidator {
     }
 
     private boolean isColorState() {
-        return x != null || y != null || hue != null || sat != null;
+        return x != null || y != null;
     }
 
     private String getFormattedName() {

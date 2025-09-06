@@ -169,9 +169,7 @@ public class HassApiImpl implements HueApi {
         changeState.setEffect(getEffect(putCall));
         // transition in seconds (float ≥ 0); HA applies no global max (device integration may enforce limits)
         changeState.setTransition(convertToSeconds(putCall.getTransitionTime()));
-        if (putCall.getHue() != null && putCall.getSat() != null) {
-            changeState.setHs_color(getHsColor(putCall));
-        } else if (putCall.getX() != null && putCall.getY() != null) {
+        if (putCall.getX() != null && putCall.getY() != null) {
             changeState.setXy_color(getXyColor(putCall));
         }
         return changeState;
@@ -186,12 +184,6 @@ public class HassApiImpl implements HueApi {
             return "off"; // "none" has been deprecated in HA
         }
         return effect.effect();
-    }
-
-    private Integer[] getHsColor(PutCall putCall) {
-        int hue = (int) (putCall.getHue() / 65535.0 * 360.0);
-        int sat = (int) (putCall.getSat() / 254.0 * 100.0);
-        return new Integer[]{hue, sat};
     }
 
     private static Double[] getXyColor(PutCall putCall) {

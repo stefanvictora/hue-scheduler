@@ -274,8 +274,6 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
                       .ct(lightState.getCt())
                       .x(lightState.getX())
                       .y(lightState.getY())
-                      .hue(lightState.getHue())
-                      .sat(lightState.getSat())
                       .on(lightState.getOn())
                       .effect(lightState.getEffect())
                       .gradient(lightState.getGradient())

@@ -85,8 +85,6 @@ public final class InputConfigurationParser {
             Boolean interpolate = null;
             Double x = null;
             Double y = null;
-            Integer hue = null;
-            Integer sat = null;
             String transitionTimeBefore = null;
             Integer transitionTime = null;
             String effect = null;
@@ -137,12 +135,6 @@ public final class InputConfigurationParser {
                     case "y":
                         y = parseDouble(value, parameter);
                         break;
-                    case "hue":
-                        hue = parseInteger(value, parameter);
-                        break;
-                    case "sat":
-                        sat = parseSaturation(value);
-                        break;
                     case "color":
                         int red;
                         int green;
@@ -192,7 +184,7 @@ public final class InputConfigurationParser {
 
             List<ScheduledLightState> scheduledLightStates;
             if (scene != null) {
-                if (ct != null || x != null || y != null || hue != null || sat != null || effect != null) {
+                if (ct != null || x != null || y != null || effect != null) {
                     throw new InvalidConfigurationLine(
                             "When 'scene' is used, only 'on', 'bri', 'tr', 'tr-before', 'days', 'force', 'interpolate' are allowed.");
                 }
@@ -209,7 +201,7 @@ public final class InputConfigurationParser {
                 }
             } else {
                 ScheduledLightStateValidator validator = new ScheduledLightStateValidator(identifier, groupState, capabilities,
-                        capBrightness(bri), ct, x, y, hue, sat, on, effect);
+                        capBrightness(bri), ct, x, y, on, effect);
                 scheduledLightStates = List.of(validator.getScheduledLightState());
             }
 
@@ -259,13 +251,6 @@ public final class InputConfigurationParser {
         return parseInteger(value, "bri");
     }
 
-    private Integer parseSaturation(String value) {
-        if (value.endsWith("%")) {
-            return parseSaturationPercentValue(value);
-        }
-        return parseInteger(value, "sat");
-    }
-
     /**
      * Calculates the brightness value [1-254]. This uses an adapted percentage range of [1%-100%]. Treating 1% as the min value. To make sure, we
      * also handle the special case of 0% and treat is as 1%.
@@ -281,18 +266,6 @@ public final class InputConfigurationParser {
             return 1;
         }
         return (int) Math.round((254.0 - 1.0) * (percent - 1) / 99.0 + 1.0);
-    }
-
-    private int parseSaturationPercentValue(String value) {
-        String percentString = value.replace("%", "").trim();
-        Double percent = parseDouble(percentString, "sat");
-        if (percent < 0) {
-            return 0;
-        }
-        if (percent > 100) {
-            return 254;
-        }
-        return (int) Math.round(254.0 * percent / 100.0);
     }
 
     private static Integer parseInteger(String value, String parameter) {

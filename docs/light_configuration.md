@@ -128,8 +128,6 @@ Properties define the state applied during the interval.
 Hue Scheduler supports several ways to set color:
 
 - `color` — **hex** (e.g., `#3CD0E2`) or **RGB** (e.g., `60,208,226`). Cannot be combined with other color properties. If `bri` is omitted, Hue Scheduler derives a suitable brightness for the color.
-- `hue` — **hue** (`0–65535`). Wraps around (`0` and `65535` are both red). **Requires** `sat`.
-- `sat` — **saturation** (`0–254` or `0%–100%`), white → fully colored. **Requires** `hue`.
 - `effect` — Activates a light/group effect. Cannot be combined with other color properties or `ct`. The effect persists until the light is turned off or `effect:none`. Brightness can still be adjusted. Supported effects vary by model. Examples (Hue color lights): `candle`, `fire`, `prism`, `sparkle`, `opal`, `glisten`.
 - `x` / `y` — **[CIE xy](https://en.wikipedia.org/wiki/CIE_1931_color_space)** coordinates (`0.0–1.0`). Useful for exact colors read from the Hue API. Cannot be combined with other color properties.
 
@@ -137,7 +135,6 @@ Examples:
 ```yacas
 Desk  10:00  color:#3CD0E2
 Desk  11:00  color:60, 208, 226
-Desk  12:00  hue:2000  sat:100
 Desk  13:00  effect:candle  bri:50%
 Desk  14:00  effect:none
 Desk  15:00  x:0.1652  y:0.3103

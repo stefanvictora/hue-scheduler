@@ -2625,69 +2625,6 @@ public class HassApiTest {
     }
 
     @Test
-    void putState_turnOn_hs_hueLargerThan360_color() {
-        api.putState(PutCall.builder()
-                            .id("light.id")
-                            .bri(254)
-                            .hue(10000)
-                            .sat(50)
-                            .build());
-
-        verify(http).postResource(getUrl("/services/light/turn_on"),
-                "{\"entity_id\":\"light.id\",\"brightness\":255,\"hs_color\":[54,19]}");
-    }
-
-    @Test
-    void putState_turnOn_hs_maxValues_color() {
-        api.putState(PutCall.builder()
-                            .id("light.id")
-                            .bri(254)
-                            .hue(65535)
-                            .sat(254)
-                            .build());
-
-        verify(http).postResource(getUrl("/services/light/turn_on"),
-                "{\"entity_id\":\"light.id\",\"brightness\":255,\"hs_color\":[360,100]}");
-    }
-
-    @Test
-    void putState_turnOn_hs_minValues_color() {
-        api.putState(PutCall.builder()
-                            .id("light.id")
-                            .bri(254)
-                            .hue(0)
-                            .sat(0)
-                            .build());
-
-        verify(http).postResource(getUrl("/services/light/turn_on"),
-                "{\"entity_id\":\"light.id\",\"brightness\":255,\"hs_color\":[0,0]}");
-    }
-
-    @Test
-    void putState_turnOn_hs_onlyHueValue_unsupported_ignored() {
-        api.putState(PutCall.builder()
-                            .id("light.id")
-                            .bri(254)
-                            .hue(65535)
-                            .build());
-
-        verify(http).postResource(getUrl("/services/light/turn_on"),
-                "{\"entity_id\":\"light.id\",\"brightness\":255}");
-    }
-
-    @Test
-    void putState_turnOn_hs_onlySatValue_unsupported_ignored() {
-        api.putState(PutCall.builder()
-                            .id("light.id")
-                            .bri(254)
-                            .sat(254)
-                            .build());
-
-        verify(http).postResource(getUrl("/services/light/turn_on"),
-                "{\"entity_id\":\"light.id\",\"brightness\":255}");
-    }
-
-    @Test
     void putState_turnOff_transition_callsCorrectEndpoint() {
         putState(PutCall.builder()
                         .on(false)
