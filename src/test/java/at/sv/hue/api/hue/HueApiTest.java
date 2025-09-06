@@ -3394,21 +3394,6 @@ class HueApiTest {
     }
 
     @Test
-    void putState_hueAndSaturation_convertedToXY() {
-        performPutCall(PutCall.builder().id("ID").hue(0).sat(254).build());
-
-        verifyPut("/light/ID", """
-                {
-                  "color": {
-                    "xy": {
-                      "x": 0.64,
-                      "y": 0.33
-                    }
-                  }
-                }""");
-    }
-
-    @Test
     void putState_on_setsFlagCorrectly() {
         performPutCall(PutCall.builder().id("ID").on(true).build());
 
@@ -4325,8 +4310,8 @@ class HueApiTest {
 
         // "Scene_1" already exists for Room -> update it; missing light treated as off
         createOrUpdateScene("GROUPED_LIGHT_1", "Scene_1",
-                PutCall.builder().id("LIGHT_1").hue(2000).sat(254),
-                PutCall.builder().id("LIGHT_2_1").hue(2000).sat(254)
+                PutCall.builder().id("LIGHT_1").x(0.623).y(0.3435),
+                PutCall.builder().id("LIGHT_2_1").x(0.623).y(0.3435)
         );
 
         verifyPut("/scene/SCENE_1", """
@@ -4786,83 +4771,6 @@ class HueApiTest {
                         },
                         "dimming": {
                           "brightness": 100.0
-                        }
-                      }
-                    },
-                    {
-                      "target": {
-                        "rid": "ON_OFF_ONLY",
-                        "rtype": "light"
-                      },
-                      "action": {
-                        "on": {
-                          "on": true
-                        }
-                      }
-                    }
-                  ]
-                }
-                """);
-
-        // HS only:
-
-        createOrUpdateScene("GROUPED_LIGHT", "SCENE",
-                PutCall.builder().id("COLOR").hue(2000).sat(254),
-                PutCall.builder().id("CT_ONLY").hue(2000).sat(254),
-                PutCall.builder().id("BRI_ONLY").hue(2000).sat(254),
-                PutCall.builder().id("ON_OFF_ONLY").hue(2000).sat(254)
-        );
-
-        verifyPut("/scene/SCENE_ID", """
-                {
-                  "metadata": {
-                    "name": "SCENE",
-                    "appdata": "huescheduler:app"
-                  },
-                  "group": {
-                    "rid": "ZONE",
-                    "rtype": "zone"
-                  },
-                  "actions": [
-                    {
-                      "target": {
-                        "rid": "COLOR",
-                        "rtype": "light"
-                      },
-                      "action": {
-                        "on": {
-                          "on": true
-                        },
-                        "color": {
-                          "xy": {
-                            "x": 0.623,
-                            "y": 0.3435
-                          }
-                        }
-                      }
-                    },
-                    {
-                      "target": {
-                        "rid": "CT_ONLY",
-                        "rtype": "light"
-                      },
-                      "action": {
-                        "on": {
-                          "on": true
-                        },
-                        "color_temperature": {
-                          "mirek": 454
-                        }
-                      }
-                    },
-                    {
-                      "target": {
-                        "rid": "BRI_ONLY",
-                        "rtype": "light"
-                      },
-                      "action": {
-                        "on": {
-                          "on": true
                         }
                       }
                     },

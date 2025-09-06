@@ -3,6 +3,7 @@ package at.sv.hue.api;
 import at.sv.hue.ColorMode;
 import at.sv.hue.Effect;
 import at.sv.hue.Gradient;
+import at.sv.hue.Pair;
 import at.sv.hue.FormatUtil;
 import at.sv.hue.color.ColorComparator;
 import lombok.Builder;
@@ -21,8 +22,6 @@ public final class PutCall {
     Integer ct;
     Double x;
     Double y;
-    Integer hue;
-    Integer sat;
     Boolean on;
     Effect effect;
     Gradient gradient;
@@ -31,16 +30,14 @@ public final class PutCall {
     Double[][] gamut;
 
     public boolean isNullCall() {
-        return Stream.of(bri, ct, x, y, hue, sat, on, effect).allMatch(Objects::isNull);
+        return Stream.of(bri, ct, x, y, on, effect).allMatch(Objects::isNull);
     }
 
     public ColorMode getColorMode() {
         if (ct != null) {
             return ColorMode.CT;
-        } else if (x != null && y != null) {
+        } else if (getXY() != null) {
             return ColorMode.XY;
-        } else if (hue != null || sat != null) {
-            return ColorMode.HS;
         } else if (gradient != null) {
             return ColorMode.GRADIENT;
         }
@@ -55,6 +52,13 @@ public final class PutCall {
         return on == Boolean.FALSE;
     }
 
+    public Pair<Double, Double> getXY() {
+        if (x == null || y == null) {
+            return null;
+        }
+        return Pair.of(x, y);
+    }
+
     @Override
     public String toString() {
         return "{" +
@@ -64,8 +68,6 @@ public final class PutCall {
                getFormattedCtIfSet() +
                getFormattedPropertyIfSet("x", x) +
                getFormattedPropertyIfSet("y", y) +
-               getFormattedPropertyIfSet("hue", hue) +
-               getFormattedPropertyIfSet("sat", sat) +
                getFormattedPropertyIfSet("effect", effect) +
                getFormattedPropertyIfSet("gradient", gradient) +
                getFormattedTransitionTimeIfSet() +
@@ -100,8 +102,6 @@ public final class PutCall {
     public boolean hasSameLightState(PutCall other) {
         return Objects.equals(this.on, other.on) &&
                Objects.equals(this.bri, other.bri) &&
-               Objects.equals(this.hue, other.hue) &&
-               Objects.equals(this.sat, other.sat) &&
                Objects.equals(this.effect, other.effect) && // todo: add gradient
                Objects.equals(this.x, other.x) &&
                Objects.equals(this.y, other.y) &&

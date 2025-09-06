@@ -68,8 +68,6 @@ Use fixed times (24-hour `HH:mm[:ss]`, e.g., `06:00`, `23:30:15`) or solar times
     - **`days`** — active days (e.g., `days:Mo-Fr`, `days:Tu,We`)
 - **Color**
     - **`color`** (hex or RGB), e.g., `#3CD0E2` or `60,208,226`
-    - **`hue`** `0–65535` (wraps), requires `sat`
-    - **`sat`** `0–254` or `0%–100%`, requires `hue`
     - **`effect`** (e.g., `prism`, `fire`, `none`)
 - **Advanced**
     - **`x`** / **`y`** — CIE xy (e.g., `x:0.6024  y:0.3433`)

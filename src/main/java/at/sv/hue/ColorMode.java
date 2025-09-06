@@ -5,7 +5,6 @@ import java.util.Locale;
 public enum ColorMode {
     CT,
     XY,
-    HS,
     GRADIENT,
     NONE;
 

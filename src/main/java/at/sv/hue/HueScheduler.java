@@ -203,11 +203,9 @@ public final class HueScheduler implements Runnable {
     int colorTemperatureOverrideThresholdKelvin;
     @Option(
             names = "--color-override-threshold", paramLabel = "<delta>",
-            defaultValue = "${env:COLOR_OVERRIDE_THRESHOLD:-6.0}",
-            description = "The color difference threshold (Delta-E CIE76) above which a light's color is considered " +
-                          "manually overridden. Lower values detect smaller color changes but may trigger during " +
-                          "transitions. Higher values ignore transition noise but may miss subtle adjustments. " +
-                          "Typical range: 5-15. Default: ${DEFAULT-VALUE}."
+            defaultValue = "${env:COLOR_OVERRIDE_THRESHOLD:-0.06}",
+            description = "OKLab color distance threshold for detecting manual overrides. "
+                          + "Typical range: 0.03–0.10. Default: ${DEFAULT-VALUE}."
     )
     double colorOverrideThreshold;
 
@@ -1184,8 +1182,6 @@ public final class HueScheduler implements Runnable {
         if (putCall.getOn() != null) properties.add("on=" + putCall.getOn());
         if (putCall.getBri() != null) properties.add("bri=" + putCall.getBri());
         if (putCall.getCt() != null) properties.add("ct=" + putCall.getCt());
-        if (putCall.getHue() != null) properties.add("hue=" + putCall.getHue());
-        if (putCall.getSat() != null) properties.add("sat=" + putCall.getSat());
         if (putCall.getX() != null) properties.add("x=" + putCall.getX());
         if (putCall.getY() != null) properties.add("y=" + putCall.getY());
         if (putCall.getEffect() != null) properties.add("effect=" + putCall.getEffect());

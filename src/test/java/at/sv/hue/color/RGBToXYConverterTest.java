@@ -27,21 +27,6 @@ public class RGBToXYConverterTest {
         assertRGBToXY(255, 0, 0, GAMUT_A, 0.64, 0.33, 254); // inside gamut
     }
 
-    /**
-     * Adapted from <a href="https://github.com/home-assistant/core/blob/dev/tests/util/test_color.py">Home Assistant test_color.py</a>
-     * License: Apache-2.0 License
-     */
-    @Test
-    void convert_convertsXYToRGB_handlesGamut() {
-        assertXYToRGB(1, 0, 255, GAMUT_A, 255, 0, 0);
-        assertXYToRGB(0, 1, 255, GAMUT_A, 0, 255, 0);
-        assertXYToRGB(0, 0, 255, GAMUT_A, 0, 69, 255);
-
-        assertXYToRGB(0.297, 0.213, 100, null, 152, 91, 168);
-        assertXYToRGB(0.311, 0.541, 50, null, 47, 122, 36);
-        assertXYToRGB(0.204, 0.142, 200, null, 103, 94, 229);
-    }
-
     @Test
     void convert_RGB_XY() {
         assertRGBToXY(255, 0, 0, null, 0.64, 0.33, 254); // primary red
@@ -78,33 +63,10 @@ public class RGBToXYConverterTest {
         assertRGBToXY(10, 50, 10, GAMUT_C, 0.3027, 0.5427, 8);
     }
 
-    @Test
-    void convert_XY_RGB() {
-        assertXYToRGB(0.64, 0.33, 255, null, 255, 0, 0); // primary red
-        assertXYToRGB(0.3, 0.6, 255, null, 0, 255, 0); // primary green
-        assertXYToRGB(0.15, 0.06, 255, null, 0, 0, 255); // primary blue
-
-        assertXYToRGB(0.576, 0.364, 255, null, 255, 89, 35);
-        assertXYToRGB(0.5746, 0.3633, 255, null, 255, 89, 37);
-        assertXYToRGB(0.3958, 0.4991, 255, null, 235, 255, 67);
-        assertXYToRGB(0.1683, 0.0701, 255, null, 76, 0, 255);
-        assertXYToRGB(0.3122, 0.3281, 255, null, 254, 254, 255);
-
-        assertXYToRGB(0.35, 0.35, 255, null, 255, 223, 202);
-        assertXYToRGB(0.2368, 0.2867, 255, GAMUT_C, 122, 220, 255);
-    }
-
     private void assertRGBToXY(int r, int g, int b, Double[][] gamut, double x, double y, int brightness) {
         RGBToXYConverter.XYColor color = RGBToXYConverter.rgbToXY(r, g, b, gamut);
         assertThat(color.x()).isEqualByComparingTo(x);
         assertThat(color.y()).isEqualByComparingTo(y);
         assertThat(color.brightness()).isEqualTo(brightness);
-    }
-
-    private void assertXYToRGB(double x, double y, int brightness, Double[][] gamut, int r, int g, int b) {
-        int[] rgb = RGBToXYConverter.xyToRgb(x, y, brightness, gamut);
-        assertThat(rgb[0]).isEqualTo(r);
-        assertThat(rgb[1]).isEqualTo(g);
-        assertThat(rgb[2]).isEqualTo(b);
     }
 }

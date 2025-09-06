@@ -3109,7 +3109,7 @@ class HueSchedulerTest {
         setCurrentTimeTo(now.plusMinutes(30));
 
         runAndAssertPutCalls(trBeforeRunnable,
-                expectedPutCall(1).bri(229).x(0.20615).y(0.2171),
+                expectedPutCall(1).bri(229).x(0.2021).y(0.2142),
                 expectedPutCall(1).x(0.2108).y(0.2496).transitionTime(tr("10min"))
         );
 
@@ -3170,66 +3170,9 @@ class HueSchedulerTest {
     }
 
     @Test
-    void parse_transitionTimeBefore_multipleStates_hueSat_hueAtStart_detectedAsSameValue_noHueInterpolation() {
-        addKnownLightIdsWithDefaultCapabilities(1);
-        addStateNow(1, "hue:0", "sat:0");
-        addState(1, now.plusMinutes(40), "hue:65535", "sat:254", "tr-before:20min");
-
-        List<ScheduledRunnable> scheduledRunnables = startScheduler(2);
-        ScheduledRunnable trBeforeRunnable = scheduledRunnables.get(1);
-
-        setCurrentTimeTo(now.plusMinutes(30));
-
-        runAndAssertPutCalls(trBeforeRunnable,
-                expectedPutCall(1).hue(0).sat(127),
-                expectedPutCall(1).hue(65535).sat(254).transitionTime(tr("10min"))
-        );
-
-        ensureRunnable(initialNow.plusDays(1).plusMinutes(20), initialNow.plusDays(2));
-    }
-
-    @Test
-    void parse_transitionTimeBefore_multipleStates_hueSat_hueAtMiddle_increasesValue() {
-        addKnownLightIdsWithDefaultCapabilities(1);
-        addStateNow(1, "hue:32768", "sat:0");
-        addState(1, now.plusMinutes(40), "hue:65535", "sat:254", "tr-before:20min");
-
-        List<ScheduledRunnable> scheduledRunnables = startScheduler(2);
-        ScheduledRunnable trBeforeRunnable = scheduledRunnables.get(1);
-
-        setCurrentTimeTo(now.plusMinutes(30));
-
-        runAndAssertPutCalls(trBeforeRunnable,
-                expectedPutCall(1).hue(49152).sat(127),
-                expectedPutCall(1).hue(65535).sat(254).transitionTime(tr("10min"))
-        );
-
-        ensureRunnable(initialNow.plusDays(1).plusMinutes(20), initialNow.plusDays(2));
-    }
-
-    @Test
-    void parse_transitionTimeBefore_multipleStates_hueSat_hueBeforeMiddle_decreasesValue() {
-        addKnownLightIdsWithDefaultCapabilities(1);
-        addStateNow(1, "hue:16384", "sat:0");
-        addState(1, now.plusMinutes(40), "hue:65535", "sat:254", "tr-before:20min");
-
-        List<ScheduledRunnable> scheduledRunnables = startScheduler(2);
-        ScheduledRunnable trBeforeRunnable = scheduledRunnables.get(1);
-
-        setCurrentTimeTo(now.plusMinutes(30));
-
-        runAndAssertPutCalls(trBeforeRunnable,
-                expectedPutCall(1).hue(8192).sat(127),
-                expectedPutCall(1).hue(65535).sat(254).transitionTime(tr("10min"))
-        );
-
-        ensureRunnable(initialNow.plusDays(1).plusMinutes(20), initialNow.plusDays(2));
-    }
-
-    @Test
     void parse_transitionTimeBefore_multipleStates_xAndY_performsInterpolation() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        addStateNow(1, "x:0", "y:0");
+        addStateNow(1, "x:0.5", "y:0.5");
         addState(1, now.plusMinutes(40), "x:1", "y:1", "tr-before:20min");
 
         List<ScheduledRunnable> scheduledRunnables = startScheduler(2);
@@ -3238,28 +3181,8 @@ class HueSchedulerTest {
         setCurrentTimeTo(now.plusMinutes(30));
 
         runAndAssertPutCalls(trBeforeRunnable,
-                expectedPutCall(1).x(0.5).y(0.5),
+                expectedPutCall(1).x(0.7275).y(0.5626),
                 expectedPutCall(1).x(1.0).y(1.0).transitionTime(tr("10min"))
-        );
-
-        ensureRunnable(initialNow.plusDays(1).plusMinutes(20), initialNow.plusDays(2));
-    }
-
-    @Test
-    void parse_transitionTimeBefore_multipleStates_previousCT_targetHS_convertsXYToHS_removesCT_performsInterpolation() {
-        addKnownLightIdsWithDefaultCapabilities(1);
-        addStateNow(1, "ct:" + DEFAULT_CT);
-        addState(1, now.plusMinutes(40), "hue:32768", "sat:254", "tr-before:20min");
-
-        List<ScheduledRunnable> scheduledRunnables = startScheduler(2);
-        ScheduledRunnable trBeforeRunnable = scheduledRunnables.get(1);
-        assertScheduleStart(trBeforeRunnable, now.plusMinutes(20), now.plusDays(1));
-
-        setCurrentTimeTo(now.plusMinutes(30));
-
-        runAndAssertPutCalls(trBeforeRunnable,
-                expectedPutCall(1).hue(19011).sat(219),
-                expectedPutCall(1).hue(32768).sat(254).transitionTime(6000)
         );
 
         ensureRunnable(initialNow.plusDays(1).plusMinutes(20), initialNow.plusDays(2));
@@ -3680,49 +3603,6 @@ class HueSchedulerTest {
     }
 
     @Test
-    void parse_canHandleSaturationInPercent_minvalue() {
-        assertAppliedSaturation("0%", 0);
-    }
-
-    @Test
-    void parse_canHandleSaturationInPercent_trims() {
-        assertAppliedSaturation("0 %", 0);
-    }
-
-    @Test
-    void parse_canHandleSaturationInPercent_halfPercent() {
-        assertAppliedSaturation("0.5%", 1);
-    }
-
-    @Test
-    void parse_canHandleSaturationInPercent_tooLow_stillUsesMinvalue() {
-        assertAppliedSaturation("-0.5%", 0);
-    }
-
-    @Test
-    void parse_canHandleSaturationInPercent_maxValue() {
-        assertAppliedSaturation("100%", 254);
-    }
-
-    @Test
-    void parse_canHandleSaturationInPercent_tooHigh_stillUsesMaxValue() {
-        assertAppliedSaturation("100.5%", 254);
-    }
-
-    private void assertAppliedSaturation(String input, int expected) {
-        addKnownLightIdsWithDefaultCapabilities(1);
-        addStateNow(1, "hue:1000", "sat:" + input);
-
-        ScheduledRunnable runnable = startAndGetSingleRunnable();
-
-        advanceTimeAndRunAndAssertPutCalls(runnable,
-                expectedPutCall(1).hue(1000).sat(expected)
-        );
-
-        ensureRunnable(initialNow.plusDays(1));
-    }
-
-    @Test
     void parse_canHandleBrightnessInPercent_minValue() {
         assertAppliedBrightness("1%", 1);
     }
@@ -3808,22 +3688,6 @@ class HueSchedulerTest {
 
         advanceTimeAndRunAndAssertGroupPutCalls(scheduledRunnable,
                 expectedGroupPutCall(ID).x(x).y(y)
-        );
-
-        ensureRunnable(initialNow.plusDays(1));
-    }
-
-    @Test
-    void parse_canHandleColorInput_viaHueAndSaturation() {
-        addKnownLightIdsWithDefaultCapabilities(1);
-        int hue = 65535;
-        int saturation = 254;
-        addStateNow("1", "hue:" + hue, "sat:" + saturation);
-
-        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
-
-        advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
-                expectedPutCall(ID).hue(hue).sat(saturation)
         );
 
         ensureRunnable(initialNow.plusDays(1));
@@ -3985,24 +3849,6 @@ class HueSchedulerTest {
     void parse_colorInput_x_y_butLightDoesNotSupportColor_exception() {
         mockLightCapabilities(1, LightCapabilities.builder().capabilities(EnumSet.of(Capability.BRIGHTNESS)));
         assertThrows(ColorNotSupported.class, () -> addStateNow("1", "color:#ffbaff"));
-    }
-
-    @Test
-    void parse_colorInput_hueAndSat_butLightDoesNotSupportColor_exception() {
-        mockLightCapabilities(1, LightCapabilities.builder());
-        assertThrows(ColorNotSupported.class, () -> addStateNow("1", "sat:200", "hue:200"));
-    }
-
-    @Test
-    void parse_satOnly_exception() {
-        addKnownLightIdsWithDefaultCapabilities(1);
-        assertThrows(InvalidPropertyValue.class, () -> addStateNow("1", "sat:200"));
-    }
-
-    @Test
-    void parse_hueOnly_exception() {
-        addKnownLightIdsWithDefaultCapabilities(1);
-        assertThrows(InvalidPropertyValue.class, () -> addStateNow("1", "hue:1000"));
     }
 
     @Test
@@ -4485,30 +4331,6 @@ class HueSchedulerTest {
         startScheduler();
 
         ensureScheduledStates(1);
-    }
-
-    @Test
-    void parse_invalidHueValue_tooHigh_exception() {
-        addKnownLightIdsWithDefaultCapabilities(1);
-        assertThrows(InvalidHueValue.class, () -> addStateNow("1", "hue:" + 65536));
-    }
-
-    @Test
-    void parse_invalidHueValue_tooLow_exception() {
-        addKnownLightIdsWithDefaultCapabilities(1);
-        assertThrows(InvalidHueValue.class, () -> addStateNow("1", "hue:" + -1));
-    }
-
-    @Test
-    void parse_invalidSaturationValue_tooHigh_exception() {
-        addKnownLightIdsWithDefaultCapabilities(1);
-        assertThrows(InvalidSaturationValue.class, () -> addStateNow("1", "sat:" + 255));
-    }
-
-    @Test
-    void parse_invalidSaturationValue_tooLow_exception() {
-        addKnownLightIdsWithDefaultCapabilities(1);
-        assertThrows(InvalidSaturationValue.class, () -> addStateNow("1", "sat:" + -1));
     }
 
     @Test
@@ -7889,11 +7711,9 @@ class HueSchedulerTest {
         addState("g1", now.plusMinutes(20), "x:0.5", "y:0.6");
         addState("g1", now.plusMinutes(30), "x:0.8", "y:0.9");
         addState("g1", now.plusMinutes(40), "bri:200");
-        addState("g1", now.plusMinutes(50), "hue:65535", "sat:254");
-        addState("g1", now.plusMinutes(60), "hue:50000", "sat:100");
-        addState("g1", now.plusMinutes(70), "bri:250");
-        addState("g1", now.plusMinutes(80), "on:false");
-        addState("g1", now.plusMinutes(90), "ct:200");
+        addState("g1", now.plusMinutes(50), "bri:250");
+        addState("g1", now.plusMinutes(60), "on:false");
+        addState("g1", now.plusMinutes(70), "ct:200");
 
         List<ScheduledRunnable> runnables = startScheduler(
                 expectedRunnable(now, now.plusMinutes(10)),
@@ -7903,9 +7723,7 @@ class HueSchedulerTest {
                 expectedRunnable(now.plusMinutes(40), now.plusMinutes(50)),
                 expectedRunnable(now.plusMinutes(50), now.plusMinutes(60)),
                 expectedRunnable(now.plusMinutes(60), now.plusMinutes(70)),
-                expectedRunnable(now.plusMinutes(70), now.plusMinutes(80)),
-                expectedRunnable(now.plusMinutes(80), now.plusMinutes(90)),
-                expectedRunnable(now.plusMinutes(90), now.plusDays(1))
+            expectedRunnable(now.plusMinutes(70), now.plusDays(1))
         );
 
         // state 1
@@ -7988,10 +7806,10 @@ class HueSchedulerTest {
         // state 6
 
         advanceTimeAndRunAndAssertGroupPutCalls(runnables.get(5),
-                expectedGroupPutCall(1).hue(65535).sat(254) // only hue/sat
+                expectedGroupPutCall(1).bri(250) // only bri
         );
 
-        assertSceneUpdate("/groups/1", expectedPutCall(6).bri(200).hue(65535).sat(254)); // ignores xy from previous state
+        assertSceneUpdate("/groups/1", expectedPutCall(6).bri(250).x(0.8).y(0.9)); // with additional x/y from previous state
 
         ensureScheduledStates(
                 expectedRunnable(initialNow.plusDays(1).plusMinutes(50), initialNow.plusDays(1).plusMinutes(60)) // next day
@@ -8000,10 +7818,10 @@ class HueSchedulerTest {
         // state 7
 
         advanceTimeAndRunAndAssertGroupPutCalls(runnables.get(6),
-                expectedGroupPutCall(1).hue(50000).sat(100) // only hue/sat
+                expectedGroupPutCall(1).on(false) // only on
         );
 
-        assertSceneUpdate("/groups/1", expectedPutCall(6).bri(200).hue(50000).sat(100)); // ignores hue sat from previous state
+        assertSceneUpdate("/groups/1", expectedPutCall(6).on(false)); // does not use any other properties
 
         ensureScheduledStates(
                 expectedRunnable(initialNow.plusDays(1).plusMinutes(60), initialNow.plusDays(1).plusMinutes(70)) // next day
@@ -8012,37 +7830,13 @@ class HueSchedulerTest {
         // state 8
 
         advanceTimeAndRunAndAssertGroupPutCalls(runnables.get(7),
-                expectedGroupPutCall(1).bri(250) // only bri
-        );
-
-        assertSceneUpdate("/groups/1", expectedPutCall(6).bri(250).hue(50000).sat(100)); // with additional hue/sat from previous state
-
-        ensureScheduledStates(
-                expectedRunnable(initialNow.plusDays(1).plusMinutes(70), initialNow.plusDays(1).plusMinutes(80)) // next day
-        );
-
-        // state 9
-
-        advanceTimeAndRunAndAssertGroupPutCalls(runnables.get(8),
-                expectedGroupPutCall(1).on(false) // only on
-        );
-
-        assertSceneUpdate("/groups/1", expectedPutCall(6).on(false)); // does not use any other properties
-
-        ensureScheduledStates(
-                expectedRunnable(initialNow.plusDays(1).plusMinutes(80), initialNow.plusDays(1).plusMinutes(90)) // next day
-        );
-
-        // state 10
-
-        advanceTimeAndRunAndAssertGroupPutCalls(runnables.get(9),
                 expectedGroupPutCall(1).ct(200) // only ct
         );
 
         assertSceneUpdate("/groups/1", expectedPutCall(6).ct(200).bri(250)); // skips "off"
 
         ensureScheduledStates(
-                expectedRunnable(initialNow.plusDays(1).plusMinutes(90), initialNow.plusDays(2)) // next day
+                expectedRunnable(initialNow.plusDays(1).plusMinutes(70), initialNow.plusDays(2)) // next day
         );
     }
 
@@ -9533,24 +9327,6 @@ class HueSchedulerTest {
     }
 
     @Test
-    void sceneControl_init_withHue_exception() {
-        mockDefaultGroupCapabilities(1);
-        mockGroupLightsForId(1, 4);
-        mockSceneLightStates(1, "TestScene", ScheduledLightState.builder().id("/lights/4").bri(100));
-
-        assertThrows(InvalidConfigurationLine.class, () -> addState("g1", now, "hue:2000", "scene:TestScene"));
-    }
-
-    @Test
-    void sceneControl_init_withSat_exception() {
-        mockDefaultGroupCapabilities(1);
-        mockGroupLightsForId(1, 4);
-        mockSceneLightStates(1, "TestScene", ScheduledLightState.builder().id("/lights/4").bri(100));
-
-        assertThrows(InvalidConfigurationLine.class, () -> addState("g1", now, "sat:100", "scene:TestScene"));
-    }
-
-    @Test
     void sceneControl_init_withEffect_exception() {
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4);
@@ -10398,8 +10174,8 @@ class HueSchedulerTest {
         assertScenePutCalls(2,
                 expectedPutCall(4).gradient(Gradient.builder()
                                                     .points(List.of(
-                                                            Pair.of(0.234, 0.567), // interpolated
-                                                            Pair.of(0.345, 0.678)  // interpolated
+                                                            Pair.of(0.2051, 0.6229), // interpolated
+                                                            Pair.of(0.3118, 0.7233)  // interpolated
                                                     ))
                                                     .build()),
                 expectedPutCall(5).bri(200) // interpolated

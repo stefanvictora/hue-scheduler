@@ -404,7 +404,7 @@ public final class HueApiImpl implements HueApi {
             putCallBuilder.ct(null);
         }
         if (!capabilities.isColorSupported() && !capabilities.isCtSupported()) {
-            putCallBuilder.x(null).y(null).hue(null).sat(null);
+            putCallBuilder.x(null).y(null);
         }
         PutCall updatedPutCall = putCallBuilder.build();
         if (!capabilities.isColorSupported() && capabilities.isCtSupported()) {
@@ -437,9 +437,6 @@ public final class HueApiImpl implements HueApi {
         }
         if (on == Boolean.FALSE) {
             return actionBuilder.build(); // no further properties needed
-        }
-        if (putCall.getColorMode() == ColorMode.HS) {
-            ColorModeConverter.convertIfNeeded(putCall, ColorMode.XY);
         }
         if (putCall.getColorMode() == ColorMode.CT) {
             actionBuilder.color_temperature(new ColorTemperature(putCall.getCt()));

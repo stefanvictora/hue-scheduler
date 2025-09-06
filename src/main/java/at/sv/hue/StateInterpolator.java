@@ -2,6 +2,7 @@ package at.sv.hue;
 
 import at.sv.hue.api.PutCall;
 import at.sv.hue.color.ColorModeConverter;
+import at.sv.hue.color.OkLabUtil;
 import lombok.RequiredArgsConstructor;
 
 import java.math.BigDecimal;
@@ -15,9 +16,6 @@ import java.util.function.Function;
 
 @RequiredArgsConstructor
 public final class StateInterpolator {
-
-    private static final int MAX_HUE_VALUE = 65535;
-    private static final int MIDDLE_HUE_VALUE = 32768;
 
     private final ScheduledStateSnapshot state;
     private final ScheduledStateSnapshot previousState;
@@ -75,10 +73,14 @@ public final class StateInterpolator {
 
         putCall.setBri(interpolateInteger(interpolatedTime, getTargetBri(target), putCall.getBri()));
         putCall.setCt(interpolateInteger(interpolatedTime, target.getCt(), putCall.getCt()));
-        putCall.setHue(interpolateHue(interpolatedTime, target.getHue(), putCall.getHue()));
-        putCall.setSat(interpolateInteger(interpolatedTime, target.getSat(), putCall.getSat()));
-        putCall.setX(interpolateDouble(interpolatedTime, target.getX(), putCall.getX()));
-        putCall.setY(interpolateDouble(interpolatedTime, target.getY(), putCall.getY()));
+        var xy = interpolateXY(interpolatedTime, target.getXY(), putCall.getXY());
+        if (xy != null) {
+            putCall.setX(xy.first());
+            putCall.setY(xy.second());
+        } else {
+            putCall.setX(null);
+            putCall.setY(null);
+        }
         putCall.setGradient(interpolateGradient(interpolatedTime, target.getGradient(), putCall.getGradient()));
 
         putCall.setOn(null); // do not per default reuse "on" property for interpolation
@@ -120,12 +122,6 @@ public final class StateInterpolator {
         if (isEqualOrNotAvailableAtTarget(putCall, target, PutCall::getCt)) {
             putCall.setCt(null);
         }
-        if (isEqualOrNotAvailableAtTarget(putCall, target, PutCall::getHue)) {
-            putCall.setHue(null);
-        }
-        if (isEqualOrNotAvailableAtTarget(putCall, target, PutCall::getSat)) {
-            putCall.setSat(null);
-        }
         if (isEqualOrNotAvailableAtTarget(putCall, target, PutCall::getX)) {
             putCall.setX(null);
         }
@@ -157,7 +153,6 @@ public final class StateInterpolator {
                          .divide(BigDecimal.valueOf(totalDuration.toMillis()), 7, RoundingMode.HALF_UP);
     }
 
-
     private static void convertColorModeIfNeeded(PutCall previousPutCall, PutCall target) {
         ColorModeConverter.convertIfNeeded(previousPutCall, target.getColorMode());
     }
@@ -176,42 +171,20 @@ public final class StateInterpolator {
                          .intValue();
     }
 
-    private Double interpolateDouble(BigDecimal interpolatedTime, Double target, Double previous) {
+    private Pair<Double, Double> interpolateXY(BigDecimal interpolatedTime, Pair<Double, Double> target,
+                                               Pair<Double, Double> previous) {
         if (target == null) {
             return previous;
         }
         if (previous == null) {
             return null;
         }
-        BigDecimal diff = BigDecimal.valueOf(target - previous);
-        return BigDecimal.valueOf(previous)
-                         .add(interpolatedTime.multiply(diff))
-                         .setScale(5, RoundingMode.HALF_UP)
-                         .doubleValue();
+        double[] point = OkLabUtil.lerpOKLabXY(previous.first(), previous.second(), target.first(), target.second(),
+                interpolatedTime.doubleValue());
+        return Pair.of(round4(point[0]), round4(point[1]));
     }
 
-    /**
-     * Perform special interpolation for hue values, as they wrap around i.e. 0 and 65535 are both considered red.
-     * This means that we need to decide in which direction we want to interpolate, to get the smoothest transition.
-     */
-    private Integer interpolateHue(BigDecimal interpolatedTime, Integer target, Integer previous) {
-        if (target == null) {
-            return previous;
-        }
-        if (previous == null) {
-            return null;
-        }
-        if (previous == 0 && target == MAX_HUE_VALUE || previous == MAX_HUE_VALUE && target == 0) {
-            return 0;
-        }
-        int diff = ((target - previous + MIDDLE_HUE_VALUE) % (MAX_HUE_VALUE + 1)) - MIDDLE_HUE_VALUE;
-        return BigDecimal.valueOf(previous)
-                         .add(interpolatedTime.multiply(BigDecimal.valueOf(diff)))
-                         .setScale(0, RoundingMode.HALF_UP)
-                         .intValue();
-    }
-
-    private Gradient interpolateGradient(BigDecimal t, Gradient target, Gradient previous) {
+    private Gradient interpolateGradient(BigDecimal interpolatedTime, Gradient target, Gradient previous) {
         if (target == null) {
             return previous;
         }
@@ -225,33 +198,31 @@ public final class StateInterpolator {
 
         final var previousPoints = previous.points();
         final var targetPoints = target.points();
-        final int n = Math.max(previousPoints.size(), targetPoints.size());
-        List<Pair<Double, Double>> out = new ArrayList<>(n);
-        for (int i = 0; i < n; i++) {
-            // Evaluate both gradients at the same normalized position
+        final int maxPoints = Math.max(previousPoints.size(), targetPoints.size());
+        List<Pair<Double, Double>> points = new ArrayList<>(maxPoints);
+        for (int i = 0; i < maxPoints; i++) {
             double pos;
-            if (n == 1) {
+            if (maxPoints == 1) { // todo: minimum points is 2; so we could remove this
                 pos = 0.0;
             } else {
-                pos = (double) i / (double) (n - 1);
+                pos = (double) i / (double) (maxPoints - 1);
             }
 
-            Pair<Double, Double> p = evalAt(previousPoints, pos); // previous at pos
-            Pair<Double, Double> q = evalAt(targetPoints, pos); // target at pos
+            var p = evalAt(previousPoints, pos);
+            var q = evalAt(targetPoints, pos);
 
-            Double x = interpolateDouble(t, q.first(), p.first());
-            Double y = interpolateDouble(t, q.second(), p.second());
-            out.add(Pair.of(x, y));
+            var point = OkLabUtil.lerpOKLabXY(p.first(), p.second(), q.first(), q.second(), interpolatedTime.doubleValue());
+            points.add(Pair.of(round4(point[0]), round4(point[1])));
         }
-        return new Gradient(out, target.mode());
+        return new Gradient(points, target.mode());
     }
 
     /**
-     * Linear evaluate an XY pair list at normalized position pos ∈ [0,1].
+     * Evaluate within a polyline of xy points at normalized position in [0,1].
      */
     private static Pair<Double, Double> evalAt(List<Pair<Double, Double>> points, double position) {
         int n = points.size();
-        if (n == 1) {
+        if (n == 1) { // todo: minimum points is 2; so we could remove this
             return points.getFirst();
         }
 
@@ -267,4 +238,7 @@ public final class StateInterpolator {
         return Pair.of(x, y);
     }
 
+    private static double round4(double v) {
+        return BigDecimal.valueOf(v).setScale(4, RoundingMode.HALF_UP).doubleValue();
+    }
 }

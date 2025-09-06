@@ -279,8 +279,6 @@ public class ScheduledStateSnapshot {
                 }
                 if (putCall.getColorMode() == ColorMode.NONE) {
                     putCall.setCt(previousPutCall.getCt());
-                    putCall.setHue(previousPutCall.getHue());
-                    putCall.setSat(previousPutCall.getSat());
                     putCall.setX(previousPutCall.getX());
                     putCall.setY(previousPutCall.getY());
                     putCall.setGradient(previousPutCall.getGradient());
