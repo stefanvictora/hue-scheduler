@@ -868,7 +868,7 @@ public final class HueScheduler implements Runnable {
     private void performPutApiCall(ScheduledStateSnapshot state, PutCalls putCalls) {
         LOG.debug("{}", putCalls);
         state.recordLastPutCalls(putCalls);
-        List<PutCall> list = putCalls.toList();
+        List<PutCall> list = putCalls.toList(); // todo: are we sure that we always have at least one element here?
         if (putCalls.isGeneralGroup()) {
             api.putGroupState(list.getFirst());
         } else if (putCalls.isGroupUpdate()) {

@@ -144,7 +144,7 @@ public class ScheduledStateRegistry {
                 .stream()
                 .map(GroupInfo::groupId)
                 .flatMap(groupId -> findActivePutCalls(groupId, now).stream())
-                .flatMap(PutCalls::stream)
+                .flatMap(PutCalls::stream) // todo: for scene states, this will return light specific put calls
                 .flatMap(putCall -> createOverriddenLightPutCalls(putCall, groupLights))
                 .collect(Collectors.toMap(PutCall::getId, putCall -> putCall, (existing, replacement) -> replacement, LinkedHashMap::new));
     }
@@ -176,6 +176,7 @@ public class ScheduledStateRegistry {
                                .findFirst();
     }
 
+    // todo: we might not always pass in another group put call here -- with scene put calls those are now individual lights
     private Stream<PutCall> createOverriddenLightPutCalls(PutCall otherGroupPutCall, List<String> groupLights) {
         return findOverlappingLights(otherGroupPutCall.getId(), groupLights)
                 .stream()
