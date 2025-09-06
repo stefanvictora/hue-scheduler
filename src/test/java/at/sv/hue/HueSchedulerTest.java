@@ -10193,6 +10193,7 @@ class HueSchedulerTest {
 
         assertAllScenePutCallsAsserted();
     }
+    // todo: add test that interpolating between modes is not possible
 
     // todo: test that the interpolated call is not repeated on normal state progression -> put calls equals check needs to consider the gradient
 
