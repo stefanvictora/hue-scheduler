@@ -16,23 +16,11 @@ public final class ColorModeConverter {
 
     public static void convertIfNeeded(PutCall putCall, ColorMode target) {
         ColorMode source = putCall.getColorMode();
-        if (source == CT && target == HS) {
-            int[] rgb = convertCtToRgb(putCall);
-            setHueAndSatFromRgb(putCall, rgb);
-        } else if (source == HS && target == XY) {
-            int[] rgb = convertHueAndSatToRgb(putCall);
-            setXYFromRgb(putCall, rgb);
-        } else if (source == CT && target == XY) {
+        if (source == CT && target == XY) {
             int[] rgb = convertCtToRgb(putCall);
             setXYFromRgb(putCall, rgb);
-        } else if (source == XY && target == HS) {
-            int[] rgb = convertXYToRgb(putCall);
-            setHueAndSatFromRgb(putCall, rgb);
         } else if (source == XY && target == CT) {
             setCtFromXY(putCall);
-        } else if (source == HS && target == CT) {
-            int[] rgb = convertHueAndSatToRgb(putCall);
-            setCtFromRgb(putCall, rgb);
         } else if (source == GRADIENT && target == XY) {
             gradientToXY(putCall);
         } else if (source == XY && target == GRADIENT) {
@@ -42,7 +30,7 @@ public final class ColorModeConverter {
                                         .build());
             putCall.setX(null);
             putCall.setY(null);
-        } else if (source == GRADIENT && (target == CT || target == HS)) {
+        } else if (source == GRADIENT && target == CT) {
             gradientToXY(putCall);
             convertIfNeeded(putCall, target);
         }
@@ -61,35 +49,10 @@ public final class ColorModeConverter {
         return rgb;
     }
 
-    private static int[] convertHueAndSatToRgb(PutCall putCall) {
-        int[] rgb = RGBToHSVConverter.hsvToRgb(putCall.getHue(), putCall.getSat(), 254);
-        putCall.setHue(null);
-        putCall.setSat(null);
-        return rgb;
-    }
-
-    private static int[] convertXYToRgb(PutCall putCall) {
-        int[] rgb = RGBToXYConverter.xyToRgb(putCall.getX(), putCall.getY(), 255, putCall.getGamut());
-        putCall.setX(null);
-        putCall.setY(null);
-        return rgb;
-    }
-
-    private static void setHueAndSatFromRgb(PutCall putCall, int[] rgb) {
-        int[] hsv = RGBToHSVConverter.rgbToHsv(rgb[0], rgb[1], rgb[2]);
-        putCall.setHue(hsv[0]);
-        putCall.setSat(hsv[1]);
-    }
-
     private static void setXYFromRgb(PutCall putCall, int[] rgb) {
         RGBToXYConverter.XYColor xyColor = RGBToXYConverter.rgbToXY(rgb[0], rgb[1], rgb[2], putCall.getGamut());
         putCall.setX(xyColor.x());
         putCall.setY(xyColor.y());
-    }
-
-    private static void setCtFromRgb(PutCall putCall, int[] rgb) {
-        int mired = CTToRGBConverter.approximateMiredFromRGB(rgb[0], rgb[1], rgb[2]);
-        putCall.setCt(mired);
     }
 
     /**

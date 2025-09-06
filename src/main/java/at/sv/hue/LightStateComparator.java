@@ -49,8 +49,6 @@ public class LightStateComparator {
         }
         return switch (colorMode) {
             case CT -> ctDiffers();
-            case HS -> ColorComparator.colorDiffers(currentState.getX(), currentState.getY(),
-                    lastPutCall.getHue(), lastPutCall.getSat(), colorOverrideThreshold);
             case XY -> ColorComparator.colorDiffers(currentState.getX(), currentState.getY(),
                     lastPutCall.getX(), lastPutCall.getY(), currentState.getLightCapabilities().getColorGamut(),
                     colorOverrideThreshold);
@@ -61,7 +59,6 @@ public class LightStateComparator {
 
     private boolean colorModeNotSupportedByState(ColorMode colorMode) {
         return colorMode == ColorMode.CT && !currentState.isCtSupported()
-               || colorMode == ColorMode.HS && !currentState.isColorSupported()
                || colorMode == ColorMode.XY && !currentState.isColorSupported();
     }
 
