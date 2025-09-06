@@ -1,8 +1,12 @@
 package at.sv.hue.color;
 
 import at.sv.hue.ColorMode;
+import at.sv.hue.Gradient;
+import at.sv.hue.Pair;
 import at.sv.hue.api.PutCall;
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -77,6 +81,109 @@ class ColorModeConverterTest {
         assertXYToHS(0.35, 0.35, null, 4327, 52);
         assertXYToHS(1, 1, GAMUT_A, 6510, 254);
         assertXYToHS(0.1969, 0.6798, GAMUT_C, 22144, 254);
+    }
+
+    @Test
+    void convert_Gradient_XY_takesFirstColor() {
+        PutCall putCall = PutCall.builder()
+                                 .gradient(Gradient.builder()
+                                                   .points(List.of(Pair.of(0.1532, 0.0475),
+                                                           Pair.of(0.6915, 0.3083),
+                                                           Pair.of(0.17, 0.7)))
+                                                   .build())
+                                 .build();
+
+        ColorModeConverter.convertIfNeeded(putCall, ColorMode.XY);
+
+        assertThat(putCall).isEqualTo(PutCall.builder()
+                                             .x(0.1532)
+                                             .y(0.0475)
+                                             .build());
+    }
+
+    @Test
+    void convert_XY_Gradient_usesColorForTwoPoints() {
+        PutCall putCall = PutCall.builder()
+                                 .x(0.6915)
+                                 .y(0.3083)
+                                 .build();
+
+        ColorModeConverter.convertIfNeeded(putCall, ColorMode.GRADIENT);
+
+        assertThat(putCall).isEqualTo(PutCall.builder()
+                                             .gradient(Gradient.builder()
+                                                               .points(List.of(
+                                                                       Pair.of(0.6915, 0.3083),
+                                                                       Pair.of(0.6915, 0.3083)))
+                                                               .build())
+                                             .build());
+    }
+
+    @Test
+    void convert_Gradient_CT_takesFirstPoint() {
+        PutCall putCall = PutCall.builder()
+                                 .gradient(Gradient.builder()
+                                                   .points(List.of(Pair.of(0.1532, 0.0475),
+                                                           Pair.of(0.6915, 0.3083),
+                                                           Pair.of(0.17, 0.7)))
+                                                   .build())
+                                 .build();
+
+        ColorModeConverter.convertIfNeeded(putCall, ColorMode.CT);
+
+        assertThat(putCall).isEqualTo(PutCall.builder()
+                                             .ct(580)
+                                             .build());
+    }
+
+    @Test
+    void convert_Gradient_HS_takesFirstPoint() {
+        PutCall putCall = PutCall.builder()
+                                 .gradient(Gradient.builder()
+                                                   .points(List.of(Pair.of(0.1532, 0.0475),
+                                                           Pair.of(0.6915, 0.3083),
+                                                           Pair.of(0.17, 0.7)))
+                                                   .build())
+                                 .build();
+
+        ColorModeConverter.convertIfNeeded(putCall, ColorMode.HS);
+
+        assertThat(putCall).isEqualTo(PutCall.builder()
+                                             .hue(45746)
+                                             .sat(254)
+                                             .build());
+    }
+
+    @Test
+    void convert_Gradient_None_keepsInput() {
+        PutCall putCall = PutCall.builder()
+                                 .gradient(Gradient.builder()
+                                                   .points(List.of(Pair.of(0.1532, 0.0475),
+                                                           Pair.of(0.6915, 0.3083),
+                                                           Pair.of(0.17, 0.7)))
+                                                   .build())
+                                 .build();
+        PutCall copy = putCall.toBuilder().build();
+
+        ColorModeConverter.convertIfNeeded(putCall, ColorMode.NONE);
+
+        assertThat(putCall).isEqualTo(copy);
+    }
+
+    @Test
+    void convert_Gradient_Gradient_keepsInput() {
+        PutCall putCall = PutCall.builder()
+                                 .gradient(Gradient.builder()
+                                                   .points(List.of(Pair.of(0.1532, 0.0475),
+                                                           Pair.of(0.6915, 0.3083),
+                                                           Pair.of(0.17, 0.7)))
+                                                   .build())
+                                 .build();
+        PutCall copy = putCall.toBuilder().build();
+
+        ColorModeConverter.convertIfNeeded(putCall, ColorMode.GRADIENT);
+
+        assertThat(putCall).isEqualTo(copy);
     }
 
     private static void assertCtToHS(int ct, int hue, int sat) {
