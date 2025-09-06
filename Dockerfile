@@ -1,20 +1,30 @@
-# Stage 1: Cache dependencies
-FROM maven:3.9.6-eclipse-temurin-22 AS dependencies
-WORKDIR /build/
+# -------- Build --------
+FROM --platform=$BUILDPLATFORM maven:3.9.11-eclipse-temurin-21 AS build
+WORKDIR /build
 COPY pom.xml .
-# Download all required dependencies first (this will only be re-run if the pom file changes)
-RUN mvn --batch-mode dependency:go-offline dependency:resolve-plugins
-
-# Stage 2: Build the Java application
-FROM maven:3.9.6-eclipse-temurin-22 AS build
-COPY --from=dependencies /root/.m2 /root/.m2
-WORKDIR /build/
-COPY pom.xml .
+RUN --mount=type=cache,target=/root/.m2,sharing=locked mvn -B -ntp dependency:go-offline
 COPY src ./src
-RUN mvn --batch-mode --fail-fast package
+RUN --mount=type=cache,target=/root/.m2,sharing=locked mvn -B -ntp package
 
-# Stage 3: Create the runtime image
-FROM eclipse-temurin:22-jre-alpine AS runtime
-WORKDIR /usr/src/hue-scheduler
-COPY --from=build /build/target/hue-scheduler.jar .
-ENTRYPOINT ["java", "-jar", "hue-scheduler.jar"]
+# -------- Runtime --------
+FROM eclipse-temurin:21-jre-alpine AS runtime
+
+# Create non-root user
+RUN addgroup -S -g 10001 app && adduser -S -u 10001 -G app app
+WORKDIR /app
+
+COPY --from=build --chown=app:app /build/target/hue-scheduler.jar /app/hue-scheduler.jar
+
+RUN printf '%s\n' \
+  '#!/bin/sh' \
+  'set -e' \
+  'TZ_PROP="-Duser.timezone=${TZ:-UTC}"' \
+  'exec java $TZ_PROP -XX:+ExitOnOutOfMemoryError -jar /app/hue-scheduler.jar' \
+  > /app/entrypoint.sh \
+  && chmod +x /app/entrypoint.sh
+
+LABEL org.opencontainers.image.title="Hue Scheduler" \
+      org.opencontainers.image.source="https://github.com/stefanvictora/hue-scheduler"
+
+USER 10001:10001
+ENTRYPOINT ["/app/entrypoint.sh"]

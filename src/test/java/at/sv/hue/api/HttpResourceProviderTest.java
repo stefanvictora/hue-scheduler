@@ -1,9 +1,9 @@
 package at.sv.hue.api;
 
 import lombok.extern.slf4j.Slf4j;
+import mockwebserver3.MockResponse;
+import mockwebserver3.MockWebServer;
 import okhttp3.OkHttpClient;
-import okhttp3.mockwebserver.MockResponse;
-import okhttp3.mockwebserver.MockWebServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,16 +35,12 @@ class HttpResourceProviderTest {
     }
 
     private void shutdownIgnoringException() {
-        try {
-            mockServer.shutdown();
-        } catch (IOException e) {
-            log.debug("MockWebServer shutdown error (ignored): {}", e.getMessage());
-        }
+        mockServer.close();
     }
 
     @Test
     void get_success() {
-        mockServer.enqueue(new MockResponse().setBody("test"));
+        mockServer.enqueue(new MockResponse.Builder().body("test").build());
 
         String resource = provider.getResource(url);
 
@@ -53,7 +49,7 @@ class HttpResourceProviderTest {
 
     @Test
     void put_success() {
-        mockServer.enqueue(new MockResponse().setBody("test"));
+        mockServer.enqueue(new MockResponse.Builder().body("test").build());
 
         String resource = provider.putResource(url, "{}");
 
@@ -62,7 +58,7 @@ class HttpResourceProviderTest {
 
     @Test
     void post_success() {
-        mockServer.enqueue(new MockResponse().setBody("test"));
+        mockServer.enqueue(new MockResponse.Builder().body("test").build());
 
         String resource = provider.postResource(url, "{}");
 
@@ -85,14 +81,14 @@ class HttpResourceProviderTest {
 
     @Test
     void code_401_throwsAuthenticationFailureException() {
-        mockServer.enqueue(new MockResponse().setResponseCode(401));
+        mockServer.enqueue(new MockResponse.Builder().code(401).build());
 
         assertThatThrownBy(() -> provider.getResource(url)).isInstanceOf(BridgeAuthenticationFailure.class);
     }
 
     @Test
     void code_403_throwsAuthenticationFailureException() {
-        mockServer.enqueue(new MockResponse().setResponseCode(403));
+        mockServer.enqueue(new MockResponse.Builder().code(403).build());
 
         assertThatThrownBy(() -> provider.getResource(url)).isInstanceOf(BridgeAuthenticationFailure.class);
     }
@@ -119,9 +115,9 @@ class HttpResourceProviderTest {
     }
 
     private void mockStatusCode(int code, String body) {
-        mockServer.enqueue(new MockResponse().setResponseCode(code).setBody(body));
-        mockServer.enqueue(new MockResponse().setResponseCode(code).setBody(body));
-        mockServer.enqueue(new MockResponse().setResponseCode(code).setBody(body));
+        mockServer.enqueue(new MockResponse.Builder().code(code).body(body).build());
+        mockServer.enqueue(new MockResponse.Builder().code(code).body(body).build());
+        mockServer.enqueue(new MockResponse.Builder().code(code).body(body).build());
     }
 
     private void assertThrowsError(Class<?> type, String messageContaining) {
