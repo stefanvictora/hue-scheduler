@@ -264,7 +264,7 @@ class OkLabUtilTest {
     }
 
     private static double[] lerpOKLabXY(double x0, double y0, double x1, double y1, double t) {
-        return OkLabUtil.lerpOKLabXY(x0, y0, x1, y1, t, null);
+        return OkLabUtil.lerpOKLabXY(x0, y0, x1, y1, t);
     }
 
     private static double[] toLab(double[] xy) {

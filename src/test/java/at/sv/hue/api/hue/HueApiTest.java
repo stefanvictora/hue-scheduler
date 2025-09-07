@@ -3394,6 +3394,21 @@ class HueApiTest {
     }
 
     @Test
+    void putState_XAndY_performsGamutCorrection() {
+        performPutCall(PutCall.builder().id("ID").x(0.15).y(0.3).build());
+
+        verifyPut("/light/ID", """
+                {
+                  "color": {
+                    "xy": {
+                      "x": 0.15969472265287582,
+                      "y": 0.29975038875008686
+                    }
+                  }
+                }""");
+    }
+
+    @Test
     void putState_on_setsFlagCorrectly() {
         performPutCall(PutCall.builder().id("ID").on(true).build());
 
