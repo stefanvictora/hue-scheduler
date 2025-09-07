@@ -59,7 +59,8 @@ public final class ColorModeConverter {
      * Use McCamy's approximation to set the ct in mired from XY
      */
     private static void setCtFromXY(PutCall putCall) {
-        double n = (putCall.getX() - 0.3320) / (0.1858 - putCall.getY());
+        XYColorGamutCorrection correction = new XYColorGamutCorrection(putCall.getX(), putCall.getY(), putCall.getGamut());
+        double n = (correction.getX() - 0.3320) / (0.1858 - correction.getY());
         int mired = (int) (1_000_000.0 / (437 * Math.pow(n, 3) + 3601 * Math.pow(n, 2) + 6861 * n + 5517));
         putCall.setX(null);
         putCall.setY(null);

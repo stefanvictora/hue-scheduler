@@ -46,7 +46,8 @@ class ColorModeConverterTest {
         assertXYToCt(0.5119, 0.4147, 1_000_000 / 2137);
         assertXYToCt(0.368, 0.3686, 1_000_000 / 4302);
         assertXYToCt(0.4448, 0.4066, 1_000_000 / 2893);
-        assertXYToCt(0.1, 0.8, 1_000_000 / 8645);
+        assertXYToCt(0.1, 0.8, 124); // applies gamut correction
+        assertXYToCt(0.8, 0.2, 186); // applies gamut correction
         assertXYToCt(0.5, 0.4, 1_000_000 / 2140);
     }
 

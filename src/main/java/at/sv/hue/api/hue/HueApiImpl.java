@@ -348,7 +348,7 @@ public final class HueApiImpl implements HueApi {
         }
         return existingScene.getActions()
                             .stream()
-                            .map(HueApiImpl::createScheduledLightState)
+                            .map(this::createScheduledLightState)
                             .toList();
     }
 
@@ -408,6 +408,7 @@ public final class HueApiImpl implements HueApi {
         if (!capabilities.isColorSupported() && !capabilities.isCtSupported()) {
             putCallBuilder.x(null).y(null);
         }
+        putCallBuilder.gamut(capabilities.getColorGamut());
         PutCall updatedPutCall = putCallBuilder.build();
         if (!capabilities.isColorSupported() && capabilities.isCtSupported()) {
             ColorModeConverter.convertIfNeeded(updatedPutCall, ColorMode.CT);
@@ -546,9 +547,11 @@ public final class HueApiImpl implements HueApi {
         resourceProvider.putResource(createUrl("/scene/" + scene.getId()), getBody(updatedScene));
     }
 
-    private static ScheduledLightState createScheduledLightState(SceneAction sceneAction) {
+    private ScheduledLightState createScheduledLightState(SceneAction sceneAction) {
         ScheduledLightState.ScheduledLightStateBuilder state = ScheduledLightState.builder();
-        state.id(sceneAction.getTarget().getRid());
+        String id = sceneAction.getTarget().getRid();
+        state.id(id);
+        state.gamut(getLightCapabilities(id).getColorGamut());
         Action action = sceneAction.getAction();
         if (action.getOn() != null) {
             // don't set on=true, as lights are per default on when recalling a scene
