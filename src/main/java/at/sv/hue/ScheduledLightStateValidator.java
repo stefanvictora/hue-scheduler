@@ -66,7 +66,7 @@ public final class ScheduledLightStateValidator {
                                       .y(y)
                                       .on(on)
                                       .effect(effect)
-                                      .gamut(capabilities.getColorGamut()) // todo: write test case (interpolation between lights of different gamut)
+                                      .gamut(capabilities.getColorGamut())
                                       .build();
         }
     }
