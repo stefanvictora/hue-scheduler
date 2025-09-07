@@ -36,13 +36,9 @@ public final class ScheduledLightStateValidator {
             if (x < 0 || y <= 0 || !(x + y <= 1)) {
                 throw new InvalidXAndYValue("Invalid xy chromaticity: x=" + x + ", y=" + y + ". Allowed range: 0 <= x <= 1, 0 < y <= 1, x + y <= 1");
             }
-            if (capabilities.getColorGamut() != null) {
-                XYColorGamutCorrection correction = new XYColorGamutCorrection(x, y, capabilities.getColorGamut());
-                x = correction.getX();
-                y = correction.getY();
-            }
-            this.x = x;
-            this.y = y;
+            XYColorGamutCorrection correction = new XYColorGamutCorrection(x, y, capabilities.getColorGamut());
+            this.x = correction.getX();
+            this.y = correction.getY();
         } else {
             this.x = null;
             this.y = null;

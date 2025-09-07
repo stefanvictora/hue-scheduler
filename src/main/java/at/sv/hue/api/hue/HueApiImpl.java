@@ -19,6 +19,7 @@ import at.sv.hue.api.LightState;
 import at.sv.hue.api.PutCall;
 import at.sv.hue.api.RateLimiter;
 import at.sv.hue.color.ColorModeConverter;
+import at.sv.hue.color.XYColorGamutCorrection;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -381,7 +382,8 @@ public final class HueApiImpl implements HueApi {
                                                   .collect(Collectors.toMap(PutCall::getId, Function.identity()));
         return getContainedLights(group)
                 .stream()
-                .map(resource -> createSceneAction(putCallMap.getOrDefault(resource.getRid(), getDefaultPutCall(resource)), resource))
+                .map(resource -> createSceneAction(putCallMap.getOrDefault(resource.getRid(),
+                        getDefaultPutCall(resource)), resource))
                 .toList();
     }
 
@@ -442,7 +444,8 @@ public final class HueApiImpl implements HueApi {
             actionBuilder.color_temperature(new ColorTemperature(putCall.getCt()));
         }
         if (putCall.getColorMode() == ColorMode.XY) {
-            actionBuilder.color(new Color(new XY(putCall.getX(), putCall.getY())));
+            XYColorGamutCorrection correction = new XYColorGamutCorrection(putCall.getX(), putCall.getY(), putCall.getGamut());
+            actionBuilder.color(new Color(new XY(correction.getX(), correction.getY())));
         }
         if (putCall.getColorMode() == ColorMode.GRADIENT) {
             Gradient gradient = putCall.getGradient();

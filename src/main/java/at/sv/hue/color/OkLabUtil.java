@@ -11,10 +11,6 @@ public final class OkLabUtil {
     private static final double WHITE_Y = 1.0;
 
     public static double[] lerpOKLabXY(double x0, double y0, double x1, double y1, double t, Double[][] gamut) {
-        if (gamut == null) {
-            return lerpOKLabXY(x0, y0, x1, y1, t);
-        }
-
         double[] s = clampXY(x0, y0, gamut);
         double[] e = clampXY(x1, y1, gamut);
         double[] xy = lerpOKLabXY(s[0], s[1], e[0], e[1], t);
@@ -29,7 +25,7 @@ public final class OkLabUtil {
     /**
      * OKLab default; switches to OKLCH shortest-arc hue only when both are sufficiently chromatic.
      */
-    private static double[] lerpOKLabXY(double x0, double y0, double x1, double y1, double t) {
+    static double[] lerpOKLabXY(double x0, double y0, double x1, double y1, double t) {
         double[] XYZ0 = xyY_to_XYZ(x0, y0, WHITE_Y);
         double[] XYZ1 = xyY_to_XYZ(x1, y1, WHITE_Y);
 

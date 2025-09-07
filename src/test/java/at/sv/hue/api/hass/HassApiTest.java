@@ -2581,6 +2581,18 @@ public class HassApiTest {
     }
 
     @Test
+    void putState_turnOn_xy_performsGamutCorrection() {
+        putState(PutCall.builder()
+                        .id("light.id")
+                        .bri(254)
+                        .x(0.15)
+                        .y(0.3));
+
+        verify(http).postResource(getUrl("/services/light/turn_on"),
+                "{\"entity_id\":\"light.id\",\"brightness\":255,\"xy_color\":[0.15969472265287582,0.29975038875008686]}");
+    }
+
+    @Test
     void putState_turnOn_xy_missingY_ignoresColor() {
         putState(PutCall.builder()
                         .id("light.id")
