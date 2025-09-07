@@ -3172,8 +3172,8 @@ class HueSchedulerTest {
     @Test
     void parse_transitionTimeBefore_multipleStates_xAndY_performsInterpolation() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        addStateNow(1, "x:0.5", "y:0.5");
-        addState(1, now.plusMinutes(40), "x:1", "y:1", "tr-before:20min");
+        addStateNow(1, "x:0.2", "y:0.2");
+        addState(1, now.plusMinutes(40), "x:0.4", "y:0.4", "tr-before:20min");
 
         List<ScheduledRunnable> scheduledRunnables = startScheduler(2);
         ScheduledRunnable trBeforeRunnable = scheduledRunnables.get(1);
@@ -3181,8 +3181,8 @@ class HueSchedulerTest {
         setCurrentTimeTo(now.plusMinutes(30));
 
         runAndAssertPutCalls(trBeforeRunnable,
-                expectedPutCall(1).x(0.5192).y(0.4377),
-                expectedPutCall(1).x(1.0).y(1.0).transitionTime(tr("10min"))
+                expectedPutCall(1).x(0.2603).y(0.4027),
+                expectedPutCall(1).x(0.4).y(0.4).transitionTime(tr("10min"))
         );
 
         ensureRunnable(initialNow.plusDays(1).plusMinutes(20), initialNow.plusDays(2));
@@ -3679,8 +3679,8 @@ class HueSchedulerTest {
     @Test
     void parse_canHandleColorInput_viaXAndY_forGroups() {
         mockGroupLightsForId(1, ID);
-        double x = 0.5043;
-        double y = 0.6079;
+        double x = 0.4;
+        double y = 0.3;
         mockDefaultGroupCapabilities(1);
         addStateNow("g1", "x:" + x, "y:" + y);
 
@@ -3807,15 +3807,15 @@ class HueSchedulerTest {
     @Test
     void parse_canHandleEffect_withParameters_xy() {
         mockDefaultLightCapabilities(1);
-        addStateNow(1, "x:0.123", "y:0.456", "effect:effect");
+        addStateNow(1, "x:0.3", "y:0.4", "effect:effect");
 
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
                 expectedPutCall(ID).effect(Effect.builder()
                                                  .effect("effect")
-                                                 .x(0.123)
-                                                 .y(0.456)
+                                                 .x(0.3)
+                                                 .y(0.4)
                                                  .build())
         );
 
@@ -4334,27 +4334,27 @@ class HueSchedulerTest {
     }
 
     @Test
-    void parse_invalidXAndYValue_tooHigh_exception() {
+    void parse_invalidXAndYValue_xTooHigh_exception() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        assertThrows(InvalidXAndYValue.class, () -> addStateNow("1", "x:" + 1.1));
+        assertThrows(InvalidXAndYValue.class, () -> addStateNow("1", "x:1.1", "y:0.1"));
     }
 
     @Test
-    void parse_invalidXAndYValue_tooLow_exception() {
+    void parse_invalidXAndYValue_yTooLow_exception() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        assertThrows(InvalidXAndYValue.class, () -> addStateNow("1", "y:" + -0.1));
+        assertThrows(InvalidXAndYValue.class, () -> addStateNow("1", "x:0", "y:0"));
     }
 
     @Test
     void parse_invalidXAndY_onlyX_exception() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        assertThrows(InvalidPropertyValue.class, () -> addStateNow("1", "x:" + 0.1));
+        assertThrows(InvalidPropertyValue.class, () -> addStateNow("1", "x:0.1"));
     }
 
     @Test
     void parse_invalidXAndY_onlyY_exception() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        assertThrows(InvalidPropertyValue.class, () -> addStateNow("1", "y:" + 0.1));
+        assertThrows(InvalidPropertyValue.class, () -> addStateNow("1", "y:0.1"));
     }
 
     @Test
@@ -7708,8 +7708,8 @@ class HueSchedulerTest {
         mockGroupLightsForId(1, 6);
         addState("g1", now, "bri:100", "ct:500");
         addState("g1", now.plusMinutes(10), "bri:150");
-        addState("g1", now.plusMinutes(20), "x:0.5", "y:0.6");
-        addState("g1", now.plusMinutes(30), "x:0.8", "y:0.9");
+        addState("g1", now.plusMinutes(20), "x:0.4", "y:0.5");
+        addState("g1", now.plusMinutes(30), "x:0.2", "y:0.2");
         addState("g1", now.plusMinutes(40), "bri:200");
         addState("g1", now.plusMinutes(50), "bri:250");
         addState("g1", now.plusMinutes(60), "on:false");
@@ -7770,10 +7770,10 @@ class HueSchedulerTest {
         // state 3
 
         advanceTimeAndRunAndAssertGroupPutCalls(runnables.get(2),
-                expectedGroupPutCall(1).x(0.5).y(0.6) // only xy
+                expectedGroupPutCall(1).x(0.4).y(0.5) // only xy
         );
 
-        assertSceneUpdate("/groups/1", expectedPutCall(6).bri(150).x(0.5).y(0.6)); // with additional bri but ignored ct from previous state
+        assertSceneUpdate("/groups/1", expectedPutCall(6).bri(150).x(0.4).y(0.5)); // with additional bri but ignored ct from previous state
 
         ensureScheduledStates(
                 expectedRunnable(initialNow.plusDays(1).plusMinutes(20), initialNow.plusDays(1).plusMinutes(30)) // next day
@@ -7782,10 +7782,10 @@ class HueSchedulerTest {
         // state 4
 
         advanceTimeAndRunAndAssertGroupPutCalls(runnables.get(3),
-                expectedGroupPutCall(1).x(0.8).y(0.9) // only xy
+                expectedGroupPutCall(1).x(0.2).y(0.2) // only xy
         );
 
-        assertSceneUpdate("/groups/1", expectedPutCall(6).bri(150).x(0.8).y(0.9));
+        assertSceneUpdate("/groups/1", expectedPutCall(6).bri(150).x(0.2).y(0.2));
 
         ensureScheduledStates(
                 expectedRunnable(initialNow.plusDays(1).plusMinutes(30), initialNow.plusDays(1).plusMinutes(40)) // next day
@@ -7797,7 +7797,7 @@ class HueSchedulerTest {
                 expectedGroupPutCall(1).bri(200) // only bri
         );
 
-        assertSceneUpdate("/groups/1", expectedPutCall(6).bri(200).x(0.8).y(0.9)); // with additional xy from previous state
+        assertSceneUpdate("/groups/1", expectedPutCall(6).bri(200).x(0.2).y(0.2)); // with additional xy from previous state
 
         ensureScheduledStates(
                 expectedRunnable(initialNow.plusDays(1).plusMinutes(40), initialNow.plusDays(1).plusMinutes(50)) // next day
@@ -7809,7 +7809,7 @@ class HueSchedulerTest {
                 expectedGroupPutCall(1).bri(250) // only bri
         );
 
-        assertSceneUpdate("/groups/1", expectedPutCall(6).bri(250).x(0.8).y(0.9)); // with additional x/y from previous state
+        assertSceneUpdate("/groups/1", expectedPutCall(6).bri(250).x(0.2).y(0.2)); // with additional x/y from previous state
 
         ensureScheduledStates(
                 expectedRunnable(initialNow.plusDays(1).plusMinutes(50), initialNow.plusDays(1).plusMinutes(60)) // next day
@@ -7849,10 +7849,10 @@ class HueSchedulerTest {
         mockDefaultLightCapabilities(6);
         mockGroupLightsForId(1, 5, 6, 7);
         addState("5", now, "bri:200");
-        addState("6", now, "x:0.5", "y:0.5");
+        addState("6", now, "x:0.2", "y:0.2");
         addState("g1", now, "bri:100", "ct:500");
         addState("5", now.plusMinutes(20), "bri:250");
-        addState("6", now.plusMinutes(20), "x:0.8", "y:0.8");
+        addState("6", now.plusMinutes(20), "x:0.4", "y:0.3");
         addState("g1", now.plusMinutes(20), "bri:150", "ct:500");
 
         List<ScheduledRunnable> scheduledRunnables = startScheduler(
@@ -7869,7 +7869,7 @@ class HueSchedulerTest {
         );
 
         assertSceneUpdate("/groups/1",
-                expectedPutCall(5).bri(200), expectedPutCall(6).x(0.5).y(0.5), expectedPutCall(7).bri(100).ct(500));
+                expectedPutCall(5).bri(200), expectedPutCall(6).x(0.2).y(0.2), expectedPutCall(7).bri(100).ct(500));
 
         ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(20)); // next day
 
@@ -7878,7 +7878,7 @@ class HueSchedulerTest {
         );
 
         assertSceneUpdate("/groups/1",
-                expectedPutCall(5).bri(250), expectedPutCall(6).x(0.8).y(0.8), expectedPutCall(7).bri(150).ct(500));
+                expectedPutCall(5).bri(250), expectedPutCall(6).x(0.4).y(0.3), expectedPutCall(7).bri(150).ct(500));
 
         ensureRunnable(initialNow.plusDays(1).plusMinutes(20), initialNow.plusDays(2)); // next day
     }
