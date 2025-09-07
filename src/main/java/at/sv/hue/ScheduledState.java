@@ -1,7 +1,6 @@
 package at.sv.hue;
 
 import at.sv.hue.api.Identifier;
-import at.sv.hue.api.LightCapabilities;
 import at.sv.hue.api.LightState;
 import at.sv.hue.api.PutCall;
 import at.sv.hue.time.StartTimeProvider;
@@ -44,8 +43,6 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
     private final Boolean interpolate;
     @Getter
     private final boolean temporary;
-    @Getter
-    private final LightCapabilities capabilities;
     private final int minTrBeforeGapInMinutes;
     private final Cache<ZonedDateTime, ScheduledStateSnapshot> snapshotCache;
     private final int brightnessOverrideThreshold;
@@ -66,7 +63,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
     @Builder
     public ScheduledState(Identifier identifier, String startString, List<ScheduledLightState> lightStates,
                           String transitionTimeBeforeString, Integer definedTransitionTime, Set<DayOfWeek> daysOfWeek,
-                          StartTimeProvider startTimeProvider, LightCapabilities capabilities,
+                          StartTimeProvider startTimeProvider,
                           int minTrBeforeGapInMinutes, int brightnessOverrideThreshold, int colorTemperatureOverrideThresholdKelvin,
                           double colorOverrideThreshold, Boolean force, Boolean interpolate, boolean groupState, boolean temporary) {
         this.identifier = identifier;
@@ -79,7 +76,6 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
             this.daysOfWeek = EnumSet.copyOf(daysOfWeek);
         }
         this.groupState = groupState;
-        this.capabilities = capabilities;
         this.definedTransitionTime = assertValidTransitionTime(definedTransitionTime);
         this.transitionTimeBeforeString = transitionTimeBeforeString;
         this.startTimeProvider = startTimeProvider;
@@ -105,7 +101,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
     private static ScheduledState createTemporaryCopy(ScheduledState state, String start) {
         ScheduledState copy = new ScheduledState(state.identifier, start,
                 state.lightStates, state.transitionTimeBeforeString, state.definedTransitionTime, state.daysOfWeek, state.startTimeProvider,
-                state.capabilities, state.minTrBeforeGapInMinutes, state.brightnessOverrideThreshold, state.colorTemperatureOverrideThresholdKelvin,
+                state.minTrBeforeGapInMinutes, state.brightnessOverrideThreshold, state.colorTemperatureOverrideThresholdKelvin,
                 state.colorOverrideThreshold, state.force, state.interpolate, state.groupState, true);
         copy.lastSeen = state.lastSeen;
         copy.originalState = state.originalState;
@@ -277,7 +273,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
                       .on(lightState.getOn())
                       .effect(lightState.getEffect())
                       .gradient(lightState.getGradient())
-                      .gamut(capabilities != null ? capabilities.getColorGamut() : null)  // todo: make it light specific
+                      .gamut(lightState.getGamut())
                       .build();
     }
 

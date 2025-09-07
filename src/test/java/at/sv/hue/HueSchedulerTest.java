@@ -48,6 +48,8 @@ import static org.mockito.Mockito.*;
 @Slf4j
 class HueSchedulerTest {
 
+    private static final Double[][] GAMUT_A = new Double[][]{{0.704, 0.296}, {0.2151, 0.7106}, {0.138, 0.08}};
+    private static final Double[][] GAMUT_C = new Double[][]{{0.6915, 0.3083}, {0.17, 0.7}, {0.1532, 0.0475}};
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss ");
     private static final int ID = 1;
     private static final int DEFAULT_BRIGHTNESS = 50;
@@ -3661,16 +3663,14 @@ class HueSchedulerTest {
     }
 
     @Test
-    void parse_canHandleColorInput_viaXAndY() {
+    void parse_canHandleColorInput_viaXAndY_appliesGamutCorrection() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        double x = 0.6075;
-        double y = 0.3525;
-        addStateNow("1", "x:" + x, "y:" + y);
+        addStateNow("1", "x:0.8", "y:0.2");
 
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
-                expectedPutCall(ID).x(x).y(y)
+                expectedPutCall(ID).x(0.6915).y(0.3083)
         );
 
         ensureRunnable(initialNow.plusDays(1));
@@ -9900,6 +9900,69 @@ class HueSchedulerTest {
         );
 
         assertAllScenePutCallsAsserted();
+    }
+
+    @Test
+    void sceneControl_interpolate_groupToScene_differentGamut_performsCorrection() {
+        mockDefaultGroupCapabilities(2);
+        mockGroupLightsForId(2, 4, 5, 6);
+        mockSceneLightStates(2, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .x(0.3)
+                                   .y(0.18)
+                                   .gamut(GAMUT_A),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .gradient(Gradient.builder()
+                                                     .points(List.of(
+                                                             Pair.of(0.3, 0.18),
+                                                             Pair.of(0.3, 0.18)
+                                                     ))
+                                                     .build())
+                                   .gamut(GAMUT_A),
+                ScheduledLightState.builder()
+                                   .id("/lights/6")
+                                   .x(0.3)
+                                   .y(0.18)
+                                   .gamut(GAMUT_C)
+        );
+        addState("g2", now, "x:0.18", "y:0.6");
+        addState("g2", now.plusMinutes(10), "scene:TestScene", "interpolate:true");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1)),
+                expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
+        );
+
+        ScheduledRunnable runnable = runnables.getFirst();
+        setCurrentTimeTo(runnable);
+        runnable.run();
+
+        assertScenePutCalls(2,
+                expectedPutCall(4).x(0.2013).y(0.5974), // gamut corrected for gamut A
+                expectedPutCall(5).gradient(Gradient.builder()
+                                                    .points(List.of(
+                                                            Pair.of(0.2013, 0.5974),
+                                                            Pair.of(0.2013, 0.5974)
+                                                    )).build()), // gamut corrected for gamut A
+                expectedPutCall(6).x(0.18).y(0.6)
+        );
+
+        assertScenePutCalls(2,
+                expectedPutCall(4).x(0.3).y(0.18).transitionTime(tr("10min")),
+                expectedPutCall(5).gradient(Gradient.builder()
+                                                    .points(List.of(
+                                                            Pair.of(0.3, 0.18),
+                                                            Pair.of(0.3, 0.18)
+                                                    )).build()).transitionTime(tr("10min")),
+                expectedPutCall(6).x(0.3).y(0.18).transitionTime(tr("10min"))
+        );
+        assertAllScenePutCallsAsserted();
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
+        );
     }
 
     @Test

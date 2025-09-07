@@ -1608,7 +1608,7 @@ class HueApiTest {
     }
 
     @Test
-    void getSceneLightStates() {
+    void getSceneLightStates_includesGamut() {
         setGetResponse("/grouped_light", """
                 {
                   "errors": [],
@@ -1950,19 +1950,157 @@ class HueApiTest {
                   ]
                 }
                 """);
+        setGetResponse("/light", """
+                
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "LIGHT_1",
+                      "owner": {
+                        "rid": "a5fdefc3-8471-43fd-b5ee-642a6561696f",
+                        "rtype": "device"
+                      },
+                      "metadata": {
+                        "name": "Light 1",
+                        "archetype": "hue_lightstrip",
+                        "function": "mixed"
+                      },
+                      "on": {
+                        "on": false
+                      },
+                      "dimming": {
+                        "brightness": 100.0,
+                        "min_dim_level": 0.01
+                      },
+                      "color_temperature": {
+                        "mirek": 199,
+                        "mirek_valid": true,
+                        "mirek_schema": {
+                          "mirek_minimum": 153,
+                          "mirek_maximum": 500
+                        }
+                      },
+                      "color": {
+                        "xy": {
+                          "x": 0.3448,
+                          "y": 0.3553
+                        },
+                        "gamut": {
+                          "red": {
+                            "x": 0.6915,
+                            "y": 0.3083
+                          },
+                          "green": {
+                            "x": 0.17,
+                            "y": 0.7
+                          },
+                          "blue": {
+                            "x": 0.1532,
+                            "y": 0.0475
+                          }
+                        },
+                        "gamut_type": "C"
+                      },
+                      "mode": "normal",
+                      "gradient": {
+                        "points": [],
+                        "mode": "interpolated_palette",
+                        "points_capable": 5,
+                        "mode_values": [
+                          "interpolated_palette",
+                          "interpolated_palette_mirrored",
+                          "random_pixelated"
+                        ],
+                        "pixel_count": 16
+                      },
+                      "effects_v2": {
+                        "action": {
+                          "effect_values": [
+                            "no_effect",
+                            "candle",
+                            "prism"
+                          ]
+                        },
+                        "status": {
+                          "effect": "no_effect",
+                          "effect_values": [
+                            "no_effect",
+                            "candle",
+                            "prism"
+                          ]
+                        }
+                      },
+                      "type": "light"
+                    },
+                    {
+                      "id": "LIGHT_2",
+                      "owner": {
+                        "rid": "cf704269-6f65-47f1-8423-677b65d3f874",
+                        "rtype": "device"
+                      },
+                      "metadata": {
+                        "name": "Light 2",
+                        "archetype": "hue_lightstrip",
+                        "function": "decorative"
+                      },
+                      "on": {
+                        "on": false
+                      },
+                      "dimming": {
+                        "brightness": 100.0,
+                        "min_dim_level": 10.0
+                      },
+                      "color_temperature": {
+                        "mirek": 199,
+                        "mirek_valid": true,
+                        "mirek_schema": {
+                          "mirek_minimum": 153,
+                          "mirek_maximum": 500
+                        }
+                      },
+                      "color": {
+                        "xy": {
+                          "x": 0.3448,
+                          "y": 0.3553
+                        },
+                        "gamut": {
+                          "red": {
+                            "x": 0.704,
+                            "y": 0.296
+                          },
+                          "green": {
+                            "x": 0.2151,
+                            "y": 0.7106
+                          },
+                          "blue": {
+                            "x": 0.138,
+                            "y": 0.08
+                          }
+                        },
+                        "gamut_type": "A"
+                      },
+                      "mode": "normal",
+                      "type": "light"
+                    }
+                  ]
+                }
+                """);
 
         assertSceneLightStates("GROUPED_LIGHT_1", "Scene_1",
                 ScheduledLightState.builder()
                                    .id("LIGHT_1")
                                    // no "on"
                                    .bri(254)
-                                   .ct(153),
+                                   .ct(153)
+                                   .gamut(GAMUT_C),
                 ScheduledLightState.builder()
                                    .id("LIGHT_2")
                                    .on(false)
                                    .bri(120)
                                    .x(0.2)
                                    .y(0.1)
+                                   .gamut(GAMUT_A)
         );
 
         assertSceneLightStates("GROUPED_LIGHT_1", "Scene_2",
@@ -1970,17 +2108,20 @@ class HueApiTest {
                                    .id("LIGHT_1")
                                    // no "on"
                                    .x(0.543)
-                                   .y(0.321),
+                                   .y(0.321)
+                                   .gamut(GAMUT_C),
                 ScheduledLightState.builder()
                                    .id("LIGHT_2")
                                    // no "on"
                                    .bri(113)
                                    .ct(199)
+                                   .gamut(GAMUT_A)
         );
 
         assertSceneLightStates("GROUPED_LIGHT_1", "Scene_3",
                 ScheduledLightState.builder()
                                    .id("LIGHT_1")
+                                   .gamut(GAMUT_C)
                                    .effect(Effect.builder()
                                                  .effect("candle")
                                                  .ct(497)
@@ -1989,6 +2130,7 @@ class HueApiTest {
                 ScheduledLightState.builder()
                                    .id("LIGHT_2")
                                    .bri(254)
+                                   .gamut(GAMUT_A)
                                    .effect(Effect.builder()
                                                  .effect("prism")
                                                  .x(0.211)
@@ -2000,12 +2142,14 @@ class HueApiTest {
         assertSceneLightStates("GROUPED_LIGHT_1", "Scene_4",
                 ScheduledLightState.builder()
                                    .id("LIGHT_1")
+                                   .gamut(GAMUT_C)
                                    .effect(Effect.builder()
                                                  .effect("candle")
                                                  .speed(0.1825)
                                                  .build()),
                 ScheduledLightState.builder()
                                    .id("LIGHT_2")
+                                   .gamut(GAMUT_A)
                                    .effect(Effect.builder()
                                                  .effect("prism")
                                                  .build())
@@ -2014,6 +2158,7 @@ class HueApiTest {
         assertSceneLightStates("GROUPED_LIGHT_1", "Scene_5",
                 ScheduledLightState.builder()
                                    .id("LIGHT_1")
+                                   .gamut(GAMUT_C)
                                    .gradient(Gradient.builder()
                                                      .points(List.of(
                                                              Pair.of(0.15352, 0.06006),
@@ -2024,6 +2169,7 @@ class HueApiTest {
                                                      .build()),
                 ScheduledLightState.builder()
                                    .id("LIGHT_2")
+                                   .gamut(GAMUT_A)
         );
 
         assertSceneLightStates("GROUPED_LIGHT_1", "UNKNOWN_SCENE"); // empty list for unknown scene
@@ -3395,14 +3541,14 @@ class HueApiTest {
 
     @Test
     void putState_XAndY_performsGamutCorrection() {
-        performPutCall(PutCall.builder().id("ID").x(0.15).y(0.3).build());
+        performPutCall(PutCall.builder().id("ID").x(0.8).y(0.2).build());
 
         verifyPut("/light/ID", """
                 {
                   "color": {
                     "xy": {
-                      "x": 0.15969472265287582,
-                      "y": 0.29975038875008686
+                      "x": 0.6915,
+                      "y": 0.3083
                     }
                   }
                 }""");
@@ -4633,15 +4779,15 @@ class HueApiTest {
                 }
                 """);
 
-        // Color and brightness (uses min mirek):
+        // Color and brightness (applies gamut correction, affecting both xy and ct):
 
         mockSceneCreationResult("SCENE_ID");
 
         createOrUpdateScene("GROUPED_LIGHT", "SCENE",
-                PutCall.builder().id("COLOR").x(0.280).y(0.280).bri(20),
-                PutCall.builder().id("CT_ONLY").x(0.280).y(0.280).bri(20),
-                PutCall.builder().id("BRI_ONLY").x(0.280).y(0.280).bri(20),
-                PutCall.builder().id("ON_OFF_ONLY").x(0.280).y(0.280).bri(20)
+                PutCall.builder().id("COLOR").x(0.8).y(0.2).bri(20), // out of gamut
+                PutCall.builder().id("CT_ONLY").x(0.8).y(0.2).bri(20), // out of gamut
+                PutCall.builder().id("BRI_ONLY").x(0.8).y(0.2).bri(20),
+                PutCall.builder().id("ON_OFF_ONLY").x(0.8).y(0.2).bri(20)
         );
 
         verifyPost("/scene", """
@@ -4669,8 +4815,8 @@ class HueApiTest {
                         },
                         "color": {
                           "xy": {
-                            "x": 0.28,
-                            "y": 0.28
+                            "x": 0.6915,
+                            "y": 0.3083
                           }
                         }
                       }
@@ -4688,7 +4834,7 @@ class HueApiTest {
                           "brightness": 7.87
                         },
                         "color_temperature": {
-                          "mirek": 153
+                          "mirek": 186
                         }
                       }
                     },

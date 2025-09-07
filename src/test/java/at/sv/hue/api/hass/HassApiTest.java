@@ -2585,11 +2585,11 @@ public class HassApiTest {
         putState(PutCall.builder()
                         .id("light.id")
                         .bri(254)
-                        .x(0.15)
-                        .y(0.3));
+                        .x(0.8)
+                        .y(0.2));
 
         verify(http).postResource(getUrl("/services/light/turn_on"),
-                "{\"entity_id\":\"light.id\",\"brightness\":255,\"xy_color\":[0.15969472265287582,0.29975038875008686]}");
+                "{\"entity_id\":\"light.id\",\"brightness\":255,\"xy_color\":[0.6915,0.3083]}");
     }
 
     @Test
