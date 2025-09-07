@@ -192,10 +192,6 @@ public final class StateInterpolator {
         if (previous == null) {
             return null;
         }
-        // todo: empty mode == interpolated_palette; consider this
-        if (!Objects.equals(previous.mode(), target.mode())) {
-            return null; // invariant for now
-        }
 
         final var previousPoints = previous.points();
         final var targetPoints = target.points();
