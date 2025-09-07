@@ -9966,6 +9966,52 @@ class HueSchedulerTest {
     }
 
     @Test
+    void sceneControl_interpolate_sceneToGroup_differentGamutForGroup_performsCorrection() {
+        mockGroupCapabilities(2, LightCapabilities.builder()
+                                                  .colorGamut(GAMUT_A)
+                                                  .capabilities(EnumSet.of(Capability.COLOR))
+                                                  .build());
+        mockGroupLightsForId(2, 4, 5);
+        mockSceneLightStates(2, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .x(0.18)
+                                   .y(0.62)
+                                   .gamut(GAMUT_C),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .x(0.18)
+                                   .y(0.62)
+                                   .gamut(GAMUT_C)
+        );
+        addState("g2", now, "scene:TestScene");
+        addState("g2", now.plusMinutes(10), "x:0.3", "y:0.2", "interpolate:true");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1)),
+                expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
+        );
+
+        ScheduledRunnable runnable = runnables.getFirst();
+        setCurrentTimeTo(runnable);
+        runnable.run();
+
+        assertScenePutCalls(2,
+                expectedPutCall(4).x(0.2037).y(0.6171), // gamut corrected for gamut A
+                expectedPutCall(5).x(0.2037).y(0.6171) // gamut corrected for gamut A
+        );
+        assertAllScenePutCallsAsserted();
+
+        assertGroupPutCalls(
+                expectedGroupPutCall(2).x(0.3).y(0.2).transitionTime(tr("10min"))
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
+        );
+    }
+
+    @Test
     void sceneControl_interpolate_groupToScene_sceneHasOffLights_interpolatesBrightness_alsoForOffState_correctPutCalls() {
         mockDefaultGroupCapabilities(2);
         mockGroupLightsForId(2, 4, 5);
@@ -10057,6 +10103,7 @@ class HueSchedulerTest {
                 expectedPutCall(4).bri(100).ct(300),
                 expectedPutCall(5).bri(150).ct(400)
         );
+        assertAllScenePutCallsAsserted();
 
         assertGroupPutCalls(
                 expectedGroupPutCall(2).bri(50).ct(200).transitionTime(tr("10min"))
