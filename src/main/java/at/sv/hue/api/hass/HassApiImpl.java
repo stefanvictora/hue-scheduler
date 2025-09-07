@@ -19,6 +19,7 @@ import at.sv.hue.api.LightState;
 import at.sv.hue.api.PutCall;
 import at.sv.hue.api.RateLimiter;
 import at.sv.hue.api.hass.area.HassAreaRegistry;
+import at.sv.hue.color.XYColorGamutCorrection;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -187,7 +188,8 @@ public class HassApiImpl implements HueApi {
     }
 
     private static Double[] getXyColor(PutCall putCall) {
-        return new Double[]{putCall.getX(), putCall.getY()};
+        XYColorGamutCorrection correction = new XYColorGamutCorrection(putCall.getX(), putCall.getY(), putCall.getGamut());
+        return new Double[]{correction.getX(), correction.getY()};
     }
 
     @Override

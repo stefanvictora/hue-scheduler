@@ -16,12 +16,6 @@ public class RGBToXYConverterTest {
      */
     @Test
     void convert_convertsRGBToXYAndBrightness_handlesGamut() {
-        assertRGBToXY(0, 0, 0, null, 0.0, 0.0, 1);
-        assertRGBToXY(255, 255, 255, null, 0.3127, 0.329, 254);
-        assertRGBToXY(0, 0, 255, null, 0.15, 0.06, 254);
-        assertRGBToXY(0, 255, 0, null, 0.3, 0.6, 254);
-        assertRGBToXY(255, 0, 0, null, 0.64, 0.33, 254);
-        assertRGBToXY(128, 0, 0, null, 0.64, 0.33, 55);
         assertRGBToXY(0, 0, 255, GAMUT_A, 0.1418, 0.0815, 184); // would be outside gamut
         assertRGBToXY(0, 255, 0, GAMUT_A, 0.3, 0.6, 254); // inside gamut
         assertRGBToXY(255, 0, 0, GAMUT_A, 0.64, 0.33, 254); // inside gamut
@@ -29,11 +23,12 @@ public class RGBToXYConverterTest {
 
     @Test
     void convert_RGB_XY() {
+        // null gamut = C
         assertRGBToXY(255, 0, 0, null, 0.64, 0.33, 254); // primary red
         assertRGBToXY(128, 0, 0, null, 0.64, 0.33, 55);
         assertRGBToXY(0, 255, 0, null, 0.3, 0.6, 254); // primary green
-        assertRGBToXY(0, 0, 255, null, 0.15, 0.06, 254); // primary blue
-        assertRGBToXY(0, 0, 0, null, 0.0, 0.0, 1);
+        assertRGBToXY(0, 0, 255, null, 0.1535, 0.0599, 254); // primary blue
+        assertRGBToXY(0, 0, 0, null, 0.1532, 0.0475, 1);
         assertRGBToXY(255, 255, 255, null, 0.3127, 0.329, 254);
 
         // no effect of gamut:
@@ -47,10 +42,10 @@ public class RGBToXYConverterTest {
         assertRGBToXY(115, 255, 201, GAMUT_B, 0.3307, 0.3633, 208);
 
         // outside A, B, and C
-        assertRGBToXY(10, 4, 256, null, 0.151, 0.0611, 254);
         assertRGBToXY(10, 4, 256, GAMUT_A, 0.143, 0.0819, 188);
         assertRGBToXY(10, 4, 256, GAMUT_B, 0.1722, 0.0503, 254);
         assertRGBToXY(10, 4, 256, GAMUT_C, 0.1535, 0.061, 254);
+        assertRGBToXY(10, 4, 256, null, 0.1535, 0.061, 254); // null = C
 
         assertRGBToXY(255, 89, 37, null, 0.5746, 0.3633, 254); // red-orange
         assertRGBToXY(235, 255, 67, null, 0.3958, 0.4991, 254);  // green-yellow

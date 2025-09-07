@@ -33,11 +33,9 @@ public final class RGBToXYConverter {
         double x = (sum == 0.0) ? 0.0 : X / sum;
         double y = (sum == 0.0) ? 0.0 : Y / sum;
 
-        if (gamut != null) {
-            XYColorGamutCorrection corr = new XYColorGamutCorrection(x, y, gamut);
-            x = corr.getX();
-            y = corr.getY();
-        }
+        XYColorGamutCorrection corr = new XYColorGamutCorrection(x, y, gamut);
+        x = corr.getX();
+        y = corr.getY();
 
         double maxY = findMaximumY(x, y); // Y in [0..1]
         int brightness = (int) Math.round((maxY > 0 ? Y / maxY : 0.0) * 255.0);
