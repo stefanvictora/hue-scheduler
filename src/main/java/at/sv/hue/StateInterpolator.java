@@ -73,7 +73,7 @@ public final class StateInterpolator {
 
         putCall.setBri(interpolateInteger(interpolatedTime, getTargetBri(target), putCall.getBri()));
         putCall.setCt(interpolateInteger(interpolatedTime, target.getCt(), putCall.getCt()));
-        var xy = interpolateXY(interpolatedTime, target.getXY(), putCall.getXY());
+        var xy = interpolateXY(interpolatedTime, target.getXY(), putCall.getXY(), putCall.getGamut());
         if (xy != null) {
             putCall.setX(xy.first());
             putCall.setY(xy.second());
@@ -81,7 +81,8 @@ public final class StateInterpolator {
             putCall.setX(null);
             putCall.setY(null);
         }
-        putCall.setGradient(interpolateGradient(interpolatedTime, target.getGradient(), putCall.getGradient()));
+        putCall.setGradient(interpolateGradient(interpolatedTime, target.getGradient(), putCall.getGradient(),
+                putCall.getGamut()));
 
         putCall.setOn(null); // do not per default reuse "on" property for interpolation
         if (target.isOn()) {
@@ -172,7 +173,7 @@ public final class StateInterpolator {
     }
 
     private Pair<Double, Double> interpolateXY(BigDecimal interpolatedTime, Pair<Double, Double> target,
-                                               Pair<Double, Double> previous) {
+                                               Pair<Double, Double> previous, Double[][] gamut) {
         if (target == null) {
             return previous;
         }
@@ -180,11 +181,11 @@ public final class StateInterpolator {
             return null;
         }
         double[] point = OkLabUtil.lerpOKLabXY(previous.first(), previous.second(), target.first(), target.second(),
-                interpolatedTime.doubleValue());
+                interpolatedTime.doubleValue(), gamut);
         return Pair.of(round4(point[0]), round4(point[1]));
     }
 
-    private Gradient interpolateGradient(BigDecimal interpolatedTime, Gradient target, Gradient previous) {
+    private Gradient interpolateGradient(BigDecimal interpolatedTime, Gradient target, Gradient previous, Double[][] gamut) {
         if (target == null) {
             return previous;
         }
@@ -211,7 +212,8 @@ public final class StateInterpolator {
             var p = evalAt(previousPoints, pos);
             var q = evalAt(targetPoints, pos);
 
-            var point = OkLabUtil.lerpOKLabXY(p.first(), p.second(), q.first(), q.second(), interpolatedTime.doubleValue());
+            var point = OkLabUtil.lerpOKLabXY(p.first(), p.second(), q.first(), q.second(),
+                    interpolatedTime.doubleValue(), gamut);
             points.add(Pair.of(round4(point[0]), round4(point[1])));
         }
         return new Gradient(points, target.mode());
