@@ -2,6 +2,7 @@ package at.sv.hue;
 
 import at.sv.hue.api.Identifier;
 import at.sv.hue.api.LightCapabilities;
+import at.sv.hue.color.XYColorGamutCorrection;
 
 import java.util.List;
 
@@ -26,12 +27,26 @@ public final class ScheduledLightStateValidator {
         this.capabilities = capabilities;
         this.brightness = assertValidBrightnessValue(brightness);
         this.ct = assertCtSupportAndValue(ct);
-        this.x = assertValidXAndY(x);
-        this.y = assertValidXAndY(y);
         this.on = on;
         this.effect = assertValidEffectValue(effect);
-        assertValidXyPair();
-        assertColorCapabilities();
+
+        assertValidXyPair(x, y);
+        if (x != null && y != null) {
+            assertColorCapabilities();
+            if (x < 0 || y <= 0 || !(x + y <= 1)) {
+                throw new InvalidXAndYValue("Invalid xy chromaticity: x=" + x + ", y=" + y + ". Allowed range: 0 <= x <= 1, 0 < y <= 1, x + y <= 1");
+            }
+            if (capabilities.getColorGamut() != null) {
+                XYColorGamutCorrection correction = new XYColorGamutCorrection(x, y, capabilities.getColorGamut());
+                x = correction.getX();
+                y = correction.getY();
+            }
+            this.x = x;
+            this.y = y;
+        } else {
+            this.x = null;
+            this.y = null;
+        }
     }
 
     public ScheduledLightState getScheduledLightState() {
@@ -124,28 +139,18 @@ public final class ScheduledLightStateValidator {
         }
     }
 
-    private Double assertValidXAndY(Double xOrY) {
-        if (xOrY != null && (xOrY > 1 || xOrY < 0)) {
-            throw new InvalidXAndYValue("Invalid x or y value '" + xOrY + "'. Allowed double range: 0-1");
-        }
-        return xOrY;
-    }
-
-    private void assertValidXyPair() {
-        if ((x == null) != (y == null)) {
+    private void assertValidXyPair(Double x, Double y) {
+        boolean onlyOneIsNull = (x == null) ^ (y == null);
+        if (onlyOneIsNull) {
             throw new InvalidPropertyValue("x and y must be provided together.");
         }
     }
 
     private void assertColorCapabilities() {
-        if (isColorState() && !capabilities.isColorSupported()) {
+        if (!capabilities.isColorSupported()) {
             throw new ColorNotSupported(getFormattedName() + " does not support setting color! "
                                         + "Capabilities: " + capabilities.getCapabilities());
         }
-    }
-
-    private boolean isColorState() {
-        return x != null || y != null;
     }
 
     private String getFormattedName() {
