@@ -513,7 +513,9 @@ class HueSchedulerTest {
                                                .colorGamutType("C")
                                                .colorGamut(gamut)
                                                .effects(List.of("effect"))
-                                               .gradientModes(List.of("GRADINET_MODE_1", "GRADIENT_MODE_2"))
+                                               .gradientModes(List.of("interpolated_palette",
+                                                       "interpolated_palette_mirrored", "random_pixelated",
+                                                       "segmented_palette"))
                                                .maxGradientPoints(5)
                                                .capabilities(EnumSet.allOf(Capability.class)).build();
         controlGroupLightsIndividually = false;
@@ -7723,7 +7725,7 @@ class HueSchedulerTest {
                 expectedRunnable(now.plusMinutes(40), now.plusMinutes(50)),
                 expectedRunnable(now.plusMinutes(50), now.plusMinutes(60)),
                 expectedRunnable(now.plusMinutes(60), now.plusMinutes(70)),
-            expectedRunnable(now.plusMinutes(70), now.plusDays(1))
+                expectedRunnable(now.plusMinutes(70), now.plusDays(1))
         );
 
         // state 1
@@ -9662,7 +9664,7 @@ class HueSchedulerTest {
                                                              Pair.of(0.123, 0.456),
                                                              Pair.of(0.234, 0.567)
                                                      ))
-                                                     .mode("GRADIENT_MODE_1")
+                                                     .mode("interpolated_palette")
                                                      .build()),
                 ScheduledLightState.builder()
                                    .id("/lights/5")
@@ -9683,7 +9685,7 @@ class HueSchedulerTest {
                                                                     Pair.of(0.123, 0.456),
                                                                     Pair.of(0.234, 0.567)
                                                             ))
-                                                            .mode("GRADIENT_MODE_1")
+                                                            .mode("interpolated_palette")
                                                             .build()),
                 expectedPutCall(5).bri(100).ct(250)
         );
@@ -9712,7 +9714,7 @@ class HueSchedulerTest {
                                                              Pair.of(0.123, 0.456),
                                                              Pair.of(0.234, 0.567)
                                                      ))
-                                                     .mode("GRADIENT_MODE_1")
+                                                     .mode("random_pixelated")
                                                      .build()),
                 ScheduledLightState.builder()
                                    .id("/lights/5")
@@ -9733,7 +9735,7 @@ class HueSchedulerTest {
                                                                      Pair.of(0.123, 0.456),
                                                                      Pair.of(0.234, 0.567)
                                                              ))
-                                                             .mode("GRADIENT_MODE_1")
+                                                             .mode("random_pixelated")
                                                              .build()),
                 expectedPutCall(5).bri(200).ct(250)
         );
@@ -10217,6 +10219,7 @@ class HueSchedulerTest {
                                                              Pair.of(0.123, 0.456),
                                                              Pair.of(0.234, 0.567)
                                                      ))
+                                                     .mode("interpolated_palette")
                                                      .build()),
                 ScheduledLightState.builder()
                                    .id("/lights/5")
@@ -10229,7 +10232,7 @@ class HueSchedulerTest {
                                                              Pair.of(0.345, 0.678),
                                                              Pair.of(0.456, 0.789)
                                                      ))
-                                                     .build()),
+                                                     .build()), // null mode = interpolated_palette
                 ScheduledLightState.builder()
                                    .id("/lights/5")
                                    .bri(250));
@@ -10271,7 +10274,7 @@ class HueSchedulerTest {
                 expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
         );
 
-        // after 5 minutes power on -> interpolates from scene group state
+        // after 5 minutes power on
 
         advanceCurrentTime(Duration.ofMinutes(5));
 
@@ -10303,7 +10306,77 @@ class HueSchedulerTest {
 
         assertAllScenePutCallsAsserted();
     }
-    // todo: add test that interpolating between modes is not possible
+
+    @Test
+    void sceneControl_interpolate_sceneToScene_withGradients_differentModes_takesModeFromTarget() {
+        mockDefaultGroupCapabilities(2);
+        mockGroupLightsForId(2, 4, 5);
+        mockSceneLightStates(2, "TestScene1",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .gradient(Gradient.builder()
+                                                     .points(List.of(
+                                                             Pair.of(0.123, 0.456),
+                                                             Pair.of(0.234, 0.567)
+                                                     ))
+                                                     .mode("interpolated_palette")
+                                                     .build()),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(150));
+        mockSceneLightStates(2, "TestScene2",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .gradient(Gradient.builder()
+                                                     .points(List.of(
+                                                             Pair.of(0.345, 0.678),
+                                                             Pair.of(0.456, 0.789)
+                                                     ))
+                                                     .mode("random_pixelated")
+                                                     .build()),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(250));
+        addState("g2", now, "scene:TestScene1");
+        addState("g2", now.plusMinutes(10), "scene:TestScene2", "interpolate:true");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1)),
+                expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
+        );
+
+        ScheduledRunnable runnable = runnables.getFirst();
+        setCurrentTimeTo(runnable);
+        runnable.run();
+
+        assertScenePutCalls(2,
+                expectedPutCall(4).gradient(Gradient.builder()
+                                                    .points(List.of(
+                                                            Pair.of(0.1637, 0.455),
+                                                            Pair.of(0.234, 0.567)
+                                                    ))
+                                                    .mode("random_pixelated")
+                                                    .build()),
+                expectedPutCall(5).bri(150)
+        );
+
+        assertScenePutCalls(2,
+                expectedPutCall(4).gradient(Gradient.builder()
+                                                    .points(List.of(
+                                                            Pair.of(0.345, 0.678),
+                                                            Pair.of(0.456, 0.789)
+                                                    ))
+                                                    .mode("random_pixelated")
+                                                    .build())
+                                  .transitionTime(tr("10min")),
+                expectedPutCall(5).bri(250).transitionTime(tr("10min"))
+        );
+        assertAllScenePutCallsAsserted();
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
+        );
+    }
 
     // todo: test that the interpolated call is not repeated on normal state progression -> put calls equals check needs to consider the gradient
 
