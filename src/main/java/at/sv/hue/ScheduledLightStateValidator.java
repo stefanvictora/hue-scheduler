@@ -19,7 +19,6 @@ public final class ScheduledLightStateValidator {
     private final Boolean on;
     private final String effect;
 
-
     public ScheduledLightStateValidator(Identifier identifier, boolean groupState, LightCapabilities capabilities,
                                         Integer brightness, Integer ct, Double x, Double y, Boolean on, String effect) {
         this.identifier = identifier;
@@ -67,6 +66,7 @@ public final class ScheduledLightStateValidator {
                                       .y(y)
                                       .on(on)
                                       .effect(effect)
+                                      .gamut(capabilities.getColorGamut()) // todo: write test case (interpolation between lights of different gamut)
                                       .build();
         }
     }

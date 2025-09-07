@@ -71,9 +71,9 @@ public final class StateInterpolator {
         PutCall putCall = copy(previous);
         convertColorModeIfNeeded(putCall, target);
 
-        putCall.setBri(interpolateInteger(interpolatedTime, getTargetBri(target), putCall.getBri()));
-        putCall.setCt(interpolateInteger(interpolatedTime, target.getCt(), putCall.getCt()));
-        var xy = interpolateXY(interpolatedTime, target.getXY(), putCall.getXY(), putCall.getGamut());
+        putCall.setBri(interpolateInteger(interpolatedTime, putCall.getBri(), getTargetBri(target)));
+        putCall.setCt(interpolateInteger(interpolatedTime, putCall.getCt(), target.getCt()));
+        var xy = interpolateXY(interpolatedTime, putCall.getXY(), target.getXY(), target.getGamut());
         if (xy != null) {
             putCall.setX(xy.first());
             putCall.setY(xy.second());
@@ -81,8 +81,8 @@ public final class StateInterpolator {
             putCall.setX(null);
             putCall.setY(null);
         }
-        putCall.setGradient(interpolateGradient(interpolatedTime, target.getGradient(), putCall.getGradient(),
-                putCall.getGamut()));
+        putCall.setGradient(interpolateGradient(interpolatedTime, putCall.getGradient(), target.getGradient(),
+                target.getGamut()));
 
         putCall.setOn(null); // do not per default reuse "on" property for interpolation
         if (target.isOn()) {
@@ -158,7 +158,7 @@ public final class StateInterpolator {
         ColorModeConverter.convertIfNeeded(previousPutCall, target.getColorMode());
     }
 
-    private Integer interpolateInteger(BigDecimal interpolatedTime, Integer target, Integer previous) {
+    private Integer interpolateInteger(BigDecimal interpolatedTime, Integer previous, Integer target) {
         if (target == null) {
             return previous;
         }
@@ -172,8 +172,8 @@ public final class StateInterpolator {
                          .intValue();
     }
 
-    private Pair<Double, Double> interpolateXY(BigDecimal interpolatedTime, Pair<Double, Double> target,
-                                               Pair<Double, Double> previous, Double[][] gamut) {
+    private Pair<Double, Double> interpolateXY(BigDecimal interpolatedTime, Pair<Double, Double> previous,
+                                               Pair<Double, Double> target, Double[][] gamut) {
         if (target == null) {
             return previous;
         }
@@ -185,7 +185,7 @@ public final class StateInterpolator {
         return Pair.of(round4(point[0]), round4(point[1]));
     }
 
-    private Gradient interpolateGradient(BigDecimal interpolatedTime, Gradient target, Gradient previous, Double[][] gamut) {
+    private Gradient interpolateGradient(BigDecimal interpolatedTime, Gradient previous, Gradient target, Double[][] gamut) {
         if (target == null) {
             return previous;
         }

@@ -14,6 +14,7 @@ public final class ScheduledLightState {
     private final Boolean on;
     private final Effect effect;
     private final Gradient gradient;
+    private final Double[][] gamut;
 
     public boolean isNullState() {
         return on == null && hasNoOtherPropertiesThanOn();

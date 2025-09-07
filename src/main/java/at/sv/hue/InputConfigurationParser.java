@@ -206,7 +206,7 @@ public final class InputConfigurationParser {
             }
 
             states.add(new ScheduledState(identifier, start, scheduledLightStates, transitionTimeBefore,
-                    transitionTime, dayOfWeeks, startTimeProvider, capabilities, minTrBeforeGapInMinutes, brightnessOverrideThreshold,
+                    transitionTime, dayOfWeeks, startTimeProvider, minTrBeforeGapInMinutes, brightnessOverrideThreshold,
                     colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold, force, interpolate, groupState, false));
         }
         return states;
