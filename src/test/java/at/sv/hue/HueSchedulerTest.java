@@ -3181,7 +3181,7 @@ class HueSchedulerTest {
         setCurrentTimeTo(now.plusMinutes(30));
 
         runAndAssertPutCalls(trBeforeRunnable,
-                expectedPutCall(1).x(0.7275).y(0.5626),
+                expectedPutCall(1).x(0.5192).y(0.4377),
                 expectedPutCall(1).x(1.0).y(1.0).transitionTime(tr("10min"))
         );
 
@@ -10138,7 +10138,7 @@ class HueSchedulerTest {
         assertScenePutCalls(2,
                 expectedPutCall(4).gradient(Gradient.builder()
                                                     .points(List.of(
-                                                            Pair.of(0.123, 0.456),
+                                                            Pair.of(0.1637, 0.455),
                                                             Pair.of(0.234, 0.567)
                                                     ))
                                                     .build()),
@@ -10174,8 +10174,8 @@ class HueSchedulerTest {
         assertScenePutCalls(2,
                 expectedPutCall(4).gradient(Gradient.builder()
                                                     .points(List.of(
-                                                            Pair.of(0.2051, 0.6229), // interpolated
-                                                            Pair.of(0.3118, 0.7233)  // interpolated
+                                                            Pair.of(0.2159, 0.5488), // interpolated
+                                                            Pair.of(0.2716, 0.5865)  // interpolated
                                                     ))
                                                     .build()),
                 expectedPutCall(5).bri(200) // interpolated

@@ -9,36 +9,45 @@ public final class OkLabUtil {
 
     private static final double CHROMA_MIN = 0.05;
     private static final double WHITE_Y = 1.0;
-    private static final double NEUTRAL_EPS = 1e-6;
+
+    public static double[] lerpOKLabXY(double x0, double y0, double x1, double y1, double t, Double[][] gamut) {
+        if (gamut == null) {
+            return lerpOKLabXY(x0, y0, x1, y1, t);
+        }
+
+        double[] s = clampXY(x0, y0, gamut);
+        double[] e = clampXY(x1, y1, gamut);
+        double[] xy = lerpOKLabXY(s[0], s[1], e[0], e[1], t);
+        return clampXY(xy[0], xy[1], gamut);
+    }
+
+    private static double[] clampXY(double x, double y, Double[][] gamut) {
+        XYColorGamutCorrection c = new XYColorGamutCorrection(x, y, gamut);
+        return new double[]{c.getX(), c.getY()};
+    }
 
     /**
      * OKLab default; switches to OKLCH shortest-arc hue only when both are sufficiently chromatic.
      */
-    public static double[] lerpOKLabXY(double x0, double y0, double x1, double y1, double t) {
+    private static double[] lerpOKLabXY(double x0, double y0, double x1, double y1, double t) {
         double[] XYZ0 = xyY_to_XYZ(x0, y0, WHITE_Y);
         double[] XYZ1 = xyY_to_XYZ(x1, y1, WHITE_Y);
 
         double[] okLab0 = XYZ_to_OKLab(XYZ0[0], XYZ0[1], XYZ0[2]);
         double[] okLab1 = XYZ_to_OKLab(XYZ1[0], XYZ1[1], XYZ1[2]);
 
-        double[] lab;
-        if (bothChromatic(okLab0, okLab1)) {
-            lab = interpolatePolarOklch(okLab0, okLab1, t);
-        } else {
-            lab = interpolateCartesianOkLab(okLab0, okLab1, t);
-        }
-
-        double[] XYZ = OKLab_to_XYZ(lab[0], lab[1], lab[2]);
-        return XYZ_to_xy(XYZ[0], XYZ[1], XYZ[2]);
-    }
-
-    /**
-     * True if both colors have at least minimal chroma.
-     */
-    private static boolean bothChromatic(double[] okLab0, double[] okLab1) {
         double c0 = Math.hypot(okLab0[1], okLab0[2]);
         double c1 = Math.hypot(okLab1[1], okLab1[2]);
-        return c0 >= CHROMA_MIN && c1 >= CHROMA_MIN;
+
+        double[] ok;
+        if (c0 < CHROMA_MIN && c1 < CHROMA_MIN) {
+            ok = lerpOkLab(okLab0, okLab1, t);
+        } else {
+            ok = lerpOklchWithHueRules(okLab0, okLab1, c0, c1, t); // hue from chromatic endpoint if only one chromatic; else shortest arc
+        }
+
+        double[] XYZ = OKLab_to_XYZ(ok[0], ok[1], ok[2]);
+        return XYZ_to_xy(XYZ[0], XYZ[1], XYZ[2]);
     }
 
     /**
@@ -84,7 +93,7 @@ public final class OkLabUtil {
 
     private static double[] XYZ_to_xy(double X, double Y, double Z) {
         double sum = X + Y + Z;
-        if (sum <= 0) {
+        if (sum <= 1e-12) {
             return new double[]{0.0, 0.0};
         }
         return new double[]{X / sum, Y / sum};
@@ -93,12 +102,11 @@ public final class OkLabUtil {
     /**
      * Linear interpolation in Cartesian OKLab space.
      */
-    private static double[] interpolateCartesianOkLab(double[] okLab0, double[] okLab1, double t) {
+    private static double[] lerpOkLab(double[] a, double[] b, double t) {
         return new double[]{
-                lerp(okLab0[0], okLab1[0], t),
-                lerp(okLab0[1], okLab1[1], t),
-                lerp(okLab0[2], okLab1[2], t)
-        };
+                lerp(a[0], b[0], t),
+                lerp(a[1], b[1], t),
+                lerp(a[2], b[2], t)};
     }
 
     private static double lerp(double a, double b, double t) {
@@ -109,26 +117,28 @@ public final class OkLabUtil {
      * Interpolation in polar OKLCH space using shortest-arc hue and near-neutral fallback.
      * Returns [L, a, b].
      */
-    private static double[] interpolatePolarOklch(double[] okLab0, double[] okLab1, double t) {
-        double L = lerp(okLab0[0], okLab1[0], t);
+    private static double[] lerpOklchWithHueRules(double[] ok0, double[] ok1, double c0, double c1, double t) {
+        double L = lerp(ok0[0], ok1[0], t);
+        double h0 = Math.atan2(ok0[2], ok0[1]);
+        double h1 = Math.atan2(ok1[2], ok1[1]);
 
-        double c0 = Math.hypot(okLab0[1], okLab0[2]);
-        double c1 = Math.hypot(okLab1[1], okLab1[2]);
-
-        double h0 = Math.atan2(okLab0[2], okLab0[1]);
-        double h1 = Math.atan2(okLab1[2], okLab1[1]);
-
-        boolean eitherNearNeutral = (c0 < NEUTRAL_EPS) || (c1 < NEUTRAL_EPS);
         double C = lerp(c0, c1, t);
         double h;
-        if (eitherNearNeutral) {
-            if (c0 >= c1) {
+        if (c0 < CHROMA_MIN ^ c1 < CHROMA_MIN) { // exactly one chromatic
+            // use hue of the chromatic endpoint
+            if (c0 >= CHROMA_MIN) {
                 h = h0;
             } else {
                 h = h1;
             }
         } else {
-            h = h0 + t * shortestAngle(h1 - h0);
+            // both chromatic: shortest-arc interpolation
+            double dh = shortestAngle(h1 - h0);
+            if (Math.abs(Math.abs(dh) - Math.PI) < 1e-9) {
+                // tie: pick direction that keeps hue closer to the higher-chroma endpoint
+                dh = (c1 >= c0) ? Math.abs(dh) : -Math.abs(dh);
+            }
+            h = h0 + t * dh;
         }
 
         double a = C * Math.cos(h);

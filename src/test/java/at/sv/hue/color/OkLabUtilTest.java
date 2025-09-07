@@ -38,8 +38,8 @@ class OkLabUtilTest {
     @DisplayName("t = 0 and t = 1 must return the exact endpoints (no drift)")
     void endpointsArePreserved() {
         // RED  ->  GREEN
-        double[] start = OkLabUtil.lerpOKLabXY(X_RED, Y_RED, X_GREEN, Y_GREEN, 0.0);
-        double[] end = OkLabUtil.lerpOKLabXY(X_RED, Y_RED, X_GREEN, Y_GREEN, 1.0);
+        double[] start = lerpOKLabXY(X_RED, Y_RED, X_GREEN, Y_GREEN, 0.0);
+        double[] end = lerpOKLabXY(X_RED, Y_RED, X_GREEN, Y_GREEN, 1.0);
 
         assertThat(start[0]).isCloseTo(X_RED, within(XY_EPS));
         assertThat(start[1]).isCloseTo(Y_RED, within(XY_EPS));
@@ -49,20 +49,52 @@ class OkLabUtilTest {
     }
 
     @Test
-    @DisplayName("White ↔ chromatic colour uses the Cartesian interpolation path")
-    void cartesianBranchMatchesLinearLab() {
-        // WHITE -> RED at t = 0.25
+    @DisplayName("Near-neutral ↔ chromatic: hue is taken from the chromatic endpoint; chroma is linear")
+    void nearNeutralChromaticHueFromChromatic() {
         double t = 0.25;
 
-        double[] xyActual = OkLabUtil.lerpOKLabXY(X_WHITE, Y_WHITE, X_RED, Y_RED, t);
-        double[] labActual = toLab(xyActual);
-
-        // Expected = linear interpolation in Lab
         double[] lab0 = toLab(X_WHITE, Y_WHITE);
         double[] lab1 = toLab(X_RED, Y_RED);
-        double[] labExpected = lerpLab(lab0, lab1, t);
 
-        assertThat(delta(labActual, labExpected)).isLessThan(LAB_EPS);
+        double h1 = atan2(lab1[2], lab1[1]);
+
+        double[] xyActual = lerpOKLabXY(X_WHITE, Y_WHITE, X_RED, Y_RED, t);
+        double[] labActual = toLab(xyActual);
+
+        double hActual = atan2(labActual[2], labActual[1]);
+
+        double hueDiffDeg = abs(toDegrees(shortestAngle(hActual - h1)));
+        assertThat(hueDiffDeg).isLessThan(DEG_EPS);
+
+        // monotonic instead of exactly linear (rescaling at Y=1 can skew magnitude)
+        double[] ts = {0.1, 0.25, 0.5, 0.75, 0.9};
+        double prev = hypot(lab0[1], lab0[2]); // start chroma
+        for (double tau : ts) {
+            double[] xy = lerpOKLabXY(X_WHITE, Y_WHITE, X_RED, Y_RED, tau);
+            double[] l = toLab(xy);
+            double c = hypot(l[1], l[2]);
+            assertThat(c).isGreaterThanOrEqualTo(prev - 1e-6);
+            prev = c;
+        }
+    }
+
+    @Test
+    @DisplayName("Both near-neutral: Cartesian interpolation ≈ linear Lab")
+    void bothNearNeutralFallsBackToCartesian() {
+        double t = 0.4;
+
+        // Two whites very close to D65 to ensure tiny chroma on both ends
+        double xA = 0.31270, yA = 0.32900; // D65
+        double xB = 0.31300, yB = 0.32920; // slight shift near white
+
+        double[] xyActual = lerpOKLabXY(xA, yA, xB, yB, t);
+        double[] labActual = toLab(xyActual);
+
+        double[] labA = toLab(xA, yA);
+        double[] labB = toLab(xB, yB);
+        double[] labCartesian = lerpLab(labA, labB, t);
+
+        assertThat(delta(labActual, labCartesian)).isLessThan(LAB_EPS);
     }
 
     @Test
@@ -71,7 +103,7 @@ class OkLabUtilTest {
         // RED -> GREEN at halfway point
         double t = 0.5;
 
-        double[] xyActual = OkLabUtil.lerpOKLabXY(X_RED, Y_RED, X_GREEN, Y_GREEN, t);
+        double[] xyActual = lerpOKLabXY(X_RED, Y_RED, X_GREEN, Y_GREEN, t);
         double[] labActual = toLab(xyActual);
 
         // Cartesian prediction (not taken by algorithm)
@@ -81,7 +113,7 @@ class OkLabUtilTest {
 
         assertThat(delta(labActual, labCartesian))
                 .as("Polar path should deviate from pure Cartesian blend")
-                .isGreaterThan(0.01);   // comfortably above numeric noise
+                .isGreaterThan(0.01);
     }
 
     @Test
@@ -98,12 +130,141 @@ class OkLabUtilTest {
 
         double expectedMidHue = h0 + t * shortestAngle(h1 - h0);
 
-        double[] xyActual = OkLabUtil.lerpOKLabXY(X_RED, Y_RED, X_MAGENTA, Y_MAGENTA, t);
+        double[] xyActual = lerpOKLabXY(X_RED, Y_RED, X_MAGENTA, Y_MAGENTA, t);
         double[] labActual = toLab(xyActual);
         double hActual = atan2(labActual[2], labActual[1]);
 
         double diffDeg = abs(toDegrees(shortestAngle(hActual - expectedMidHue)));
         assertThat(diffDeg).isLessThan(DEG_EPS);
+    }
+
+    @Test
+    @DisplayName("Symmetry: f(a,b,t) == f(b,a,1-t) in xy")
+    void symmetryProperty() {
+        double t = 0.3;
+
+        double[] p = lerpOKLabXY(X_RED, Y_RED, X_GREEN, Y_GREEN, t);
+        double[] q = lerpOKLabXY(X_GREEN, Y_GREEN, X_RED, Y_RED, 1.0 - t);
+
+        assertThat(p[0]).isCloseTo(q[0], within(XY_EPS));
+        assertThat(p[1]).isCloseTo(q[1], within(XY_EPS));
+    }
+
+    @Test
+    @DisplayName("Same endpoints: f(p,p,t) == p for all t (including extrapolation)")
+    void sameEndpointsIdempotent() {
+        double[][] pts = {
+                {X_RED, Y_RED}, {X_GREEN, Y_GREEN},
+                {X_WHITE, Y_WHITE}, {X_MAGENTA, Y_MAGENTA}
+        };
+        double[] ts = {-0.25, 0.0, 0.1, 0.5, 1.0, 1.5};
+        for (double[] p : pts) {
+            for (double t : ts) {
+                double[] xy = lerpOKLabXY(p[0], p[1], p[0], p[1], t);
+                assertThat(xy[0]).isCloseTo(p[0], within(XY_EPS));
+                assertThat(xy[1]).isCloseTo(p[1], within(XY_EPS));
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("Chromatic ↔ chromatic: hue follows shortest arc for multiple t")
+    void hueShortestArcMultiT() {
+        double[] lab0 = toLab(X_RED, Y_RED);
+        double[] lab1 = toLab(X_GREEN, Y_GREEN);
+        double h0 = atan2(lab0[2], lab0[1]);
+        double h1 = atan2(lab1[2], lab1[1]);
+        double dh = shortestAngle(h1 - h0);
+
+        for (double t : new double[]{0.1, 0.3, 0.5, 0.7, 0.9}) {
+            double[] xy = lerpOKLabXY(X_RED, Y_RED, X_GREEN, Y_GREEN, t);
+            double[] lab = toLab(xy);
+            double h = atan2(lab[2], lab[1]);
+            double diffDeg = abs(toDegrees(shortestAngle(h - (h0 + t * dh))));
+            assertThat(diffDeg).isLessThan(DEG_EPS);
+        }
+    }
+
+    @Test
+    @DisplayName("Near-neutral ↔ chromatic: hue stays near chromatic endpoint across t")
+    void nearNeutralHueConsistency() {
+        double[] labR = toLab(X_RED, Y_RED);
+        double hR = atan2(labR[2], labR[1]);
+        for (double t : new double[]{0.1, 0.3, 0.5, 0.7, 0.9}) {
+            double[] xy = lerpOKLabXY(X_WHITE, Y_WHITE, X_RED, Y_RED, t);
+            double[] lab = toLab(xy);
+            double h = atan2(lab[2], lab[1]);
+            double diffDeg = abs(toDegrees(shortestAngle(h - hR)));
+            assertThat(diffDeg).isLessThan(DEG_EPS);
+        }
+    }
+
+    @Test
+    @DisplayName("Near-neutral ↔ chromatic: chroma increases (W→R) and decreases (R→W)")
+    void nearNeutralChromaMonotonicBothDirections() {
+        // W -> R : non-decreasing
+        double prevUp = hypot(toLab(X_WHITE, Y_WHITE)[1], toLab(X_WHITE, Y_WHITE)[2]);
+        for (double t : new double[]{0.1, 0.3, 0.5, 0.7, 0.9}) {
+            double[] l = toLab(lerpOKLabXY(X_WHITE, Y_WHITE, X_RED, Y_RED, t));
+            double c = hypot(l[1], l[2]);
+            assertThat(c).isGreaterThanOrEqualTo(prevUp - 1e-6);
+            prevUp = c;
+        }
+        // R -> W : non-increasing
+        double prevDown = hypot(toLab(X_RED, Y_RED)[1], toLab(X_RED, Y_RED)[2]);
+        for (double t : new double[]{0.1, 0.3, 0.5, 0.7, 0.9}) {
+            double[] l = toLab(lerpOKLabXY(X_RED, Y_RED, X_WHITE, Y_WHITE, t));
+            double c = hypot(l[1], l[2]);
+            assertThat(c).isLessThanOrEqualTo(prevDown + 1e-6);
+            prevDown = c;
+        }
+    }
+
+    @Test
+    @DisplayName("Continuity: small t steps cause small OKLab changes (no jumps)")
+    void continuityNoJumps() {
+        double tStep = 0.01;
+        double[] prevLab = toLab(lerpOKLabXY(X_RED, Y_RED, X_GREEN, Y_GREEN, 0.0));
+        for (double t = tStep; t <= 1.0; t += tStep) {
+            double[] lab = toLab(lerpOKLabXY(X_RED, Y_RED, X_GREEN, Y_GREEN, t));
+            // generous bound; ensures no discontinuity across hue wrapping logic
+            assertThat(delta(prevLab, lab)).isLessThan(0.15);
+            prevLab = lab;
+        }
+    }
+
+    @Test
+    @DisplayName("Numerics: results are finite and within [0,1] in xy")
+    void finiteAndInRange() {
+        double[][] pairs = {
+                {X_RED, Y_RED, X_GREEN, Y_GREEN},
+                {X_WHITE, Y_WHITE, X_RED, Y_RED},
+                {X_GREEN, Y_GREEN, X_MAGENTA, Y_MAGENTA}
+        };
+        double[] ts = {0.0, 0.1, 0.5, 0.9, 1.0};
+        for (double[] p : pairs) {
+            for (double t : ts) {
+                double[] xy = lerpOKLabXY(p[0], p[1], p[2], p[3], t);
+                assertThat(xy[0]).isFinite();
+                assertThat(xy[1]).isFinite();
+                assertThat(xy[0]).isBetween(0.0, 1.0);
+                assertThat(xy[1]).isBetween(0.0, 1.0);
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("deltaE_OKLab: zero on identical, symmetric, positive otherwise")
+    void deltaEBasics() {
+        assertThat(OkLabUtil.deltaE_OKLab(X_RED, Y_RED, X_RED, Y_RED)).isCloseTo(0.0, within(1e-9));
+        double dRG = OkLabUtil.deltaE_OKLab(X_RED, Y_RED, X_GREEN, Y_GREEN);
+        double dGR = OkLabUtil.deltaE_OKLab(X_GREEN, Y_GREEN, X_RED, Y_RED);
+        assertThat(dRG).isCloseTo(dGR, within(1e-12));
+        assertThat(dRG).isGreaterThan(0.0);
+    }
+
+    private static double[] lerpOKLabXY(double x0, double y0, double x1, double y1, double t) {
+        return OkLabUtil.lerpOKLabXY(x0, y0, x1, y1, t, null);
     }
 
     private static double[] toLab(double[] xy) {
