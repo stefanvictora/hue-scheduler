@@ -10,4 +10,9 @@ public record Pair<F, S>(F first, S second) {
     public boolean test(BiPredicate<F, S> predicate) {
         return predicate.test(first, second);
     }
+
+    @Override
+    public String toString() {
+        return "[" + first + "," + second + ']';
+    }
 }

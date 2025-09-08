@@ -1694,7 +1694,7 @@ class HueSchedulerTest {
     }
 
     @Test
-    void parse_transitionTimeBefore_allowsBackToBack_zeroLengthState_usedOnlyForInterpolation() {
+    void parse_transitionTimeBefore_allowsBackToBack_zeroLengthState_bri_usedOnlyForInterpolation() {
         enableUserModificationTracking();
         addKnownLightIdsWithDefaultCapabilities(1);
         addState(1, "00:00", "bri:" + DEFAULT_BRIGHTNESS); // 00:00, zero length
@@ -1747,6 +1747,116 @@ class HueSchedulerTest {
 
         ensureRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)); // next day
     }
+
+    @Test
+    void parse_transitionTimeBefore_allowsBackToBack_zeroLengthState_ct_usedOnlyForInterpolation() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, "00:00", "ct:160"); // 00:00, zero length
+        addState(1, "00:10", "ct:170", "interpolate:true"); // 00:00, same start as initial
+        addState(1, "00:10", "ct:180"); // 10:00, zero length
+        addState(1, "00:20", "ct:190", "interpolate:true"); // 10:00 same start as second zero length
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusMinutes(10)), // 00:10 zero length
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1)),
+                expectedRunnable(now.plusDays(1), now.plusDays(1)) // 00:00 zero length state, scheduled next day
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).ct(160),
+                expectedPutCall(1).ct(170).transitionTime(tr("10min"))
+        );
+
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(10)); // next day
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(1)); // no interaction; zero length
+
+        ensureRunnable(now.plusDays(1), now.plusDays(1)); // next day
+
+        // second tr-before
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(2),
+                expectedPutCall(1).ct(180),
+                expectedPutCall(1).ct(190).transitionTime(tr("10min"))
+        );
+
+        ensureRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)); // next day
+    }
+
+    @Test
+    void parse_transitionTimeBefore_allowsBackToBack_zeroLengthState_x_usedOnlyForInterpolation() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, "00:00", "x:0.25", "y:0.2"); // 00:00, zero length
+        addState(1, "00:10", "x:0.26", "y:0.2", "interpolate:true"); // 00:00, same start as initial
+        addState(1, "00:10", "x:0.27", "y:0.2"); // 10:00, zero length
+        addState(1, "00:20", "x:0.28", "y:0.2", "interpolate:true"); // 10:00 same start as second zero length
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusMinutes(10)), // 00:10 zero length
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1)),
+                expectedRunnable(now.plusDays(1), now.plusDays(1)) // 00:00 zero length state, scheduled next day
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).x(0.25).y(0.2),
+                expectedPutCall(1).x(0.26).y(0.2).transitionTime(tr("10min"))
+        );
+
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(10)); // next day
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(1)); // no interaction; zero length
+
+        ensureRunnable(now.plusDays(1), now.plusDays(1)); // next day
+
+        // second tr-before
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(2),
+                expectedPutCall(1).x(0.27).y(0.2),
+                expectedPutCall(1).x(0.28).y(0.2).transitionTime(tr("10min"))
+        );
+
+        ensureRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)); // next day
+    }
+
+    @Test
+    void parse_transitionTimeBefore_allowsBackToBack_zeroLengthState_y_usedOnlyForInterpolation() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, "00:00", "x:0.2", "y:0.21"); // 00:00, zero length
+        addState(1, "00:10", "x:0.2", "y:0.22", "interpolate:true"); // 00:00, same start as initial
+        addState(1, "00:10", "x:0.2", "y:0.23"); // 10:00, zero length
+        addState(1, "00:20", "x:0.2", "y:0.24", "interpolate:true"); // 10:00 same start as second zero length
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusMinutes(10)), // 00:10 zero length
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1)),
+                expectedRunnable(now.plusDays(1), now.plusDays(1)) // 00:00 zero length state, scheduled next day
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).x(0.2).y(0.21),
+                expectedPutCall(1).x(0.2).y(0.22).transitionTime(tr("10min"))
+        );
+
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(10)); // next day
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(1)); // no interaction; zero length
+
+        ensureRunnable(now.plusDays(1), now.plusDays(1)); // next day
+
+        // second tr-before
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(2),
+                expectedPutCall(1).x(0.2).y(0.23),
+                expectedPutCall(1).x(0.2).y(0.24).transitionTime(tr("10min"))
+        );
+
+        ensureRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)); // next day
+    }
+
+    // todo: add test for gradient
 
     @Test
     void parse_transitionTimeBefore_viaInterpolate_usesTransitionFromPreviousState() {
@@ -9721,12 +9831,12 @@ class HueSchedulerTest {
                                    .bri(100)
                                    .ct(250));
         addState("g1", now, "scene:TestScene1");
-        addState("g1", now.plusMinutes(10), "scene:TestScene2");
+        addState("g1", now.plusMinutes(10), "scene:TestScene2", "tr-before:5min");
 
 
         List<ScheduledRunnable> runnables = startScheduler(
-                expectedRunnable(now, now.plusMinutes(10)),
-                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+                expectedRunnable(now, now.plusMinutes(5)),
+                expectedRunnable(now.plusMinutes(5), now.plusDays(1))
         );
 
         advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
@@ -9741,7 +9851,22 @@ class HueSchedulerTest {
         );
 
         ensureScheduledStates(
-                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
+                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(5)) // next day
+        );
+
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.get(1), 1,
+                expectedPutCall(4).gradient(Gradient.builder()
+                                                    .points(List.of(
+                                                            Pair.of(0.123, 0.456),
+                                                            Pair.of(0.234, 0.567)
+                                                    ))
+                                                    .mode("random_pixelated")
+                                                    .build()).transitionTime(tr("5min")),
+                expectedPutCall(5).bri(100).ct(250).transitionTime(tr("5min"))
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusDays(1).plusMinutes(5), initialNow.plusDays(2)) // next day
         );
     }
 
