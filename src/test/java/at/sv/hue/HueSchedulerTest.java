@@ -2929,7 +2929,41 @@ class HueSchedulerTest {
     }
 
     @Test
-    void parse_interpolate_offState_treatedAsZeroBrightness_interpolates() {
+    void parse_interpolate_offStateAsSource_treatedAsZeroBrightness_interpolates() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now, "on:false");
+        addState(1, now.plusMinutes(10), "bri:10", "interpolate:true");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1)),
+                expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).bri(1),
+                expectedPutCall(1).bri(10).transitionTime(tr("10min"))
+        );
+
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(2)); // next day
+
+        // turn lights on after 5 minutes
+
+        advanceCurrentTime(Duration.ofMinutes(5));
+
+        ScheduledRunnable powerOnRunnable = simulateLightOnEvent(
+                expectedPowerOnEnd(initialNow.plusDays(1))
+        ).getFirst();
+
+        powerOnRunnable.run();
+
+        assertPutCalls(
+                expectedPutCall(1).bri(5), // interpolated
+                expectedPutCall(1).bri(10).transitionTime(tr("5min"))
+        );
+    }
+
+    @Test
+    void parse_interpolate_longDuration_offStateAsTarget_treatedAsZeroBrightness_interpolates() {
         addKnownLightIdsWithDefaultCapabilities(1);
         addState(1, now, "bri:100", "ct:200");
         addState(1, now.plusHours(2), "on:false", "interpolate:true");
@@ -10327,6 +10361,119 @@ class HueSchedulerTest {
         assertScenePutCalls(2,
                 expectedPutCall(4).bri(200).ct(400).transitionTime(tr("5min")),
                 expectedPutCall(5).bri(250).ct(500).transitionTime(tr("5min"))
+        );
+
+        assertAllScenePutCallsAsserted();
+    }
+
+    @Test
+    void sceneControl_interpolate_sceneToScene_lightIsOffInBothScenes_stayOffInInterpolatedCall() {
+        mockDefaultGroupCapabilities(2);
+        mockGroupLightsForId(2, 4, 5);
+        mockSceneLightStates(2, "TestScene1",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .on(false),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(150));
+        mockSceneLightStates(2, "TestScene2",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .on(false),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(250));
+        addState("g2", now, "scene:TestScene1");
+        addState("g2", now.plusMinutes(10), "scene:TestScene2", "interpolate:true");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1)),
+                expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
+        );
+
+        ScheduledRunnable runnable = runnables.getFirst();
+        setCurrentTimeTo(runnable);
+        runnable.run();
+
+        assertScenePutCalls(2,
+                expectedPutCall(4).on(false),
+                expectedPutCall(5).bri(150)
+        );
+
+        assertScenePutCalls(2,
+                expectedPutCall(4).on(false).transitionTime(tr("10min")),
+                expectedPutCall(5).bri(250).transitionTime(tr("10min"))
+        );
+        assertAllScenePutCallsAsserted();
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
+        );
+    }
+
+    @Test
+    void sceneControl_interpolate_sceneToScene_lightIsOffInPreviousScenes_interpolatesCorrectly() {
+        mockDefaultGroupCapabilities(2);
+        mockGroupLightsForId(2, 4, 5);
+        mockSceneLightStates(2, "TestScene1",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .on(false),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(150));
+        mockSceneLightStates(2, "TestScene2",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(250));
+        addState("g2", now, "scene:TestScene1");
+        addState("g2", now.plusMinutes(10), "scene:TestScene2", "interpolate:true");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1)),
+                expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
+        );
+
+        ScheduledRunnable runnable = runnables.getFirst();
+        setCurrentTimeTo(runnable);
+        runnable.run();
+
+        assertScenePutCalls(2,
+                expectedPutCall(4).bri(1), // min brightness value
+                expectedPutCall(5).bri(150)
+        );
+
+        assertScenePutCalls(2,
+                expectedPutCall(4).bri(100).transitionTime(tr("10min")),
+                expectedPutCall(5).bri(250).transitionTime(tr("10min"))
+        );
+        assertAllScenePutCallsAsserted();
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
+        );
+
+        // after 5 minutes power on -> interpolates brightness
+
+        advanceCurrentTime(Duration.ofMinutes(5));
+
+        List<ScheduledRunnable> powerOnRunnables = simulateLightOnEvent("/groups/2",
+                expectedPowerOnEnd(initialNow.plusDays(1))
+        );
+
+        powerOnRunnables.getFirst().run();
+
+        assertScenePutCalls(2,
+                expectedPutCall(4).bri(50),  // interpolated
+                expectedPutCall(5).bri(200)  // interpolated
+        );
+        assertScenePutCalls(2,
+                expectedPutCall(4).bri(100).transitionTime(tr("5min")),
+                expectedPutCall(5).bri(250).transitionTime(tr("5min"))
         );
 
         assertAllScenePutCallsAsserted();
