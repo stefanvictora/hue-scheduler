@@ -71,7 +71,7 @@ public final class StateInterpolator {
         PutCall putCall = copy(previous);
         convertColorModeIfNeeded(putCall, target);
 
-        putCall.setBri(interpolateInteger(interpolatedTime, putCall.getBri(), getTargetBri(target)));
+        putCall.setBri(interpolateInteger(interpolatedTime, getBriConsideringOff(putCall), getBriConsideringOff(target)));
         putCall.setCt(interpolateInteger(interpolatedTime, putCall.getCt(), target.getCt()));
         var xy = interpolateXY(interpolatedTime, putCall.getXY(), target.getXY(), target.getGamut());
         if (xy != null) {
@@ -88,15 +88,22 @@ public final class StateInterpolator {
         if (target.isOn()) {
             putCall.setOn(true); // the current state is turning lights on, also set "on" property for interpolated state
         }
+        if (previous.isOff() && target.isOff()) {
+            putCall.setOn(false);
+            putCall.setBri(null);
+        }
+        if (putCall.getBri() != null && putCall.getBri() == 0) {
+            putCall.setBri(1); // min brightness is 1 if light is on
+        }
 
         return putCall;
     }
 
-    private static Integer getTargetBri(PutCall target) {
-        if (target.isOff()) {
+    private static Integer getBriConsideringOff(PutCall putCall) {
+        if (putCall.isOff()) {
             return 0;
         }
-        return target.getBri();
+        return putCall.getBri();
     }
 
     private static PutCall copy(PutCall putCall) {
@@ -109,6 +116,7 @@ public final class StateInterpolator {
      */
     public static boolean hasNoOverlappingProperties(PutCall previous, PutCall target) {
         PutCall putCall = copy(previous);
+        putCall.setBri(getBriConsideringOff(putCall));
         putCall.setOn(null); // do not reuse on property
         putCall.setEffect(null); // interpolation between effects not supported
         convertColorModeIfNeeded(putCall, target);
