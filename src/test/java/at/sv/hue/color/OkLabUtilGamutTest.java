@@ -39,8 +39,8 @@ class OkLabUtilGamutTest {
             double[] sClamp = clampXY(OOG1[0], OOG1[1], gamut);
             double[] eClamp = clampXY(OOG2[0], OOG2[1], gamut);
 
-            double[] at0 = OkLabUtil.lerpOKLabXY(OOG1[0], OOG1[1], OOG2[0], OOG2[1], 0.0, gamut);
-            double[] at1 = OkLabUtil.lerpOKLabXY(OOG1[0], OOG1[1], OOG2[0], OOG2[1], 1.0, gamut);
+            double[] at0 = lerpOKLabXY(OOG1[0], OOG1[1], OOG2[0], OOG2[1], 0.0, gamut);
+            double[] at1 = lerpOKLabXY(OOG1[0], OOG1[1], OOG2[0], OOG2[1], 1.0, gamut);
 
             assertThat(at0[0]).isCloseTo(sClamp[0], within(XY_EPS));
             assertThat(at0[1]).isCloseTo(sClamp[1], within(XY_EPS));
@@ -63,7 +63,7 @@ class OkLabUtilGamutTest {
             };
             for (double[] p : pairs) {
                 for (double t : ts) {
-                    double[] xy = OkLabUtil.lerpOKLabXY(p[0], p[1], p[2], p[3], t, gamut);
+                    double[] xy = lerpOKLabXY(p[0], p[1], p[2], p[3], t, gamut);
                     assertThat(isInsideGamut(xy[0], xy[1], gamut))
                             .as("xy must be inside gamut at t=" + t)
                             .isTrue();
@@ -78,11 +78,11 @@ class OkLabUtilGamutTest {
         Double[][] gamut = GAMUT_C; // any will do
         double t = 0.37;
 
-        double[] xyAuto = OkLabUtil.lerpOKLabXY(OOG1[0], OOG1[1], OOG2[0], OOG2[1], t, gamut);
+        double[] xyAuto = lerpOKLabXY(OOG1[0], OOG1[1], OOG2[0], OOG2[1], t, gamut);
 
         double[] s = clampXY(OOG1[0], OOG1[1], gamut);
         double[] e = clampXY(OOG2[0], OOG2[1], gamut);
-        double[] mid = OkLabUtil.lerpOKLabXY(s[0], s[1], e[0], e[1], t, null);
+        double[] mid = lerpOKLabXY(s[0], s[1], e[0], e[1], t, null);
         double[] xyManual = clampXY(mid[0], mid[1], gamut);
 
         assertThat(xyAuto[0]).isCloseTo(xyManual[0], within(XY_EPS));
@@ -101,8 +101,8 @@ class OkLabUtilGamutTest {
         assertThat(isInsideGamut(e[0], e[1], gamut)).isTrue();
 
         for (double t : new double[]{0.0, 0.2, 0.5, 0.8, 1.0}) {
-            double[] unclamped = OkLabUtil.lerpOKLabXY(s[0], s[1], e[0], e[1], t, null);
-            double[] clamped = OkLabUtil.lerpOKLabXY(s[0], s[1], e[0], e[1], t, gamut);
+            double[] unclamped = lerpOKLabXY(s[0], s[1], e[0], e[1], t, null);
+            double[] clamped = lerpOKLabXY(s[0], s[1], e[0], e[1], t, gamut);
             assertThat(clamped[0]).isCloseTo(unclamped[0], within(XY_EPS));
             assertThat(clamped[1]).isCloseTo(unclamped[1], within(XY_EPS));
         }
@@ -113,8 +113,8 @@ class OkLabUtilGamutTest {
     void symmetryWithClamp() {
         Double[][] gamut = GAMUT_B;
         double t = 0.33;
-        double[] p = OkLabUtil.lerpOKLabXY(OOG1[0], OOG1[1], IN1[0], IN1[1], t, gamut);
-        double[] q = OkLabUtil.lerpOKLabXY(IN1[0], IN1[1], OOG1[0], OOG1[1], 1.0 - t, gamut);
+        double[] p = lerpOKLabXY(OOG1[0], OOG1[1], IN1[0], IN1[1], t, gamut);
+        double[] q = lerpOKLabXY(IN1[0], IN1[1], OOG1[0], OOG1[1], 1.0 - t, gamut);
         assertThat(p[0]).isCloseTo(q[0], within(XY_EPS));
         assertThat(p[1]).isCloseTo(q[1], within(XY_EPS));
     }
@@ -123,10 +123,14 @@ class OkLabUtilGamutTest {
     @DisplayName("Idempotence: clamping the clamped result changes nothing")
     void idempotentOutputs() {
         Double[][] gamut = GAMUT_A;
-        double[] xy = OkLabUtil.lerpOKLabXY(OOG1[0], OOG1[1], OOG2[0], OOG2[1], 0.6, gamut);
+        double[] xy = lerpOKLabXY(OOG1[0], OOG1[1], OOG2[0], OOG2[1], 0.6, gamut);
         double[] reclamped = clampXY(xy[0], xy[1], gamut);
         assertThat(reclamped[0]).isCloseTo(xy[0], within(XY_EPS));
         assertThat(reclamped[1]).isCloseTo(xy[1], within(XY_EPS));
+    }
+
+    private static double[] lerpOKLabXY(double x0, double y0, double x1, double y1, double t, Double[][] gamut) {
+        return OkLabUtil.lerpOKLabXY(x0, y0, x1, y1, t, gamut);
     }
 
     private static boolean isInsideGamut(double x, double y, Double[][] gamut) {
