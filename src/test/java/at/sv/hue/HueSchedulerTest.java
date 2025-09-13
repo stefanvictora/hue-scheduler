@@ -3876,12 +3876,34 @@ class HueSchedulerTest {
 
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
-        int bri = 125;
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
-                expectedPutCall(ID).bri(bri).x(DEFAULT_X).y(DEFAULT_Y)
+                expectedPutCall(ID).bri(125).x(DEFAULT_X).y(DEFAULT_Y)
         );
 
         ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
+    void parse_canHandleColorInput_okhcl_setsXYAndBrightness() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addStateNow("1", "color:oklch(0.7 0.1 250)");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
+                expectedPutCall(ID).bri(178).x(0.23230679573929788).y(0.24985671375977586)
+        );
+
+        ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
+    void parse_unknownColor_exception() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+
+        assertThatThrownBy(() -> addStateNow("1", "color:UNKNWON(94 186)"))
+                .isInstanceOf(InvalidPropertyValue.class)
+                .hasMessageStartingWith("Invalid color value 'UNKNWON(94 186)'");
     }
 
     @Test
@@ -3894,6 +3916,152 @@ class HueSchedulerTest {
 
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
                 expectedPutCall(ID).bri(customBrightness).x(DEFAULT_X).y(DEFAULT_Y)
+        );
+
+        ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
+    void parse_gradient_rgb_justOnePoint_exception() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+
+        assertThatThrownBy(() -> addStateNow("1", "gradient:[rgb(94 186 125)]"))
+                .isInstanceOf(InvalidPropertyValue.class)
+                .hasMessageStartingWith("Invalid gradient value '[rgb(94 186 125)]'. A gradient must contain at least two colors");
+    }
+
+    @Test
+    void parse_gradient_rgb_twoPoints_missingRgbValue_exception() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+
+        assertThatThrownBy(() -> addStateNow("1", "gradient:[rgb(94 186),rgb(200 100 50)]"))
+                .isInstanceOf(InvalidPropertyValue.class)
+                .hasMessageStartingWith("Invalid RGB value 'rgb(94 186)'");
+    }
+
+    @Test
+    void parse_gradient_twoPoints_missingClosingBraces_exception() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+
+        assertThatThrownBy(() -> addStateNow("1", "gradient:[rgb(94 186 125,rgb(200 100 50)]"))
+                .isInstanceOf(InvalidPropertyValue.class)
+                .hasMessageStartingWith("Invalid color value");
+        assertThatThrownBy(() -> addStateNow("1", "gradient:[xy(0.1 0.2,rgb(200 100 50)]"))
+                .isInstanceOf(InvalidPropertyValue.class)
+                .hasMessageStartingWith("Invalid color value");
+        assertThatThrownBy(() -> addStateNow("1", "gradient:[oklch(0.6988 0.1235 257.98,rgb(200 100 50)]"))
+                .isInstanceOf(InvalidPropertyValue.class)
+                .hasMessageStartingWith("Invalid color value");
+    }
+
+    @Test
+    void parse_gradient_doesNotSupportGradient_exception() {
+        mockLightCapabilities(1, LightCapabilities.builder().capabilities(EnumSet.noneOf(Capability.class)));
+
+        assertThatThrownBy(() -> addStateNow("1", "gradient:[rgb(94 186 125),rgb(200 100 50)]"))
+                .isInstanceOf(InvalidPropertyValue.class)
+                .hasMessageContaining("does not support setting gradient");
+    }
+
+    @Test
+    void parse_gradient_xy_missingY_exception() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+
+        assertThatThrownBy(() -> addStateNow("1", "gradient:[xy(0.1 0.2),xy(0.1)]"))
+                .isInstanceOf(InvalidPropertyValue.class)
+                .hasMessageStartingWith("Invalid xy value 'xy(0.1)'");
+    }
+
+    @Test
+    void parse_gradient_rgb_twoPoints() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addStateNow("1", "gradient:[rgb( 94 186 125 ), rgb(200 100 50)]");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
+                expectedPutCall(ID).gradient(Gradient.builder()
+                                                     .points(List.of(
+                                                             Pair.of(0.2862, 0.4311),
+                                                             Pair.of(0.5148, 0.3845)
+                                                     ))
+                                                     .build())
+        );
+
+        ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
+    void parse_gradient_rgbAndHex_twoPoints() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addStateNow("1", "gradient:[rgb(150 90 77),#5eba7d]");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
+                expectedPutCall(ID).gradient(Gradient.builder()
+                                                     .points(List.of(
+                                                             Pair.of(0.4311, 0.3516),
+                                                             Pair.of(0.2862, 0.4311)
+                                                             ))
+                                                     .build())
+        );
+
+        ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
+    void parse_gradient_rgbAndXY_parsedCorrectly() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addStateNow("1", "gradient:[rgb(94 186 125),xy(0.5148 0.3845)]");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
+                expectedPutCall(ID).gradient(Gradient.builder()
+                                                     .points(List.of(
+                                                             Pair.of(0.2862, 0.4311),
+                                                             Pair.of(0.5148, 0.3845)
+                                                     ))
+                                                     .build())
+        );
+
+        ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
+    void parse_gradient_rgbAndXY_appliesGamutCorrection() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addStateNow("1", "gradient:[rgb(94 186 125),xy(0.8 0.2)]");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
+                expectedPutCall(ID).gradient(Gradient.builder()
+                                                     .points(List.of(
+                                                             Pair.of(0.2862, 0.4311),
+                                                             Pair.of(0.6915, 0.3083) // gamut corrected
+                                                     ))
+                                                     .build())
+        );
+
+        ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
+    void parse_gradient_rgbAndOklch_twoPoints() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addStateNow("1", "gradient:[rgb(94 186 125),oklch(0.6988 0.1235 257.98)]");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
+                expectedPutCall(ID).gradient(Gradient.builder()
+                                                     .points(List.of(
+                                                             Pair.of(0.2862, 0.4311),
+                                                             Pair.of(0.22315660961595307, 0.22642772615768392)
+                                                     ))
+                                                     .build())
         );
 
         ensureRunnable(initialNow.plusDays(1));

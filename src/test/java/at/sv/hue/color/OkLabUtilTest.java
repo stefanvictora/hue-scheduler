@@ -263,6 +263,14 @@ class OkLabUtilTest {
         assertThat(dRG).isGreaterThan(0.0);
     }
 
+    @Test
+    void oklch_to_xy_reference() {
+        double[] xy = OkLabUtil.OKLchDeg_to_xy(0.7, 0.1, 250.0);
+        
+        assertThat(xy[0]).isCloseTo(0.23230679574, within(1e-9));
+        assertThat(xy[1]).isCloseTo(0.24985671376, within(1e-9));
+    }
+
     private static double[] lerpOKLabXY(double x0, double y0, double x1, double y1, double t) {
         return OkLabUtil.lerpOKLabXY(x0, y0, x1, y1, t);
     }

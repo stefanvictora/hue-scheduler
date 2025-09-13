@@ -25,6 +25,10 @@ public final class LightCapabilities {
         return capabilities.contains(Capability.COLOR);
     }
 
+    public boolean isGradientSupported() {
+        return capabilities.contains(Capability.GRADIENT);
+    }
+
     public boolean isCtSupported() {
         return capabilities.contains(Capability.COLOR_TEMPERATURE);
     }

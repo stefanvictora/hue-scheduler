@@ -21,7 +21,7 @@ public final class ScheduledLightState {
     }
 
     private boolean hasNoOtherPropertiesThanOn() {
-        return bri == null && ct == null && x == null && y == null && effect == null;
+        return bri == null && ct == null && x == null && y == null && effect == null && gradient == null;
     }
 
     public boolean hasOtherPropertiesThanOn() {
