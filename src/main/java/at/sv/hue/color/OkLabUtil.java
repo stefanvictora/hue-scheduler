@@ -166,4 +166,15 @@ public final class OkLabUtil {
         double d0 = a[0] - b[0], d1 = a[1] - b[1], d2 = a[2] - b[2];
         return Math.sqrt(d0 * d0 + d1 * d1 + d2 * d2);
     }
+
+    public static double[] OKLchDeg_to_xy(double L, double C, double hueDegrees) {
+        return OKLch_to_xy(L, C, Math.toRadians(hueDegrees));
+    }
+
+    private static double[] OKLch_to_xy(double L, double C, double hueRadians) {
+        double a = C * Math.cos(hueRadians);
+        double b = C * Math.sin(hueRadians);
+        double[] xyz = OKLab_to_XYZ(L, a, b);
+        return XYZ_to_xy(xyz[0], xyz[1], xyz[2]);
+    }
 }

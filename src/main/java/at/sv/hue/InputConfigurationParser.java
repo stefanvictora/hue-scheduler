@@ -6,7 +6,9 @@ import at.sv.hue.api.Identifier;
 import at.sv.hue.api.LightCapabilities;
 import at.sv.hue.api.hass.HassSupportedEntityType;
 import at.sv.hue.color.CTToRGBConverter;
+import at.sv.hue.color.OkLchParser;
 import at.sv.hue.color.RGBToXYConverter;
+import at.sv.hue.color.XYColor;
 import at.sv.hue.time.StartTimeProvider;
 
 import java.awt.*;
@@ -85,6 +87,7 @@ public final class InputConfigurationParser {
             Boolean interpolate = null;
             Double x = null;
             Double y = null;
+            Gradient gradient = null;
             String transitionTimeBefore = null;
             Integer transitionTime = null;
             String effect = null;
@@ -113,10 +116,9 @@ public final class InputConfigurationParser {
                         }
                         if (capabilities.isColorSupported() && ct > capabilities.getCtMax()) {
                             int[] rgb = CTToRGBConverter.approximateRGBFromMired(ct);
-                            RGBToXYConverter.XYColor xyColor = RGBToXYConverter.rgbToXY(rgb[0], rgb[1], rgb[2],
-                                    capabilities.getColorGamut());
-                            x = xyColor.x();
-                            y = xyColor.y();
+                            var xy = convertToXY(rgb[0], rgb[1], rgb[2], capabilities);
+                            x = xy.x();
+                            y = xy.y();
                             ct = null;
                         }
                         break;
@@ -136,30 +138,29 @@ public final class InputConfigurationParser {
                         y = parseDouble(value, parameter);
                         break;
                     case "color":
-                        int red;
-                        int green;
-                        int blue;
-                        if (value.contains(",")) {
-                            String[] rgb = value.split(",");
-                            if (rgb.length != 3) {
-                                throw new InvalidPropertyValue("Invalid RGB value '" + value + "'. Make sure to separate the color values with ','.");
-                            }
-                            red = parseInteger(rgb[0], "color");
-                            green = parseInteger(rgb[1], "color");
-                            blue = parseInteger(rgb[2], "color");
-                        } else {
-                            Color color = Color.decode(value);
-                            red = color.getRed();
-                            green = color.getGreen();
-                            blue = color.getBlue();
-                        }
-                        RGBToXYConverter.XYColor xyColor = RGBToXYConverter.rgbToXY(red, green, blue,
-                                capabilities.getColorGamut());
+                        XYColor xyColor = parseColorValue(value, capabilities);
                         x = xyColor.x();
                         y = xyColor.y();
                         if (bri == null) {
-                            bri = xyColor.brightness();
+                            bri = xyColor.bri();
                         }
+                        break;
+                    case "gradient":
+                        String gradientString = value.substring(1, value.length() - 1).trim();
+                        String[] pointStrings = gradientString.split(",\\s*");
+                        if (pointStrings.length < 2) {
+                            throw new InvalidPropertyValue("Invalid gradient value '" + value +
+                                                           "'. A gradient must contain at least two colors, separated by ','.");
+                        }
+                        var colors = Arrays.stream(pointStrings)
+                                           .map(point -> parseColorValue(point, capabilities))
+                                           .toList();
+                        var points = colors.stream()
+                                           .map(color -> Pair.of(color.x(), color.y()))
+                                           .toList();
+                        gradient = Gradient.builder()
+                                           .points(points)
+                                           .build();
                         break;
                     case "effect":
                         effect = value;
@@ -201,7 +202,7 @@ public final class InputConfigurationParser {
                 }
             } else {
                 ScheduledLightStateValidator validator = new ScheduledLightStateValidator(identifier, groupState, capabilities,
-                        capBrightness(bri), ct, x, y, on, effect);
+                        capBrightness(bri), ct, x, y, on, effect, gradient);
                 scheduledLightStates = List.of(validator.getScheduledLightState());
             }
 
@@ -210,6 +211,49 @@ public final class InputConfigurationParser {
                     colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold, force, interpolate, groupState, false));
         }
         return states;
+    }
+
+    private static XYColor parseColorValue(String value, LightCapabilities capabilities) {
+        if (value.startsWith("rgb(") && value.endsWith(")")) {
+            String rgbString = value.substring(4, value.length() - 1).trim();
+            String[] rgb = rgbString.split(" ");
+            if (rgb.length != 3) {
+                throw new InvalidPropertyValue("Invalid RGB value '" + value + "'. Make sure to separate the color values with ' '.");
+            }
+            var r = parseInteger(rgb[0], "color");
+            var g = parseInteger(rgb[1], "color");
+            var b = parseInteger(rgb[2], "color");
+            return convertToXY(r, g, b, capabilities);
+        } else if (value.startsWith("#")) {
+            Color color = Color.decode(value);
+            return convertToXY(color.getRed(), color.getGreen(), color.getBlue(), capabilities);
+        } else if (value.startsWith("xy(") && value.endsWith(")")) {
+            String xyString = value.substring(3, value.length() - 1).trim();
+            String[] xy = xyString.split(" ");
+            if (xy.length != 2) {
+                throw new InvalidPropertyValue("Invalid xy value '" + value + "'. Make sure to separate the color values with ' '.");
+            }
+            double x = parseDouble(xy[0], "color");
+            double y = parseDouble(xy[1], "color");
+            return new XYColor(x, y, null);
+        } else if (value.startsWith("oklch(") && value.endsWith(")")) {
+            return OkLchParser.parseOkLch(value);
+        } else if (value.contains(",")) { // legacy support for comma-separated rgb
+            String[] rgb = value.split(",");
+            if (rgb.length != 3) {
+                throw new InvalidPropertyValue("Invalid RGB value '" + value + "'. Make sure to separate the color values with ','.");
+            }
+            int red = parseInteger(rgb[0], "color");
+            int green = parseInteger(rgb[1], "color");
+            int blue = parseInteger(rgb[2], "color");
+            return convertToXY(red, green, blue, capabilities);
+        }
+        throw new InvalidPropertyValue("Invalid color value '" + value + "'. Supported formats are: " +
+                                       "rgb(r g b), #rrggbb, xy(x y), oklch(L C h).");
+    }
+
+    private static XYColor convertToXY(int r, int g, int b, LightCapabilities capabilities) {
+        return RGBToXYConverter.rgbToXY(r, g, b, capabilities.getColorGamut());
     }
 
     private static List<ScheduledLightState> scaleBrightness(Integer targetBrightness, List<ScheduledLightState> scheduledLightStates) {
@@ -272,11 +316,11 @@ public final class InputConfigurationParser {
         return parseValueWithErrorHandling(value.trim(), parameter, "integer", Integer::valueOf);
     }
 
-    private Double parseDouble(String value, String parameter) {
+    private static Double parseDouble(String value, String parameter) {
         return parseValueWithErrorHandling(value, parameter, "double", Double::parseDouble);
     }
 
-    private Boolean parseBoolean(String value, String parameter) {
+    private static Boolean parseBoolean(String value, String parameter) {
         return parseValueWithErrorHandling(value, parameter, "boolean", Boolean::parseBoolean);
     }
 
