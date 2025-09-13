@@ -137,6 +137,10 @@ public final class StateInterpolator {
         if (isEqualOrNotAvailableAtTarget(putCall, target, PutCall::getY)) {
             putCall.setY(null);
         }
+        if (isEqualOrNotAvailableAtTarget(putCall, target, PutCall::getGradient)) {
+            putCall.setGradient(null);
+        }
+
     }
 
     private static PutCall getTargetConsideringOff(PutCall target) {

@@ -1915,6 +1915,52 @@ class HueSchedulerTest {
     }
 
     @Test
+    void parse_interpolate_gradient_sameValues_noInterpolation() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, "00:00", "gradient:[xy(0.8 0.2), xy(0.2 0.3)]");
+        addState(1, "00:30", "gradient:[xy(0.8 0.2), xy(0.2 0.3)]", "interpolate:true");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(30)),
+                expectedRunnable(now.plusMinutes(30), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).gradient(Gradient.builder()
+                                                    .points(List.of(
+                                                            Pair.of(0.6915, 0.3083),
+                                                            Pair.of(0.2, 0.3)
+                                                    ))
+                                                    .build())
+        );
+
+        ensureRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(30)); // next day
+    }
+
+    @Test
+    void parse_interpolate_gradient_noOverlappingProperties_noInterpolation() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, "00:00", "gradient:[xy(0.8 0.2), xy(0.2 0.3)]");
+        addState(1, "00:30", "bri:100", "interpolate:true");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(30)),
+                expectedRunnable(now.plusMinutes(30), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).bri(100).gradient(Gradient.builder()
+                                                             .points(List.of(
+                                                                     Pair.of(0.6915, 0.3083),
+                                                                     Pair.of(0.2, 0.3)
+                                                             ))
+                                                             .build())
+        );
+
+        ensureRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(30)); // next day
+    }
+
+    @Test
     void parse_transitionTimeBefore_performsInterpolationsAfterPowerCycles_usesTransitionFromPreviousState() {
         addKnownLightIdsWithDefaultCapabilities(1);
         addState(1, now, "bri:" + DEFAULT_BRIGHTNESS, "tr:1"); // this transition is used in interpolated call
@@ -4003,7 +4049,7 @@ class HueSchedulerTest {
                                                      .points(List.of(
                                                              Pair.of(0.4311, 0.3516),
                                                              Pair.of(0.2862, 0.4311)
-                                                             ))
+                                                     ))
                                                      .build())
         );
 
@@ -9648,6 +9694,16 @@ class HueSchedulerTest {
         mockSceneLightStates(1, "TestScene", ScheduledLightState.builder().id("/lights/4").bri(100));
 
         assertThrows(InvalidConfigurationLine.class, () -> addState("g1", now, "effect:effect", "scene:TestScene"));
+    }
+
+    @Test
+    void sceneControl_init_withGradient_exception() {
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4);
+        mockSceneLightStates(1, "TestScene", ScheduledLightState.builder().id("/lights/4").bri(100));
+
+        assertThrows(InvalidConfigurationLine.class, () -> addState("g1", now,
+                "gradient:[rgb(10 10 10), rgb(10 10 11)]", "scene:TestScene"));
     }
 
     @Test
