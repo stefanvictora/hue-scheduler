@@ -3303,7 +3303,7 @@ class HueSchedulerTest {
         setCurrentTimeTo(now.plusMinutes(30));
 
         runAndAssertPutCalls(trBeforeRunnable,
-                expectedPutCall(1).bri(229).x(0.2021).y(0.2142),
+                expectedPutCall(1).bri(229).x(0.2062).y(0.2171),
                 expectedPutCall(1).x(0.2108).y(0.2496).transitionTime(tr("10min"))
         );
 
@@ -3375,7 +3375,7 @@ class HueSchedulerTest {
         setCurrentTimeTo(now.plusMinutes(30));
 
         runAndAssertPutCalls(trBeforeRunnable,
-                expectedPutCall(1).x(0.2603).y(0.4027),
+                expectedPutCall(1).x(0.3).y(0.3),
                 expectedPutCall(1).x(0.4).y(0.4).transitionTime(tr("10min"))
         );
 
@@ -3937,7 +3937,7 @@ class HueSchedulerTest {
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
-                expectedPutCall(ID).bri(178).x(0.23230679573929788).y(0.24985671375977586)
+                expectedPutCall(ID).bri(178).x(0.2323).y(0.2499)
         );
 
         ensureRunnable(initialNow.plusDays(1));
@@ -4105,7 +4105,7 @@ class HueSchedulerTest {
                 expectedPutCall(ID).gradient(Gradient.builder()
                                                      .points(List.of(
                                                              Pair.of(0.2862, 0.4311),
-                                                             Pair.of(0.22315660961595307, 0.22642772615768392)
+                                                             Pair.of(0.2232, 0.2264)
                                                      ))
                                                      .build())
         );
@@ -10784,8 +10784,8 @@ class HueSchedulerTest {
         assertScenePutCalls(2,
                 expectedPutCall(4).gradient(Gradient.builder()
                                                     .points(List.of(
-                                                            Pair.of(0.2159, 0.5488), // interpolated
-                                                            Pair.of(0.2716, 0.5865)  // interpolated
+                                                            Pair.of(0.234, 0.567), // interpolated
+                                                            Pair.of(0.2924, 0.608)  // interpolated
                                                     ))
                                                     .build()),
                 expectedPutCall(5).bri(200) // interpolated

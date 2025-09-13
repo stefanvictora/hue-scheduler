@@ -61,7 +61,7 @@ public final class OkLabUtil {
     /**
      * OKLab <-> XYZ (D65), expects XYZ normalized so that white has Y=1.0
      */
-    public static double[] XYZ_to_OKLab(double X, double Y, double Z) {
+    static double[] XYZ_to_OKLab(double X, double Y, double Z) {
         double l = 0.8189330101 * X + 0.3618667424 * Y - 0.1288597137 * Z;
         double m = 0.0329845436 * X + 0.9293118715 * Y + 0.0361456387 * Z;
         double s = 0.0482003018 * X + 0.2643662691 * Y + 0.6338517070 * Z;

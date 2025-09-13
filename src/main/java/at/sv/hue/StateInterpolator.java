@@ -2,7 +2,7 @@ package at.sv.hue;
 
 import at.sv.hue.api.PutCall;
 import at.sv.hue.color.ColorModeConverter;
-import at.sv.hue.color.OkLabUtil;
+import at.sv.hue.color.XYColorGamutCorrection;
 import lombok.RequiredArgsConstructor;
 
 import java.math.BigDecimal;
@@ -192,12 +192,24 @@ public final class StateInterpolator {
         if (previous == null) {
             return null;
         }
-        double[] point = OkLabUtil.lerpOKLabXY(previous.first(), previous.second(), target.first(), target.second(),
-                interpolatedTime.doubleValue(), gamut);
-        return Pair.of(round4(point[0]), round4(point[1]));
+
+        Double x = interpolateDouble(interpolatedTime, previous.first(), target.first());
+        Double y = interpolateDouble(interpolatedTime, previous.second(), target.second());
+
+        XYColorGamutCorrection correction = new XYColorGamutCorrection(x, y, gamut);
+        return Pair.of(correction.getX(), correction.getY());
     }
 
-    private Gradient interpolateGradient(BigDecimal interpolatedTime, Gradient previous, Gradient target, Double[][] gamut) {
+    private Double interpolateDouble(BigDecimal interpolatedTime, Double previous, Double target) {
+        BigDecimal diff = BigDecimal.valueOf(target - previous);
+        return BigDecimal.valueOf(previous)
+                         .add(interpolatedTime.multiply(diff))
+                         .setScale(5, RoundingMode.HALF_UP)
+                         .doubleValue();
+    }
+
+    private Gradient interpolateGradient(BigDecimal interpolatedTime, Gradient previous, Gradient target,
+                                         Double[][] gamut) {
         if (target == null) {
             return previous;
         }
@@ -210,19 +222,16 @@ public final class StateInterpolator {
         final int maxPoints = Math.max(previousPoints.size(), targetPoints.size());
         List<Pair<Double, Double>> points = new ArrayList<>(maxPoints);
         for (int i = 0; i < maxPoints; i++) {
-            double pos;
-            if (maxPoints == 1) { // todo: minimum points is 2; so we could remove this
-                pos = 0.0;
-            } else {
-                pos = (double) i / (double) (maxPoints - 1);
-            }
+            double pos = (double) i / (double) (maxPoints - 1);
 
             var p = evalAt(previousPoints, pos);
-            var q = evalAt(targetPoints, pos);
+            var t = evalAt(targetPoints, pos);
 
-            var point = OkLabUtil.lerpOKLabXY(p.first(), p.second(), q.first(), q.second(),
-                    interpolatedTime.doubleValue(), gamut);
-            points.add(Pair.of(round4(point[0]), round4(point[1])));
+            Double x = interpolateDouble(interpolatedTime, p.first(), t.first());
+            Double y = interpolateDouble(interpolatedTime, p.second(), t.second());
+
+            XYColorGamutCorrection correction = new XYColorGamutCorrection(x, y, gamut);
+            points.add(Pair.of(correction.getX(), correction.getY()));
         }
         return new Gradient(points, target.mode());
     }
@@ -232,9 +241,6 @@ public final class StateInterpolator {
      */
     private static Pair<Double, Double> evalAt(List<Pair<Double, Double>> points, double position) {
         int n = points.size();
-        if (n == 1) { // todo: minimum points is 2; so we could remove this
-            return points.getFirst();
-        }
 
         double f = position * (n - 1);
         int i0 = (int) Math.floor(f);
@@ -246,9 +252,5 @@ public final class StateInterpolator {
         double x = a.first() + w * (b.first() - a.first());
         double y = a.second() + w * (b.second() - a.second());
         return Pair.of(x, y);
-    }
-
-    private static double round4(double v) {
-        return BigDecimal.valueOf(v).setScale(4, RoundingMode.HALF_UP).doubleValue();
     }
 }

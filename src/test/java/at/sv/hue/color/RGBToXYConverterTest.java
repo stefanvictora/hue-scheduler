@@ -16,7 +16,7 @@ public class RGBToXYConverterTest {
      */
     @Test
     void convert_convertsRGBToXYAndBrightness_handlesGamut() {
-        assertRGBToXY(0, 0, 255, GAMUT_A, 0.1418, 0.0815, 184); // would be outside gamut
+        assertRGBToXY(0, 0, 255, GAMUT_A, 0.1418, 0.0815, 183); // would be outside gamut
         assertRGBToXY(0, 255, 0, GAMUT_A, 0.3, 0.6, 254); // inside gamut
         assertRGBToXY(255, 0, 0, GAMUT_A, 0.64, 0.33, 254); // inside gamut
     }
