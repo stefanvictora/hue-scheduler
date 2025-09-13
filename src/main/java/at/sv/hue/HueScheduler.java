@@ -253,6 +253,7 @@ public final class HueScheduler implements Runnable {
     private SceneEventListenerImpl sceneEventListener;
     private ScheduledStateRegistry stateRegistry;
     private int sceneSyncDelayInSeconds = 5;
+    private boolean autoFillGradient = true;
     private boolean supportsOffLightUpdates = false;
 
     public HueScheduler() {
@@ -272,7 +273,7 @@ public final class HueScheduler implements Runnable {
                         double colorSyncThreshold,
                         int sceneActivationIgnoreWindowInSeconds, boolean interpolateAll, boolean enableSceneSync,
                         String sceneSyncName, int syncFailureRetryInMinutes, int sceneSyncDelayInSeconds,
-                        boolean supportsOffLightUpdates) {
+                        boolean autoFillGradient, boolean supportsOffLightUpdates) {
         this();
         this.api = api;
         ZonedDateTime initialTime = currentTime.get();
@@ -301,6 +302,7 @@ public final class HueScheduler implements Runnable {
         this.sceneSyncName = sceneSyncName;
         this.syncFailureRetryInMinutes = syncFailureRetryInMinutes;
         this.sceneSyncDelayInSeconds = sceneSyncDelayInSeconds;
+        this.autoFillGradient = autoFillGradient;
         this.supportsOffLightUpdates = supportsOffLightUpdates;
         apiCacheInvalidationIntervalInMinutes = 15;
         stateRegistry = new ScheduledStateRegistry(currentTime, api);
@@ -555,7 +557,7 @@ public final class HueScheduler implements Runnable {
     public void addState(String input) {
         new InputConfigurationParser(startTimeProvider, api, minTrBeforeGapInMinutes,
                 parseBrightnessPercentValue(brightnessOverrideThresholdPercentage),
-                colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold, interpolateAll)
+                colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold, interpolateAll, autoFillGradient)
                 .parse(input)
                 .forEach(stateRegistry::addState);
     }
