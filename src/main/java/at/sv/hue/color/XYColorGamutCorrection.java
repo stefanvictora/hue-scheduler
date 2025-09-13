@@ -2,6 +2,9 @@ package at.sv.hue.color;
 
 import lombok.Getter;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+
 /**
  * Code adapted from <a href="https://github.com/home-assistant/core/blob/dev/homeassistant/util/color.py">Home Assistant color.py</a>
  * License: Apache-2.0 License
@@ -23,12 +26,16 @@ public final class XYColorGamutCorrection {
         this.gamut = new ColorGamut(gamut);
         if (!isInRange()) {
             Point result = getClosestPointToPoint();
-            this.x = result.getX();
-            this.y = result.getY();
+            this.x = round4(result.getX());
+            this.y = round4(result.getY());
         } else {
-            this.x = x;
-            this.y = y;
+            this.x = round4(x);
+            this.y = round4(y);
         }
+    }
+
+    private static double round4(double v) {
+        return BigDecimal.valueOf(v).setScale(4, RoundingMode.HALF_UP).doubleValue();
     }
 
     private boolean isInRange() {
