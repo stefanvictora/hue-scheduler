@@ -91,9 +91,6 @@ public final class RGBToXYConverter {
         return BigDecimal.valueOf(v).setScale(4, RoundingMode.HALF_UP).doubleValue();
     }
 
-    public record XYColor(double x, double y, int brightness) {
-    }
-
     private static final class GammaCorrection {
         private static final double gamma = 2.4;
         private static final double transition = 0.0031308; // linear domain

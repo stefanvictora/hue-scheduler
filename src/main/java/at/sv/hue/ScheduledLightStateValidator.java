@@ -18,9 +18,11 @@ public final class ScheduledLightStateValidator {
     private final Double y;
     private final Boolean on;
     private final String effect;
+    private final Gradient gradient;
 
     public ScheduledLightStateValidator(Identifier identifier, boolean groupState, LightCapabilities capabilities,
-                                        Integer brightness, Integer ct, Double x, Double y, Boolean on, String effect) {
+                                        Integer brightness, Integer ct, Double x, Double y, Boolean on, String effect,
+                                        Gradient gradient) {
         this.identifier = identifier;
         this.groupState = groupState;
         this.capabilities = capabilities;
@@ -28,20 +30,17 @@ public final class ScheduledLightStateValidator {
         this.ct = assertCtSupportAndValue(ct);
         this.on = on;
         this.effect = assertValidEffectValue(effect);
-
         assertValidXyPair(x, y);
         if (x != null && y != null) {
             assertColorCapabilities();
-            if (x < 0 || y <= 0 || !(x + y <= 1)) {
-                throw new InvalidXAndYValue("Invalid xy chromaticity: x=" + x + ", y=" + y + ". Allowed range: 0 <= x <= 1, 0 < y <= 1, x + y <= 1");
-            }
-            XYColorGamutCorrection correction = new XYColorGamutCorrection(x, y, capabilities.getColorGamut());
-            this.x = correction.getX();
-            this.y = correction.getY();
+            var xy = assertAndCorrectXYValue(x, y);
+            this.x = xy.first();
+            this.y = xy.second();
         } else {
             this.x = null;
             this.y = null;
         }
+        this.gradient = assertValidGradientValue(gradient);
     }
 
     public ScheduledLightState getScheduledLightState() {
@@ -66,6 +65,7 @@ public final class ScheduledLightStateValidator {
                                       .y(y)
                                       .on(on)
                                       .effect(effect)
+                                      .gradient(gradient)
                                       .gamut(capabilities.getColorGamut())
                                       .build();
         }
@@ -146,6 +146,35 @@ public final class ScheduledLightStateValidator {
         if (!capabilities.isColorSupported()) {
             throw new ColorNotSupported(getFormattedName() + " does not support setting color! "
                                         + "Capabilities: " + capabilities.getCapabilities());
+        }
+    }
+
+    private Pair<Double, Double> assertAndCorrectXYValue(Double x, Double y) {
+        if (x < 0 || y <= 0 || !(x + y <= 1)) {
+            throw new InvalidXAndYValue("Invalid xy chromaticity: x=" + x + ", y=" + y + ". Allowed range: 0 <= x <= 1, 0 < y <= 1, x + y <= 1");
+        }
+        XYColorGamutCorrection correction = new XYColorGamutCorrection(x, y, capabilities.getColorGamut());
+        return Pair.of(correction.getX(), correction.getY());
+    }
+
+    private Gradient assertValidGradientValue(Gradient gradient) {
+        if (gradient != null) {
+            assertGradientCapabilities();
+            var points = gradient.points().stream()
+                                 .map(point -> {
+                                     var xy = assertAndCorrectXYValue(point.first(), point.second());
+                                     return Pair.of(xy.first(), xy.second());
+                                 })
+                                 .toList();
+            return Gradient.builder().points(points).build();
+        }
+        return null;
+    }
+
+    private void assertGradientCapabilities() {
+        if (!capabilities.isGradientSupported()) {
+            throw new InvalidPropertyValue(getFormattedName() + " does not support setting gradient! "
+                                           + "Capabilities: " + capabilities.getCapabilities());
         }
     }
 

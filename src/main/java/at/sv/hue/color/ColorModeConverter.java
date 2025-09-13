@@ -50,7 +50,7 @@ public final class ColorModeConverter {
     }
 
     private static void setXYFromRgb(PutCall putCall, int[] rgb) {
-        RGBToXYConverter.XYColor xyColor = RGBToXYConverter.rgbToXY(rgb[0], rgb[1], rgb[2], putCall.getGamut());
+        XYColor xyColor = RGBToXYConverter.rgbToXY(rgb[0], rgb[1], rgb[2], putCall.getGamut());
         putCall.setX(xyColor.x());
         putCall.setY(xyColor.y());
     }

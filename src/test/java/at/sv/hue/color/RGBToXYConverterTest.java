@@ -59,9 +59,9 @@ public class RGBToXYConverterTest {
     }
 
     private void assertRGBToXY(int r, int g, int b, Double[][] gamut, double x, double y, int brightness) {
-        RGBToXYConverter.XYColor color = RGBToXYConverter.rgbToXY(r, g, b, gamut);
+        XYColor color = RGBToXYConverter.rgbToXY(r, g, b, gamut);
         assertThat(color.x()).isEqualByComparingTo(x);
         assertThat(color.y()).isEqualByComparingTo(y);
-        assertThat(color.brightness()).isEqualTo(brightness);
+        assertThat(color.bri()).isEqualTo(brightness);
     }
 }

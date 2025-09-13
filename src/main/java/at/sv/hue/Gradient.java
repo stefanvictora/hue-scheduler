@@ -11,7 +11,7 @@ public record Gradient(List<Pair<Double, Double>> points, String mode) {
     public String toString() {
         return "{" +
                "points=" + points +
-               ", mode='" + mode + '\'' +
+               (mode != null ? ", mode='" + mode + '\'' : "") +
                '}';
     }
 }
