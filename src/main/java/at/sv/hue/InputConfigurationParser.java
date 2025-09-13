@@ -185,7 +185,7 @@ public final class InputConfigurationParser {
 
             List<ScheduledLightState> scheduledLightStates;
             if (scene != null) {
-                if (ct != null || x != null || y != null || effect != null) {
+                if (ct != null || x != null || y != null || effect != null || gradient != null) {
                     throw new InvalidConfigurationLine(
                             "When 'scene' is used, only 'on', 'bri', 'tr', 'tr-before', 'days', 'force', 'interpolate' are allowed.");
                 }
