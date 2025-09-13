@@ -26,6 +26,8 @@ public final class InputConfigurationParser {
 
     private static final Pattern TR_PATTERN = Pattern.compile("(?:(\\d+)h)?(?:(\\d+)min)?(?:(\\d+)s)?(\\d*)?",
             Pattern.CASE_INSENSITIVE);
+    private static final Pattern GRADIENT_VALUE = Pattern.compile("^\\[(?<list>.+?)](?:@(?<mode>[A-Za-z_]+))?$",
+            Pattern.CASE_INSENSITIVE);
 
     private final StartTimeProvider startTimeProvider;
     private final HueApi api;
@@ -149,8 +151,14 @@ public final class InputConfigurationParser {
                         }
                         break;
                     case "gradient":
-                        String gradientString = value.substring(1, value.length() - 1).trim();
-                        String[] pointStrings = gradientString.split(",\\s*");
+                        Matcher m = GRADIENT_VALUE.matcher(value.trim());
+                        if (!m.matches()) {
+                            throw new InvalidPropertyValue("Invalid gradient value '" + value +
+                                                           "'. Expected: gradient:[<color>, <color>[, ...]]@<mode?>");
+                        }
+                        String gradientList = m.group("list");
+                        String mode = m.group("mode");
+                        String[] pointStrings = gradientList.split(",\\s*");
                         var colors = Arrays.stream(pointStrings)
                                            .map(point -> parseColorValue(point, capabilities))
                                            .toList();
@@ -166,6 +174,7 @@ public final class InputConfigurationParser {
                                            .toList();
                         gradient = Gradient.builder()
                                            .points(points)
+                                           .mode(mode)
                                            .build();
                         break;
                     case "effect":
@@ -255,7 +264,7 @@ public final class InputConfigurationParser {
             return convertToXY(red, green, blue, capabilities);
         }
         throw new InvalidPropertyValue("Invalid color value '" + value + "'. Supported formats are: " +
-                                       "rgb(r g b), #rrggbb, xy(x y), oklch(L C h).");
+                                       "'rgb(r g b)', '#rrggbb', 'xy(x y)', 'oklch(L C h)'.");
     }
 
     private static XYColor convertToXY(int r, int g, int b, LightCapabilities capabilities) {
