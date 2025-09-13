@@ -23,7 +23,7 @@ public final class StateInterpolator {
 
     public PutCalls getInterpolatedPutCalls() {
         if (state.isAlreadyReached(dateTime)) {
-            return null; // the state is already reached
+            return null; // no interpolation needed anymore
         }
         return interpolate();
     }

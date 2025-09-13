@@ -6481,6 +6481,7 @@ class HueSchedulerTest {
         advanceCurrentTime(Duration.ofSeconds(sceneActivationIgnoreWindowInSeconds)); // outside ignore window
 
         runAndAssertPutCalls(powerOnRunnable,
+                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS) // still applied, as just turned on and synced scene is not treated as manual override
                 expectedPutCall(1).bri(50)
         );
     }
