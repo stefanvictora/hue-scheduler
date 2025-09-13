@@ -160,6 +160,7 @@ public final class ScheduledLightStateValidator {
     private Gradient assertValidGradientValue(Gradient gradient) {
         if (gradient != null) {
             assertGradientCapabilities();
+            assertValidNumberOfGradientPoints(gradient);
             var points = gradient.points().stream()
                                  .map(point -> {
                                      var xy = assertAndCorrectXYValue(point.first(), point.second());
@@ -175,6 +176,18 @@ public final class ScheduledLightStateValidator {
         if (!capabilities.isGradientSupported()) {
             throw new InvalidPropertyValue(getFormattedName() + " does not support setting gradient! "
                                            + "Capabilities: " + capabilities.getCapabilities());
+        }
+    }
+
+    private void assertValidNumberOfGradientPoints(Gradient gradient) {
+        if (gradient.points().size() < 2) {
+            throw new InvalidPropertyValue("Invalid gradient '" + gradient +
+                                           "'. A gradient must contain at least two colors.");
+        }
+        if (gradient.points().size() > capabilities.getMaxGradientPoints()) {
+            throw new InvalidPropertyValue("Invalid gradient '" + gradient +
+                                           "'. The maximum number of gradient points for this light is " +
+                                           capabilities.getMaxGradientPoints() + ".");
         }
     }
 
