@@ -224,6 +224,7 @@ public final class HueScheduler implements Runnable {
     private SceneEventListenerImpl sceneEventListener;
     private ScheduledStateRegistry stateRegistry;
     private int sceneSyncDelayInSeconds = 5;
+    private boolean autoFillGradient = true;
 
     public HueScheduler() {
         currentTime = ZonedDateTime::now;
@@ -242,7 +243,8 @@ public final class HueScheduler implements Runnable {
                         int minTrBeforeGapInMinutes, int brightnessOverrideThresholdPercentage,
                         int colorTemperatureOverrideThresholdKelvin, double colorOverrideThreshold,
                         int sceneActivationIgnoreWindowInSeconds, boolean interpolateAll, boolean enableSceneSync,
-                        String sceneSyncName, int sceneSyncIntervalInMinutes, int sceneSyncDelayInSeconds) {
+                        String sceneSyncName, int sceneSyncIntervalInMinutes, int sceneSyncDelayInSeconds,
+                        boolean autoFillGradient) {
         this();
         this.api = api;
         ZonedDateTime initialTime = currentTime.get();
@@ -268,6 +270,7 @@ public final class HueScheduler implements Runnable {
         this.sceneSyncName = sceneSyncName;
         this.sceneSyncIntervalInMinutes = sceneSyncIntervalInMinutes;
         this.sceneSyncDelayInSeconds = sceneSyncDelayInSeconds;
+        this.autoFillGradient = autoFillGradient;
         apiCacheInvalidationIntervalInMinutes = 15;
         stateRegistry = new ScheduledStateRegistry(currentTime, api);
         this.sceneEventListener = new SceneEventListenerImpl(api, fakeTicker, sceneActivationIgnoreWindowInSeconds,
@@ -496,7 +499,7 @@ public final class HueScheduler implements Runnable {
 
     public void addState(String input) {
         new InputConfigurationParser(startTimeProvider, api, minTrBeforeGapInMinutes, brightnessOverrideThresholdPercentage,
-                colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold, interpolateAll)
+                colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold, interpolateAll, autoFillGradient)
                 .parse(input)
                 .forEach(stateRegistry::addState);
     }

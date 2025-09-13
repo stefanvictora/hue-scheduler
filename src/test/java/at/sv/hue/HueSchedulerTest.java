@@ -92,6 +92,7 @@ class HueSchedulerTest {
     private int expectedSceneUpdates;
     private int sceneSyncDelayInSeconds;
     private int sceneActivationIgnoreWindowInSeconds;
+    private boolean autoFillGradient;
 
     private void setCurrentTimeToAndRun(ScheduledRunnable scheduledRunnable) {
         setCurrentTimeTo(scheduledRunnable);
@@ -139,7 +140,7 @@ class HueSchedulerTest {
                 requireSceneActivation, defaultInterpolationTransitionTimeInMs, 0, connectionFailureRetryDelay,
                 minTrGap, BRIGHTNESS_OVERRIDE_THRESHOLD_PERCENT, COLOR_TEMPERATURE_OVERRIDE_THRESHOLD_KELVIN,
                 COLOR_OVERRIDE_THRESHOLD, sceneActivationIgnoreWindowInSeconds, interpolateAll,
-                enableSceneSync, sceneSyncName, sceneSyncInterpolationInterval, sceneSyncDelayInSeconds);
+                enableSceneSync, sceneSyncName, sceneSyncInterpolationInterval, sceneSyncDelayInSeconds, autoFillGradient);
         manualOverrideTracker = scheduler.getManualOverrideTracker();
     }
 
@@ -517,6 +518,7 @@ class HueSchedulerTest {
         interpolateAll = false;
         sceneSyncDelayInSeconds = 0;
         sceneActivationIgnoreWindowInSeconds = 5;
+        autoFillGradient = false;
         create();
     }
 
@@ -3965,7 +3967,20 @@ class HueSchedulerTest {
 
         assertThatThrownBy(() -> addStateNow("1", "gradient:[rgb(94 186 125)]"))
                 .isInstanceOf(InvalidPropertyValue.class)
-                .hasMessageStartingWith("Invalid gradient value '[rgb(94 186 125)]'. A gradient must contain at least two colors");
+                .hasMessageStartingWith("Invalid gradient")
+                .hasMessageContaining("A gradient must contain at least two colors.");
+    }
+
+    @Test
+    void parse_gradient_rgb_twoManyPoints_exception() {
+        mockLightCapabilities(1, LightCapabilities.builder()
+                                                  .maxGradientPoints(2)
+                                                  .capabilities(EnumSet.of(Capability.GRADIENT)));
+
+        assertThatThrownBy(() -> addStateNow("1", "gradient:[rgb(94 186 125),rgb(94 186 125),rgb(94 186 125)]"))
+                .isInstanceOf(InvalidPropertyValue.class)
+                .hasMessageStartingWith("Invalid gradient")
+                .hasMessageContaining("The maximum number of gradient points for this light is 2.");
     }
 
     @Test
@@ -4021,6 +4036,30 @@ class HueSchedulerTest {
                 expectedPutCall(ID).gradient(Gradient.builder()
                                                      .points(List.of(
                                                              Pair.of(0.2862, 0.4311),
+                                                             Pair.of(0.5148, 0.3845)
+                                                     ))
+                                                     .build())
+        );
+
+        ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
+    void parse_gradient_rgb_twoPoints_autoFillTrue_extendsToFivePoints() {
+        autoFillGradient = true;
+        create();
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addStateNow("1", "gradient:[rgb(94 186 125),rgb(200 100 50)]");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
+                expectedPutCall(ID).gradient(Gradient.builder()
+                                                     .points(List.of(
+                                                             Pair.of(0.2862, 0.4311),
+                                                             Pair.of(0.3581, 0.4808),
+                                                             Pair.of(0.441, 0.4843),
+                                                             Pair.of(0.5017, 0.4448),
                                                              Pair.of(0.5148, 0.3845)
                                                      ))
                                                      .build())
