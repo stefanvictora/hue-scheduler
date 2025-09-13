@@ -5,7 +5,7 @@ import lombok.Builder;
 import java.util.List;
 import java.util.Objects;
 
-@Builder
+@Builder(toBuilder = true)
 public record Gradient(List<Pair<Double, Double>> points, String mode) {
 
     @Override
