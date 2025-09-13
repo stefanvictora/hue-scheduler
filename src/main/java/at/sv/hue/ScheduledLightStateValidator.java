@@ -161,13 +161,14 @@ public final class ScheduledLightStateValidator {
         if (gradient != null) {
             assertGradientCapabilities();
             assertValidNumberOfGradientPoints(gradient);
+            assertValidGradientMode(gradient);
             var points = gradient.points().stream()
                                  .map(point -> {
                                      var xy = assertAndCorrectXYValue(point.first(), point.second());
                                      return Pair.of(xy.first(), xy.second());
                                  })
                                  .toList();
-            return Gradient.builder().points(points).build();
+            return gradient.toBuilder().points(points).build();
         }
         return null;
     }
@@ -188,6 +189,17 @@ public final class ScheduledLightStateValidator {
             throw new InvalidPropertyValue("Invalid gradient '" + gradient +
                                            "'. The maximum number of gradient points for this light is " +
                                            capabilities.getMaxGradientPoints() + ".");
+        }
+    }
+
+    private void assertValidGradientMode(Gradient gradient) {
+        if (gradient.mode() == null) {
+            return;
+        }
+        List<String> supportedModes = capabilities.getGradientModes();
+        if (supportedModes == null || !supportedModes.contains(gradient.mode())) {
+            throw new InvalidPropertyValue("Unsupported gradient mode: '" + gradient.mode() + "'." +
+                                           " Supported modes: " + supportedModes);
         }
     }
 

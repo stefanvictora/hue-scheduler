@@ -4053,6 +4053,47 @@ class HueSchedulerTest {
     }
 
     @Test
+    void parse_gradient_rgb_twoPoints_withMode_correctlyParsed() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addStateNow("1", "gradient:[rgb(94 186 125),rgb(200 100 50)]@random_pixelated");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
+                expectedPutCall(ID).gradient(Gradient.builder()
+                                                     .points(List.of(
+                                                             Pair.of(0.2862, 0.4311),
+                                                             Pair.of(0.5148, 0.3845)
+                                                     ))
+                                                     .mode("random_pixelated")
+                                                     .build())
+        );
+
+        ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
+    void parse_gradient_rgb_unknownMode_exception() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+
+        assertThatThrownBy(() -> addStateNow("1", "gradient:[rgb(94 186 125),rgb(200 100 50)]@UNKNOWN"))
+                .isInstanceOf(InvalidPropertyValue.class)
+                .hasMessageStartingWith("Unsupported gradient mode: 'UNKNOWN'");
+    }
+
+    @Test
+    void parse_gradient_rgb_hasNoAvailableModesDefined_exception() {
+        mockLightCapabilities(1, LightCapabilities.builder()
+                                                  .maxGradientPoints(5)
+                                                  .gradientModes(null)
+                                                  .capabilities(EnumSet.of(Capability.GRADIENT)));
+
+        assertThatThrownBy(() -> addStateNow("1", "gradient:[rgb(94 186 125),rgb(200 100 50)]@random_pixelated"))
+                .isInstanceOf(InvalidPropertyValue.class)
+                .hasMessageStartingWith("Unsupported gradient mode: 'random_pixelated'");
+    }
+
+    @Test
     void parse_gradient_rgb_twoPoints_autoFillTrue_extendsToFivePoints() {
         autoFillGradient = true;
         create();
