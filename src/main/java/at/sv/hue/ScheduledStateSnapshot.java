@@ -277,7 +277,16 @@ public class ScheduledStateSnapshot {
                 if (putCall.getBri() == null) {
                     putCall.setBri(previousPutCall.getBri());
                 }
-                if (putCall.getColorMode() == ColorMode.NONE) {
+                if (putCall.getEffect() != null) {
+                    Effect effect = putCall.getEffect();
+                    if (hasNoColorProperties(effect)) {
+                        Effect.EffectBuilder builder = effect.toBuilder();
+                        builder.x(previousPutCall.getX());
+                        builder.y(previousPutCall.getY());
+                        builder.ct(previousPutCall.getCt());
+                        putCall.setEffect(builder.build());
+                    }
+                } else if (putCall.getColorMode() == ColorMode.NONE) {
                     putCall.setCt(previousPutCall.getCt());
                     putCall.setX(previousPutCall.getX());
                     putCall.setY(previousPutCall.getY());
@@ -290,6 +299,10 @@ public class ScheduledStateSnapshot {
 
     private static boolean hasNoTransition(PutCalls putCalls) {
         return putCalls.getTransitionTime() == null || putCalls.getTransitionTime() == 0;
+    }
+
+    private static boolean hasNoColorProperties(Effect effect) {
+        return effect.x() == null && effect.y() == null && effect.ct() == null;
     }
 
     public PutCalls getNextInterpolatedSplitPutCalls(ZonedDateTime now) {
