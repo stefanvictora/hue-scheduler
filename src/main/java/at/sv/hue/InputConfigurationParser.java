@@ -6,7 +6,6 @@ import at.sv.hue.api.Identifier;
 import at.sv.hue.api.LightCapabilities;
 import at.sv.hue.api.hass.HassSupportedEntityType;
 import at.sv.hue.color.CTToRGBConverter;
-import at.sv.hue.color.OkLabUtil;
 import at.sv.hue.color.OkLchParser;
 import at.sv.hue.color.RGBToXYConverter;
 import at.sv.hue.color.XYColor;
@@ -162,13 +161,6 @@ public final class InputConfigurationParser {
                         var colors = Arrays.stream(pointStrings)
                                            .map(point -> parseColorValue(point, capabilities))
                                            .toList();
-                        if (autoFillGradient && colors.size() == 2) {
-                            colors = autoFillPerceptualTwoPoint(
-                                    colors.get(0),
-                                    colors.get(1),
-                                    capabilities.getMaxGradientPoints(),
-                                    capabilities.getColorGamut());
-                        }
                         var points = colors.stream()
                                            .map(color -> Pair.of(color.x(), color.y()))
                                            .toList();
@@ -217,7 +209,7 @@ public final class InputConfigurationParser {
                 }
             } else {
                 ScheduledLightStateValidator validator = new ScheduledLightStateValidator(identifier, groupState, capabilities,
-                        capBrightness(bri), ct, x, y, on, effect, gradient);
+                        capBrightness(bri), ct, x, y, on, effect, gradient, autoFillGradient);
                 scheduledLightStates = List.of(validator.getScheduledLightState());
             }
 
@@ -269,19 +261,6 @@ public final class InputConfigurationParser {
 
     private static XYColor convertToXY(int r, int g, int b, LightCapabilities capabilities) {
         return RGBToXYConverter.rgbToXY(r, g, b, capabilities.getColorGamut());
-    }
-
-    static List<XYColor> autoFillPerceptualTwoPoint(XYColor start, XYColor end, int maxPoints, Double[][] gamut) {
-        int n = Math.max(3, maxPoints);
-        List<XYColor> points = new ArrayList<>(n);
-        points.add(start);
-        for (int i = 1; i < n - 1; i++) {
-            double t = (double) i / (double) (n - 1);
-            double[] xy = OkLabUtil.lerpOKLabXY(start.x(), start.y(), end.x(), end.y(), t, gamut);
-            points.add(new XYColor(xy[0], xy[1], null));
-        }
-        points.add(end);
-        return points;
     }
 
     private static List<ScheduledLightState> scaleBrightness(Integer targetBrightness, List<ScheduledLightState> scheduledLightStates) {

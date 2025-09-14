@@ -2,8 +2,10 @@ package at.sv.hue;
 
 import at.sv.hue.api.Identifier;
 import at.sv.hue.api.LightCapabilities;
+import at.sv.hue.color.OkLabUtil;
 import at.sv.hue.color.XYColorGamutCorrection;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public final class ScheduledLightStateValidator {
@@ -18,11 +20,12 @@ public final class ScheduledLightStateValidator {
     private final Double y;
     private final Boolean on;
     private final String effect;
+    private final boolean autoFillGradient;
     private final Gradient gradient;
 
     public ScheduledLightStateValidator(Identifier identifier, boolean groupState, LightCapabilities capabilities,
                                         Integer brightness, Integer ct, Double x, Double y, Boolean on, String effect,
-                                        Gradient gradient) {
+                                        Gradient gradient, boolean autoFillGradient) {
         this.identifier = identifier;
         this.groupState = groupState;
         this.capabilities = capabilities;
@@ -30,6 +33,7 @@ public final class ScheduledLightStateValidator {
         this.ct = assertCtSupportAndValue(ct);
         this.on = on;
         this.effect = assertValidEffectValue(effect);
+        this.autoFillGradient = autoFillGradient;
         assertValidXyPair(x, y);
         if (x != null && y != null) {
             assertColorCapabilities();
@@ -162,13 +166,7 @@ public final class ScheduledLightStateValidator {
             assertGradientCapabilities();
             assertValidNumberOfGradientPoints(gradient);
             assertValidGradientMode(gradient);
-            var points = gradient.points().stream()
-                                 .map(point -> {
-                                     var xy = assertAndCorrectXYValue(point.first(), point.second());
-                                     return Pair.of(xy.first(), xy.second());
-                                 })
-                                 .toList();
-            return gradient.toBuilder().points(points).build();
+            return validateGradientPointsAndAutoFillIfNeeded(gradient);
         }
         return null;
     }
@@ -201,6 +199,47 @@ public final class ScheduledLightStateValidator {
             throw new InvalidPropertyValue("Unsupported gradient mode: '" + gradient.mode() + "'." +
                                            " Supported modes: " + supportedModes);
         }
+    }
+
+    private Gradient validateGradientPointsAndAutoFillIfNeeded(Gradient gradient) {
+        var points = autoFillPointsIfNeeded(gradient);
+        return gradient.toBuilder()
+                       .points(validateAndCorrectPoints(points))
+                       .build();
+    }
+
+    private List<Pair<Double, Double>> autoFillPointsIfNeeded(Gradient gradient) {
+        if (shouldNotAutoFill(gradient)) {
+            return gradient.points();
+        }
+        return autoFillPerceptualTwoPoint(gradient.points().get(0), gradient.points().get(1));
+    }
+
+    private boolean shouldNotAutoFill(Gradient gradient) {
+        return !autoFillGradient || gradient.points().size() != 2;
+    }
+
+    private List<Pair<Double, Double>> autoFillPerceptualTwoPoint(Pair<Double, Double> start, Pair<Double, Double> end) {
+        int maxGradientPoints = Math.max(3, capabilities.getMaxGradientPoints());
+        List<Pair<Double, Double>> points = new ArrayList<>(maxGradientPoints);
+        points.add(start);
+        for (int i = 1; i < maxGradientPoints - 1; i++) {
+            double t = (double) i / (double) (maxGradientPoints - 1);
+            double[] xy = OkLabUtil.lerpOKLabXY(start.first(), start.second(), end.first(), end.second(), t,
+                    capabilities.getColorGamut());
+            points.add(Pair.of(xy[0], xy[1]));
+        }
+        points.add(end);
+        return points;
+    }
+
+    private List<Pair<Double, Double>> validateAndCorrectPoints(List<Pair<Double, Double>> points) {
+        return points.stream()
+                     .map(point -> {
+                         var xy = assertAndCorrectXYValue(point.first(), point.second());
+                         return Pair.of(xy.first(), xy.second());
+                     })
+                     .toList();
     }
 
     private String getFormattedName() {
