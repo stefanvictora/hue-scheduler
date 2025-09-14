@@ -277,10 +277,10 @@ public class ScheduledStateSnapshot {
                 if (putCall.getBri() == null) {
                     putCall.setBri(previousPutCall.getBri());
                 }
-                if (putCall.getEffect() == null) {
+                if (shouldCopyEffect(putCall)) {
                     putCall.setEffect(previousPutCall.getEffect());
                 }
-                if (putCall.getEffect() != null && !putCall.getEffect().isNone()) {
+                if (shouldParameteriseEffect(putCall)) {
                     Effect effect = putCall.getEffect();
                     if (hasNoColorProperties(effect)) {
                         Effect.EffectBuilder builder = effect.toBuilder();
@@ -302,6 +302,14 @@ public class ScheduledStateSnapshot {
 
     private static boolean hasNoTransition(PutCalls putCalls) {
         return putCalls.getTransitionTime() == null || putCalls.getTransitionTime() == 0;
+    }
+
+    private static boolean shouldCopyEffect(PutCall putCall) {
+        return putCall.getEffect() == null && putCall.getGradient() == null; // effects are not compatible with gradients
+    }
+
+    private static boolean shouldParameteriseEffect(PutCall putCall) {
+        return putCall.getEffect() != null && !putCall.getEffect().isNone();
     }
 
     private static boolean hasNoColorProperties(Effect effect) {
