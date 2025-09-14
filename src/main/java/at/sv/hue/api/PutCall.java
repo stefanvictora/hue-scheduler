@@ -29,7 +29,7 @@ public final class PutCall {
     Double[][] gamut;
 
     public boolean isNullCall() {
-        return Stream.of(bri, ct, x, y, on, effect).allMatch(Objects::isNull);
+        return Stream.of(bri, ct, x, y, on, effect, gradient).allMatch(Objects::isNull);
     }
 
     public ColorMode getColorMode() {

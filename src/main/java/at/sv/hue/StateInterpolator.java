@@ -137,10 +137,9 @@ public final class StateInterpolator {
         if (isEqualOrNotAvailableAtTarget(putCall, target, PutCall::getY)) {
             putCall.setY(null);
         }
-        if (isEqualOrNotAvailableAtTarget(putCall, target, PutCall::getGradient)) {
+        if (isEqualOrNotAvailableAtTarget(putCall, target, StateInterpolator::getGradientPoints)) { // we don't care about gradient mode here
             putCall.setGradient(null);
         }
-
     }
 
     private static PutCall getTargetConsideringOff(PutCall target) {
@@ -154,6 +153,13 @@ public final class StateInterpolator {
 
     private static boolean isEqualOrNotAvailableAtTarget(PutCall putCall, PutCall target, Function<PutCall, Object> function) {
         return Objects.equals(function.apply(putCall), function.apply(target)) || function.apply(target) == null;
+    }
+
+    private static List<Pair<Double, Double>> getGradientPoints(PutCall putCall) {
+        if (putCall.getGradient() == null) {
+            return null;
+        }
+        return putCall.getGradient().points();
     }
 
     /**
