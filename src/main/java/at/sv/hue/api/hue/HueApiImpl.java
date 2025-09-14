@@ -89,7 +89,7 @@ public final class HueApiImpl implements HueApi {
     }
 
     private static <T> AsyncLoadingCache<String, Map<String, T>> createCache(Supplier<Map<String, T>> supplier,
-                                                                        int apiCacheInvalidationIntervalInMinutes) {
+                                                                             int apiCacheInvalidationIntervalInMinutes) {
         return Caffeine.newBuilder()
                        .refreshAfterWrite(Duration.ofMinutes(apiCacheInvalidationIntervalInMinutes))
                        .expireAfterWrite(Duration.ofMinutes(apiCacheInvalidationIntervalInMinutes * 2L))
@@ -789,6 +789,7 @@ public final class HueApiImpl implements HueApi {
                 .stream()
                 .map(LightCapabilities::getCapabilities)
                 .flatMap(Collection::stream)
+                .filter(capability -> capability != Capability.GRADIENT)
                 .collect(Collectors.toSet()));
     }
 
