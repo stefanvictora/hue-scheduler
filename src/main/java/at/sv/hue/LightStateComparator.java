@@ -6,8 +6,13 @@ import at.sv.hue.api.PutCall;
 import at.sv.hue.color.ColorComparator;
 import lombok.RequiredArgsConstructor;
 
+import java.util.List;
+import java.util.Objects;
+
 @RequiredArgsConstructor
 public class LightStateComparator {
+
+    private static final String DEFAULT_GRADIENT_MODE = "interpolated_palette";
 
     private final PutCall lastPutCall;
     private final LightState currentState;
@@ -44,7 +49,7 @@ public class LightStateComparator {
         if (colorModeNotSupportedByState(colorMode)) {
             return false;
         }
-        if (incompatibleColorMode(colorMode)) {
+        if (colorModeDiffers(colorMode)) {
             return true;
         }
         return switch (colorMode) {
@@ -52,19 +57,53 @@ public class LightStateComparator {
             case XY -> ColorComparator.colorDiffers(currentState.getX(), currentState.getY(),
                     lastPutCall.getX(), lastPutCall.getY(), currentState.getLightCapabilities().getColorGamut(),
                     colorOverrideThreshold);
-            // todo: add gradient comparison
+            case GRADIENT -> gradientDiffers();
             default -> false;
         };
     }
 
-    private boolean colorModeNotSupportedByState(ColorMode colorMode) {
-        return colorMode == ColorMode.CT && !currentState.isCtSupported()
-               || colorMode == ColorMode.XY && !currentState.isColorSupported();
+    private boolean gradientDiffers() {
+        if (gradientModeDiffers()) {
+            return true;
+        }
+        return gradientPointsDiffer();
     }
 
-    private boolean incompatibleColorMode(ColorMode colorMode) {
-        return colorMode == ColorMode.CT && currentState.getColormode() != ColorMode.CT ||
-               currentState.getColormode() == ColorMode.CT && colorMode != ColorMode.CT;
+    private boolean gradientModeDiffers() {
+        return !Objects.equals(getGradientModeOrDefault(currentState.getGradient()),
+                getGradientModeOrDefault(lastPutCall.getGradient()));
+    }
+
+    private String getGradientModeOrDefault(Gradient gradient) {
+        return Objects.requireNonNullElse(gradient.mode(), DEFAULT_GRADIENT_MODE);
+    }
+
+    private boolean gradientPointsDiffer() {
+        List<Pair<Double, Double>> currentPoints = currentState.getGradient().points();
+        List<Pair<Double, Double>> lastPoints = lastPutCall.getGradient().points();
+        if (currentPoints.size() != lastPoints.size()) {
+            return true;
+        }
+        for (int i = 0; i < lastPoints.size(); i++) {
+            Pair<Double, Double> currentPoint = currentPoints.get(i);
+            Pair<Double, Double> lastPoint = lastPoints.get(i);
+            if (ColorComparator.colorDiffers(currentPoint.first(), currentPoint.second(),
+                    lastPoint.first(), lastPoint.second(), currentState.getLightCapabilities().getColorGamut(),
+                    colorOverrideThreshold)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean colorModeNotSupportedByState(ColorMode colorMode) {
+        return colorMode == ColorMode.CT && !currentState.isCtSupported()
+               || colorMode == ColorMode.XY && !currentState.isColorSupported()
+               || colorMode == ColorMode.GRADIENT && !currentState.isGradientSupported();
+    }
+
+    private boolean colorModeDiffers(ColorMode colorMode) {
+        return !Objects.equals(colorMode, currentState.getColormode());
     }
 
     private boolean ctDiffers() {
