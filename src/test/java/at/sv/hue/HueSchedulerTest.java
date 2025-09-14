@@ -4078,6 +4078,17 @@ class HueSchedulerTest {
     }
 
     @Test
+    void parse_gradient_withAutoFill_doesNotSupportGradient_exception() {
+        autoFillGradient = true;
+        create();
+        mockLightCapabilities(1, LightCapabilities.builder().capabilities(EnumSet.noneOf(Capability.class)));
+
+        assertThatThrownBy(() -> addStateNow("1", "gradient:[rgb(94 186 125),rgb(200 100 50)]"))
+                .isInstanceOf(InvalidPropertyValue.class)
+                .hasMessageContaining("does not support setting gradient");
+    }
+
+    @Test
     void parse_gradient_xy_missingY_exception() {
         addKnownLightIdsWithDefaultCapabilities(1);
 
