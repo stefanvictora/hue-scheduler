@@ -277,7 +277,10 @@ public class ScheduledStateSnapshot {
                 if (putCall.getBri() == null) {
                     putCall.setBri(previousPutCall.getBri());
                 }
-                if (putCall.getEffect() != null) {
+                if (putCall.getEffect() == null) {
+                    putCall.setEffect(previousPutCall.getEffect());
+                }
+                if (putCall.getEffect() != null && !putCall.getEffect().isNone()) {
                     Effect effect = putCall.getEffect();
                     if (hasNoColorProperties(effect)) {
                         Effect.EffectBuilder builder = effect.toBuilder();
