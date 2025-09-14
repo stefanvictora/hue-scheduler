@@ -513,7 +513,7 @@ class HueSchedulerTest {
         defaultCapabilities = LightCapabilities.builder().ctMin(153).ctMax(500)
                                                .colorGamutType("C")
                                                .colorGamut(gamut)
-                                               .effects(List.of("effect"))
+                                               .effects(List.of("candle"))
                                                .gradientModes(List.of("interpolated_palette",
                                                        "interpolated_palette_mirrored", "random_pixelated",
                                                        "segmented_palette"))
@@ -1882,7 +1882,7 @@ class HueSchedulerTest {
     @Test
     void parse_interpolate_effect_noBrightness_noInterpolation() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        addState(1, "00:00", "effect:effect");
+        addState(1, "00:00", "effect:candle");
         addState(1, "00:30", "bri:" + DEFAULT_BRIGHTNESS, "interpolate:true");
 
         List<ScheduledRunnable> scheduledRunnables = startScheduler(
@@ -1891,7 +1891,7 @@ class HueSchedulerTest {
         );
 
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
-                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).effect(Effect.builder().effect("effect").build())
+                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).effect(Effect.builder().effect("candle").build())
         );
 
         ensureRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(30)); // next day
@@ -1900,7 +1900,7 @@ class HueSchedulerTest {
     @Test
     void parse_interpolate_effect_withBrightness_interpolates() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        addState(1, "00:00", "bri:50", "effect:effect");
+        addState(1, "00:00", "bri:50", "effect:candle");
         addState(1, "00:30", "bri:100", "interpolate:true");
 
         List<ScheduledRunnable> scheduledRunnables = startScheduler(
@@ -1909,7 +1909,7 @@ class HueSchedulerTest {
         );
 
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
-                expectedPutCall(1).bri(50).effect(Effect.builder().effect("effect").build()),
+                expectedPutCall(1).bri(50).effect(Effect.builder().effect("candle").build()),
                 expectedPutCall(1).bri(100).transitionTime(tr("30min"))
         );
 
@@ -4272,7 +4272,7 @@ class HueSchedulerTest {
     void parse_effect_lightDoesNotSupportEffects_exception() {
         mockLightCapabilities("/lights/1", LightCapabilities.builder().build());
 
-        assertThrows(InvalidPropertyValue.class, () -> addStateNow("1", "effect:effect"));
+        assertThrows(InvalidPropertyValue.class, () -> addStateNow("1", "effect:candle"));
     }
 
     @Test
@@ -4294,13 +4294,13 @@ class HueSchedulerTest {
     @Test
     void parse_canHandleEffect_withParameters_ct() {
         mockDefaultLightCapabilities(1);
-        addStateNow(1, "ct:350", "effect:effect");
+        addStateNow(1, "ct:350", "effect:candle");
 
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
                 expectedPutCall(ID).effect(Effect.builder()
-                                                 .effect("effect")
+                                                 .effect("candle")
                                                  .ct(350)
                                                  .build())
         );
@@ -4311,16 +4311,86 @@ class HueSchedulerTest {
     @Test
     void parse_canHandleEffect_withParameters_xy() {
         mockDefaultLightCapabilities(1);
-        addStateNow(1, "x:0.3", "y:0.4", "effect:effect");
+        addStateNow(1, "x:0.3", "y:0.4", "effect:candle");
 
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
                 expectedPutCall(ID).effect(Effect.builder()
-                                                 .effect("effect")
+                                                 .effect("candle")
                                                  .x(0.3)
                                                  .y(0.4)
                                                  .build())
+        );
+
+        ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
+    void parse_canHandleEffect_buildsFullPicture_reusesPreviousColorAsParameter_xy() {
+        mockDefaultLightCapabilities(1);
+        addState(1, now, "effect:candle");
+        addState(1, now.plusMinutes(10), "bri:100", "ct:200");
+        addState(1, now.plusMinutes(20), "x:0.3", "y:0.4");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusMinutes(20)),
+                expectedRunnable(now.plusMinutes(20), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).bri(100).effect(Effect.builder()
+                                                         .effect("candle")
+                                                         .x(0.3)
+                                                         .y(0.4)
+                                                         .build())
+        );
+
+        ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
+    void parse_canHandleEffect_buildsFullPicture_reusesPreviousColorAsParameter_ct() {
+        mockDefaultLightCapabilities(1);
+        addState(1, now, "effect:candle");
+        addState(1, now.plusMinutes(10), "x:0.3", "y:0.4");
+        addState(1, now.plusMinutes(20), "bri:100", "ct:200");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusMinutes(20)),
+                expectedRunnable(now.plusMinutes(20), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).bri(100).effect(Effect.builder()
+                                                         .effect("candle")
+                                                         .ct(200)
+                                                         .build())
+        );
+
+        ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
+    void parse_canHandleEffect_buildsFullPicture_effectAlreadyHasParameters_notOverridden() {
+        mockDefaultLightCapabilities(1);
+        addState(1, now, "ct:250", "effect:candle");
+        addState(1, now.plusMinutes(10), "x:0.3", "y:0.4");
+        addState(1, now.plusMinutes(20), "bri:100", "ct:200");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusMinutes(20)),
+                expectedRunnable(now.plusMinutes(20), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).bri(100).effect(Effect.builder()
+                                                         .effect("candle")
+                                                         .ct(250) // not overridden
+                                                         .build())
         );
 
         ensureRunnable(initialNow.plusDays(1));
@@ -9837,7 +9907,7 @@ class HueSchedulerTest {
         mockGroupLightsForId(1, 4);
         mockSceneLightStates(1, "TestScene", ScheduledLightState.builder().id("/lights/4").bri(100));
 
-        assertThrows(InvalidConfigurationLine.class, () -> addState("g1", now, "effect:effect", "scene:TestScene"));
+        assertThrows(InvalidConfigurationLine.class, () -> addState("g1", now, "effect:candle", "scene:TestScene"));
     }
 
     @Test
@@ -11165,7 +11235,7 @@ class HueSchedulerTest {
         mockSceneLightStates(2, "TestScene1",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
-                                   .effect(Effect.builder().effect("effect").build()), // only effect
+                                   .effect(Effect.builder().effect("candle").build()), // only effect
                 ScheduledLightState.builder()
                                    .id("/lights/5")
                                    .ct(300));
@@ -11185,7 +11255,7 @@ class HueSchedulerTest {
         );
 
         advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 2,
-                expectedPutCall(4).bri(100).effect(Effect.builder().effect("effect").build()),
+                expectedPutCall(4).bri(100).effect(Effect.builder().effect("candle").build()),
                 expectedPutCall(5).bri(200).ct(300)
         );
 
