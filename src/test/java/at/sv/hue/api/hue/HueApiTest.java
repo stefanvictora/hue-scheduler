@@ -3112,7 +3112,7 @@ class HueApiTest {
     }
 
     @Test
-    void getGroupCapabilities_returnsMaxOfAllContainedLights() {
+    void getGroupCapabilities_returnsMaxOfAllContainedLights_excludesGradientCapabilities() {
         setGetResponse("/grouped_light", """
                 {
                   "errors": [],
@@ -3172,6 +3172,14 @@ class HueApiTest {
                         "rtype": "zone"
                       },
                       "type": "grouped_light"
+                    },
+                    {
+                      "id": "GroupedLight_Zone_8",
+                      "owner": {
+                        "rid": "Zone_8",
+                        "rtype": "zone"
+                      },
+                      "type": "grouped_light"
                     }
                   ]
                 }""");
@@ -3183,19 +3191,23 @@ class HueApiTest {
                       "id": "Zone_1",
                       "children": [
                         {
-                          "rid": "42",
+                          "rid": "CT_LIGHT",
                           "rtype": "light"
                         },
                         {
-                          "rid": "22",
+                          "rid": "COLOR_LIGHT_C",
                           "rtype": "light"
                         },
                         {
-                          "rid": "30",
+                          "rid": "ON_OFF_LIGHT",
                           "rtype": "light"
                         },
                         {
-                          "rid": "25",
+                          "rid": "COLOR_CT_LIGHT",
+                          "rtype": "light"
+                        },
+                        {
+                          "rid": "GRADIENT_LIGHT",
                           "rtype": "light"
                         }
                       ],
@@ -3205,7 +3217,7 @@ class HueApiTest {
                       "id": "Zone_2",
                       "children": [
                         {
-                          "rid": "22",
+                          "rid": "COLOR_LIGHT_C",
                           "rtype": "light"
                         }
                       ],
@@ -3215,7 +3227,7 @@ class HueApiTest {
                       "id": "Zone_3",
                       "children": [
                         {
-                          "rid": "42",
+                          "rid": "CT_LIGHT",
                           "rtype": "light"
                         }
                       ],
@@ -3225,7 +3237,7 @@ class HueApiTest {
                       "id": "Zone_4",
                       "children": [
                         {
-                          "rid": "30",
+                          "rid": "ON_OFF_LIGHT",
                           "rtype": "light"
                         }
                       ],
@@ -3235,7 +3247,7 @@ class HueApiTest {
                       "id": "Zone_5",
                       "children": [
                         {
-                          "rid": "23",
+                          "rid": "COLOR_LIGHT_A",
                           "rtype": "light"
                         }
                       ],
@@ -3245,11 +3257,11 @@ class HueApiTest {
                       "id": "Zone_6",
                       "children": [
                         {
-                          "rid": "22",
+                          "rid": "COLOR_LIGHT_C",
                           "rtype": "light"
                         },
                         {
-                          "rid": "23",
+                          "rid": "COLOR_LIGHT_A",
                           "rtype": "light"
                         }
                       ],
@@ -3259,7 +3271,17 @@ class HueApiTest {
                       "id": "Zone_7",
                       "children": [
                         {
-                          "rid": "24",
+                          "rid": "COLOR_LIGHT_B",
+                          "rtype": "light"
+                        }
+                      ],
+                      "type": "zone"
+                    },
+                    {
+                      "id": "Zone_8",
+                      "children": [
+                        {
+                          "rid": "GRADIENT_LIGHT",
                           "rtype": "light"
                         }
                       ],
@@ -3273,7 +3295,7 @@ class HueApiTest {
                   "errors": [],
                   "data": [
                     {
-                      "id": "42",
+                      "id": "CT_LIGHT",
                       "metadata": {
                         "name": "Color temperature light"
                       },
@@ -3292,7 +3314,7 @@ class HueApiTest {
                       "type": "light"
                     },
                     {
-                      "id": "22",
+                      "id": "COLOR_LIGHT_C",
                       "metadata": {
                         "name": "Color light"
                       },
@@ -3324,7 +3346,7 @@ class HueApiTest {
                       "type": "light"
                     },
                     {
-                      "id": "23",
+                      "id": "COLOR_LIGHT_A",
                       "metadata": {
                         "name": "Color light"
                       },
@@ -3356,7 +3378,7 @@ class HueApiTest {
                       "type": "light"
                     },
                     {
-                      "id": "24",
+                      "id": "COLOR_LIGHT_B",
                       "metadata": {
                         "name": "Color light"
                       },
@@ -3388,7 +3410,7 @@ class HueApiTest {
                       "type": "light"
                     },
                     {
-                      "id": "25",
+                      "id": "COLOR_CT_LIGHT",
                       "metadata": {
                         "name": "Extended color light"
                       },
@@ -3428,7 +3450,121 @@ class HueApiTest {
                       "type": "light"
                     },
                     {
-                      "id": "30",
+                      "id": "GRADIENT_LIGHT",
+                      "owner": {
+                        "rid": "2d019cd6-7de4-46dc-b8af-963add43a000",
+                        "rtype": "device"
+                      },
+                      "metadata": {
+                        "name": "Gradient color light"
+                      },
+                      "on": {
+                        "on": true
+                      },
+                      "dimming": {
+                        "brightness": 7.91,
+                        "min_dim_level": 0.01
+                      },
+                      "dimming_delta": {},
+                      "color_temperature": {
+                        "mirek": null,
+                        "mirek_valid": false,
+                        "mirek_schema": {
+                          "mirek_minimum": 153,
+                          "mirek_maximum": 500
+                        }
+                      },
+                      "color": {
+                        "xy": {
+                          "x": 0.1969,
+                          "y": 0.0688
+                        },
+                        "gamut": {
+                          "red": {
+                            "x": 0.6915,
+                            "y": 0.3083
+                          },
+                          "green": {
+                            "x": 0.17,
+                            "y": 0.7
+                          },
+                          "blue": {
+                            "x": 0.1532,
+                            "y": 0.0475
+                          }
+                        },
+                        "gamut_type": "C"
+                      },
+                      "gradient": {
+                        "points": [
+                          {
+                            "color": {
+                              "xy": {
+                                "x": 0.1969,
+                                "y": 0.0688
+                              }
+                            }
+                          },
+                          {
+                            "color": {
+                              "xy": {
+                                "x": 0.3352,
+                                "y": 0.1357
+                              }
+                            }
+                          },
+                          {
+                            "color": {
+                              "xy": {
+                                "x": 0.5501,
+                                "y": 0.2398
+                              }
+                            }
+                          },
+                          {
+                            "color": {
+                              "xy": {
+                                "x": 0.6079,
+                                "y": 0.3554
+                              }
+                            }
+                          },
+                          {
+                            "color": {
+                              "xy": {
+                                "x": 0.4813,
+                                "y": 0.45
+                              }
+                            }
+                          }
+                        ],
+                        "mode": "interpolated_palette",
+                        "points_capable": 5,
+                        "mode_values": [
+                          "interpolated_palette",
+                          "random_pixelated"
+                        ],
+                        "pixel_count": 24
+                      },
+                      "effects_v2": {
+                        "action": {
+                          "effect_values": [
+                            "no_effect",
+                            "candle"
+                          ]
+                        },
+                        "status": {
+                          "effect": "no_effect",
+                          "effect_values": [
+                            "no_effect",
+                            "candle"
+                          ]
+                        }
+                      },
+                      "type": "light"
+                    },
+                    {
+                      "id": "ON_OFF_LIGHT",
                       "metadata": {
                         "name": "On/off plug-in unit"
                       },
@@ -3484,6 +3620,15 @@ class HueApiTest {
                 LightCapabilities.builder()
                                  .colorGamut(GAMUT_B)
                                  .capabilities(EnumSet.of(Capability.COLOR, Capability.BRIGHTNESS, Capability.ON_OFF))
+                                 .build());
+        assertCapabilities(
+                getGroupCapabilities("GroupedLight_Zone_8"),
+                LightCapabilities.builder()
+                                 .colorGamut(GAMUT_C)
+                                 .ctMin(153)
+                                 .ctMax(500)
+                                 .capabilities(EnumSet.of(Capability.COLOR_TEMPERATURE, Capability.COLOR,
+                                         Capability.BRIGHTNESS, Capability.ON_OFF))
                                  .build());
     }
 

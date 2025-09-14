@@ -797,6 +797,7 @@ public final class HueApiImpl implements HueApi {
                 .stream()
                 .map(LightCapabilities::getCapabilities)
                 .flatMap(Collection::stream)
+                .filter(capability -> capability != Capability.GRADIENT)
                 .collect(Collectors.toSet()));
     }
 
