@@ -4089,6 +4089,33 @@ class HueSchedulerTest {
     }
 
     @Test
+    void parse_gradient_withEffect_exception() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+
+        assertThatThrownBy(() -> addStateNow("1", "effect:candle", "gradient:[rgb(94 186 125),rgb(200 100 50)]"))
+                .isInstanceOf(InvalidPropertyValue.class)
+                .hasMessageStartingWith("When setting a gradient, no other color properties");
+    }
+
+    @Test
+    void parse_gradient_withXY_exception() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+
+        assertThatThrownBy(() -> addStateNow("1", "x:0.4", "y:0.4", "gradient:[rgb(94 186 125),rgb(200 100 50)]"))
+                .isInstanceOf(InvalidPropertyValue.class)
+                .hasMessageStartingWith("When setting a gradient, no other color properties");
+    }
+
+    @Test
+    void parse_gradient_withCT_exception() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+
+        assertThatThrownBy(() -> addStateNow("1", "ct:200", "gradient:[rgb(94 186 125),rgb(200 100 50)]"))
+                .isInstanceOf(InvalidPropertyValue.class)
+                .hasMessageStartingWith("When setting a gradient, no other color properties");
+    }
+
+    @Test
     void parse_gradient_xy_missingY_exception() {
         addKnownLightIdsWithDefaultCapabilities(1);
 
@@ -4492,6 +4519,53 @@ class HueSchedulerTest {
 
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
                 expectedPutCall(1).bri(100).x(0.3).y(0.4).effect(Effect.builder().effect("none").build())
+        );
+
+        ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
+    void parse_canHandleEffect_gradient_buildsFullPicture_ignoresEffect() {
+        mockDefaultLightCapabilities(1);
+        addState(1, now, "gradient:[xy(0.2 0.3), xy(0.4 0.4)]");
+        addState(1, now.plusMinutes(10), "bri:200");
+        addState(1, now.plusMinutes(20), "effect:candle");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusMinutes(20)),
+                expectedRunnable(now.plusMinutes(20), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).bri(200).gradient(Gradient.builder()
+                                                             .points(List.of(
+                                                                     Pair.of(0.2, 0.3),
+                                                                     Pair.of(0.4, 0.4)
+                                                             ))
+                                                             .build()
+
+                )
+        );
+
+        ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
+    void parse_canHandleEffect_gradient_buildsFullPicture_alreadyHasEffect_ignoresGradient() {
+        mockDefaultLightCapabilities(1);
+        addState(1, now, "effect:candle");
+        addState(1, now.plusMinutes(10), "bri:200");
+        addState(1, now.plusMinutes(20), "gradient:[xy(0.2 0.3),xy(0.4 0.4)]");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusMinutes(20)),
+                expectedRunnable(now.plusMinutes(20), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).bri(200).effect(Effect.builder().effect("candle").build())
         );
 
         ensureRunnable(initialNow.plusDays(1));
@@ -9901,8 +9975,6 @@ class HueSchedulerTest {
                 expectedRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)) // next day
         );
     }
-
-    // todo: Fall berücksichtigen, falls es mehr als eine Szene gibt mit dem gleichen Namen innerhalb der Gruppe. Weil das durchaus der Fall sein kann.
 
     @Test
     void sceneControl_init_loadsLightPropertiesForGroupByName() {

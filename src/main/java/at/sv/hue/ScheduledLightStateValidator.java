@@ -33,7 +33,6 @@ public final class ScheduledLightStateValidator {
         this.ct = assertCtSupportAndValue(ct);
         this.on = on;
         this.effect = assertValidEffectValue(effect);
-        this.autoFillGradient = autoFillGradient;
         assertValidXyPair(x, y);
         if (x != null && y != null) {
             assertColorCapabilities();
@@ -44,6 +43,7 @@ public final class ScheduledLightStateValidator {
             this.x = null;
             this.y = null;
         }
+        this.autoFillGradient = autoFillGradient;
         this.gradient = assertValidGradientValue(gradient);
     }
 
@@ -166,6 +166,7 @@ public final class ScheduledLightStateValidator {
             assertGradientCapabilities();
             assertValidNumberOfGradientPoints(gradient);
             assertValidGradientMode(gradient);
+            assertNoOtherColorPropertiesThanGradient();
             return validateGradientPointsAndAutoFillIfNeeded(gradient);
         }
         return null;
@@ -198,6 +199,12 @@ public final class ScheduledLightStateValidator {
         if (supportedModes == null || !supportedModes.contains(gradient.mode())) {
             throw new InvalidPropertyValue("Unsupported gradient mode: '" + gradient.mode() + "'." +
                                            " Supported modes: " + supportedModes);
+        }
+    }
+
+    private void assertNoOtherColorPropertiesThanGradient() {
+        if (ct != null || x != null || effect != null) { // y is not checked, because x and y must be set together
+            throw new InvalidPropertyValue("When setting a gradient, no other color properties (ct, x, y, effect) are allowed.");
         }
     }
 

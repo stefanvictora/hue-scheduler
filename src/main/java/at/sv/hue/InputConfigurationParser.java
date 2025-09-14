@@ -156,17 +156,13 @@ public final class InputConfigurationParser {
                                                            "'. Expected: gradient:[<color>, <color>[, ...]]@<mode?>");
                         }
                         String gradientList = m.group("list");
-                        String mode = m.group("mode");
-                        String[] pointStrings = gradientList.split(",\\s*");
-                        var colors = Arrays.stream(pointStrings)
+                        var points = Arrays.stream(gradientList.split(",\\s*"))
                                            .map(point -> parseColorValue(point, capabilities))
-                                           .toList();
-                        var points = colors.stream()
                                            .map(color -> Pair.of(color.x(), color.y()))
                                            .toList();
                         gradient = Gradient.builder()
                                            .points(points)
-                                           .mode(mode)
+                                           .mode(m.group("mode"))
                                            .build();
                         break;
                     case "effect":
