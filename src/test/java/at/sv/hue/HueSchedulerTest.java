@@ -1917,10 +1917,63 @@ class HueSchedulerTest {
     }
 
     @Test
+    void parse_interpolate_gradient_differentValues_interpolates() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, "00:00", "gradient:[xy(0.8 0.2), xy(0.2 0.3)]");
+        addState(1, "00:30", "gradient:[xy(0.8 0.2), xy(0.4 0.4)]", "interpolate:true");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1)),
+                expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).gradient(Gradient.builder()
+                                                    .points(List.of(
+                                                            Pair.of(0.6915, 0.3083),
+                                                            Pair.of(0.2, 0.3)
+                                                    ))
+                                                    .build()),
+                expectedPutCall(1).gradient(Gradient.builder()
+                                                    .points(List.of(
+                                                            Pair.of(0.6915, 0.3083),
+                                                            Pair.of(0.4, 0.4)
+                                                    ))
+                                                    .build())
+                                  .transitionTime(tr("30min"))
+        );
+
+        ensureRunnable(now.plusDays(1), now.plusDays(2)); // next day
+    }
+
+    @Test
     void parse_interpolate_gradient_sameValues_noInterpolation() {
         addKnownLightIdsWithDefaultCapabilities(1);
         addState(1, "00:00", "gradient:[xy(0.8 0.2), xy(0.2 0.3)]");
         addState(1, "00:30", "gradient:[xy(0.8 0.2), xy(0.2 0.3)]", "interpolate:true");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(30)),
+                expectedRunnable(now.plusMinutes(30), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).gradient(Gradient.builder()
+                                                    .points(List.of(
+                                                            Pair.of(0.6915, 0.3083),
+                                                            Pair.of(0.2, 0.3)
+                                                    ))
+                                                    .build())
+        );
+
+        ensureRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(30)); // next day
+    }
+
+    @Test
+    void parse_interpolate_gradient_sameValues_differentMode_ignored_noInterpolation() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, "00:00", "gradient:[xy(0.8 0.2), xy(0.2 0.3)]");
+        addState(1, "00:30", "gradient:[xy(0.8 0.2), xy(0.2 0.3)]@random_pixelated", "interpolate:true");
 
         List<ScheduledRunnable> scheduledRunnables = startScheduler(
                 expectedRunnable(now, now.plusMinutes(30)),

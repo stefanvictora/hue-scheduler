@@ -219,6 +219,24 @@ class ScheduledStateTest {
     }
 
     @Test
+    void lightStateDiffers_xy_differentColorMode_true() {
+        ScheduledState scheduledState = scheduledState(state().x(0.123)
+                                                              .y(0.456)
+                                                              .bri(100));
+        LightState lightState = LightState.builder()
+                                          .on(true)
+                                          .x(0.123)
+                                          .y(0.456)
+                                          .brightness(100)
+                                          .colorTemperature(200)
+                                          .colormode(ColorMode.CT)
+                                          .lightCapabilities(FULL_CAPABILITIES)
+                                          .build();
+
+        assertLightStateDiffers(scheduledState, lightState, true);
+    }
+
+    @Test
     void lightStateDiffers_xy_sameXAndY_noGamut_false() {
         ScheduledState scheduledState = scheduledState(state().x(0.123)
                                                               .y(0.456));
@@ -421,10 +439,150 @@ class ScheduledStateTest {
                                           .y(0.456)
                                           .colorTemperature(30)
                                           .effect("IGNORED")
+                                          .colormode(ColorMode.XY)
                                           .lightCapabilities(FULL_CAPABILITIES)
                                           .build();
 
         assertLightStateDiffers(scheduledState, lightState, false);
+    }
+
+    @Test
+    void lightStateDiffers_gradient_samePoints_false() {
+        ScheduledState scheduledState = scheduledState(state().gradient(Gradient.builder()
+                                                                                .points(List.of(
+                                                                                        Pair.of(0.2, 0.3),
+                                                                                        Pair.of(0.8, 0.2)
+                                                                                ))
+                                                                                .build()));
+        LightState lightState = LightState.builder()
+                                          .on(true)
+                                          .gradient(Gradient.builder()
+                                                            .points(List.of(
+                                                                    Pair.of(0.2, 0.3),
+                                                                    Pair.of(0.8, 0.2)
+                                                            ))
+                                                            .build())
+                                          .colormode(ColorMode.GRADIENT)
+                                          .lightCapabilities(FULL_CAPABILITIES)
+                                          .build();
+
+        assertLightStateDiffers(scheduledState, lightState, false);
+    }
+
+    @Test
+    void lightStateDiffers_gradient_differentPointValues_true() {
+        ScheduledState scheduledState = scheduledState(state().gradient(Gradient.builder()
+                                                                                .points(List.of(
+                                                                                        Pair.of(0.2, 0.3),
+                                                                                        Pair.of(0.8, 0.2)
+                                                                                ))
+                                                                                .build()));
+        LightState lightState = LightState.builder()
+                                          .on(true)
+                                          .gradient(Gradient.builder()
+                                                            .points(List.of(
+                                                                    Pair.of(0.2, 0.3),
+                                                                    Pair.of(0.5, 0.4)
+                                                            ))
+                                                            .build())
+                                          .colormode(ColorMode.GRADIENT)
+                                          .lightCapabilities(FULL_CAPABILITIES)
+                                          .build();
+
+        assertLightStateDiffers(scheduledState, lightState, true);
+    }
+
+    @Test
+    void lightStateDiffers_gradient_differentNumberOfPoints_true() {
+        ScheduledState scheduledState = scheduledState(state().gradient(Gradient.builder()
+                                                                                .points(List.of(
+                                                                                        Pair.of(0.2, 0.3),
+                                                                                        Pair.of(0.8, 0.2)
+                                                                                ))
+                                                                                .build()));
+        LightState lightState = LightState.builder()
+                                          .on(true)
+                                          .gradient(Gradient.builder()
+                                                            .points(List.of(
+                                                                    Pair.of(0.2, 0.3),
+                                                                    Pair.of(0.8, 0.2),
+                                                                    Pair.of(0.2, 0.5)
+                                                            ))
+                                                            .build())
+                                          .colormode(ColorMode.GRADIENT)
+                                          .lightCapabilities(FULL_CAPABILITIES)
+                                          .build();
+
+        assertLightStateDiffers(scheduledState, lightState, true);
+    }
+
+    @Test
+    void lightStateDiffers_gradient_defaultMode_false() {
+        ScheduledState scheduledState = scheduledState(state().gradient(Gradient.builder()
+                                                                                .points(List.of(
+                                                                                        Pair.of(0.2, 0.3),
+                                                                                        Pair.of(0.8, 0.2)
+                                                                                ))
+                                                                                .mode(null) // defaults to "interpolated_palette"
+                                                                                .build()));
+        LightState lightState = LightState.builder()
+                                          .on(true)
+                                          .gradient(Gradient.builder()
+                                                            .points(List.of(
+                                                                    Pair.of(0.2, 0.3),
+                                                                    Pair.of(0.8, 0.2)
+                                                            ))
+                                                            .mode("interpolated_palette")
+                                                            .build())
+                                          .colormode(ColorMode.GRADIENT)
+                                          .lightCapabilities(FULL_CAPABILITIES)
+                                          .build();
+
+        assertLightStateDiffers(scheduledState, lightState, false);
+    }
+
+    @Test
+    void lightStateDiffers_gradient_differentMode_true() {
+        ScheduledState scheduledState = scheduledState(state().gradient(Gradient.builder()
+                                                                                .points(List.of(
+                                                                                        Pair.of(0.2, 0.3),
+                                                                                        Pair.of(0.8, 0.2)
+                                                                                ))
+                                                                                .mode("interpolated_palette")
+                                                                                .build()));
+        LightState lightState = LightState.builder()
+                                          .on(true)
+                                          .gradient(Gradient.builder()
+                                                            .points(List.of(
+                                                                    Pair.of(0.2, 0.3),
+                                                                    Pair.of(0.8, 0.2)
+                                                            ))
+                                                            .mode("random_pixelated")
+                                                            .build())
+                                          .colormode(ColorMode.GRADIENT)
+                                          .lightCapabilities(FULL_CAPABILITIES)
+                                          .build();
+
+        assertLightStateDiffers(scheduledState, lightState, true);
+    }
+
+    @Test
+    void lightStateDiffers_gradient_doesSupportGradient_butDifferentColorMode_true() {
+        ScheduledState scheduledState = scheduledState(state().gradient(Gradient.builder()
+                                                                                .points(List.of(
+                                                                                        Pair.of(0.2, 0.3),
+                                                                                        Pair.of(0.8, 0.2)
+                                                                                ))
+                                                                                .build()));
+        LightState lightState = LightState.builder()
+                                          .on(true)
+                                          .x(0.2)
+                                          .y(0.3)
+                                          .colormode(ColorMode.XY)
+                                          .lightCapabilities(FULL_CAPABILITIES)
+                                          .build();
+
+        assertLightStateDiffers(scheduledState, lightState, true);
     }
 
     @Test
@@ -604,6 +762,25 @@ class ScheduledStateTest {
                                           .colorTemperature(100)
                                           .colormode(ColorMode.CT)
                                           .lightCapabilities(COLOR_TEMPERATURE_LIGHT)
+                                          .build();
+
+        assertLightStateDiffers(scheduledState, lightState, false);
+    }
+
+    @Test
+    void lightStateDiffers_differentCapabilities_doesNotSupportGradient_false() {
+        ScheduledState scheduledState = scheduledState(state().gradient(Gradient.builder()
+                                                                                .points(List.of(
+                                                                                        Pair.of(0.2, 0.3),
+                                                                                        Pair.of(0.8, 0.2)
+                                                                                ))
+                                                                                .build()));
+        LightState lightState = LightState.builder()
+                                          .on(true)
+                                          .x(0.5) // ignored
+                                          .y(0.4)
+                                          .colormode(ColorMode.XY)
+                                          .lightCapabilities(COLOR_LIGHT_ONLY)
                                           .build();
 
         assertLightStateDiffers(scheduledState, lightState, false);

@@ -30,6 +30,10 @@ public final class LightState {
         return getCapabilities().contains(Capability.COLOR);
     }
 
+    public boolean isGradientSupported() {
+        return getCapabilities().contains(Capability.GRADIENT);
+    }
+
     public boolean isCtSupported() {
         return getCapabilities().contains(Capability.COLOR_TEMPERATURE);
     }
