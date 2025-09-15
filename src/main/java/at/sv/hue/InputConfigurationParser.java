@@ -252,7 +252,7 @@ public final class InputConfigurationParser {
             return convertToXY(red, green, blue, capabilities);
         }
         throw new InvalidPropertyValue("Invalid color value '" + value + "'. Supported formats are: " +
-                                       "'rgb(r g b)', '#rrggbb', 'xy(x y)', 'oklch(L C h)'.");
+                                       "'rgb(r g b)', '#rrggbb', 'xy(x y)', 'oklch(L C h)'. Use space not comma as value separator.");
     }
 
     private static XYColor convertToXY(int r, int g, int b, LightCapabilities capabilities) {

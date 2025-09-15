@@ -34,7 +34,7 @@ public final class ScheduledLightStateValidator {
         this.on = on;
         this.effect = assertValidEffectValue(effect);
         assertValidXyPair(x, y);
-        if (x != null && y != null) {
+        if (x != null) { // y is not null, because of assertValidXyPair
             assertColorCapabilities();
             var xy = assertAndCorrectXYValue(x, y);
             this.x = xy.first();
