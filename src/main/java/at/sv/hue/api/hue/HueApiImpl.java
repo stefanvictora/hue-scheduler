@@ -383,12 +383,8 @@ public final class HueApiImpl implements HueApi {
         return getContainedLights(group)
                 .stream()
                 .map(resource -> createSceneAction(putCallMap.getOrDefault(resource.getRid(),
-                        getDefaultPutCall(resource)), resource))
+                        PutCall.builder().on(false).build()), resource))
                 .toList();
-    }
-
-    private static PutCall getDefaultPutCall(ResourceReference resource) {
-        return PutCall.builder().id(resource.getRid()).on(false).build();
     }
 
     private SceneAction createSceneAction(PutCall putCall, ResourceReference resource) {
@@ -410,7 +406,7 @@ public final class HueApiImpl implements HueApi {
         }
         putCallBuilder.gamut(capabilities.getColorGamut());
         PutCall updatedPutCall = putCallBuilder.build();
-        if (!capabilities.isColorSupported() && capabilities.isCtSupported()) {
+        if (!capabilities.isColorSupported() && capabilities.isCtSupported()) { // .isCtSupported() redundant, but clearer
             ColorModeConverter.convertIfNeeded(updatedPutCall, ColorMode.CT);
         }
         if (updatedPutCall.getCt() != null) {
@@ -577,9 +573,6 @@ public final class HueApiImpl implements HueApi {
         if (action.getEffects_v2() != null) {
             Action.EffectsAction effectsAction = action.getEffects_v2().getAction();
             String effect = effectsAction.getEffect();
-            if ("no_effect".equals(effect)) {
-                effect = "none";
-            }
             state.effect(getEffectState(effect, effectsAction.getParameters()));
         }
         if (action.getGradient() != null) {

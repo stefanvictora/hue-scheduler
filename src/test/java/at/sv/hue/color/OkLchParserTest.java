@@ -32,7 +32,7 @@ class OkLchParserTest {
         XYColor b = OkLchParser.parseOkLch("oklch(70% 0.1 250deg)");           // percent + deg
         XYColor c = OkLchParser.parseOkLch("oklch(0.7 0.1 4.36332313rad)");    // radians
         XYColor d = OkLchParser.parseOkLch("oklch(0.7 0.1 277.7777778grad)");  // grads (gon)
-        XYColor e = OkLchParser.parseOkLch("oklch(0.7 0.1 0.6944444444turn)"); // turns
+        XYColor e = OkLchParser.parseOkLch("oklch(0.7 0.1 0.6944444444TURN )"); // turns
         XYColor f = OkLchParser.parseOkLch("oklch(0.7, 0.1, 250)");            // commas allowed
         XYColor g = OkLchParser.parseOkLch("oklch(.7 0.1 250 / 0.3)");         // alpha ignored
 

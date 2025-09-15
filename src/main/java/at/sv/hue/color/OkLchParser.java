@@ -46,7 +46,7 @@ public final class OkLchParser {
 
     private static String[] splitIntoParts(String s) {
         int slash = s.indexOf('/');
-        if (slash >= 0) {
+        if (slash != -1) {
             s = s.substring(0, slash).trim();
         }
         String[] parts = s.replace(',', ' ').trim().split("\\s+");

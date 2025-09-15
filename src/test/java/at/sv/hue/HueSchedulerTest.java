@@ -1858,7 +1858,61 @@ class HueSchedulerTest {
         ensureRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)); // next day
     }
 
-    // todo: add test for gradient
+    @Test
+    void parse_transitionTimeBefore_allowsBackToBack_zeroLengthState_gradient_usedOnlyForInterpolation() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, "00:00", "gradient:[xy(0.2 0.3), xy(0.4 0.4)]"); // 00:00, zero length
+        addState(1, "00:10", "gradient:[xy(0.2 0.3), xy(0.4 0.41)]", "interpolate:true"); // 00:00, same start as initial
+        addState(1, "00:10", "gradient:[xy(0.2 0.3), xy(0.4 0.42)]"); // 10:00, zero length
+        addState(1, "00:20", "gradient:[xy(0.2 0.3), xy(0.4 0.43)]", "interpolate:true"); // 10:00 same start as second zero length
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusMinutes(10)), // 00:10 zero length
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1)),
+                expectedRunnable(now.plusDays(1), now.plusDays(1)) // 00:00 zero length state, scheduled next day
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).gradient(Gradient.builder()
+                                                    .points(List.of(
+                                                            Pair.of(0.2, 0.3),
+                                                            Pair.of(0.4, 0.4)
+                                                    ))
+                                                    .build()),
+                expectedPutCall(1).gradient(Gradient.builder()
+                                                    .points(List.of(
+                                                            Pair.of(0.2, 0.3),
+                                                            Pair.of(0.4, 0.41)
+                                                    ))
+                                                    .build()).transitionTime(tr("10min"))
+        );
+
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(10)); // next day
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(1)); // no interaction; zero length
+
+        ensureRunnable(now.plusDays(1), now.plusDays(1)); // next day
+
+        // second tr-before
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(2),
+                expectedPutCall(1).gradient(Gradient.builder()
+                                                    .points(List.of(
+                                                            Pair.of(0.2, 0.3),
+                                                            Pair.of(0.4, 0.42)
+                                                    ))
+                                                    .build()),
+                expectedPutCall(1).gradient(Gradient.builder()
+                                                    .points(List.of(
+                                                            Pair.of(0.2, 0.3),
+                                                            Pair.of(0.4, 0.43)
+                                                    ))
+                                                    .build()).transitionTime(tr("10min"))
+        );
+
+        ensureRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)); // next day
+    }
 
     @Test
     void parse_transitionTimeBefore_viaInterpolate_usesTransitionFromPreviousState() {
@@ -3594,6 +3648,55 @@ class HueSchedulerTest {
     }
 
     @Test
+    void parse_transitionTimeBefore_multipleStates_fullPicture_gradient_doesSkipInterpolatedUpdateIfNotChanged() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now, "bri:100", "gradient:[xy(0.2 0.2),xy(0.4 0.4)]");
+        addState(1, now.plusMinutes(10), "bri:200", "tr-before:5min");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(5)),
+                expectedRunnable(now.plusMinutes(5), now.plusDays(1))
+        );
+
+        // first state
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).bri(100).gradient(Gradient.builder()
+                                                             .points(List.of(
+                                                                     Pair.of(0.2, 0.2),
+                                                                     Pair.of(0.4, 0.4)
+                                                             ))
+                                                             .build())
+        );
+
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(5)); // next day
+
+        // second state
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(1),
+                // does not repeat interpolated call from previous state
+                expectedPutCall(1).bri(200).transitionTime(tr("5min"))
+        );
+
+        ensureRunnable(initialNow.plusDays(1).plusMinutes(5), initialNow.plusDays(2)); // next day
+
+        List<ScheduledRunnable> secondPowerOnRunnables = simulateLightOnEvent(
+                expectedPowerOnEnd(initialNow.plusMinutes(5)),
+                expectedPowerOnEnd(initialNow.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(secondPowerOnRunnables.get(1),
+                expectedPutCall(1).bri(100).gradient(Gradient.builder()
+                                                             .points(List.of(
+                                                                     Pair.of(0.2, 0.2),
+                                                                     Pair.of(0.4, 0.4)
+                                                             ))
+                                                             .build()),
+                expectedPutCall(1).bri(200).transitionTime(tr("5min"))
+        );
+    }
+
+    @Test
     void parse_weekdayScheduling_todayIsMonday_stateOnlyOnMonday_normallyScheduled() {
         addKnownLightIdsWithDefaultCapabilities(1);
         setupTimeWithDayOfWeek(DayOfWeek.MONDAY);
@@ -4023,6 +4126,16 @@ class HueSchedulerTest {
     }
 
     @Test
+    void parse_gradient_invalidFormat_exception() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+
+        assertThatThrownBy(() -> addStateNow("1", "gradient:rgb(94 186 125),rgb(94 186 125)"))
+                .isInstanceOf(InvalidPropertyValue.class)
+                .hasMessageStartingWith("Invalid gradient")
+                .hasMessageContaining("Expected: gradient:[");
+    }
+
+    @Test
     void parse_gradient_rgb_justOnePoint_exception() {
         addKnownLightIdsWithDefaultCapabilities(1);
 
@@ -4230,7 +4343,7 @@ class HueSchedulerTest {
     @Test
     void parse_gradient_rgbAndXY_parsedCorrectly() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        addStateNow("1", "gradient:[rgb(94 186 125),xy(0.5148 0.3845)]");
+        addStateNow("1", "gradient:[rgb(94 186 125),xy( 0.5148 0.3845)]");
 
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
@@ -4335,15 +4448,16 @@ class HueSchedulerTest {
     @Test
     void parse_canHandleEffect_withParameters_ct() {
         mockDefaultLightCapabilities(1);
-        addStateNow(1, "ct:350", "effect:candle");
+        addStateNow(1, "on:true", "ct:350", "effect:candle", "tr:10s");
 
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
-                expectedPutCall(1).effect(Effect.builder()
-                                                .effect("candle")
-                                                .ct(350)
-                                                .build())
+                expectedPutCall(1).on(true).effect(Effect.builder()
+                                                         .effect("candle")
+                                                         .ct(350)
+                                                         .build())
+                                  .transitionTime(tr("10s"))
         );
 
         ensureRunnable(initialNow.plusDays(1));
@@ -10452,7 +10566,7 @@ class HueSchedulerTest {
     }
 
     @Test
-    void sceneControl_sceneThenScene_oneWithGradient_calculatesFullPicture_correctPutCalls() {
+    void sceneControl_sceneToScene_oneWithGradient_trBefore_calculatesFullPicture_correctPutCalls() {
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
         mockSceneLightStates(1, "TestScene1",
@@ -10467,8 +10581,8 @@ class HueSchedulerTest {
                                    .id("/lights/4")
                                    .gradient(Gradient.builder()
                                                      .points(List.of(
-                                                             Pair.of(0.123, 0.456),
-                                                             Pair.of(0.234, 0.567)
+                                                             Pair.of(0.2, 0.3),
+                                                             Pair.of(0.4, 0.4)
                                                      ))
                                                      .mode("random_pixelated")
                                                      .build()),
@@ -10488,8 +10602,8 @@ class HueSchedulerTest {
         advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
                 expectedPutCall(4).bri(100).gradient(Gradient.builder()
                                                              .points(List.of(
-                                                                     Pair.of(0.123, 0.456),
-                                                                     Pair.of(0.234, 0.567)
+                                                                     Pair.of(0.2, 0.3),
+                                                                     Pair.of(0.4, 0.4)
                                                              ))
                                                              .mode("random_pixelated")
                                                              .build()),
@@ -10503,8 +10617,8 @@ class HueSchedulerTest {
         advanceTimeAndRunAndAssertScenePutCalls(runnables.get(1), 1,
                 expectedPutCall(4).gradient(Gradient.builder()
                                                     .points(List.of(
-                                                            Pair.of(0.123, 0.456),
-                                                            Pair.of(0.234, 0.567)
+                                                            Pair.of(0.2, 0.3),
+                                                            Pair.of(0.4, 0.4)
                                                     ))
                                                     .mode("random_pixelated")
                                                     .build()).transitionTime(tr("5min")),

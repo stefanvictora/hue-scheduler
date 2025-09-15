@@ -490,7 +490,7 @@ public class HassApiTest {
                                 0.524,
                                 0.387
                             ],
-                            "effect": "None",
+                            "effect": "Candle",
                             "mode": "normal",
                             "dynamics": "none",
                             "friendly_name": "CT Only",
@@ -513,7 +513,7 @@ public class HassApiTest {
                                                    .colorTemperature(366)
                                                    .x(0.524)
                                                    .y(0.387)
-                                                   .effect("none")
+                                                   .effect("candle")
                                                    .colormode(ColorMode.CT)
                                                    .brightness(233) // converted to hue range
                                                    .lightCapabilities(LightCapabilities.builder()
