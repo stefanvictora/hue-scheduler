@@ -102,7 +102,8 @@ public final class PutCall {
     public boolean hasSameLightState(PutCall other) {
         return Objects.equals(this.on, other.on) &&
                Objects.equals(this.bri, other.bri) &&
-               Objects.equals(this.effect, other.effect) && // todo: add gradient
+               Objects.equals(this.effect, other.effect) &&
+               Objects.equals(this.gradient, other.gradient) &&
                Objects.equals(this.x, other.x) &&
                Objects.equals(this.y, other.y) &&
                Objects.equals(this.ct, other.ct);

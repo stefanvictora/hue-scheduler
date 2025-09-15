@@ -829,12 +829,12 @@ class HueApiTest {
                       "id": "device_id",
                       "services": [
                         {
-                          "rid": "zigbee_id",
-                          "rtype": "zigbee_connectivity"
-                        },
-                        {
                           "rid": "unavailable_light",
                           "rtype": "light"
+                        },
+                        {
+                          "rid": "zigbee_id",
+                          "rtype": "zigbee_connectivity"
                         }
                       ],
                       "type": "device"
@@ -4839,19 +4839,19 @@ class HueApiTest {
                         },
                         "gamut": {
                           "red": {
-                            "x": 0.6915,
-                            "y": 0.3083
+                            "x": 0.675,
+                            "y": 0.322
                           },
                           "green": {
-                            "x": 0.17,
-                            "y": 0.7
+                            "x": 0.409,
+                            "y": 0.518
                           },
                           "blue": {
-                            "x": 0.1532,
-                            "y": 0.0475
+                            "x": 0.167,
+                            "y": 0.04
                           }
                         },
-                        "gamut_type": "C"
+                        "gamut_type": "B"
                       },
                       "type": "light"
                     },
@@ -4930,7 +4930,7 @@ class HueApiTest {
 
         createOrUpdateScene("GROUPED_LIGHT", "SCENE",
                 PutCall.builder().id("COLOR").x(0.8).y(0.2).bri(20), // out of gamut
-                PutCall.builder().id("CT_ONLY").x(0.8).y(0.2).bri(20), // out of gamut
+                PutCall.builder().id("CT_ONLY").x(0.8).y(0.2).bri(20),
                 PutCall.builder().id("BRI_ONLY").x(0.8).y(0.2).bri(20),
                 PutCall.builder().id("ON_OFF_ONLY").x(0.8).y(0.2).bri(20)
         );
@@ -4960,8 +4960,8 @@ class HueApiTest {
                         },
                         "color": {
                           "xy": {
-                            "x": 0.6915,
-                            "y": 0.3083
+                            "x": 0.675,
+                            "y": 0.322
                           }
                         }
                       }
