@@ -142,7 +142,10 @@ public interface HueApi extends ResourceModificationEventListener {
      * @param groupId   the identifier of the group for which the scene light states are needed; must not be null or empty
      * @param sceneName the name of the scene within the group whose light states are to be retrieved; must not be null or empty
      * @return a list of ScheduledLightState objects representing the light states associated with the specified scene;
-     * never null but may be empty if no states are found.
+     * never null.
+     * @throws SceneNotFoundException if no scene with the given name exists for the specified group
+     * @throws GroupNotFoundException if no group with the given id exists
+     * @throws NonUniqueNameException if multiple scenes with the same name exist for the specified group
      */
     List<ScheduledLightState> getSceneLightState(String groupId, String sceneName);
 

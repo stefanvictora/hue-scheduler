@@ -16,8 +16,10 @@ import at.sv.hue.api.Identifier;
 import at.sv.hue.api.LightCapabilities;
 import at.sv.hue.api.LightNotFoundException;
 import at.sv.hue.api.LightState;
+import at.sv.hue.api.NonUniqueNameException;
 import at.sv.hue.api.PutCall;
 import at.sv.hue.api.RateLimiter;
+import at.sv.hue.api.SceneNotFoundException;
 import at.sv.hue.color.ColorModeConverter;
 import at.sv.hue.color.XYColorGamutCorrection;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -342,14 +344,10 @@ public final class HueApiImpl implements HueApi {
     @Override
     public List<ScheduledLightState> getSceneLightState(String groupedLightId, String sceneName) {
         Group group = getAndAssertGroupExists(groupedLightId);
-        Scene existingScene = getScene(group, sceneName);
-        if (existingScene == null) {
-            return List.of();
-        }
-        return existingScene.getActions()
-                            .stream()
-                            .map(this::createScheduledLightState)
-                            .toList();
+        return getUniqueScene(group, sceneName).getActions()
+                                               .stream()
+                                               .map(this::createScheduledLightState)
+                                               .toList();
     }
 
     @Override
@@ -674,11 +672,28 @@ public final class HueApiImpl implements HueApi {
     }
 
     private Scene getScene(Group group, String name) {
+        return findScenesByGroupAndName(group, name)
+                .stream()
+                .findFirst()
+                .orElse(null);
+    }
+
+    private Scene getUniqueScene(Group group, String name) {
+        List<Scene> scenes = findScenesByGroupAndName(group, name);
+        if (scenes.size() > 1) {
+            throw new NonUniqueNameException("Multiple scenes with name '" + name + "' found for group '" + group.getName() + "'");
+        }
+        if (scenes.isEmpty()) {
+            throw new SceneNotFoundException("No scene with name '" + name + "' found for group '" + group.getName() + "'");
+        }
+        return scenes.getFirst();
+    }
+
+    private List<Scene> findScenesByGroupAndName(Group group, String name) {
         return getAvailableScenes().values()
                                    .stream()
                                    .filter(scene -> scene.isPartOf(group) && name.equals(scene.metadata.name))
-                                   .findFirst()
-                                   .orElse(null);
+                                   .toList();
     }
 
     private Map<String, Light> getAvailableLights() {
