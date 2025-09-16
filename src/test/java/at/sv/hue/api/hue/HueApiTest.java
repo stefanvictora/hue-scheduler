@@ -106,7 +106,7 @@ class HueApiTest {
     }
 
     @Test
-    void getState_hasGradientSupport() {
+    void getState_hasGradientSupport_currentlyActive() {
         setGetResponse("/light/cb6f54e8-5071-478e-9c0a-949a51b117a2", """
                 {
                   "errors": [],
@@ -291,7 +291,139 @@ class HueApiTest {
     }
 
     @Test
-    void getState_returnsLightState_effectActive_xyAsParameter_callsCorrectApiURL() {
+    void getState_hasGradientSupport_notActive() {
+        setGetResponse("/light/cb6f54e8-5071-478e-9c0a-949a51b117a2", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "cb6f54e8-5071-478e-9c0a-949a51b117a2",
+                      "owner": {
+                        "rid": "2d019cd6-7de4-46dc-b8af-963add43a000",
+                        "rtype": "device"
+                      },
+                      "metadata": {
+                        "name": "TV Play",
+                        "archetype": "hue_lightstrip_tv",
+                        "function": "decorative"
+                      },
+                      "product_data": {
+                        "function": "decorative"
+                      },
+                      "on": {
+                        "on": true
+                      },
+                      "dimming": {
+                        "brightness": 7.91,
+                        "min_dim_level": 0.01
+                      },
+                      "color_temperature": {
+                        "mirek": null,
+                        "mirek_valid": false,
+                        "mirek_schema": {
+                          "mirek_minimum": 153,
+                          "mirek_maximum": 500
+                        }
+                      },
+                      "color": {
+                        "xy": {
+                          "x": 0.6025,
+                          "y": 0.3433
+                        },
+                        "gamut": {
+                          "red": {
+                            "x": 0.6915,
+                            "y": 0.3083
+                          },
+                          "green": {
+                            "x": 0.17,
+                            "y": 0.7
+                          },
+                          "blue": {
+                            "x": 0.1532,
+                            "y": 0.0475
+                          }
+                        },
+                        "gamut_type": "C"
+                      },
+                      "dynamics": {
+                        "status": "none",
+                        "status_values": [
+                          "none",
+                          "dynamic_palette"
+                        ],
+                        "speed": 0.0,
+                        "speed_valid": false
+                      },
+                      "alert": {
+                        "action_values": [
+                          "breathe"
+                        ]
+                      },
+                      "mode": "normal",
+                      "gradient": {
+                        "points": [],
+                        "mode": "interpolated_palette",
+                        "points_capable": 5,
+                        "mode_values": [
+                          "interpolated_palette",
+                          "random_pixelated"
+                        ],
+                        "pixel_count": 24
+                      },
+                      "effects_v2": {
+                        "action": {
+                          "effect_values": [
+                            "no_effect",
+                            "candle"
+                          ]
+                        },
+                        "status": {
+                          "effect": "no_effect",
+                          "effect_values": [
+                            "no_effect",
+                            "candle"
+                          ]
+                        }
+                      },
+                      "type": "light"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/device", EMPTY_RESPONSE);
+
+        LightState lightState = getLightState("cb6f54e8-5071-478e-9c0a-949a51b117a2");
+
+        assertLightState(
+                lightState,
+                LightState.builder()
+                          .id("cb6f54e8-5071-478e-9c0a-949a51b117a2")
+                          .on(true)
+                          .brightness(20)
+                          .colorTemperature(null)
+                          .x(0.6025)
+                          .y(0.3433)
+                          .colormode(ColorMode.XY)
+                          .effect("none")
+                          .lightCapabilities(LightCapabilities.builder()
+                                                              .colorGamutType("C")
+                                                              .colorGamut(GAMUT_C)
+                                                              .ctMin(153)
+                                                              .ctMax(500)
+                                                              .gradientModes(List.of("interpolated_palette", "random_pixelated"))
+                                                              .maxGradientPoints(5)
+                                                              .effects(List.of("candle"))
+                                                              .capabilities(EnumSet.of(Capability.GRADIENT, Capability.COLOR, Capability.COLOR_TEMPERATURE,
+                                                                      Capability.BRIGHTNESS, Capability.ON_OFF))
+                                                              .build()
+                          )
+                          .build()
+        );
+    }
+
+    @Test
+    void getState_returnsLightState_effectActive_xyAsParameter() {
         setGetResponse("/light", """
                 {
                   "errors": [],
@@ -434,7 +566,7 @@ class HueApiTest {
     }
 
     @Test
-    void getState_returnsLightState_effectActive_ctAsParameter_callsCorrectApiURL() {
+    void getState_returnsLightState_effectActive_ctAsParameter() {
         setGetResponse("/light/cb6f54e8-5071-478e-9c0a-949a51b117a2", """
                 {
                   "errors": [],
@@ -526,6 +658,105 @@ class HueApiTest {
                                       .effect("candle")
                                       .ct(493)
                                       .speed(0.1825)
+                                      .build())
+                        .colormode(ColorMode.CT)
+                        .lightCapabilities(LightCapabilities.builder()
+                                                            .effects(List.of("candle"))
+                                                            .capabilities(EnumSet.of(
+                                                                    Capability.COLOR,
+                                                                    Capability.BRIGHTNESS,
+                                                                    Capability.COLOR_TEMPERATURE,
+                                                                    Capability.ON_OFF)
+                                                            )
+                                                            .ctMin(153)
+                                                            .ctMax(500)
+                                                            .build())
+                        .build()
+        );
+    }
+
+    @Test
+    void getState_returnsLightState_effectActive_justSpeed() {
+        setGetResponse("/light/cb6f54e8-5071-478e-9c0a-949a51b117a2", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "cb6f54e8-5071-478e-9c0a-949a51b117a2",
+                      "id_v1": "/lights/55",
+                      "owner": {
+                        "rid": "2d019cd6-7de4-46dc-b8af-963add43a000",
+                        "rtype": "device"
+                      },
+                      "metadata": {
+                        "name": "TV Play",
+                        "archetype": "hue_lightstrip_tv",
+                        "function": "decorative"
+                      },
+                      "product_data": {
+                        "function": "decorative"
+                      },
+                      "on": {
+                        "on": true
+                      },
+                      "dimming": {
+                        "brightness": 26.09,
+                        "min_dim_level": 0.01
+                      },
+                      "color_temperature": {
+                        "mirek": 493,
+                        "mirek_valid": true,
+                        "mirek_schema": {
+                          "mirek_minimum": 153,
+                          "mirek_maximum": 500
+                        }
+                      },
+                      "color": {
+                        "xy": {
+                          "x": 0.5236,
+                          "y": 0.4137
+                        }
+                      },
+                      "mode": "normal",
+                      "effects_v2": {
+                        "action": {
+                          "effect_values": [
+                            "no_effect",
+                            "candle"
+                          ]
+                        },
+                        "status": {
+                          "effect": "candle",
+                          "effect_values": [
+                            "no_effect",
+                            "candle"
+                          ],
+                          "parameters": {
+                            "speed": 0.5
+                          }
+                        }
+                      },
+                      "type": "light"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/device", EMPTY_RESPONSE);
+
+        LightState lightState = getLightState("cb6f54e8-5071-478e-9c0a-949a51b117a2");
+
+        assertLightState(
+                lightState, LightState
+                        .builder()
+                        .id("cb6f54e8-5071-478e-9c0a-949a51b117a2")
+                        .on(true)
+                        .x(0.5236)
+                        .y(0.4137)
+                        .colorTemperature(493)
+                        .brightness(66)
+                        .effect(Effect.builder()
+                                      .effect("candle")
+                                      .speed(0.5)
                                       .build())
                         .colormode(ColorMode.CT)
                         .lightCapabilities(LightCapabilities.builder()
