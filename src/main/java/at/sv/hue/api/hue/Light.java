@@ -145,7 +145,7 @@ final class Light implements Resource {
                 return null;
             }
             ColorTemperature colorTemperature = status.parameters.color_temperature;
-            if (colorTemperature == null) { // todo: mutation coverage
+            if (colorTemperature == null) {
                 return null;
             }
             return colorTemperature.getMirekIfValid();
@@ -156,7 +156,7 @@ final class Light implements Resource {
                 return null;
             }
             Color color = status.parameters.color;
-            if (color == null) { // todo: mutation coverage
+            if (color == null) {
                 return null;
             }
             return color.xy.x;
@@ -167,7 +167,7 @@ final class Light implements Resource {
                 return null;
             }
             Color color = status.parameters.color;
-            if (color == null) { // todo: mutation coverage
+            if (color == null) {
                 return null;
             }
             return color.xy.y;
@@ -220,7 +220,7 @@ final class Light implements Resource {
         List<String> mode_values;
 
         public at.sv.hue.Gradient getGradient() {
-            if (points == null) { // todo: mutation coverage
+            if (points.isEmpty()) {
                 return null;
             }
             List<Pair<Double, Double>> points = this.points.stream()

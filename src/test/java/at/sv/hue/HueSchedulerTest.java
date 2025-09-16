@@ -4322,6 +4322,49 @@ class HueSchedulerTest {
     }
 
     @Test
+    void parse_gradient_rgb_threePoints_autoFill_doesNothing_keepsOriginalPoints() {
+        autoFillGradient = true;
+        create();
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addStateNow("1", "gradient:[xy(0.2 0.2),xy(0.3 0.3),xy(0.4 0.4)]");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
+                expectedPutCall(ID).gradient(Gradient.builder()
+                                                     .points(List.of(
+                                                             Pair.of(0.2, 0.2),
+                                                             Pair.of(0.3, 0.3),
+                                                             Pair.of(0.4, 0.4)
+                                                     ))
+                                                     .build())
+        );
+
+        ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
+    void parse_gradient_rgb_twoPoints_maxPoints() {
+        mockLightCapabilities(1, LightCapabilities.builder()
+                                                  .maxGradientPoints(2)
+                                                  .capabilities(EnumSet.of(Capability.GRADIENT)));
+        addStateNow("1", "gradient:[xy(0.2 0.2),xy(0.3 0.3)]");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
+                expectedPutCall(ID).gradient(Gradient.builder()
+                                                     .points(List.of(
+                                                             Pair.of(0.2, 0.2),
+                                                             Pair.of(0.3, 0.3)
+                                                     ))
+                                                     .build())
+        );
+
+        ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
     void parse_gradient_rgbAndHex_twoPoints() {
         addKnownLightIdsWithDefaultCapabilities(1);
         addStateNow("1", "gradient:[rgb(150 90 77),#5eba7d]");
@@ -11375,8 +11418,6 @@ class HueSchedulerTest {
                 expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
         );
     }
-
-    // todo: test that the interpolated call is not repeated on normal state progression -> put calls equals check needs to consider the gradient
 
     @Test
     void sceneControl_interpolate_sceneToScene_noOverlappingProperties_noInterpolation() {
