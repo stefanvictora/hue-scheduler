@@ -16,6 +16,7 @@ import at.sv.hue.api.Identifier;
 import at.sv.hue.api.LightCapabilities;
 import at.sv.hue.api.LightNotFoundException;
 import at.sv.hue.api.LightState;
+import at.sv.hue.api.NonUniqueNameException;
 import at.sv.hue.api.PutCall;
 import at.sv.hue.api.RateLimiter;
 import at.sv.hue.api.hass.area.HassAreaRegistry;
@@ -319,7 +320,7 @@ public class HassApiImpl implements HueApi {
 
     @Override
     public List<ScheduledLightState> getSceneLightState(String groupId, String sceneName) {
-        return List.of(); // nut supported by Home Assistant
+        throw new UnsupportedOperationException("Scene scheduling is not supported by Home Assistant");
     }
 
     @Override
