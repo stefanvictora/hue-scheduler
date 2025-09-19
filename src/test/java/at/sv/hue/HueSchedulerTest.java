@@ -3035,15 +3035,15 @@ class HueSchedulerTest {
     @Test
     void parse_transitionTimeBefore_multipleStates_currentIsOffState_doesNotAddOffPropertyToInterpolatedCall() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        addStateNow(1, "bri:10"); // no explicit "off"
-        addState(1, now.plusMinutes(40), "on:false", "bri:" + DEFAULT_BRIGHTNESS, "tr-before:20min");
+        addStateNow(1, "ct:200"); // no explicit "off"
+        addState(1, now.plusMinutes(40), "on:false", "ct:300", "tr-before:20min");
 
         List<ScheduledRunnable> scheduledRunnables = startScheduler(2);
         ScheduledRunnable trBeforeRunnable = scheduledRunnables.get(1);
 
         advanceTimeAndRunAndAssertPutCalls(trBeforeRunnable,
-                expectedPutCall(1).bri(10), // no "off" added
-                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS).on(false).transitionTime(tr("20min"))
+                expectedPutCall(1).ct(200), // no "off" added
+                expectedPutCall(1).ct(300).on(false).transitionTime(tr("20min"))
         );
 
         ensureRunnable(initialNow.plusDays(1).plusMinutes(20), initialNow.plusDays(2));
@@ -5229,6 +5229,13 @@ class HueSchedulerTest {
     }
 
     @Test
+    void parse_brightness_andOff_exception() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+
+        assertThrows(InvalidPropertyValue.class, () -> addStateNow(1, "on:false", "bri:100"));
+    }
+
+    @Test
     void parse_on_forOnOffLight() {
         mockLightCapabilities(1, LightCapabilities.builder().capabilities(EnumSet.of(Capability.ON_OFF)));
 
@@ -5699,12 +5706,12 @@ class HueSchedulerTest {
     @Test
     void run_execution_offState_withInvalidAdditionalProperties_doesNotRetryAfterPowerOn() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        addState(1, now, "on:false", "bri:10");
+        addState(1, now, "on:false", "ct:200");
 
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
         runAndAssertPutCalls(scheduledRunnable,
-                expectedPutCall(1).on(false).bri(10) // bri actually does not make any sense here
+                expectedPutCall(1).ct(200).on(false)
         );
 
         ensureNextDayRunnable();

@@ -29,9 +29,9 @@ public final class ScheduledLightStateValidator {
         this.identifier = identifier;
         this.groupState = groupState;
         this.capabilities = capabilities;
+        this.on = on;
         this.brightness = assertValidBrightnessValue(brightness);
         this.ct = assertCtSupportAndValue(ct);
-        this.on = on;
         this.effect = assertValidEffectValue(effect);
         assertValidXyPair(x, y);
         if (x != null) { // y is not null, because of assertValidXyPair
@@ -105,6 +105,7 @@ public final class ScheduledLightStateValidator {
             return null;
         }
         assertBrightnessSupported();
+        assertNotCombinedWithOff();
         return brightness;
     }
 
@@ -112,6 +113,12 @@ public final class ScheduledLightStateValidator {
         if (!capabilities.isBrightnessSupported()) {
             throw new BrightnessNotSupported(getFormattedName() + " does not support setting brightness! "
                                              + "Capabilities: " + capabilities.getCapabilities());
+        }
+    }
+
+    private void assertNotCombinedWithOff() {
+        if (on == Boolean.FALSE) {
+            throw new InvalidPropertyValue("Brightness cannot be set when 'on' is set to false.");
         }
     }
 
