@@ -36,4 +36,8 @@ public final class LightCapabilities {
     public boolean isBrightnessSupported() {
         return capabilities.contains(Capability.BRIGHTNESS);
     }
+
+    public boolean isEffectSupported(String effect) {
+        return effects != null && effects.contains(effect);
+    }
 }
