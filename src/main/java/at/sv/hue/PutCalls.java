@@ -34,7 +34,7 @@ public final class PutCalls {
     }
 
     private static List<PutCall> convertPutCallsIfNeeded(String id, List<PutCall> putCalls, boolean groupUpdate) {
-        if (groupUpdate && putCalls.size() == 1) {
+        if (groupUpdate && putCalls.size() == 1) { // for non groups the id of the putCall is already the light id
             return List.of(putCalls.getFirst().toBuilder()
                                    .id(id) // use group id instead of light id
                                    .build());
