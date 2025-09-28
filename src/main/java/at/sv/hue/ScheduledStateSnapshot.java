@@ -251,7 +251,7 @@ public class ScheduledStateSnapshot {
         }
         PutCalls putCalls = getPutCalls(now);
         return putCalls.map(putCall -> {
-            if (putCall.getOn() == Boolean.FALSE && hasNoTransition(putCalls)) {
+            if (putCall.getOn() == Boolean.FALSE) {
                 return putCall;
             }
             ScheduledStateSnapshot previousState = this;
@@ -264,7 +264,7 @@ public class ScheduledStateSnapshot {
                 PutCall previousPutCall;
                 if (previousPutCalls.isGeneralGroup()) {
                     previousPutCall = previousPutCalls.toList().getFirst();
-                } else if (putCalls.isGeneralGroup()) {
+                } else if (putCalls.isGeneralGroup()) { // optimization
                     break; // we cannot map specific lights to a general group
                 } else {
                     previousPutCall = previousPutCalls.get(putCall.getId());
@@ -296,10 +296,6 @@ public class ScheduledStateSnapshot {
             }
             return putCall;
         });
-    }
-
-    private static boolean hasNoTransition(PutCalls putCalls) {
-        return putCalls.getTransitionTime() == null || putCalls.getTransitionTime() == 0;
     }
 
     private static boolean shouldCopyEffect(PutCall putCall) {
