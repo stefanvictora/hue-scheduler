@@ -402,6 +402,10 @@ public final class HueApiImpl implements HueApi {
         if (!capabilities.isColorSupported() && !capabilities.isCtSupported()) {
             putCallBuilder.x(null).y(null);
         }
+        Effect effect = putCall.getEffect();
+        if (effect != null && !capabilities.isEffectSupported(effect.effect())) {
+            putCallBuilder.effect(null);
+        }
         putCallBuilder.gamut(capabilities.getColorGamut());
         PutCall updatedPutCall = putCallBuilder.build();
         if (!capabilities.isColorSupported() && capabilities.isCtSupported()) { // .isCtSupported() redundant, but clearer
