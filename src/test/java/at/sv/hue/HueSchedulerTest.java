@@ -3188,6 +3188,32 @@ class HueSchedulerTest {
     }
 
     @Test
+    void parse_offState_withTransition_stillNoFullPicture() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now, "on:false", "tr:5s", "force:true");
+        addState(1, now.plusMinutes(10), "bri:100", "ct:200");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).on(false).transitionTime(tr("5s"))
+        );
+
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(10)); // next day
+
+        ScheduledRunnable powerOnRunnable = simulateLightOnEvent(
+                expectedPowerOnEnd(initialNow.plusMinutes(10))
+        ).getFirst();
+
+        advanceTimeAndRunAndAssertPutCalls(powerOnRunnable,
+                expectedPutCall(1).on(false).transitionTime(tr("5s"))
+        );
+    }
+
+    @Test
     void parse_offState_zeroTransition_noFullPictureUsed() {
         addKnownLightIdsWithDefaultCapabilities(1);
         addState(1, now, "on:false", "tr:0");
