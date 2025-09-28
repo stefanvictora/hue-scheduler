@@ -984,7 +984,7 @@ public final class HueScheduler implements Runnable {
     private static ScheduledStateSnapshot createTemporaryFollowUpSplitState(ScheduledStateSnapshot state) {
         ScheduledState temporaryCopy = ScheduledState.createTemporaryCopy(state.getScheduledState());
         ScheduledStateSnapshot nextSplitSnapshot = temporaryCopy.getSnapshot(state.getDefinedStart());
-        nextSplitSnapshot.overwriteEnd(state.getEnd());
+        nextSplitSnapshot.overwriteEnd(state.getEnd()); // optimization
         return nextSplitSnapshot;
     }
 

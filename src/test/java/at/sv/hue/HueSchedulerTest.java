@@ -1952,6 +1952,43 @@ class HueSchedulerTest {
     }
 
     @Test
+    void parse_interpolate_differentColorMode_butSameProperties_noInterpolation() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, "00:00", "ct:200");
+        addState(1, "00:30", "x:0.3473", "y:0.3523", "interpolate:true");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(30)),
+                expectedRunnable(now.plusMinutes(30), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).ct(200)
+        );
+
+        ensureRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(30)); // next day
+    }
+
+    @Test
+    void parse_interpolate_differentColorMode_differentProperties_interpolates() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, "00:00", "ct:153");
+        addState(1, "00:30", "x:0.3473", "y:0.3523", "interpolate:true");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1)),
+                expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).x(0.3157).y(0.3329), // = ct:153 converted to xy
+                expectedPutCall(1).x(0.3473).y(0.3523).transitionTime(tr("30min"))
+        );
+
+        ensureRunnable(now.plusDays(1), now.plusDays(2)); // next day
+    }
+
+    @Test
     void parse_interpolate_effect_withBrightness_interpolates() {
         addKnownLightIdsWithDefaultCapabilities(1);
         addState(1, "00:00", "bri:50", "effect:candle");
