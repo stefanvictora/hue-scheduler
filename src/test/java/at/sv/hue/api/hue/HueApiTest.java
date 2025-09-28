@@ -4908,6 +4908,21 @@ class HueApiTest {
                           "y": 0.3553
                         }
                       },
+                      "effects_v2": {
+                        "action": {
+                          "effect_values": [
+                            "no_effect",
+                            "opal"
+                          ]
+                        },
+                        "status": {
+                          "effect": "no_effect",
+                          "effect_values": [
+                            "no_effect",
+                            "opal"
+                          ]
+                        }
+                      },
                       "type": "light"
                     },
                     {
@@ -5283,6 +5298,21 @@ class HueApiTest {
                         },
                         "gamut_type": "B"
                       },
+                      "effects_v2": {
+                        "action": {
+                          "effect_values": [
+                            "no_effect",
+                            "candle"
+                          ]
+                        },
+                        "status": {
+                          "effect": "no_effect",
+                          "effect_values": [
+                            "no_effect",
+                            "candle"
+                          ]
+                        }
+                      },
                       "type": "light"
                     },
                     {
@@ -5311,6 +5341,21 @@ class HueApiTest {
                           "mirek_maximum": 454
                         }
                       },
+                      "effects_v2": {
+                        "action": {
+                          "effect_values": [
+                            "no_effect",
+                            "candle"
+                          ]
+                        },
+                        "status": {
+                          "effect": "no_effect",
+                          "effect_values": [
+                            "no_effect",
+                            "candle"
+                          ]
+                        }
+                      },
                       "type": "light"
                     },
                     {
@@ -5331,6 +5376,21 @@ class HueApiTest {
                       "dimming": {
                         "brightness": 100.0,
                         "min_dim_level": 5.0
+                      },
+                      "effects_v2": {
+                        "action": {
+                          "effect_values": [
+                            "no_effect",
+                            "different_effect"
+                          ]
+                        },
+                        "status": {
+                          "effect": "no_effect",
+                          "effect_values": [
+                            "no_effect",
+                            "different_effect"
+                          ]
+                        }
                       },
                       "type": "light"
                     },
@@ -5493,6 +5553,93 @@ class HueApiTest {
                         },
                         "color_temperature": {
                           "mirek": 454
+                        }
+                      }
+                    },
+                    {
+                      "target": {
+                        "rid": "BRI_ONLY",
+                        "rtype": "light"
+                      },
+                      "action": {
+                        "on": {
+                          "on": true
+                        },
+                        "dimming": {
+                          "brightness": 100.0
+                        }
+                      }
+                    },
+                    {
+                      "target": {
+                        "rid": "ON_OFF_ONLY",
+                        "rtype": "light"
+                      },
+                      "action": {
+                        "on": {
+                          "on": true
+                        }
+                      }
+                    }
+                  ]
+                }
+                """);
+
+        // effect and brightness:
+
+        createOrUpdateScene("GROUPED_LIGHT", "SCENE",
+                PutCall.builder().id("COLOR").bri(254).effect(Effect.builder().effect("candle").build()),
+                PutCall.builder().id("CT_ONLY").bri(254).effect(Effect.builder().effect("candle").build()),
+                PutCall.builder().id("BRI_ONLY").bri(254).effect(Effect.builder().effect("candle").build()),
+                PutCall.builder().id("ON_OFF_ONLY").bri(254).effect(Effect.builder().effect("candle").build())
+        );
+
+        verifyPost("/scene", """
+                {
+                  "metadata": {
+                    "name": "SCENE",
+                    "appdata": "huescheduler:app"
+                  },
+                  "group": {
+                    "rid": "ZONE",
+                    "rtype": "zone"
+                  },
+                  "actions": [
+                    {
+                      "target": {
+                        "rid": "COLOR",
+                        "rtype": "light"
+                      },
+                      "action": {
+                        "on": {
+                          "on": true
+                        },
+                        "dimming": {
+                          "brightness": 100.0
+                        },
+                        "effects_v2": {
+                          "action": {
+                            "effect": "candle"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "target": {
+                        "rid": "CT_ONLY",
+                        "rtype": "light"
+                      },
+                      "action": {
+                        "on": {
+                          "on": true
+                        },
+                        "dimming": {
+                          "brightness": 100.0
+                        },
+                        "effects_v2": {
+                          "action": {
+                            "effect": "candle"
+                          }
                         }
                       }
                     },
