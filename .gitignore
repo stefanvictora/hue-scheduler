@@ -21,6 +21,9 @@ buildNumber.properties
 .idea/**/tasks.xml
 .idea/**/usage.statistics.xml
 .idea/**/dictionaries
+.idea/dictionaries
+.idea/httpRequests
+.idea/copilot.*.xml
 .idea/**/shelf
 .idea/sonarlint
 .idea/jpa-buddy.xml
