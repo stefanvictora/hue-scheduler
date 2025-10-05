@@ -192,10 +192,10 @@ public final class StateInterpolator {
 
     private Pair<Double, Double> interpolateXY(BigDecimal interpolatedTime, Pair<Double, Double> previous,
                                                Pair<Double, Double> target, Double[][] gamut) {
-        if (target == null) {
+        if (target == null) { // todo: no mutation coverage
             return previous;
         }
-        if (previous == null) {
+        if (previous == null) { // todo: no mutation coverage
             return null;
         }
 
@@ -216,10 +216,10 @@ public final class StateInterpolator {
 
     private Gradient interpolateGradient(BigDecimal interpolatedTime, Gradient previous, Gradient target,
                                          Double[][] gamut) {
-        if (target == null) {
+        if (target == null) { // todo: no mutation coverage
             return previous;
         }
-        if (previous == null) {
+        if (previous == null) { // todo: no mutation coverage
             return null;
         }
 
