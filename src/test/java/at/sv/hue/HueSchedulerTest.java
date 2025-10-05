@@ -6179,20 +6179,18 @@ class HueSchedulerTest {
     }
 
     @Test
-    void sceneTurnedOn_syncedScene_insideIgnoreWindow_stillSchedulesState() {
-        enableUserModificationTracking();
+    void sceneTurnedOn_syncedScene_noInterpolation_insideIgnoreWindow_doesNotApplyStateAgain() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        addState(1, now, "bri:" + DEFAULT_BRIGHTNESS);
-        addState(1, now.plusMinutes(10), "bri:" + (DEFAULT_BRIGHTNESS + 10));
+        addState(1, now, "bri:50");
+        addState(1, now.plusMinutes(10), "bri:60");
 
         List<ScheduledRunnable> scheduledRunnables = startScheduler(
                 expectedRunnable(now, now.plusMinutes(10)),
                 expectedRunnable(now.plusMinutes(10), now.plusDays(1))
         );
 
-        setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS));
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
-                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS)
+                expectedPutCall(1).bri(50)
         );
 
         ensureScheduledStates(
@@ -6202,29 +6200,122 @@ class HueSchedulerTest {
         // simulate synced scene activated: automatically triggers light on event
         simulateSyncedSceneActivated("/scenes/123456ABC", "/lights/1", "/lights/2");
 
-        ScheduledRunnable powerOnRunnable = ensureScheduledStates(expectedPowerOnEnd(initialNow.plusMinutes(10))).getFirst();
-
         // additional light on event; no additional runnable created
         simulateLightOnEvent("/groups/1");
 
-        // wait a bit, but still inside ignore window
-        advanceCurrentTime(Duration.ofSeconds(4));
+        ScheduledRunnable powerOnRunnable = ensureScheduledStates(expectedPowerOnEnd(initialNow.plusMinutes(10))).getFirst();
 
-        // modify current light state
-        setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS - 10));
-        runAndAssertPutCalls(powerOnRunnable,
-                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS) // still applied, as just turned on and synced scene is ignored
+        advanceCurrentTime(Duration.ofSeconds(sceneActivationIgnoreWindowInSeconds - 1)); // inside ignore window
+        
+        runAndAssertPutCalls(powerOnRunnable); // no additional update
+    }
+
+    @Test
+    void sceneTurnedOn_syncedScene_noInterpolation_outsideIgnoreWindow_doesApplyStateAgain() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now, "bri:50");
+        addState(1, now.plusMinutes(10), "bri:60");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
         );
 
-        // second state
-
-        setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS));
-        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(1),
-                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 10) // also second state is correctly applied
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).bri(50)
         );
 
         ensureScheduledStates(
-                expectedRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)) // next day
+                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
+        );
+
+        // simulate synced scene activated
+        simulateSyncedSceneActivated("/scenes/123456ABC", "/lights/1");
+
+        ScheduledRunnable powerOnRunnable = ensureScheduledStates(expectedPowerOnEnd(initialNow.plusMinutes(10))).getFirst();
+
+        advanceCurrentTime(Duration.ofSeconds(sceneActivationIgnoreWindowInSeconds)); // outside ignore window
+
+        runAndAssertPutCalls(powerOnRunnable,
+                expectedPutCall(1).bri(50)
+        );
+    }
+
+    @Test
+    void sceneTurnedOn_syncedScene_noInterpolation_doesNotApplyStateAgain_stillResetsManualOverride_nextDayAppliedNormally() {
+        enableUserModificationTracking();
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now, "bri:50");
+        addState(1, now.plusMinutes(10), "bri:60");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).bri(50)
+        );
+
+        ScheduledRunnable nextDayRunnable = ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
+        ).getFirst();
+
+        // second state: detected as overridden
+
+        setLightStateResponse(1, expectedState().brightness(100));
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(1)); // detected as overridden
+
+        ensureRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)); // next day
+
+        // simulate synced scene activated: automatically triggers light on event and resets manual override
+
+        simulateSyncedSceneActivated("/scenes/123456ABC", "/lights/1", "/lights/2");
+
+        ScheduledRunnable powerOnRunnable = ensureScheduledStates(
+                expectedPowerOnEnd(initialNow.plusMinutes(10)), // already ended
+                expectedPowerOnEnd(initialNow.plusDays(1))
+        ).get(1);
+
+        runAndAssertPutCalls(powerOnRunnable); // no additional update
+        
+        // next day state: now applied again, as override has been reset
+        setLightStateResponse(1, expectedState().brightness(60));
+        advanceTimeAndRunAndAssertPutCalls(nextDayRunnable,
+                expectedPutCall(1).bri(50)
+        );
+
+        ensureRunnable(initialNow.plusDays(2), initialNow.plusDays(2).plusMinutes(10)); // next day
+    }
+
+    @Test
+    void sceneTurnedOn_syncedScene_withInterpolation_appliesStateAgain() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now, "bri:50");
+        addState(1, now.plusMinutes(10), "bri:60", "interpolate:true");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1)),
+                expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).bri(50), // interpolated
+                expectedPutCall(1).bri(60).transitionTime(tr("10min"))
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
+        );
+
+        // simulate synced scene activated
+        simulateSyncedSceneActivated("/scenes/123456ABC", "/lights/1", "/lights/2");
+
+        ScheduledRunnable powerOnRunnable = ensureScheduledStates(expectedPowerOnEnd(initialNow.plusDays(1))).getFirst();
+
+        runAndAssertPutCalls(powerOnRunnable,
+                // no interpolated put call; as this was already set by the scene
+                expectedPutCall(1).bri(60).transitionTime(tr("10min"))  // re-applies state due to ongoing interpolation
         );
     }
 
@@ -7506,9 +7597,7 @@ class HueSchedulerTest {
         simulateSyncedSceneActivated("/scene/synced_scene", "/lights/5", "/lights/6", "/lights/7", "/lights/8");
 
         ScheduledRunnable syncedSceneRunnable = ensureScheduledStates(expectedPowerOnEnd(initialNow.plusMinutes(10))).getFirst();
-        advanceTimeAndRunAndAssertPutCalls(syncedSceneRunnable,
-                expectedGroupPutCall(2).bri(120)
-        );
+        advanceTimeAndRunAndAssertPutCalls(syncedSceneRunnable); // no further update needed, no interpolations
 
         // g2.2
 
@@ -7858,26 +7947,26 @@ class HueSchedulerTest {
     // todo: what about if the schedule contains on:true, should we then still not apply it?
 
     @Test
-    void disableAutomaticActivation_ignoresLightOnEvents_exceptForSyncedSceneActivation() {
+    void requireSceneActivation_ignoresLightOnEvents_exceptForSyncedSceneActivation() {
         requireSceneActivation();
         addKnownLightIdsWithDefaultCapabilities(1);
-        addState(1, now, "bri:100");
-        addState(1, now.plusMinutes(10), "bri:110");
+        addState(1, now.plusMinutes(5), "bri:100", "tr-before:5min");
+        addState(1, now.plusMinutes(10), "bri:110", "tr-before:5min");
 
         List<ScheduledRunnable> runnables = startScheduler(
-                expectedRunnable(now, now.plusMinutes(10)),
-                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+                expectedRunnable(now, now.plusMinutes(5)),
+                expectedRunnable(now.plusMinutes(5), now.plusDays(1))
         );
 
         advanceTimeAndRunAndAssertPutCalls(runnables.getFirst());
 
         ScheduledRunnable firstNextDay = ensureScheduledStates(
-                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
+                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(5)) // next day
         ).getFirst();
 
         // case 1: turned on normally -> ignored
 
-        ScheduledRunnable powerOnRunnable = simulateLightOnEvent("/lights/1", expectedPowerOnEnd(now.plusMinutes(10))).getFirst();
+        ScheduledRunnable powerOnRunnable = simulateLightOnEvent("/lights/1", expectedPowerOnEnd(now.plusMinutes(5))).getFirst();
 
         advanceTimeAndRunAndAssertPutCalls(powerOnRunnable); // no update performed
 
@@ -7885,7 +7974,7 @@ class HueSchedulerTest {
 
         simulateSceneActivated("/scene/XYZ", "/lights/1");
 
-        ScheduledRunnable normalSceneRunnable = simulateLightOnEvent("/lights/1", expectedPowerOnEnd(now.plusMinutes(10))).getFirst();
+        ScheduledRunnable normalSceneRunnable = simulateLightOnEvent("/lights/1", expectedPowerOnEnd(now.plusMinutes(5))).getFirst();
 
         advanceTimeAndRunAndAssertPutCalls(normalSceneRunnable); // no update performed
 
@@ -7893,10 +7982,10 @@ class HueSchedulerTest {
 
         simulateSyncedSceneActivated("/scene/ABC", "/lights/1");
 
-        ScheduledRunnable syncedSceneRunnable = ensureScheduledStates(expectedPowerOnEnd(now.plusMinutes(10))).getFirst();
+        ScheduledRunnable syncedSceneRunnable = ensureScheduledStates(expectedPowerOnEnd(now.plusMinutes(5))).getFirst();
 
         advanceTimeAndRunAndAssertPutCalls(syncedSceneRunnable,
-                expectedPutCall(1).bri(100)
+                expectedPutCall(1).bri(100).transitionTime(tr("5min"))
         );
 
         // wait until after ignore window -> light turned off and on again. Is ignored again
@@ -7905,7 +7994,7 @@ class HueSchedulerTest {
 
         simulateLightOffEvent("/lights/1"); // simulate light turned off
 
-        ScheduledRunnable powerOnRunnable2 = simulateLightOnEvent("/lights/1", expectedPowerOnEnd(initialNow.plusMinutes(10))).getFirst();
+        ScheduledRunnable powerOnRunnable2 = simulateLightOnEvent("/lights/1", expectedPowerOnEnd(initialNow.plusMinutes(5))).getFirst();
 
         runAndAssertPutCalls(powerOnRunnable2); // ignored again
 
@@ -7914,7 +8003,7 @@ class HueSchedulerTest {
         advanceTimeAndRunAndAssertPutCalls(runnables.get(1));
 
         ScheduledRunnable secondNextDay = ensureScheduledStates(
-                expectedRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)) // next day
+                expectedRunnable(initialNow.plusDays(1).plusMinutes(5), initialNow.plusDays(2)) // next day
         ).getFirst();
 
         // synced scene turned on again -> applies second state and allows first next day to follow
@@ -7922,22 +8011,22 @@ class HueSchedulerTest {
         simulateSyncedSceneActivated("/scene/ABC", "/lights/1");
 
         ScheduledRunnable syncedSceneRunnable2 = ensureScheduledStates(
-                expectedPowerOnEnd(initialNow.plusMinutes(10)), // already ended
+                expectedPowerOnEnd(initialNow.plusMinutes(5)), // already ended
                 expectedPowerOnEnd(initialNow.plusDays(1))
         ).get(1);
 
         advanceTimeAndRunAndAssertPutCalls(syncedSceneRunnable2,
-                expectedPutCall(1).bri(110)
+                expectedPutCall(1).bri(110).transitionTime(tr("5min"))
         );
 
         // first next day
 
         advanceTimeAndRunAndAssertPutCalls(firstNextDay,
-                expectedPutCall(1).bri(100)
+                expectedPutCall(1).bri(100).transitionTime(tr("5min"))
         );
 
         ensureScheduledStates(
-                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
+                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(5)) // next day
         );
     }
 
@@ -7960,18 +8049,16 @@ class HueSchedulerTest {
                 expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
         ).getFirst();
 
-        // synced scene -> applies first state, ignoring any light state
+        // synced scene -> tracks first state apply via scene, ignoring any light state
 
         simulateSyncedSceneActivated("/scene/ABC", "/lights/1");
 
         ScheduledRunnable syncedSceneRunnable = ensureScheduledStates(expectedPowerOnEnd(now.plusMinutes(10))).getFirst();
 
         setLightStateResponse(1, expectedState().brightness(200)); // ignored
-        advanceTimeAndRunAndAssertPutCalls(syncedSceneRunnable,
-                expectedPutCall(1).bri(100)
-        );
+        advanceTimeAndRunAndAssertPutCalls(syncedSceneRunnable); // no further update needed, scene already set the state; tracks last seen state
 
-        // light has been modified before second state -> triggers override
+        // light has been modified before second state -> triggers override based on last seen state tracked via scene
 
         setLightStateResponse(1, expectedState().brightness(100 + BRIGHTNESS_OVERRIDE_THRESHOLD));
         advanceTimeAndRunAndAssertPutCalls(runnables.get(1));
@@ -7998,9 +8085,7 @@ class HueSchedulerTest {
                 expectedPowerOnEnd(initialNow.plusDays(1).plusMinutes(10))
         ).get(2);
 
-        advanceTimeAndRunAndAssertPutCalls(syncedSceneRunnable2,
-                expectedPutCall(1).bri(100)
-        );
+        advanceTimeAndRunAndAssertPutCalls(syncedSceneRunnable2); // no additional update needed, no interpolation
 
         // secondNextDay applied normally
 
@@ -8067,9 +8152,7 @@ class HueSchedulerTest {
                 expectedPowerOnEnd(now.plusMinutes(10))
         ).getFirst();
 
-        advanceTimeAndRunAndAssertPutCalls(syncedSceneRunnable,
-                expectedGroupPutCall(1).bri(100)
-        );
+        advanceTimeAndRunAndAssertPutCalls(syncedSceneRunnable); // no additional update needed, no interpolation
 
         // simulate group light to be turned on physically -> keeps synced scene turn on
 
