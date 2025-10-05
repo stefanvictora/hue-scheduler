@@ -100,7 +100,7 @@ public final class PutCall {
     }
 
     public boolean hasSameLightState(PutCall other) {
-        return Objects.equals(this.on, other.on) &&
+        return Objects.equals(this.on, other.on) && // todo: mutation coverage
                Objects.equals(this.bri, other.bri) &&
                Objects.equals(this.effect, other.effect) &&
                Objects.equals(this.gradient, other.gradient) &&
