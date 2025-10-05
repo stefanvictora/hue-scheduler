@@ -738,7 +738,7 @@ public final class HueScheduler implements Runnable {
         if (wasJustTurnedOn(state)) {
             return false;
         }
-        if (state.hasGapBefore()) {
+        if (state.hasGapBefore()) { // todo: no mutation coverage
             return false; // ignore modifications if there is a gap in the schedule
         }
         ScheduledState lastSeenState = stateRegistry.getLastSeenState(state);

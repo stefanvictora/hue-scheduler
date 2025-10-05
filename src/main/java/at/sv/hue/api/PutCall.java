@@ -102,7 +102,7 @@ public final class PutCall {
         if (other == null) {
             return false;
         }
-        return Objects.equals(this.on, other.on) &&
+        return Objects.equals(this.on, other.on) && // todo: mutation coverage
                Objects.equals(this.bri, other.bri) &&
                Objects.equals(this.effect, other.effect) &&
                Objects.equals(this.gradient, other.gradient) &&
