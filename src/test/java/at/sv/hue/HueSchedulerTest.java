@@ -33,6 +33,7 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
@@ -6149,7 +6150,7 @@ class HueSchedulerTest {
         );
 
         // simulate scene activated
-        simulateSceneActivated("/scenes/123456ABC", "/lights/1", "/lights/2");
+        simulateSceneActivated("/groups/2", "/lights/1", "/lights/2");
         setLightStateResponse(2, expectedState().brightness(DEFAULT_BRIGHTNESS - 10));
 
         // wait a bit, but still inside ignore window
@@ -6198,7 +6199,7 @@ class HueSchedulerTest {
         );
 
         // simulate synced scene activated: automatically triggers light on event
-        simulateSyncedSceneActivated("/scenes/123456ABC", "/lights/1", "/lights/2");
+        simulateSyncedSceneActivated("/groups/1", "/lights/1", "/lights/2");
 
         // additional light on event; no additional runnable created
         simulateLightOnEvent("/groups/1");
@@ -6206,7 +6207,7 @@ class HueSchedulerTest {
         ScheduledRunnable powerOnRunnable = ensureScheduledStates(expectedPowerOnEnd(initialNow.plusMinutes(10))).getFirst();
 
         advanceCurrentTime(Duration.ofSeconds(sceneActivationIgnoreWindowInSeconds - 1)); // inside ignore window
-        
+
         runAndAssertPutCalls(powerOnRunnable); // no additional update
     }
 
@@ -6230,7 +6231,7 @@ class HueSchedulerTest {
         );
 
         // simulate synced scene activated
-        simulateSyncedSceneActivated("/scenes/123456ABC", "/lights/1");
+        simulateSyncedSceneActivated("/groups/1", "/lights/1");
 
         ScheduledRunnable powerOnRunnable = ensureScheduledStates(expectedPowerOnEnd(initialNow.plusMinutes(10))).getFirst();
 
@@ -6270,7 +6271,7 @@ class HueSchedulerTest {
 
         // simulate synced scene activated: automatically triggers light on event and resets manual override
 
-        simulateSyncedSceneActivated("/scenes/123456ABC", "/lights/1", "/lights/2");
+        simulateSyncedSceneActivated("/groups/1", "/lights/1", "/lights/2");
 
         ScheduledRunnable powerOnRunnable = ensureScheduledStates(
                 expectedPowerOnEnd(initialNow.plusMinutes(10)), // already ended
@@ -6278,7 +6279,7 @@ class HueSchedulerTest {
         ).get(1);
 
         runAndAssertPutCalls(powerOnRunnable); // no additional update
-        
+
         // next day state: now applied again, as override has been reset
         setLightStateResponse(1, expectedState().brightness(60));
         advanceTimeAndRunAndAssertPutCalls(nextDayRunnable,
@@ -6309,7 +6310,7 @@ class HueSchedulerTest {
         );
 
         // simulate synced scene activated
-        simulateSyncedSceneActivated("/scenes/123456ABC", "/lights/1", "/lights/2");
+        simulateSyncedSceneActivated("/groups/1", "/lights/1", "/lights/2");
 
         ScheduledRunnable powerOnRunnable = ensureScheduledStates(expectedPowerOnEnd(initialNow.plusDays(1))).getFirst();
 
@@ -6343,7 +6344,7 @@ class HueSchedulerTest {
         );
 
         // simulate scene activated
-        simulateSceneActivated("/scenes/123456ABC", "/lights/1", "/lights/2");
+        simulateSceneActivated("/groups/1", "/lights/1", "/lights/2");
         setLightStateResponse(2, expectedState().brightness(DEFAULT_BRIGHTNESS - 10));
 
         // since its a non synced scene, no direct light on event
@@ -6394,7 +6395,7 @@ class HueSchedulerTest {
         );
 
         // simulate scene activated
-        simulateSceneActivated("/scenes/123456ABC", "/lights/1", "/lights/2");
+        simulateSceneActivated("/groups/1", "/lights/1", "/lights/2");
         setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS - 10));
 
         // wait until ignore window passed
@@ -6440,7 +6441,7 @@ class HueSchedulerTest {
         );
 
         // simulate scene activated
-        simulateSceneActivated("/scenes/57892IA", "/lights/40", "/lights/3");
+        simulateSceneActivated("/groups/1", "/lights/40", "/lights/3");
 
         ScheduledRunnable powerOnRunnable = simulateLightOnEvent("/lights/3",
                 expectedPowerOnEnd(now.plusMinutes(10))
@@ -6474,7 +6475,7 @@ class HueSchedulerTest {
 
         advanceCurrentTime(Duration.ofMinutes(10));
         // simulate scene activated
-        simulateSceneActivated("/scenes/789AI", "/lights/40", "/lights/1");
+        simulateSceneActivated("/groups/1", "/lights/40", "/lights/1");
 
         // no light on event, light was already on; light has not been modified by scene
 
@@ -6511,7 +6512,7 @@ class HueSchedulerTest {
 
         advanceCurrentTime(Duration.ofMinutes(10));
         // simulate scene activated
-        simulateSceneActivated("/scenes/789AI", "/lights/40", "/lights/1");
+        simulateSceneActivated("/groups/1", "/lights/40", "/lights/1");
         // modifies light state
         setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS + BRIGHTNESS_OVERRIDE_THRESHOLD));
 
@@ -6543,7 +6544,7 @@ class HueSchedulerTest {
         );
 
         // simulate scene activated
-        simulateSceneActivated("/scenes/57892IA", "/lights/1");
+        simulateSceneActivated("/groups/1", "/lights/1");
 
         ScheduledRunnable powerOnRunnable = simulateLightOnEventExpectingSingleScheduledState(now.plusMinutes(10));
 
@@ -7262,7 +7263,7 @@ class HueSchedulerTest {
     }
 
     @Test
-    void sceneSync_childGroupsHaveNoSchedule_createsScenes() {
+    void sceneSync_childGroupHasNoSchedule_createsScene() {
         enableSceneSync();
 
         mockDefaultGroupCapabilities(1);
@@ -7540,6 +7541,127 @@ class HueSchedulerTest {
     }
 
     @Test
+    void sceneSync_multipleSchedules_childSceneActivated_usesParentState_doesNotResetOverride() {
+        enableUserModificationTracking();
+
+        mockDefaultGroupCapabilities(1);
+        mockDefaultGroupCapabilities(2);
+        mockDefaultGroupCapabilities(3);
+        mockGroupLightsForId(1, 5, 6);
+        mockGroupLightsForId(2, 5);
+        mockGroupLightsForId(3, 6);
+        mockAssignedGroups(5, 1, 2);
+        mockAssignedGroups(6, 1, 3);
+        addState("g1", now, "bri:120");
+        addState("g3", now, "bri:130");
+        addState("g1", now.plusMinutes(10), "bri:220");
+        addState("g3", now.plusMinutes(10), "bri:230");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusSeconds(1), now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1)),
+                expectedRunnable(now.plusMinutes(10).plusSeconds(1), now.plusDays(1))
+        );
+
+        // g1.1
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.getFirst(),
+                expectedGroupPutCall(1).bri(120)
+        );
+
+        ScheduledRunnable nextDayG1_1 = ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(10)); // next day
+
+        // g3.1
+
+        manualOverrideTracker.onManuallyOverridden("/groups/3"); // simulate override
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.get(1));
+
+        ScheduledRunnable nextDayG3_1 = ensureRunnable(initialNow.plusDays(1).plusSeconds(1), initialNow.plusDays(1).plusMinutes(10)); // next day
+
+        // g1.2 -> also detects override
+
+        setGroupStateResponses(1,
+                expectedState().id("/lights/5").brightness(120),
+                expectedState().id("/lights/6").brightness(120 - BRIGHTNESS_OVERRIDE_THRESHOLD) // overridden
+        );
+        advanceTimeAndRunAndAssertPutCalls(runnables.get(2)); // override detected
+
+        ScheduledRunnable nextDayG1_2 = ensureRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)); // next day
+
+        // Activate synced scene for g2 -> only updates light 5
+
+        simulateSyncedSceneActivated("/groups/2", "/lights/5");
+
+        ScheduledRunnable syncedSceneRunnable2 = ensureScheduledStates(
+                expectedPowerOnEnd(initialNow.plusMinutes(10)), // already ended
+                expectedPowerOnEnd(initialNow.plusDays(1))
+        ).get(1);
+
+        advanceTimeAndRunAndAssertPutCalls(syncedSceneRunnable2);
+
+        // g3.2 -> still overridden
+
+        setGroupStateResponses(3,
+                expectedState().id("/lights/6").brightness(120 - BRIGHTNESS_OVERRIDE_THRESHOLD) // still overridden
+        );
+        advanceTimeAndRunAndAssertPutCalls(runnables.get(3));
+
+        ScheduledRunnable nextDayG3_2 = ensureRunnable(initialNow.plusDays(1).plusMinutes(10).plusSeconds(1), initialNow.plusDays(2));
+
+        // next day G1_1, still detected as overridden
+
+        setGroupStateResponses(1,
+                expectedState().id("/lights/5").brightness(230),
+                expectedState().id("/lights/6").brightness(120 - BRIGHTNESS_OVERRIDE_THRESHOLD) // overridden
+        );
+        advanceTimeAndRunAndAssertPutCalls(nextDayG1_1); // still overridden
+
+        ensureRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)); // next day
+
+        // activate synced scene for group 1 -> resets override
+
+        simulateSyncedSceneActivated("/groups/1", "/lights/5", "/lights/6");
+
+        ScheduledRunnable syncedSceneRunnable3 = ensureScheduledStates(
+                // for g1
+                expectedPowerOnEnd(initialNow.plusDays(1)), // already ended
+                expectedPowerOnEnd(initialNow.plusDays(1).plusMinutes(10)),
+                // for g3
+                expectedRunnable(now.plusSeconds(1), initialNow.plusMinutes(10)), // already ended
+                expectedRunnable(now.plusSeconds(1), initialNow.plusDays(1)) // already ended
+        ).get(1);
+
+        advanceTimeAndRunAndAssertPutCalls(syncedSceneRunnable3);
+
+        // Applied normally again:
+
+        // G3_1
+
+        setGroupStateResponses(3,
+                expectedState().id("/lights/6").brightness(130)
+        );
+        advanceTimeAndRunAndAssertPutCalls(nextDayG3_1,
+                expectedGroupPutCall(3).bri(130)
+        );
+
+        ensureRunnable(initialNow.plusDays(2).plusSeconds(1), initialNow.plusDays(2).plusMinutes(10)); // next day
+
+        // G1_2
+
+        setGroupStateResponses(1,
+                expectedState().id("/lights/5").brightness(120),
+                expectedState().id("/lights/6").brightness(130)
+        );
+        advanceTimeAndRunAndAssertPutCalls(nextDayG1_2,
+                expectedGroupPutCall(1).bri(220)
+        );
+
+        ensureRunnable(initialNow.plusDays(2).plusMinutes(10), initialNow.plusDays(3)); // next day
+    }
+
+    @Test
     void sceneSync_multipleSchedules_offStateIsCorrectlyReCheckedAfterSyncedSceneTurnedOnContainingOffStates_bugCase() {
         enableSceneSync();
 
@@ -7594,7 +7716,7 @@ class HueSchedulerTest {
 
         // Activate synced scene for g1 -> only applies g2 state again
 
-        simulateSyncedSceneActivated("/scene/synced_scene", "/lights/5", "/lights/6", "/lights/7", "/lights/8");
+        simulateSyncedSceneActivated("/groups/1", "/lights/5", "/lights/6", "/lights/7", "/lights/8");
 
         ScheduledRunnable syncedSceneRunnable = ensureScheduledStates(expectedPowerOnEnd(initialNow.plusMinutes(10))).getFirst();
         advanceTimeAndRunAndAssertPutCalls(syncedSceneRunnable); // no further update needed, no interpolations
@@ -7972,7 +8094,7 @@ class HueSchedulerTest {
 
         // case 2: turned on through normal scene -> ignored
 
-        simulateSceneActivated("/scene/XYZ", "/lights/1");
+        simulateSceneActivated("/groups/1", "/lights/1");
 
         ScheduledRunnable normalSceneRunnable = simulateLightOnEvent("/lights/1", expectedPowerOnEnd(now.plusMinutes(5))).getFirst();
 
@@ -7980,7 +8102,7 @@ class HueSchedulerTest {
 
         // case 3: turned on through synced scene -> apply
 
-        simulateSyncedSceneActivated("/scene/ABC", "/lights/1");
+        simulateSyncedSceneActivated("/groups/1", "/lights/1");
 
         ScheduledRunnable syncedSceneRunnable = ensureScheduledStates(expectedPowerOnEnd(now.plusMinutes(5))).getFirst();
 
@@ -8008,7 +8130,7 @@ class HueSchedulerTest {
 
         // synced scene turned on again -> applies second state and allows first next day to follow
 
-        simulateSyncedSceneActivated("/scene/ABC", "/lights/1");
+        simulateSyncedSceneActivated("/groups/1", "/lights/1");
 
         ScheduledRunnable syncedSceneRunnable2 = ensureScheduledStates(
                 expectedPowerOnEnd(initialNow.plusMinutes(5)), // already ended
@@ -8051,7 +8173,7 @@ class HueSchedulerTest {
 
         // synced scene -> tracks first state apply via scene, ignoring any light state
 
-        simulateSyncedSceneActivated("/scene/ABC", "/lights/1");
+        simulateSyncedSceneActivated("/groups/1", "/lights/1");
 
         ScheduledRunnable syncedSceneRunnable = ensureScheduledStates(expectedPowerOnEnd(now.plusMinutes(10))).getFirst();
 
@@ -8077,7 +8199,7 @@ class HueSchedulerTest {
 
         // activate synced scene again -> applies firstNextDay state, resetting override
 
-        simulateSyncedSceneActivated("/scene/ABC", "/lights/1");
+        simulateSyncedSceneActivated("/groups/1", "/lights/1");
 
         ScheduledRunnable syncedSceneRunnable2 = ensureScheduledStates(
                 expectedPowerOnEnd(initialNow.plusMinutes(10)), // already ended
@@ -8146,7 +8268,7 @@ class HueSchedulerTest {
 
         // synced scene -> applies first state, ignoring any light state
 
-        simulateSyncedSceneActivated("/scene/ABC", "/lights/5", "/lights/6");
+        simulateSyncedSceneActivated("/groups/1", "/lights/5", "/lights/6");
 
         ScheduledRunnable syncedSceneRunnable = ensureScheduledStates(
                 expectedPowerOnEnd(now.plusMinutes(10))
@@ -8218,16 +8340,19 @@ class HueSchedulerTest {
         );
     }
 
-    private void simulateSceneActivated(String sceneId, String... containedLights) {
-        simulateSceneWithNameActivated(sceneId, unsyncedSceneName, containedLights);
+    private void simulateSceneActivated(String groupId, String... containedLights) {
+        simulateSceneWithNameActivated(groupId, unsyncedSceneName, containedLights);
     }
 
-    private void simulateSyncedSceneActivated(String sceneId, String... containedLights) {
-        simulateSceneWithNameActivated(sceneId, sceneSyncName, containedLights);
+    private void simulateSyncedSceneActivated(String groupId, String... containedLights) {
+        simulateSceneWithNameActivated(groupId, sceneSyncName, containedLights);
     }
 
-    private void simulateSceneWithNameActivated(String sceneId, String sceneName, String... containedLights) {
-        when(mockedHueApi.getAffectedIdsByScene(sceneId)).thenReturn(Arrays.asList(containedLights));
+    private void simulateSceneWithNameActivated(String groupId, String sceneName, String... containedLights) {
+        String sceneId = "/scene/mocked_scene_" + sceneName;
+        List<String> affectedIds = new ArrayList<String>(Arrays.asList(containedLights));
+        affectedIds.add(groupId);
+        when(mockedHueApi.getAffectedIdsByScene(sceneId)).thenReturn(affectedIds);
         when(mockedHueApi.getSceneName(sceneId)).thenReturn(sceneName);
 
         scheduler.getSceneEventListener().onSceneActivated(sceneId);
