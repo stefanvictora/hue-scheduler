@@ -565,16 +565,16 @@ public final class HueScheduler implements Runnable {
                 return;
             }
             if (justTurnedOnBySyncedScene(snapshot)) {
-                recordLastSeen(snapshot, now);
+                snapshot.recordLastSeen(now);
                 if (snapshot.isAlreadyReached(now)) {
                     LOG.info("Just turned on by synced scene and no interpolations: Skip further update");
                     // record last put call to not trigger manual overrides for follow-up states
-                    recordLastPutCall(snapshot, getPutCallWithAdjustedTr(snapshot, now, false));
+                    snapshot.recordLastPutCall(getPutCallWithAdjustedTr(snapshot, now, false));
                     createOnPowerOnCopyAndReschedule(snapshot);
                     return;
                 } else {
                     // prevent additional interpolated put call, which was already applied by the scene
-                    recordLastPutCall(snapshot, snapshot.getInterpolatedPutCallIfNeeded(now));
+                    snapshot.recordLastPutCall(snapshot.getInterpolatedPutCallIfNeeded(now));
                 }
             }
             LOG.info("Set: {}", snapshot);
@@ -599,7 +599,7 @@ public final class HueScheduler implements Runnable {
                 retry(snapshot, getMs(bridgeFailureRetryDelayInSeconds));
                 return;
             }
-            recordLastSeen(snapshot, now);
+            snapshot.recordLastSeen(now);
             if (snapshot.isOff()) {
                 LOG.info("Turned off");
             }
@@ -784,10 +784,9 @@ public final class HueScheduler implements Runnable {
             return false;
         }
         ScheduledState lastSeenState = stateRegistry.getLastSeenState(state);
-        if (lastSeenState != null && lastSeenState.getLastPutCall().hasSameLightState(interpolatedPutCall) &&
-            (wasNotJustTurnedOn(state) || justTurnedOnBySyncedScene(state))) {
+        if (shouldSkipInterpolation(lastSeenState, interpolatedPutCall, state)) {
             if (justTurnedOnBySyncedScene(state)) {
-                // if turned on via synced scene, we still need to wait for the transition time used by the scene
+                // if turned on via synced scene, we still need to wait for the transition time used by the scene (= tr of state)
                 sleepIfNeeded(getInterpolationTransitionTime(state));
             }
             return false; // skip interpolation, last put call is the same as the current one; and no power cycle
@@ -799,6 +798,11 @@ public final class HueScheduler implements Runnable {
         putState(previousState, interpolatedPutCall);
         sleepIfNeeded(interpolationTransitionTime);
         return true;
+    }
+
+    private boolean shouldSkipInterpolation(ScheduledState lastSeenState, PutCall interpolatedPutCall, ScheduledStateSnapshot state) {
+        return lastSeenState != null && lastSeenState.getLastPutCall().hasSameLightState(interpolatedPutCall) &&
+               (wasNotJustTurnedOn(state) || justTurnedOnBySyncedScene(state));
     }
 
     private Integer getInterpolationTransitionTime(ScheduledStateSnapshot state) {
@@ -867,15 +871,7 @@ public final class HueScheduler implements Runnable {
     private void performPutApiCall(ScheduledStateSnapshot state, PutCall putCall) {
         LOG.debug("{}", putCall);
         api.putState(putCall);
-        recordLastPutCall(state, putCall);
-    }
-
-    private static void recordLastPutCall(ScheduledStateSnapshot snapshot, PutCall putCall) {
-        snapshot.recordLastPutCall(putCall);
-    }
-
-    private static void recordLastSeen(ScheduledStateSnapshot snapshot, ZonedDateTime now) {
-        snapshot.recordLastSeen(now);
+        state.recordLastPutCall(putCall);
     }
 
     private PutCall getPutCallWithAdjustedTr(ScheduledStateSnapshot state, ZonedDateTime now, boolean performedInterpolation) {
