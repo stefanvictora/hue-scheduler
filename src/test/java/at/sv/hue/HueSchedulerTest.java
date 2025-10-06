@@ -7604,7 +7604,6 @@ class HueSchedulerTest {
         simulateSyncedSceneActivated("/groups/1", "/lights/5", "/lights/6");
 
         ScheduledRunnable syncedSceneRunnable3 = ensureScheduledStates(
-                // for g1
                 expectedPowerOnEnd(initialNow.plusDays(1)), // already ended
                 expectedPowerOnEnd(initialNow.plusDays(1).plusMinutes(10))
         ).get(1);
@@ -7622,6 +7621,96 @@ class HueSchedulerTest {
         );
 
         ensureRunnable(initialNow.plusDays(2).plusMinutes(10), initialNow.plusDays(3)); // next day
+    }
+
+    @Test
+    void sceneSync_singleSchedule_withInterpolation_childSceneActivated_usesParentState_resetsOverride() {
+        enableUserModificationTracking();
+
+        mockDefaultGroupCapabilities(1);
+        mockDefaultGroupCapabilities(2);
+        mockDefaultGroupCapabilities(3);
+        mockGroupLightsForId(1, 5, 6);
+        mockGroupLightsForId(2, 5);
+        mockGroupLightsForId(3, 6);
+        mockAssignedGroups(5, 1, 2);
+        mockAssignedGroups(6, 1, 3);
+        addState("g1", now.plusMinutes(5), "bri:120", "tr-before:5min");
+        addState("g1", now.plusMinutes(10), "bri:220", "tr-before:5min");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(5)),
+                expectedRunnable(now.plusMinutes(5), now.plusDays(1))
+        );
+
+        // g1.1
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.getFirst(),
+                expectedGroupPutCall(1).bri(220), // interpolated
+                expectedGroupPutCall(1).bri(120).transitionTime(tr("5min"))
+        );
+
+        ScheduledRunnable nextDay1 = ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(5)); // next day
+
+        // g1.2 -> detects override
+
+        setGroupStateResponses(1,
+                expectedState().id("/lights/5").brightness(120),
+                expectedState().id("/lights/6").brightness(120 - BRIGHTNESS_OVERRIDE_THRESHOLD) // overridden
+        );
+        advanceTimeAndRunAndAssertPutCalls(runnables.get(1)); // override detected
+
+        ScheduledRunnable nextDay2 = ensureRunnable(initialNow.plusDays(1).plusMinutes(5), initialNow.plusDays(2)); // next day
+
+        // Activate synced scene for g2 -> re-triggers the parent state, rests override
+
+        simulateSyncedSceneActivated("/groups/2", "/lights/5");
+
+        ScheduledRunnable syncedSceneRunnable2 = ensureScheduledStates(
+                expectedPowerOnEnd(initialNow.plusMinutes(5)), // already ended
+                expectedPowerOnEnd(initialNow.plusDays(1))
+        ).get(1);
+
+        advanceTimeAndRunAndAssertPutCalls(syncedSceneRunnable2,
+                expectedGroupPutCall(1).bri(220).transitionTime(tr("5min"))
+        );
+
+        // next day, still detected as overridden
+
+        setGroupStateResponses(1,
+                expectedState().id("/lights/5").brightness(220),
+                expectedState().id("/lights/6").brightness(220)
+        );
+        advanceTimeAndRunAndAssertPutCalls(nextDay1,
+                expectedGroupPutCall(1).bri(120).transitionTime(tr("5min"))
+        );
+
+        ensureRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(5)); // next day
+
+        // activate synced scene for group 1
+
+        simulateSyncedSceneActivated("/groups/1", "/lights/5", "/lights/6");
+
+        ScheduledRunnable syncedSceneRunnable3 = ensureScheduledStates(
+                expectedPowerOnEnd(initialNow.plusDays(1)), // already ended
+                expectedPowerOnEnd(initialNow.plusDays(1).plusMinutes(5))
+        ).get(1);
+
+        advanceTimeAndRunAndAssertPutCalls(syncedSceneRunnable3,
+                expectedGroupPutCall(1).bri(120).transitionTime(tr("5min"))
+        );
+
+        // Next day 2
+
+        setGroupStateResponses(1,
+                expectedState().id("/lights/5").brightness(120),
+                expectedState().id("/lights/6").brightness(120)
+        );
+        advanceTimeAndRunAndAssertPutCalls(nextDay2,
+                expectedGroupPutCall(1).bri(220).transitionTime(tr("5min"))
+        );
+
+        ensureRunnable(initialNow.plusDays(2).plusMinutes(5), initialNow.plusDays(3)); // next day
     }
 
     @Test
