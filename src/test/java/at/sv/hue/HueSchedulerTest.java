@@ -7541,6 +7541,90 @@ class HueSchedulerTest {
     }
 
     @Test
+    void sceneSync_singleSchedule_childSceneActivated_usesParentState_doesNotResetOverride() {
+        enableUserModificationTracking();
+
+        mockDefaultGroupCapabilities(1);
+        mockDefaultGroupCapabilities(2);
+        mockDefaultGroupCapabilities(3);
+        mockGroupLightsForId(1, 5, 6);
+        mockGroupLightsForId(2, 5);
+        mockGroupLightsForId(3, 6);
+        mockAssignedGroups(5, 1, 2);
+        mockAssignedGroups(6, 1, 3);
+        addState("g1", now, "bri:120");
+        addState("g1", now.plusMinutes(10), "bri:220");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+        );
+
+        // g1.1
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.getFirst(),
+                expectedGroupPutCall(1).bri(120)
+        );
+
+        ScheduledRunnable nextDay1 = ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(10)); // next day
+
+        // g1.2 -> detects override
+
+        setGroupStateResponses(1,
+                expectedState().id("/lights/5").brightness(120),
+                expectedState().id("/lights/6").brightness(120 - BRIGHTNESS_OVERRIDE_THRESHOLD) // overridden
+        );
+        advanceTimeAndRunAndAssertPutCalls(runnables.get(1)); // override detected
+
+        ScheduledRunnable nextDay2 = ensureRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)); // next day
+
+        // Activate synced scene for g2 -> only updates light 5
+
+        simulateSyncedSceneActivated("/groups/2", "/lights/5");
+
+        ScheduledRunnable syncedSceneRunnable2 = ensureScheduledStates(
+                expectedPowerOnEnd(initialNow.plusMinutes(10)), // already ended
+                expectedPowerOnEnd(initialNow.plusDays(1))
+        ).get(1);
+
+        advanceTimeAndRunAndAssertPutCalls(syncedSceneRunnable2);
+
+        // next day, still detected as overridden
+
+        setGroupStateResponses(1,
+                expectedState().id("/lights/5").brightness(220),
+                expectedState().id("/lights/6").brightness(120 - BRIGHTNESS_OVERRIDE_THRESHOLD) // overridden
+        );
+        advanceTimeAndRunAndAssertPutCalls(nextDay1); // still overridden
+
+        ensureRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)); // next day
+
+        // activate synced scene for group 1 -> resets override
+
+        simulateSyncedSceneActivated("/groups/1", "/lights/5", "/lights/6");
+
+        ScheduledRunnable syncedSceneRunnable3 = ensureScheduledStates(
+                // for g1
+                expectedPowerOnEnd(initialNow.plusDays(1)), // already ended
+                expectedPowerOnEnd(initialNow.plusDays(1).plusMinutes(10))
+        ).get(1);
+
+        advanceTimeAndRunAndAssertPutCalls(syncedSceneRunnable3);
+
+        // Applied normally again:
+
+        setGroupStateResponses(1,
+                expectedState().id("/lights/5").brightness(120),
+                expectedState().id("/lights/6").brightness(120)
+        );
+        advanceTimeAndRunAndAssertPutCalls(nextDay2,
+                expectedGroupPutCall(1).bri(220)
+        );
+
+        ensureRunnable(initialNow.plusDays(2).plusMinutes(10), initialNow.plusDays(3)); // next day
+    }
+
+    @Test
     void sceneSync_multipleSchedules_childSceneActivated_usesParentState_doesNotResetOverride() {
         enableUserModificationTracking();
 
