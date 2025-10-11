@@ -567,7 +567,7 @@ public final class HueScheduler implements Runnable {
             if (justTurnedOnBySyncedScene(snapshot)) {
                 snapshot.recordLastSeen(now);
                 if (snapshot.isAlreadyReached(now)) {
-                    LOG.info("Just turned on by synced scene and no interpolations: Skip further update");
+                    LOG.info("Turned on by synced scene and no interpolations: Skip re-apply.");
                     // record last put call to not trigger manual overrides for follow-up states
                     snapshot.recordLastPutCall(getPutCallWithAdjustedTr(snapshot, now, false));
                     createOnPowerOnCopyAndReschedule(snapshot);
