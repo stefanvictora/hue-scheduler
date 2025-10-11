@@ -413,8 +413,8 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
                (temporary && !retryAfterPowerOnState ? ", temporary" : "") +
                (retryAfterPowerOnState ? ", power-on-state" : "") +
                getFormattedPropertyIfSet("on", on) +
-               getFormattedPropertyIfSet("bri", brightness) +
-               getFormattedPropertyIfSet("ct", ct) +
+               getFormattedBriIfSet() +
+               getFormattedCtIfSet() +
                getFormattedPropertyIfSet("x", x) +
                getFormattedPropertyIfSet("y", y) +
                getFormattedPropertyIfSet("hue", hue) +
@@ -451,6 +451,17 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
 
     private String formatPropertyName(String name) {
         return ", " + name + "=";
+    }
+
+    private String getFormattedBriIfSet() {
+        if (brightness == null) return "";
+        return formatPropertyName("bri") + brightness + " (" + FormatUtil.formatBrightnessPercent(brightness) + "%)";
+    }
+
+    private String getFormattedCtIfSet() {
+        if (ct == null) return "";
+        long kelvin = Math.round(1_000_000.0 / ct);
+        return formatPropertyName("ct") + ct + " (" + kelvin + "K)";
     }
 
     private String getFormattedDaysOfWeek() {

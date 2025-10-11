@@ -3553,6 +3553,11 @@ class HueSchedulerTest {
     }
 
     @Test
+    void parse_canHandleBrightnessInPercent_alsoDoubleValues2() {
+        assertAppliedBrightness("10.89%", 26);
+    }
+
+    @Test
     void parse_canHandleBrightnessInPercent_maxValue() {
         assertAppliedBrightness("100%", 254);
     }
