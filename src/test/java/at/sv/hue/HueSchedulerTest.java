@@ -6125,7 +6125,7 @@ class HueSchedulerTest {
         );
 
         // simulate scene activated, with no name -> no exception
-        simulateSceneWithNameActivated("/scenes/unknown", null, "/lights/1", "/lights/2");
+        simulateSceneWithNameActivated("/groups/1", null, "/lights/1", "/lights/2");
     }
 
     @Test
@@ -8523,7 +8523,7 @@ class HueSchedulerTest {
 
     private void simulateSceneWithNameActivated(String groupId, String sceneName, String... containedLights) {
         String sceneId = "/scene/mocked_scene_" + sceneName;
-        List<String> affectedIds = new ArrayList<String>(Arrays.asList(containedLights));
+        List<String> affectedIds = new ArrayList<>(Arrays.asList(containedLights));
         affectedIds.add(groupId);
         when(mockedHueApi.getAffectedIdsByScene(sceneId)).thenReturn(affectedIds);
         when(mockedHueApi.getSceneName(sceneId)).thenReturn(sceneName);
