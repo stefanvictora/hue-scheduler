@@ -345,6 +345,11 @@ public class ScheduledStateSnapshot {
         return now.isAfter(getEnd());
     }
 
+    public boolean isAlreadyReached(ZonedDateTime now) {
+        ZonedDateTime definedStart = getDefinedStart();
+        return definedStart.isBefore(now) || definedStart.isEqual(now);
+    }
+
     public boolean isScheduledOn(ZonedDateTime day) {
         return isScheduledOn(DayOfWeek.from(day));
     }

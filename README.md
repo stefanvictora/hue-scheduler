@@ -12,7 +12,7 @@
 
 **New in 0.12.0** — **Sync schedules to scenes** so lights turn on in the desired state instantly (opt-in via ``--enable-scene-sync``). Now also with Home Assistant support.
 
-Hue Scheduler goes beyond tools like Adaptive Lighting by giving you precise control over brightness, color temperature, color, power state, and custom interpolations between solar and absolute times. It's designed to work with dumb wall switches: as soon as lights become available, Hue Scheduler applies the correct results consistent even after physical on/off toggles.
+Hue Scheduler goes beyond tools like Adaptive Lighting by giving you precise control over brightness, color temperature, color, power state, and custom interpolations between solar and absolute times. It's designed to work with dumb wall switches: as soon as lights become available, Hue Scheduler applies the correct settings consistently, even after physical on/off toggles.
 
 ## Demo
 

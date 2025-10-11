@@ -21,8 +21,7 @@ public final class StateInterpolator {
     private final boolean keepPreviousPropertiesForNullTargets;
 
     public PutCall getInterpolatedPutCall() {
-        ZonedDateTime definedStart = state.getDefinedStart();
-        if (definedStart.isBefore(dateTime) || definedStart.isEqual(dateTime)) {
+        if (state.isAlreadyReached(dateTime)) {
             return null; // the state is already reached
         }
         PutCall interpolatedPutCall;
