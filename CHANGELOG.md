@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.13.1] - 2025-10-11
+
+### Changed
+- Skip re-apply of states that were just recalled by a synced scene and have no ongoing interpolation (#31)
+- Log brightness percent and Kelvin values (#33)
+
+### Fixed
+- Fixed a concurrency issue and updated dependencies (#28)
+
 ## [0.13.0] - 2025-08-18
 
 ### Added
