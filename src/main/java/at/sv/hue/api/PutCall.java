@@ -1,6 +1,7 @@
 package at.sv.hue.api;
 
 import at.sv.hue.ColorMode;
+import at.sv.hue.FormatUtil;
 import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -54,8 +55,8 @@ public final class PutCall {
         return "PutCall {" +
                "id=" + id +
                getFormattedPropertyIfSet("on", on) +
-               getFormattedPropertyIfSet("bri", bri) +
-               getFormattedPropertyIfSet("ct", ct) +
+               getFormattedBriIfSet() +
+               getFormattedCtIfSet() +
                getFormattedPropertyIfSet("x", x) +
                getFormattedPropertyIfSet("y", y) +
                getFormattedPropertyIfSet("hue", hue) +
@@ -69,6 +70,17 @@ public final class PutCall {
     private String getFormattedPropertyIfSet(String name, Object property) {
         if (property == null) return "";
         return formatPropertyName(name) + property;
+    }
+
+    private String getFormattedBriIfSet() {
+        if (bri == null) return "";
+        return formatPropertyName("bri") + bri + " (" + FormatUtil.formatBrightnessPercent(bri) + "%)";
+    }
+
+    private String getFormattedCtIfSet() {
+        if (ct == null) return "";
+        long kelvin = Math.round(1_000_000.0 / ct);
+        return formatPropertyName("ct") + ct + " (" + kelvin + "K)";
     }
 
     private String formatPropertyName(String name) {
