@@ -70,7 +70,7 @@ public class HassApiImpl implements HueApi {
         this.rateLimiter = rateLimiter;
         mapper = new ObjectMapper();
         mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
-        mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+        mapper.setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL);
     }
 
     @Override
@@ -357,8 +357,8 @@ public class HassApiImpl implements HueApi {
         synchronized (lightMapLock) {
             if (nameToStatesMap == null || nameToStatesMapInvalidated) {
                 nameToStatesMap = new HashMap<>();
-                getOrLookupStates().forEach((id, state) ->
-                        nameToStatesMap.computeIfAbsent(state.attributes.friendly_name, s -> new ArrayList<>()).add(state));
+                getOrLookupStates().forEach((_, state) ->
+                        nameToStatesMap.computeIfAbsent(state.attributes.friendly_name, _ -> new ArrayList<>()).add(state));
                 nameToStatesMapInvalidated = false;
             }
         }
