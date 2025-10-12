@@ -39,14 +39,25 @@ public final class ScheduledLightState {
     @Override
     public String toString() {
         return "(id=" + id +
-               getFormattedPropertyIfSet("bri", bri) +
-               getFormattedPropertyIfSet("ct", ct) +
+               getFormattedBriIfSet() +
+               getFormattedCtIfSet() +
                getFormattedPropertyIfSet("x", x) +
                getFormattedPropertyIfSet("y", y) +
                getFormattedPropertyIfSet("on", on) +
                getFormattedPropertyIfSet("effect", effect) +
                getFormattedPropertyIfSet("gradient", gradient)
                + ")";
+    }
+
+    private String getFormattedBriIfSet() {
+        if (bri == null) return "";
+        return formatPropertyName("bri") + bri + " (" + FormatUtil.formatBrightnessPercent(bri) + "%)";
+    }
+
+    private String getFormattedCtIfSet() {
+        if (ct == null) return "";
+        long kelvin = Math.round(1_000_000.0 / ct);
+        return formatPropertyName("ct") + ct + " (" + kelvin + "K)";
     }
 
     private String getFormattedPropertyIfSet(String name, Object property) {
