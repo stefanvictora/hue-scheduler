@@ -30,7 +30,7 @@ public class ScheduledStateRegistry {
     }
 
     public void addState(ScheduledState state) {
-        lightStates.computeIfAbsent(state.getId(), key -> new ArrayList<>()).add(state);
+        lightStates.computeIfAbsent(state.getId(), _ -> new ArrayList<>()).add(state);
     }
 
     public ScheduledStateSnapshot getPreviousState(ScheduledStateSnapshot currentStateSnapshot) {
@@ -144,9 +144,8 @@ public class ScheduledStateRegistry {
                 .stream()
                 .map(GroupInfo::groupId)
                 .flatMap(groupId -> findActivePutCalls(groupId, now).stream())
-                .flatMap(PutCalls::stream) // todo: for scene states, this will return light specific put calls
-                .flatMap(putCall -> createOverriddenLightPutCalls(putCall, groupLights))
-                .collect(Collectors.toMap(PutCall::getId, putCall -> putCall, (existing, replacement) -> replacement, LinkedHashMap::new));
+                .flatMap(putCalls -> createOverriddenLightPutCalls(putCalls, groupLights))
+                .collect(Collectors.toMap(PutCall::getId, putCall -> putCall, (_, replacement) -> replacement, LinkedHashMap::new));
     }
 
     private List<PutCalls> findActivePutCalls(List<String> ids, ZonedDateTime now) {
@@ -176,11 +175,10 @@ public class ScheduledStateRegistry {
                                .findFirst();
     }
 
-    // todo: we might not always pass in another group put call here -- with scene put calls those are now individual lights
-    private Stream<PutCall> createOverriddenLightPutCalls(PutCall otherGroupPutCall, List<String> groupLights) {
-        return findOverlappingLights(otherGroupPutCall.getId(), groupLights)
+    private Stream<PutCall> createOverriddenLightPutCalls(PutCalls otherGroupPutCalls, List<String> groupLights) {
+        return findOverlappingLights(otherGroupPutCalls.getId(), groupLights)
                 .stream()
-                .map(lightId -> convertToLightPutCall(otherGroupPutCall, lightId));
+                .map(lightId -> convertToLightPutCall(otherGroupPutCalls, lightId));
     }
 
     private List<String> findOverlappingLights(String otherGroupId, List<String> groupLights) {
@@ -190,8 +188,12 @@ public class ScheduledStateRegistry {
         return overlappingLights;
     }
 
-    private static PutCall convertToLightPutCall(PutCall putCall, String lightId) {
-        return putCall.toBuilder().id(lightId).build();
+    private static PutCall convertToLightPutCall(PutCalls putCalls, String lightId) {
+        if (putCalls.isGeneralGroup()) {
+            return putCalls.toList().getFirst().toBuilder().id(lightId).build();
+        } else {
+            return putCalls.get(lightId);
+        }
     }
 
     private List<ScheduledState> findStatesForId(ScheduledStateSnapshot snapshot) {

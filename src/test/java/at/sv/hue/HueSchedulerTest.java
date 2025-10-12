@@ -10232,6 +10232,123 @@ class HueSchedulerTest {
     }
 
     @Test
+    void sceneControl_withSceneSync_considersThem() {
+        enableSceneSync();
+
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        mockSceneLightStates(1, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100)
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(50)
+                                   .ct(40));
+        addState("g1", now, "scene:TestScene");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+                expectedPutCall(4).bri(100).ct(20),
+                expectedPutCall(5).bri(50).ct(40)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
+        );
+
+        assertSceneUpdate("/groups/1",
+                expectedPutCall(4).bri(100).ct(20),
+                expectedPutCall(5).bri(50).ct(40)
+        );
+    }
+
+    @Test
+    void sceneControl_withSceneSync_overlappingGroups_considersThem() {
+        enableSceneSync();
+
+        mockDefaultGroupCapabilities(1);
+        mockDefaultGroupCapabilities(2);
+        mockGroupLightsForId(1, 4, 5);
+        mockGroupLightsForId(2, 4, 5, 6);
+        mockAssignedGroups(4, 1, 2);
+        mockAssignedGroups(5, 1, 2);
+        mockAssignedGroups(6, 1);
+        mockSceneLightStates(1, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100)
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(50)
+                                   .ct(40));
+        mockSceneLightStates(2, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(240)
+                                   .ct(340),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(250)
+                                   .ct(350),
+                ScheduledLightState.builder()
+                                   .id("/lights/6")
+                                   .bri(254)
+                                   .ct(200));
+        addState("g1", now, "scene:TestScene");
+        addState("g2", now, "scene:TestScene");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1)),
+                expectedRunnable(now.plusSeconds(1), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 2,
+                expectedPutCall(4).bri(240).ct(340), // todo: we should consider the overrides also here in the future; but they are not officially supported yet
+                expectedPutCall(5).bri(250).ct(350),
+                expectedPutCall(6).bri(254).ct(200)
+        );
+
+        assertSceneUpdate("/groups/2",
+                expectedPutCall(4).bri(100).ct(20), // from group 1
+                expectedPutCall(5).bri(50).ct(40), // from group 1
+                expectedPutCall(6).bri(254).ct(200)
+        );
+        assertSceneUpdate("/groups/1",
+                expectedPutCall(4).bri(100).ct(20),
+                expectedPutCall(5).bri(50).ct(40)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
+        );
+
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.get(1), 1,
+                expectedPutCall(4).bri(100).ct(20),
+                expectedPutCall(5).bri(50).ct(40)
+        );
+
+        assertSceneUpdate("/groups/2",
+                expectedPutCall(4).bri(100).ct(20), // from group 1
+                expectedPutCall(5).bri(50).ct(40), // from group 1
+                expectedPutCall(6).bri(254).ct(200)
+        );
+        assertSceneUpdate("/groups/1",
+                expectedPutCall(4).bri(100).ct(20),
+                expectedPutCall(5).bri(50).ct(40)
+        );
+        
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusDays(1).plusSeconds(1), initialNow.plusDays(2)) // next day
+        );
+    }
+
+    @Test
     void sceneControl_init_withOnProperty_addsOnToIndividualLights_unlessTheyAreOff() {
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
