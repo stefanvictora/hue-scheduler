@@ -7311,7 +7311,6 @@ class HueSchedulerTest {
         advanceCurrentTime(Duration.ofSeconds(sceneActivationIgnoreWindowInSeconds)); // outside ignore window
 
         runAndAssertPutCalls(powerOnRunnable,
-                expectedPutCall(1).bri(DEFAULT_BRIGHTNESS) // still applied, as just turned on and synced scene is not treated as manual override
                 expectedPutCall(1).bri(50)
         );
     }
@@ -8610,7 +8609,7 @@ class HueSchedulerTest {
 
         // g1.1
 
-        advanceTimeAndRunAndAssertPutCalls(runnables.getFirst(),
+        advanceTimeAndRunAndAssertGroupPutCalls(runnables.getFirst(),
                 expectedGroupPutCall(1).bri(120)
         );
 
@@ -8622,7 +8621,7 @@ class HueSchedulerTest {
                 expectedState().id("/lights/5").brightness(120),
                 expectedState().id("/lights/6").brightness(120 - BRIGHTNESS_OVERRIDE_THRESHOLD) // overridden
         );
-        advanceTimeAndRunAndAssertPutCalls(runnables.get(1)); // override detected
+        advanceTimeAndRunAndAssertGroupPutCalls(runnables.get(1)); // override detected
 
         ScheduledRunnable nextDay2 = ensureRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)); // next day
 
@@ -8635,7 +8634,7 @@ class HueSchedulerTest {
                 expectedPowerOnEnd(initialNow.plusDays(1))
         ).get(1);
 
-        advanceTimeAndRunAndAssertPutCalls(syncedSceneRunnable2);
+        advanceTimeAndRunAndAssertGroupPutCalls(syncedSceneRunnable2);
 
         // next day, still detected as overridden
 
@@ -8643,7 +8642,7 @@ class HueSchedulerTest {
                 expectedState().id("/lights/5").brightness(220),
                 expectedState().id("/lights/6").brightness(120 - BRIGHTNESS_OVERRIDE_THRESHOLD) // overridden
         );
-        advanceTimeAndRunAndAssertPutCalls(nextDay1); // still overridden
+        advanceTimeAndRunAndAssertGroupPutCalls(nextDay1); // still overridden
 
         ensureRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)); // next day
 
@@ -8656,7 +8655,7 @@ class HueSchedulerTest {
                 expectedPowerOnEnd(initialNow.plusDays(1).plusMinutes(10))
         ).get(1);
 
-        advanceTimeAndRunAndAssertPutCalls(syncedSceneRunnable3);
+        advanceTimeAndRunAndAssertGroupPutCalls(syncedSceneRunnable3);
 
         // Applied normally again:
 
@@ -8664,7 +8663,7 @@ class HueSchedulerTest {
                 expectedState().id("/lights/5").brightness(120),
                 expectedState().id("/lights/6").brightness(120)
         );
-        advanceTimeAndRunAndAssertPutCalls(nextDay2,
+        advanceTimeAndRunAndAssertGroupPutCalls(nextDay2,
                 expectedGroupPutCall(1).bri(220)
         );
 
@@ -8693,7 +8692,7 @@ class HueSchedulerTest {
 
         // g1.1
 
-        advanceTimeAndRunAndAssertPutCalls(runnables.getFirst(),
+        advanceTimeAndRunAndAssertGroupPutCalls(runnables.getFirst(),
                 expectedGroupPutCall(1).bri(220), // interpolated
                 expectedGroupPutCall(1).bri(120).transitionTime(tr("5min"))
         );
@@ -8706,7 +8705,7 @@ class HueSchedulerTest {
                 expectedState().id("/lights/5").brightness(120),
                 expectedState().id("/lights/6").brightness(120 - BRIGHTNESS_OVERRIDE_THRESHOLD) // overridden
         );
-        advanceTimeAndRunAndAssertPutCalls(runnables.get(1)); // override detected
+        advanceTimeAndRunAndAssertGroupPutCalls(runnables.get(1)); // override detected
 
         ScheduledRunnable nextDay2 = ensureRunnable(initialNow.plusDays(1).plusMinutes(5), initialNow.plusDays(2)); // next day
 
@@ -8719,7 +8718,7 @@ class HueSchedulerTest {
                 expectedPowerOnEnd(initialNow.plusDays(1))
         ).get(1);
 
-        advanceTimeAndRunAndAssertPutCalls(syncedSceneRunnable2,
+        advanceTimeAndRunAndAssertGroupPutCalls(syncedSceneRunnable2,
                 expectedGroupPutCall(1).bri(220).transitionTime(tr("5min"))
         );
 
@@ -8729,7 +8728,7 @@ class HueSchedulerTest {
                 expectedState().id("/lights/5").brightness(220),
                 expectedState().id("/lights/6").brightness(220)
         );
-        advanceTimeAndRunAndAssertPutCalls(nextDay1,
+        advanceTimeAndRunAndAssertGroupPutCalls(nextDay1,
                 expectedGroupPutCall(1).bri(120).transitionTime(tr("5min"))
         );
 
@@ -8744,7 +8743,7 @@ class HueSchedulerTest {
                 expectedPowerOnEnd(initialNow.plusDays(1).plusMinutes(5))
         ).get(1);
 
-        advanceTimeAndRunAndAssertPutCalls(syncedSceneRunnable3,
+        advanceTimeAndRunAndAssertGroupPutCalls(syncedSceneRunnable3,
                 expectedGroupPutCall(1).bri(120).transitionTime(tr("5min"))
         );
 
@@ -8754,7 +8753,7 @@ class HueSchedulerTest {
                 expectedState().id("/lights/5").brightness(120),
                 expectedState().id("/lights/6").brightness(120)
         );
-        advanceTimeAndRunAndAssertPutCalls(nextDay2,
+        advanceTimeAndRunAndAssertGroupPutCalls(nextDay2,
                 expectedGroupPutCall(1).bri(220).transitionTime(tr("5min"))
         );
 
@@ -8787,7 +8786,7 @@ class HueSchedulerTest {
 
         // g1.1
 
-        advanceTimeAndRunAndAssertPutCalls(runnables.getFirst(),
+        advanceTimeAndRunAndAssertGroupPutCalls(runnables.getFirst(),
                 expectedGroupPutCall(1).bri(120)
         );
 
@@ -8797,7 +8796,7 @@ class HueSchedulerTest {
 
         manualOverrideTracker.onManuallyOverridden("/groups/3"); // simulate override
 
-        advanceTimeAndRunAndAssertPutCalls(runnables.get(1));
+        advanceTimeAndRunAndAssertGroupPutCalls(runnables.get(1));
 
         ScheduledRunnable nextDayG3_1 = ensureRunnable(initialNow.plusDays(1).plusSeconds(1), initialNow.plusDays(1).plusMinutes(10)); // next day
 
@@ -8807,7 +8806,7 @@ class HueSchedulerTest {
                 expectedState().id("/lights/5").brightness(120),
                 expectedState().id("/lights/6").brightness(120 - BRIGHTNESS_OVERRIDE_THRESHOLD) // overridden
         );
-        advanceTimeAndRunAndAssertPutCalls(runnables.get(2)); // override detected
+        advanceTimeAndRunAndAssertGroupPutCalls(runnables.get(2)); // override detected
 
         ScheduledRunnable nextDayG1_2 = ensureRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)); // next day
 
@@ -8820,14 +8819,14 @@ class HueSchedulerTest {
                 expectedPowerOnEnd(initialNow.plusDays(1))
         ).get(1);
 
-        advanceTimeAndRunAndAssertPutCalls(syncedSceneRunnable2);
+        advanceTimeAndRunAndAssertGroupPutCalls(syncedSceneRunnable2);
 
         // g3.2 -> still overridden
 
         setGroupStateResponses(3,
                 expectedState().id("/lights/6").brightness(120 - BRIGHTNESS_OVERRIDE_THRESHOLD) // still overridden
         );
-        advanceTimeAndRunAndAssertPutCalls(runnables.get(3));
+        advanceTimeAndRunAndAssertGroupPutCalls(runnables.get(3));
 
         ScheduledRunnable nextDayG3_2 = ensureRunnable(initialNow.plusDays(1).plusMinutes(10).plusSeconds(1), initialNow.plusDays(2));
 
@@ -8837,7 +8836,7 @@ class HueSchedulerTest {
                 expectedState().id("/lights/5").brightness(230),
                 expectedState().id("/lights/6").brightness(120 - BRIGHTNESS_OVERRIDE_THRESHOLD) // overridden
         );
-        advanceTimeAndRunAndAssertPutCalls(nextDayG1_1); // still overridden
+        advanceTimeAndRunAndAssertGroupPutCalls(nextDayG1_1); // still overridden
 
         ensureRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)); // next day
 
@@ -8854,7 +8853,7 @@ class HueSchedulerTest {
                 expectedRunnable(now.plusSeconds(1), initialNow.plusDays(1)) // already ended
         ).get(1);
 
-        advanceTimeAndRunAndAssertPutCalls(syncedSceneRunnable3);
+        advanceTimeAndRunAndAssertGroupPutCalls(syncedSceneRunnable3);
 
         // Applied normally again:
 
@@ -8863,7 +8862,7 @@ class HueSchedulerTest {
         setGroupStateResponses(3,
                 expectedState().id("/lights/6").brightness(130)
         );
-        advanceTimeAndRunAndAssertPutCalls(nextDayG3_1,
+        advanceTimeAndRunAndAssertGroupPutCalls(nextDayG3_1,
                 expectedGroupPutCall(3).bri(130)
         );
 
@@ -8875,7 +8874,7 @@ class HueSchedulerTest {
                 expectedState().id("/lights/5").brightness(120),
                 expectedState().id("/lights/6").brightness(130)
         );
-        advanceTimeAndRunAndAssertPutCalls(nextDayG1_2,
+        advanceTimeAndRunAndAssertGroupPutCalls(nextDayG1_2,
                 expectedGroupPutCall(1).bri(220)
         );
 

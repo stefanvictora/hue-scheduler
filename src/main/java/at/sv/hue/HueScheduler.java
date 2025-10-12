@@ -58,7 +58,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
-@Command(name = "HueScheduler", version = "0.13.0", mixinStandardHelpOptions = true, sortOptions = false)
+@Command(name = "HueScheduler", version = "0.14.0", mixinStandardHelpOptions = true, sortOptions = false)
 public final class HueScheduler implements Runnable {
 
     private static final Logger LOG = LoggerFactory.getLogger(HueScheduler.class);
@@ -570,12 +570,12 @@ public final class HueScheduler implements Runnable {
                 if (snapshot.isAlreadyReached(now)) {
                     LOG.info("Turned on by synced scene and no interpolations: Skip re-apply.");
                     // record last put call to not trigger manual overrides for follow-up states
-                    snapshot.recordLastPutCall(getPutCallWithAdjustedTr(snapshot, now, false));
+                    snapshot.recordLastPutCalls(getPutCallsWithAdjustedTr(snapshot, now, false));
                     createOnPowerOnCopyAndReschedule(snapshot);
                     return;
                 } else {
                     // prevent additional interpolated put call, which was already applied by the scene
-                    snapshot.recordLastPutCall(snapshot.getInterpolatedPutCallIfNeeded(now));
+                    snapshot.recordLastPutCalls(snapshot.getInterpolatedPutCallsIfNeeded(now));
                 }
             }
             LOG.info("Set: {}", snapshot);
