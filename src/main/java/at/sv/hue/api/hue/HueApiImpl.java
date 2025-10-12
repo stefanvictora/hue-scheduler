@@ -83,7 +83,7 @@ public final class HueApiImpl implements HueApi {
         this.resourceProvider = resourceProvider;
         mapper = new ObjectMapper();
         mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
-        mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+        mapper.setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL);
         mapper.setDefaultMergeable(true);
         assertNotHttpSchemeProvided(host);
         baseApi = "https://" + host + "/clip/v2/resource";
@@ -108,7 +108,7 @@ public final class HueApiImpl implements HueApi {
         return Caffeine.newBuilder()
                        .refreshAfterWrite(Duration.ofMinutes(apiCacheInvalidationIntervalInMinutes))
                        .expireAfterWrite(Duration.ofMinutes(apiCacheInvalidationIntervalInMinutes * 2L))
-                       .buildAsync(key -> supplier.get());
+                       .buildAsync(_ -> supplier.get());
     }
 
     @Override
@@ -800,7 +800,7 @@ public final class HueApiImpl implements HueApi {
                                                                  .filter(c -> c.getColorGamut() != null)
                                                                  .collect(Collectors.toMap(LightCapabilities::getColorGamutType,
                                                                          LightCapabilities::getColorGamut,
-                                                                         (gamut1, gamut2) -> gamut1));
+                                                                         (gamut1, _) -> gamut1));
         return colorGamutMap.getOrDefault("C", colorGamutMap.getOrDefault("B", colorGamutMap.getOrDefault("A", null)));
     }
 
