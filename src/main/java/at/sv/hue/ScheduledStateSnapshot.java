@@ -67,8 +67,9 @@ public class ScheduledStateSnapshot {
     }
 
     private boolean hasNoOverlappingProperties() {
-        PutCall previousPutCall = getPreviousState().getFullPicturePutCall(null);
-        return StateInterpolator.hasNoOverlappingProperties(previousPutCall, getPutCallIgnoringTransition());
+        PutCalls previousPutCalls = getPreviousState().getFullPicturePutCalls(null);
+        PutCalls putCalls = getPutCallsIgnoringTransition();
+        return previousPutCalls.allMatch(putCalls, StateInterpolator::hasNoOverlappingProperties);
     }
 
     private int getTimeUntilPreviousState() {
@@ -199,6 +200,8 @@ public class ScheduledStateSnapshot {
     public ZonedDateTime calculateNextPowerOnEnd(ZonedDateTime now) {
         if (isInsideSplitCallWindow(now)) {
             return getNextTransitionTimeSplitStart(now).minusSeconds(1);
+        } else if (isOff() && hasTransitionBefore()) {
+            return getDefinedStart().minusSeconds(1);
         } else {
             return null; // will be calculated on demand
         }
@@ -225,71 +228,103 @@ public class ScheduledStateSnapshot {
         return scheduledState.isRetryAfterPowerOnState();
     }
 
-    public PutCall getPutCall(ZonedDateTime now) {
-        return scheduledState.getPutCall(now, definedStart);
+    public PutCalls getPutCalls(ZonedDateTime now) {
+        return scheduledState.getPutCalls(now, definedStart);
     }
 
-    private PutCall getPutCallIgnoringTransition() {
-        return scheduledState.getPutCall(null, null);
+    private PutCalls getPutCallsIgnoringTransition() {
+        return scheduledState.getPutCalls(null, null);
     }
 
-    public PutCall getInterpolatedFullPicturePutCall(ZonedDateTime now) {
-        PutCall putCall = getInterpolatedPutCallIfNeeded(now);
-        if (putCall != null) {
-            return putCall;
+    public PutCalls getInterpolatedFullPicturePutCalls(ZonedDateTime now) {
+        PutCalls putCalls = getInterpolatedPutCallsIfNeeded(now);
+        if (putCalls != null) {
+            return putCalls;
         } else {
-            return getFullPicturePutCall(now);
+            return getFullPicturePutCalls(now);
         }
     }
 
-    public PutCall getFullPicturePutCall(ZonedDateTime now) {
+    public PutCalls getFullPicturePutCalls(ZonedDateTime now) {
         if (isNullState()) {
             return null;
         }
-        PutCall putCall = getPutCall(now);
-        if (putCall.getOn() == Boolean.FALSE) {
+        PutCalls putCalls = getPutCalls(now);
+        return putCalls.map(putCall -> {
+            if (putCall.getOn() == Boolean.FALSE) {
+                return putCall;
+            }
+            ScheduledStateSnapshot previousState = this;
+            while (putCall.getBri() == null || putCall.getColorMode() == ColorMode.NONE) { // stop as soon as we have brightness and color mode
+                previousState = previousState.getPreviousState();
+                if (previousState == null || isSameState(previousState) || previousState.isNullState()) {
+                    break;
+                }
+                PutCalls previousPutCalls = previousState.getPutCallsIgnoringTransition();
+                PutCall previousPutCall;
+                if (previousPutCalls.isGeneralGroup()) {
+                    previousPutCall = previousPutCalls.getFirst();
+                } else if (putCalls.isGeneralGroup()) { // optimization
+                    break; // we cannot map specific lights to a general group
+                } else {
+                    previousPutCall = previousPutCalls.get(putCall.getId());
+                    if (previousPutCall == null) {
+                        break; // no previous put call found, stop here
+                    }
+                }
+                if (putCall.getBri() == null) {
+                    putCall.setBri(previousPutCall.getBri());
+                }
+                if (shouldCopyEffect(putCall)) {
+                    putCall.setEffect(previousPutCall.getEffect());
+                }
+                if (shouldParameteriseEffect(putCall)) {
+                    Effect effect = putCall.getEffect();
+                    if (hasNoColorProperties(effect)) {
+                        Effect.EffectBuilder builder = effect.toBuilder();
+                        builder.x(previousPutCall.getX());
+                        builder.y(previousPutCall.getY());
+                        builder.ct(previousPutCall.getCt());
+                        putCall.setEffect(builder.build());
+                    }
+                } else if (putCall.getColorMode() == ColorMode.NONE) {
+                    putCall.setCt(previousPutCall.getCt());
+                    putCall.setX(previousPutCall.getX());
+                    putCall.setY(previousPutCall.getY());
+                    putCall.setGradient(previousPutCall.getGradient());
+                }
+            }
             return putCall;
-        }
-        ScheduledStateSnapshot previousState = this;
-        while (putCall.getBri() == null || putCall.getColorMode() == ColorMode.NONE) { // stop as soon as we have brightness and color mode
-            previousState = previousState.getPreviousState();
-            if (previousState == null || isSameState(previousState) || previousState.isNullState()) {
-                break;
-            }
-            PutCall previousPutCall = previousState.getPutCallIgnoringTransition();
-            if (putCall.getBri() == null) {
-                putCall.setBri(previousPutCall.getBri());
-            }
-            if (putCall.getColorMode() == ColorMode.NONE) {
-                putCall.setCt(previousPutCall.getCt());
-                putCall.setHue(previousPutCall.getHue());
-                putCall.setSat(previousPutCall.getSat());
-                putCall.setX(previousPutCall.getX());
-                putCall.setY(previousPutCall.getY());
-            }
-        }
-        return putCall;
+        });
     }
 
-    public PutCall getInterpolatedPutCallIfNeeded(ZonedDateTime now) {
-        return getInterpolatedPutCallIfNeeded(now, true);
+    private static boolean shouldCopyEffect(PutCall putCall) {
+        return putCall.getEffect() == null && putCall.getGradient() == null; // effects are not compatible with gradients
     }
 
-    public PutCall getNextInterpolatedSplitPutCall(ZonedDateTime now) {
+    private static boolean shouldParameteriseEffect(PutCall putCall) {
+        return putCall.getEffect() != null && !putCall.getEffect().isNone();
+    }
+
+    private static boolean hasNoColorProperties(Effect effect) {
+        return effect.x() == null && effect.y() == null && effect.ct() == null;
+    }
+
+    public PutCalls getNextInterpolatedSplitPutCalls(ZonedDateTime now) {
         ZonedDateTime nextSplitStart = getNextTransitionTimeSplitStart(now).minusMinutes(getRequiredGap()); // add buffer;
         Duration between = Duration.between(now, nextSplitStart);
         if (between.isZero() || between.isNegative()) {
             return null; // we are inside the required gap, skip split call;
         }
-        PutCall interpolatedSplitPutCall = getInterpolatedPutCallIfNeeded(nextSplitStart, false);
-        if (interpolatedSplitPutCall == null) {
+        PutCalls interpolatedSplitPutCalls = getInterpolatedPutCallsIfNeeded(nextSplitStart);
+        if (interpolatedSplitPutCalls == null) {
             return null; // no interpolation possible; todo: write test or remove if not needed anymore
         }
-        interpolatedSplitPutCall.setTransitionTime((int) between.toMillis() / 100);
-        return interpolatedSplitPutCall;
+        interpolatedSplitPutCalls.setTransitionTime((int) between.toMillis() / 100);
+        return interpolatedSplitPutCalls;
     }
 
-    private PutCall getInterpolatedPutCallIfNeeded(ZonedDateTime dateTime, boolean keepPreviousPropertiesForNullTargets) {
+    public PutCalls getInterpolatedPutCallsIfNeeded(ZonedDateTime dateTime) {
         if (!hasTransitionBefore()) {
             return null;
         }
@@ -297,16 +332,15 @@ public class ScheduledStateSnapshot {
         if (previousState == null) {
             return null;
         }
-        return new StateInterpolator(this, previousState, dateTime, keepPreviousPropertiesForNullTargets)
-                .getInterpolatedPutCall();
+        return new StateInterpolator(this, previousState, dateTime).getInterpolatedPutCalls();
     }
 
     public boolean performsInterpolation(ZonedDateTime now) {
-        return getInterpolatedPutCallIfNeeded(now) != null;
+        return getInterpolatedPutCallsIfNeeded(now) != null;
     }
 
-    public void recordLastPutCall(PutCall putCall) {
-        scheduledState.setLastPutCall(putCall);
+    public void recordLastPutCalls(PutCalls putCalls) {
+        scheduledState.setLastPutCalls(putCalls);
     }
 
     public void recordLastSeen(ZonedDateTime lastSeen) {

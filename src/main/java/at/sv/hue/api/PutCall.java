@@ -1,6 +1,9 @@
 package at.sv.hue.api;
 
 import at.sv.hue.ColorMode;
+import at.sv.hue.Effect;
+import at.sv.hue.Gradient;
+import at.sv.hue.Pair;
 import at.sv.hue.FormatUtil;
 import lombok.Builder;
 import lombok.Data;
@@ -18,26 +21,24 @@ public final class PutCall {
     Integer ct;
     Double x;
     Double y;
-    Integer hue;
-    Integer sat;
     Boolean on;
-    String effect;
+    Effect effect;
+    Gradient gradient;
     Integer transitionTime;
-    boolean groupState;
     @EqualsAndHashCode.Exclude
     Double[][] gamut;
 
     public boolean isNullCall() {
-        return Stream.of(bri, ct, x, y, hue, sat, on, effect).allMatch(Objects::isNull);
+        return Stream.of(bri, ct, x, y, on, effect, gradient).allMatch(Objects::isNull);
     }
 
     public ColorMode getColorMode() {
         if (ct != null) {
             return ColorMode.CT;
-        } else if (x != null && y != null) {
+        } else if (getXY() != null) {
             return ColorMode.XY;
-        } else if (hue != null || sat != null) {
-            return ColorMode.HS;
+        } else if (gradient != null) {
+            return ColorMode.GRADIENT;
         }
         return ColorMode.NONE;
     }
@@ -46,24 +47,29 @@ public final class PutCall {
         return on == Boolean.TRUE;
     }
 
-    public boolean hasNonDefaultTransitionTime() {
-        return transitionTime != null && transitionTime != 4;
+    public boolean isOff() {
+        return on == Boolean.FALSE;
+    }
+
+    public Pair<Double, Double> getXY() {
+        if (x == null || y == null) {
+            return null;
+        }
+        return Pair.of(x, y);
     }
 
     @Override
     public String toString() {
-        return "PutCall {" +
+        return "{" +
                "id=" + id +
                getFormattedPropertyIfSet("on", on) +
                getFormattedBriIfSet() +
                getFormattedCtIfSet() +
                getFormattedPropertyIfSet("x", x) +
                getFormattedPropertyIfSet("y", y) +
-               getFormattedPropertyIfSet("hue", hue) +
-               getFormattedPropertyIfSet("sat", sat) +
                getFormattedPropertyIfSet("effect", effect) +
+               getFormattedPropertyIfSet("gradient", gradient) +
                getFormattedTransitionTimeIfSet() +
-               (groupState ? ", group=true" : "") +
                "}";
     }
 
@@ -96,11 +102,10 @@ public final class PutCall {
         if (other == null) {
             return false;
         }
-        return Objects.equals(this.on, other.on) &&
+        return Objects.equals(this.on, other.on) && // todo: mutation coverage
                Objects.equals(this.bri, other.bri) &&
-               Objects.equals(this.hue, other.hue) &&
-               Objects.equals(this.sat, other.sat) &&
                Objects.equals(this.effect, other.effect) &&
+               Objects.equals(this.gradient, other.gradient) &&
                Objects.equals(this.x, other.x) &&
                Objects.equals(this.y, other.y) &&
                Objects.equals(this.ct, other.ct);

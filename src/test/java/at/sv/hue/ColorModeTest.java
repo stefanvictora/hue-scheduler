@@ -22,8 +22,8 @@ class ColorModeTest {
         assertColorMode("ct", ColorMode.CT);
         assertColorMode("XY", ColorMode.XY);
         assertColorMode("xy", ColorMode.XY);
-        assertColorMode("HS", ColorMode.HS);
-        assertColorMode("hs", ColorMode.HS);
+        assertColorMode("gradient", ColorMode.GRADIENT);
+        assertColorMode("GRADIENT", ColorMode.GRADIENT);
     }
 
     private static void assertColorMode(String name, ColorMode colorMode) {
