@@ -647,6 +647,9 @@ public class AbstractHueSchedulerTest {
     }
 
     protected void assertScenePutCalls(int groupId, PutCall.PutCallBuilder... putCallBuilders) {
+        if (putCallBuilders.length == 0) {
+            return;
+        }
         List<PutCall> putCalls = Arrays.stream(putCallBuilders)
                                        .map(PutCall.PutCallBuilder::build)
                                        .toList();

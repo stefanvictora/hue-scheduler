@@ -1008,13 +1008,13 @@ public final class HueScheduler implements Runnable {
             putCalls.setTransitionTime(null);
         }
         state.recordLastPutCalls(putCalls);
-        List<PutCall> list = putCalls.toList(); // todo: are we sure that we always have at least one element here?
+        // todo: are we sure that we always have at least one element here?
         if (putCalls.isGeneralGroup()) {
-            api.putGroupState(list.getFirst());
+            api.putGroupState(putCalls.getFirst());
         } else if (putCalls.isGroupUpdate()) {
-            api.putSceneState(putCalls.getId(), list);
+            api.putSceneState(putCalls.getId(), putCalls.toList());
         } else {
-            api.putState(list.getFirst());
+            api.putState(putCalls.getFirst());
         }
     }
 

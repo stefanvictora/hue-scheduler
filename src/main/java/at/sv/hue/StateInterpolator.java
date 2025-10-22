@@ -42,14 +42,14 @@ public final class StateInterpolator {
     private PutCalls interpolate(PutCalls previous, PutCalls target, BigDecimal interpolatedTime) {
         List<PutCall> putCalls = new ArrayList<>();
         if (previous.isGeneralGroup()) {
-            PutCall previousPutCall = previous.toList().getFirst();
+            PutCall previousPutCall = previous.getFirst();
             target.toList().forEach(targetPutCall -> {
                 PutCall putCall = interpolate(previousPutCall, targetPutCall, interpolatedTime);
                 putCall.setId(targetPutCall.getId());
                 putCalls.add(putCall);
             });
         } else if (target.isGeneralGroup()) {
-            PutCall targetPutCall = target.toList().getFirst();
+            PutCall targetPutCall = target.getFirst();
             previous.toList().forEach(previousPutCall -> {
                 PutCall putCall = interpolate(previousPutCall, targetPutCall, interpolatedTime);
                 putCalls.add(putCall);

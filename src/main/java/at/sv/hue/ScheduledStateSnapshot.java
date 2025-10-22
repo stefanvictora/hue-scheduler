@@ -265,7 +265,7 @@ public class ScheduledStateSnapshot {
                 PutCalls previousPutCalls = previousState.getPutCallsIgnoringTransition();
                 PutCall previousPutCall;
                 if (previousPutCalls.isGeneralGroup()) {
-                    previousPutCall = previousPutCalls.toList().getFirst();
+                    previousPutCall = previousPutCalls.getFirst();
                 } else if (putCalls.isGeneralGroup()) { // optimization
                     break; // we cannot map specific lights to a general group
                 } else {
