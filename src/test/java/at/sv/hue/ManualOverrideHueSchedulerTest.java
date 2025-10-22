@@ -10,8 +10,6 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.mockito.Mockito.*;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 
 public class ManualOverrideHueSchedulerTest extends AbstractHueSchedulerTest {
 
@@ -929,14 +927,16 @@ public class ManualOverrideHueSchedulerTest extends AbstractHueSchedulerTest {
         ScheduledRunnable secondState = ensureRunnable(now.plusHours(2), now.plusDays(1).plusHours(1));
 
         // user modified light state before first state -> update skipped and retry scheduled
-        setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS + 5)
-                                                .colorTemperature(DEFAULT_CT));
+        setLightStateResponse(1, expectedState()
+                .brightness(DEFAULT_BRIGHTNESS + 20 + BRIGHTNESS_OVERRIDE_THRESHOLD)
+                .colorTemperature(DEFAULT_CT)
+                .colormode(ColorMode.CT));
 
-        setCurrentTimeToAndRun(firstState); // no update, as modification was detected
+        advanceTimeAndRunAndAssertPutCalls(firstState);  // no update, as modification was detected
 
         ensureRunnable(initialNow.plusDays(1).plusHours(1), initialNow.plusDays(1).plusHours(2)); // next day
 
-        setCurrentTimeToAndRun(secondState);  // no update, as modification was detected
+        advanceTimeAndRunAndAssertPutCalls(secondState);  // no update, as modification was detected
 
         ensureRunnable(initialNow.plusDays(1).plusHours(2), initialNow.plusDays(2).plusHours(1)); // next day
     }
@@ -956,8 +956,10 @@ public class ManualOverrideHueSchedulerTest extends AbstractHueSchedulerTest {
         ensureRunnable(initialNow.plusDays(1)); // for next day
 
         // user modified light state between first and second state -> ignored since force:true is set
-        setLightStateResponse(1, expectedState().brightness(DEFAULT_BRIGHTNESS + 5)
-                                                .colorTemperature(DEFAULT_CT));
+        setLightStateResponse(1, expectedState()
+                .brightness(DEFAULT_BRIGHTNESS + BRIGHTNESS_OVERRIDE_THRESHOLD)
+                .colorTemperature(DEFAULT_CT)
+                .colormode(ColorMode.CT));
 
         advanceTimeAndRunAndAssertPutCalls(secondState,
                 expectedPutCall(1).bri(DEFAULT_BRIGHTNESS + 10) // enforced despite user changes

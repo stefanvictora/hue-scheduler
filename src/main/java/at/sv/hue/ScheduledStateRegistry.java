@@ -190,7 +190,7 @@ public class ScheduledStateRegistry {
 
     private static PutCall convertToLightPutCall(PutCalls putCalls, String lightId) {
         if (putCalls.isGeneralGroup()) {
-            return putCalls.toList().getFirst().toBuilder().id(lightId).build();
+            return putCalls.getFirst().toBuilder().id(lightId).build();
         } else {
             return putCalls.get(lightId);
         }
