@@ -54,6 +54,10 @@ public final class PutCalls {
         return stream().toList();
     }
 
+    public PutCall getFirst() {
+        return toList().getFirst();
+    }
+
     public PutCall get(String id) {
         return map.get(id);
     }

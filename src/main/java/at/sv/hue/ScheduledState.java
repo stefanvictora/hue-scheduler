@@ -228,9 +228,14 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
     }
 
     public boolean lightStateDiffers(LightState currentState) {
-        return lastPutCalls.stream()
-                           .allMatch(putCall -> new LightStateComparator(putCall, currentState, brightnessOverrideThreshold,
-                                   colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold).lightStateDiffers());
+        PutCall putCall;
+        if (lastPutCalls.isGeneralGroup() || !lastPutCalls.isGroupUpdate()) {
+            putCall = lastPutCalls.getFirst();
+        } else {
+            putCall = lastPutCalls.get(currentState.getId());
+        }
+        return new LightStateComparator(putCall, currentState, brightnessOverrideThreshold,
+                colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold).lightStateDiffers();
     }
 
     public void setLastSeen(ZonedDateTime lastSeen) {

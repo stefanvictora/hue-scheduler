@@ -12,7 +12,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class SceneControlHueSchedulerTest extends AbstractHueSchedulerTest {
-    
+
     @Test
     void sceneControl_init_loadsLightPropertiesForGroupByName() {
         mockDefaultGroupCapabilities(1);
@@ -560,7 +560,129 @@ public class SceneControlHueSchedulerTest extends AbstractHueSchedulerTest {
         );
     }
 
-    // todo: add test for manual override detection an scenes -> this might not yet work as expected
+    @Test
+    void sceneControl_withModificationTracking_correctlyDetectsOverride() {
+        enableUserModificationTracking();
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        mockSceneLightStates(1, "TestScene1",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100)
+                                   .ct(200),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(125)
+                                   .ct(225));
+        mockSceneLightStates(1, "TestScene2",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(200)
+                                   .ct(300),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(225)
+                                   .ct(325));
+        addState("g1", now, "scene:TestScene1");
+        addState("g1", now.plusMinutes(10), "scene:TestScene2");
+
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+                expectedPutCall(4).bri(100).ct(200),
+                expectedPutCall(5).bri(125).ct(225)
+        );
+
+        ScheduledRunnable nextDay = ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
+        ).getFirst();
+
+        // No override, yet
+        setGroupStateResponses(1,
+                expectedState().id("/lights/4").brightness(100).colorTemperature(200).colormode(ColorMode.CT),
+                expectedState().id("/lights/5").brightness(125).colorTemperature(225).colormode(ColorMode.CT)
+        );
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.get(1), 1,
+                expectedPutCall(4).bri(200).ct(300),
+                expectedPutCall(5).bri(225).ct(325)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)) // next day
+        );
+
+        // User override: switched light state 4 and 5
+        setGroupStateResponses(1,
+                expectedState().id("/lights/4").brightness(225).colorTemperature(325).colormode(ColorMode.CT),
+                expectedState().id("/lights/5").brightness(200).colorTemperature(300).colormode(ColorMode.CT)
+        );
+        advanceTimeAndRunAndAssertScenePutCalls(nextDay, 1); // override detected
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusDays(2), initialNow.plusDays(2).plusMinutes(10)) // next day
+        );
+    }
+
+    @Test
+    void sceneControl_withModificationTracking_groupThenScene_correctlyDetectsOverride() {
+        enableUserModificationTracking();
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        mockSceneLightStates(1, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(200)
+                                   .ct(300),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(100)
+                                   .ct(250));
+        addState("g1", now, "scene:TestScene");
+        addState("g1", now.plusMinutes(10), "bri:50", "ct:200");
+
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+                expectedPutCall(4).bri(200).ct(300),
+                expectedPutCall(5).bri(100).ct(250)
+        );
+
+        ScheduledRunnable nextDay = ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
+        ).getFirst();
+
+        // No override, yet
+        setGroupStateResponses(1,
+                expectedState().id("/lights/4").brightness(200).colorTemperature(300).colormode(ColorMode.CT),
+                expectedState().id("/lights/5").brightness(100).colorTemperature(250).colormode(ColorMode.CT)
+        );
+        advanceTimeAndRunAndAssertGroupPutCalls(runnables.get(1),
+                expectedGroupPutCall(1).bri(50).ct(200)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2)) // next day
+        );
+
+        // User override
+        setGroupStateResponses(1,
+                expectedState().id("/lights/4").brightness(100).colorTemperature(200).colormode(ColorMode.CT),
+                expectedState().id("/lights/5").brightness(100).colorTemperature(200).colormode(ColorMode.CT)
+        );
+        advanceTimeAndRunAndAssertScenePutCalls(nextDay, 1); // override detected
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusDays(2), initialNow.plusDays(2).plusMinutes(10)) // next day
+        );
+    }
 
     @Test
     void sceneControl_sceneThenGroup_sceneWithGradient_calculatesFullPicture_correctPutCalls() {
