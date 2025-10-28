@@ -196,7 +196,7 @@ public class ScheduledStateSnapshot {
         return getNextTransitionTimeSplitStart(now).isBefore(definedStart);
     }
 
-    public ZonedDateTime calculateNextPowerOnEnd(ZonedDateTime now) {
+    public ZonedDateTime calculateNextPowerTransitionEnd(ZonedDateTime now) {
         if (isInsideSplitCallWindow(now)) {
             return getNextTransitionTimeSplitStart(now).minusSeconds(1);
         } else {
@@ -221,8 +221,8 @@ public class ScheduledStateSnapshot {
         return scheduledState.getRequiredGap();
     }
 
-    public boolean isRetryAfterPowerOnState() {
-        return scheduledState.isRetryAfterPowerOnState();
+    public boolean isTriggeredByPowerTransition() {
+        return scheduledState.isTriggeredByPowerTransition();
     }
 
     public PutCall getPutCall(ZonedDateTime now) {

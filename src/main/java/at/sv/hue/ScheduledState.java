@@ -40,7 +40,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
     private final Double y;
     private final Integer hue;
     private final Integer sat;
-    private final Boolean on;
+    private Boolean on;
     @Getter
     private final Integer definedTransitionTime;
     private final String transitionTimeBeforeString;
@@ -61,8 +61,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
     private final int colorTemperatureOverrideThresholdKelvin;
     private final double colorOverrideThreshold;
     @Getter
-    @Setter
-    private boolean retryAfterPowerOnState;
+    private boolean triggeredByPowerTransition;
     @Getter
     private ZonedDateTime lastSeen;
     private ScheduledState originalState;
@@ -108,7 +107,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
         this.force = force;
         this.temporary = temporary;
         originalState = this;
-        retryAfterPowerOnState = false;
+        triggeredByPowerTransition = false;
         previousStateLookup = (state) -> null;
         nextStateLookup = (state, dateTime) -> null;
         assertColorCapabilities();
@@ -403,6 +402,13 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
         return identifier.id();
     }
 
+    public void setTriggeredByPowerTransition(boolean triggeredByPowerTransition) {
+        this.triggeredByPowerTransition = triggeredByPowerTransition;
+        if (force != Boolean.TRUE) {
+            on = null;
+        }
+    }
+
     @Override
     public String toString() {
         return getFormattedName() + " {" + "start=" + startString + ", " + getFormattedProperties() + '}';
@@ -410,8 +416,8 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
 
     public String getFormattedProperties() {
         return "id=" + identifier.id() +
-               (temporary && !retryAfterPowerOnState ? ", temporary" : "") +
-               (retryAfterPowerOnState ? ", power-on-state" : "") +
+               (temporary && !triggeredByPowerTransition ? ", temporary" : "") +
+               (triggeredByPowerTransition ? ", power-transition-state" : "") +
                getFormattedPropertyIfSet("on", on) +
                getFormattedBriIfSet() +
                getFormattedCtIfSet() +
@@ -436,8 +442,8 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
 
     public String getContextName() {
         String context = identifier.name();
-        if (isRetryAfterPowerOnState()) {
-            context += " (power-on)";
+        if (isTriggeredByPowerTransition()) {
+            context += " (power-transition)";
         } else if (temporary) {
             context += " (temporary)";
         }

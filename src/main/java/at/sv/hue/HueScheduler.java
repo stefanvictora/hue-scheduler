@@ -153,7 +153,7 @@ public final class HueScheduler implements Runnable {
             defaultValue = "${env:POWER_ON_RESCHEDULE_DELAY:-150}",
             description = "The delay in ms after the light on-event was received and the current state should be " +
                           "rescheduled again. Default: ${DEFAULT-VALUE} ms.")
-    int powerOnRescheduleDelayInMs;
+    int powerTransitionRescheduleDelayInMs;
     @Option(names = "--bridge-failure-retry-delay", paramLabel = "<delay>",
             defaultValue = "${env:BRIDGE_FAILURE_RETRY_DELAY:-10}",
             description = "The delay in seconds for retrying an API call, if the bridge could not be reached due to " +
@@ -220,19 +220,17 @@ public final class HueScheduler implements Runnable {
     private HueApi api;
     private StateScheduler stateScheduler;
     private final ManualOverrideTracker manualOverrideTracker;
-    private final LightEventListener lightEventListener;
+    private LightEventListener lightEventListener;
     private Supplier<ZonedDateTime> currentTime;
     private StartTimeProvider startTimeProvider;
     private SceneEventListenerImpl sceneEventListener;
     private ScheduledStateRegistry stateRegistry;
     private int sceneSyncDelayInSeconds = 5;
+    private boolean supportOffLightUpdates = false;
 
     public HueScheduler() {
         currentTime = ZonedDateTime::now;
         manualOverrideTracker = new ManualOverrideTrackerImpl();
-        lightEventListener = new LightEventListenerImpl(manualOverrideTracker,
-                deviceId -> api.getAffectedIdsByDevice(deviceId),
-                id -> sceneEventListener.wasRecentlyAffectedBySyncedScene(id));
     }
 
     public HueScheduler(HueApi api, StateScheduler stateScheduler,
@@ -240,11 +238,12 @@ public final class HueScheduler implements Runnable {
                         double requestsPerSecond, boolean controlGroupLightsIndividually,
                         boolean disableUserModificationTracking, boolean requireSceneActivation,
                         String defaultInterpolationTransitionTimeString,
-                        int powerOnRescheduleDelayInMs, int bridgeFailureRetryDelayInSeconds,
+                        int powerTransitionRescheduleDelayInMs, int bridgeFailureRetryDelayInSeconds,
                         int minTrBeforeGapInMinutes, int brightnessOverrideThresholdPercentage,
                         int colorTemperatureOverrideThresholdKelvin, double colorOverrideThreshold,
                         int sceneActivationIgnoreWindowInSeconds, boolean interpolateAll, boolean enableSceneSync,
-                        String sceneSyncName, int sceneSyncIntervalInMinutes, int sceneSyncDelayInSeconds) {
+                        String sceneSyncName, int sceneSyncIntervalInMinutes, int sceneSyncDelayInSeconds,
+                        boolean supportsOffLightUpdates) {
         this();
         this.api = api;
         ZonedDateTime initialTime = currentTime.get();
@@ -257,7 +256,7 @@ public final class HueScheduler implements Runnable {
         this.disableUserModificationTracking = disableUserModificationTracking;
         this.requireSceneActivation = requireSceneActivation;
         this.defaultInterpolationTransitionTimeString = defaultInterpolationTransitionTimeString;
-        this.powerOnRescheduleDelayInMs = powerOnRescheduleDelayInMs;
+        this.powerTransitionRescheduleDelayInMs = powerTransitionRescheduleDelayInMs;
         this.bridgeFailureRetryDelayInSeconds = bridgeFailureRetryDelayInSeconds;
         this.minTrBeforeGapInMinutes = minTrBeforeGapInMinutes;
         this.brightnessOverrideThresholdPercentage = brightnessOverrideThresholdPercentage;
@@ -270,10 +269,19 @@ public final class HueScheduler implements Runnable {
         this.sceneSyncName = sceneSyncName;
         this.sceneSyncIntervalInMinutes = sceneSyncIntervalInMinutes;
         this.sceneSyncDelayInSeconds = sceneSyncDelayInSeconds;
+        this.supportOffLightUpdates = supportsOffLightUpdates;
         apiCacheInvalidationIntervalInMinutes = 15;
         stateRegistry = new ScheduledStateRegistry(currentTime, api);
+        lightEventListener = createLightEventListener();
         this.sceneEventListener = new SceneEventListenerImpl(api, fakeTicker, sceneActivationIgnoreWindowInSeconds,
                 sceneSyncName::equals, lightEventListener);
+    }
+
+    private LightEventListenerImpl createLightEventListener() {
+        return new LightEventListenerImpl(manualOverrideTracker,
+                deviceId -> api.getAffectedIdsByDevice(deviceId),
+                id -> sceneEventListener.wasRecentlyAffectedBySyncedScene(id),
+                supportOffLightUpdates);
     }
 
     private Integer parseInterpolationTransitionTime(String interpolationTransitionTimeString) {
@@ -321,6 +329,7 @@ public final class HueScheduler implements Runnable {
                 new HassWebSocketClientImpl(websocketOrigin, accessToken, httpClient, 5));
         HassAvailabilityListener availabilityListener = new HassAvailabilityListener(this::clearCachesAndReSyncScenes);
         api = new HassApiImpl(apiHost, new HttpResourceProviderImpl(httpClient), areaRegistry, availabilityListener, rateLimiter);
+        lightEventListener = createLightEventListener();
         sceneEventListener = new SceneEventListenerImpl(api, Ticker.systemTicker(),
                 sceneActivationIgnoreWindowInSeconds,
                 sceneName -> HassApiUtils.matchesSceneSyncName(sceneName, sceneSyncName), lightEventListener);
@@ -330,9 +339,11 @@ public final class HueScheduler implements Runnable {
     }
 
     private void setupHueApi() {
+        supportOffLightUpdates = true;
         OkHttpClient httpsClient = createHueHttpsClient();
         RateLimiter rateLimiter = RateLimiter.create(requestsPerSecond);
         api = new HueApiImpl(new HttpResourceProviderImpl(httpsClient), apiHost, rateLimiter, apiCacheInvalidationIntervalInMinutes);
+        lightEventListener = createLightEventListener();
         sceneEventListener = new SceneEventListenerImpl(api, Ticker.systemTicker(),
                 sceneActivationIgnoreWindowInSeconds, sceneSyncName::equals, lightEventListener);
         new HueEventStreamReader(apiHost, accessToken, httpsClient, new HueEventHandler(lightEventListener, sceneEventListener, api),
@@ -424,7 +435,7 @@ public final class HueScheduler implements Runnable {
     }
 
     private void assertTimingConfigurations() {
-        if (powerOnRescheduleDelayInMs < 0) {
+        if (powerTransitionRescheduleDelayInMs < 0) {
             fail("--power-on-reschedule-delay must be >= 0");
         }
         if (minTrBeforeGapInMinutes < 0) {
@@ -556,12 +567,13 @@ public final class HueScheduler implements Runnable {
                 return;
             }
             if (shouldSyncScene(snapshot)) {
+                // todo: reuse this background task also for repeated "off-state" updates
                 scheduleAsyncSceneSync(snapshot, false);
                 MDC.put("context", snapshot.getContextName());
             }
             if (shouldIgnoreState(snapshot)) {
                 LOG.debug("Ignore state: {}", snapshot);
-                createOnPowerOnCopyAndReschedule(snapshot);
+                createPowerTransitionCopyAndReschedule(snapshot);
                 return;
             }
             if (justTurnedOnBySyncedScene(snapshot)) {
@@ -570,7 +582,7 @@ public final class HueScheduler implements Runnable {
                     LOG.info("Turned on by synced scene and no interpolations: Skip re-apply.");
                     // record last put call to not trigger manual overrides for follow-up states
                     snapshot.recordLastPutCall(getPutCallWithAdjustedTr(snapshot, now, false));
-                    createOnPowerOnCopyAndReschedule(snapshot);
+                    createPowerTransitionCopyAndReschedule(snapshot);
                     return;
                 } else {
                     // prevent additional interpolated put call, which was already applied by the scene
@@ -579,21 +591,25 @@ public final class HueScheduler implements Runnable {
             }
             LOG.info("Set: {}", snapshot);
             try {
-                if (wasNotJustTurnedOn(snapshot) &&     // todo: wasJustTurnedOn is not working if we have gaps in the schedule
-                    (lightHasBeenManuallyOverriddenBefore(snapshot) || lightIsOffAndDoesNotTurnOn(snapshot))) {
-                    LOG.info("Off or manually overridden: Skip update");
-                    createOnPowerOnCopyAndReschedule(snapshot);
-                    return;
-                }
-                if (shouldTrackUserModification(snapshot) &&
-                    (justTurnedOnThroughNormalScene(snapshot) || stateHasBeenManuallyOverriddenSinceLastSeen(snapshot))) {
-                    LOG.info("Manually overridden or scene turn-on: Pause updates until turned off and on again");
-                    manualOverrideTracker.onManuallyOverridden(snapshot.getId());
-                    createOnPowerOnCopyAndReschedule(snapshot);
-                    return;
+                if (isConsideredOn(snapshot) || doesNotSupportOffLightUpdates()) {
+                    if (isTimeSlotTriggered(snapshot) &&
+                        (lightHasBeenManuallyOverriddenBefore(snapshot) || lightIsOffAndDoesNotTurnOn(snapshot))) {
+                        LOG.info("Off or manually overridden: Skip update");
+                        createPowerTransitionCopyAndReschedule(snapshot);
+                        return;
+                    }
+                    if (shouldTrackUserModification(snapshot) &&
+                        (justTurnedOnThroughNormalScene(snapshot) || stateHasBeenManuallyOverriddenSinceLastSeen(snapshot))) {
+                        LOG.info("Manually overridden or scene turn-on: Pause updates until turned off and on again");
+                        manualOverrideTracker.onManuallyOverridden(snapshot.getId());
+                        createPowerTransitionCopyAndReschedule(snapshot);
+                        return;
+                    }
                 }
                 boolean performedInterpolation = putAdditionalInterpolatedStateIfNeeded(snapshot, now);
-                putState(snapshot, performedInterpolation, now);
+                if (isOnOrNoInterpolation(snapshot, performedInterpolation)) {
+                    putState(snapshot, performedInterpolation, now);
+                }
             } catch (BridgeConnectionFailure | ApiFailure e) {
                 logException(e);
                 retry(snapshot, getMs(bridgeFailureRetryDelayInSeconds));
@@ -603,13 +619,13 @@ public final class HueScheduler implements Runnable {
             if (snapshot.isOff()) {
                 LOG.info("Turned off");
             }
-            createOnPowerOnCopyAndReschedule(snapshot);
+            createPowerTransitionCopyAndReschedule(snapshot);
         }, currentTime.get().plus(delayInMs + overlappingDelayInMs, ChronoUnit.MILLIS), snapshot.getEnd());
     }
 
-    private void createOnPowerOnCopyAndReschedule(ScheduledStateSnapshot snapshot) {
-        if (snapshot.isRetryAfterPowerOnState()) {
-            retryWhenBackOn(snapshot);
+    private void createPowerTransitionCopyAndReschedule(ScheduledStateSnapshot snapshot) {
+        if (snapshot.isTriggeredByPowerTransition()) {
+            scheduleOnPowerTransition(snapshot);
             return;
         }
         ZonedDateTime now = currentTime.get();
@@ -617,10 +633,10 @@ public final class HueScheduler implements Runnable {
             ScheduledStateSnapshot nextSplitSnapshot = createTemporaryFollowUpSplitState(snapshot);
             schedule(nextSplitSnapshot, snapshot.getNextInterpolationSplitDelayInMs(now));
         }
-        if (shouldRetryOnPowerOn(snapshot)) {
-            ScheduledStateSnapshot powerOnCopy = createPowerOnCopy(snapshot);
-            LOG.trace("Created power-on runnable: {}", powerOnCopy);
-            retryWhenBackOn(powerOnCopy);
+        if (shouldApplyOnPowerTransition(snapshot)) {
+            ScheduledStateSnapshot copy = createPowerTransitionCopy(snapshot);
+            LOG.trace("Created power-transition runnable: {}", copy);
+            scheduleOnPowerTransition(copy);
         }
         reschedule(snapshot);
     }
@@ -637,12 +653,12 @@ public final class HueScheduler implements Runnable {
         return enableSceneSync && !state.isTemporary();
     }
 
-    private boolean wasNotJustTurnedOn(ScheduledStateSnapshot state) {
-        return !wasJustTurnedOn(state);
+    private boolean isTimeSlotTriggered(ScheduledStateSnapshot state) {
+        return !wasJustPowerTransition(state);
     }
 
-    private boolean wasJustTurnedOn(ScheduledStateSnapshot state) {
-        return state.isRetryAfterPowerOnState();
+    private boolean wasJustPowerTransition(ScheduledStateSnapshot state) {
+        return state.isTriggeredByPowerTransition();
     }
 
     private void scheduleAsyncSceneSync(ScheduledStateSnapshot state, boolean justOnce) {
@@ -689,7 +705,19 @@ public final class HueScheduler implements Runnable {
     }
 
     private boolean lightIsOffAndDoesNotTurnOn(ScheduledStateSnapshot state) {
-        return !state.isOn() && (lastSeenAsOff(state.getId()) || isCurrentlyOff(state));
+        return !state.isOn() && isConsideredOff(state);
+    }
+
+    private boolean isConsideredOff(ScheduledStateSnapshot state) {
+        return lastSeenAsOff(state.getId()) || isCurrentlyOff(state);
+    }
+
+    private boolean isConsideredOn(ScheduledStateSnapshot snapshot) {
+        return !isConsideredOff(snapshot);
+    }
+
+    private boolean doesNotSupportOffLightUpdates() {
+        return !supportOffLightUpdates;
     }
 
     private boolean lastSeenAsOff(String id) {
@@ -727,15 +755,15 @@ public final class HueScheduler implements Runnable {
     }
 
     private boolean justTurnedOnBySyncedScene(ScheduledStateSnapshot state) {
-        return wasJustTurnedOn(state) && sceneEventListener.wasRecentlyAffectedBySyncedScene(state.getId());
+        return wasJustPowerTransition(state) && sceneEventListener.wasRecentlyAffectedBySyncedScene(state.getId());
     }
 
     private boolean justTurnedOnThroughNormalScene(ScheduledStateSnapshot state) {
-        return wasJustTurnedOn(state) && sceneEventListener.wasRecentlyAffectedByNormalScene(state.getId());
+        return wasJustPowerTransition(state) && sceneEventListener.wasRecentlyAffectedByNormalScene(state.getId());
     }
 
     private boolean stateHasBeenManuallyOverriddenSinceLastSeen(ScheduledStateSnapshot state) {
-        if (wasJustTurnedOn(state)) {
+        if (wasJustPowerTransition(state)) {
             return false;
         }
         if (state.hasGapBefore()) {
@@ -795,14 +823,14 @@ public final class HueScheduler implements Runnable {
         LOG.debug("Perform interpolation from previous state: {}", previousState);
         Integer interpolationTransitionTime = getInterpolationTransitionTime(previousState);
         interpolatedPutCall.setTransitionTime(interpolationTransitionTime);
-        putState(previousState, interpolatedPutCall);
+        putState(state, interpolatedPutCall);
         sleepIfNeeded(interpolationTransitionTime);
         return true;
     }
 
     private boolean shouldSkipInterpolation(ScheduledState lastSeenState, PutCall interpolatedPutCall, ScheduledStateSnapshot state) {
         return lastSeenState != null && lastSeenState.getLastPutCall().hasSameLightState(interpolatedPutCall) &&
-               (wasNotJustTurnedOn(state) || justTurnedOnBySyncedScene(state));
+               (isTimeSlotTriggered(state) || justTurnedOnBySyncedScene(state)) && isConsideredOn(state);
     }
 
     private Integer getInterpolationTransitionTime(ScheduledStateSnapshot state) {
@@ -822,6 +850,10 @@ public final class HueScheduler implements Runnable {
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private boolean isOnOrNoInterpolation(ScheduledStateSnapshot snapshot, boolean performedInterpolation) {
+        return isConsideredOn(snapshot) || !performedInterpolation;
     }
 
     private void reschedule(ScheduledStateSnapshot snapshot) {
@@ -899,7 +931,7 @@ public final class HueScheduler implements Runnable {
         if (performedInterpolation) {
             return false;
         }
-        return wasJustTurnedOn(state) || isFirstTimeStateSeen(state);
+        return wasJustPowerTransition(state) || isFirstTimeStateSeen(state);
     }
 
     private boolean isFirstTimeStateSeen(ScheduledStateSnapshot state) {
@@ -932,20 +964,20 @@ public final class HueScheduler implements Runnable {
         schedule(snapshot, delayInMs);
     }
 
-    private ScheduledStateSnapshot createPowerOnCopy(ScheduledStateSnapshot state) {
-        ScheduledState powerOnCopy = ScheduledState.createTemporaryCopy(state.getScheduledState());
-        powerOnCopy.setRetryAfterPowerOnState(true);
-        ScheduledStateSnapshot snapshot = powerOnCopy.getSnapshot(state.getDefinedStart());
-        snapshot.overwriteEnd(state.calculateNextPowerOnEnd(currentTime.get()));
+    private ScheduledStateSnapshot createPowerTransitionCopy(ScheduledStateSnapshot state) {
+        ScheduledState copy = ScheduledState.createTemporaryCopy(state.getScheduledState());
+        copy.setTriggeredByPowerTransition(true);
+        ScheduledStateSnapshot snapshot = copy.getSnapshot(state.getDefinedStart());
+        snapshot.overwriteEnd(state.calculateNextPowerTransitionEnd(currentTime.get()));
         return snapshot;
     }
 
-    private static boolean shouldRetryOnPowerOn(ScheduledStateSnapshot state) {
+    private static boolean shouldApplyOnPowerTransition(ScheduledStateSnapshot state) {
         return !state.isOff() && state.hasOtherPropertiesThanOn() || state.isForced();
     }
 
-    private void retryWhenBackOn(ScheduledStateSnapshot snapshot) {
-        lightEventListener.runWhenTurnedOn(snapshot.getId(), () -> schedule(snapshot, powerOnRescheduleDelayInMs));
+    private void scheduleOnPowerTransition(ScheduledStateSnapshot snapshot) {
+        lightEventListener.runOnPowerTransition(snapshot.getId(), () -> schedule(snapshot, powerTransitionRescheduleDelayInMs));
     }
 
     private void scheduleSolarDataInfoLog() {
