@@ -16,22 +16,22 @@ public class LightEventListenerImpl implements LightEventListener {
     private final ConcurrentHashMap<String, CopyOnWriteArrayList<Runnable>> powerTransitionWaitingList;
     private final Function<String, List<String>> affectedIdsByDeviceLookup;
     private final Predicate<String> wasRecentlyAffectedBySyncedScene;
-    private final boolean supportOffLightUpdates;
+    private final boolean supportsOffLightUpdates;
 
     public LightEventListenerImpl(ManualOverrideTracker manualOverrideTracker,
                                   Function<String, List<String>> affectedIdsByDeviceLookup,
-                                  Predicate<String> wasRecentlyAffectedBySyncedScene, boolean supportOffLightUpdates) {
+                                  Predicate<String> wasRecentlyAffectedBySyncedScene, boolean supportsOffLightUpdates) {
         this.manualOverrideTracker = manualOverrideTracker;
         this.affectedIdsByDeviceLookup = affectedIdsByDeviceLookup;
         this.wasRecentlyAffectedBySyncedScene = wasRecentlyAffectedBySyncedScene;
-        this.supportOffLightUpdates = supportOffLightUpdates;
+        this.supportsOffLightUpdates = supportsOffLightUpdates;
         powerTransitionWaitingList = new ConcurrentHashMap<>();
     }
 
     @Override
     public void onLightOff(String id) {
         manualOverrideTracker.onLightOff(id);
-        if (supportOffLightUpdates) {
+        if (supportsOffLightUpdates) {
             MDC.put("context", "off-event " + id);
             rescheduleWaitingStates(id);
             MDC.remove("context");

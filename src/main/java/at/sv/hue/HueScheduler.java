@@ -226,7 +226,7 @@ public final class HueScheduler implements Runnable {
     private SceneEventListenerImpl sceneEventListener;
     private ScheduledStateRegistry stateRegistry;
     private int sceneSyncDelayInSeconds = 5;
-    private boolean supportOffLightUpdates = false;
+    private boolean supportsOffLightUpdates = false;
 
     public HueScheduler() {
         currentTime = ZonedDateTime::now;
@@ -269,7 +269,7 @@ public final class HueScheduler implements Runnable {
         this.sceneSyncName = sceneSyncName;
         this.sceneSyncIntervalInMinutes = sceneSyncIntervalInMinutes;
         this.sceneSyncDelayInSeconds = sceneSyncDelayInSeconds;
-        this.supportOffLightUpdates = supportsOffLightUpdates;
+        this.supportsOffLightUpdates = supportsOffLightUpdates;
         apiCacheInvalidationIntervalInMinutes = 15;
         stateRegistry = new ScheduledStateRegistry(currentTime, api);
         lightEventListener = createLightEventListener();
@@ -281,7 +281,7 @@ public final class HueScheduler implements Runnable {
         return new LightEventListenerImpl(manualOverrideTracker,
                 deviceId -> api.getAffectedIdsByDevice(deviceId),
                 id -> sceneEventListener.wasRecentlyAffectedBySyncedScene(id),
-                supportOffLightUpdates);
+                supportsOffLightUpdates);
     }
 
     private Integer parseInterpolationTransitionTime(String interpolationTransitionTimeString) {
@@ -339,7 +339,7 @@ public final class HueScheduler implements Runnable {
     }
 
     private void setupHueApi() {
-        supportOffLightUpdates = true;
+        supportsOffLightUpdates = true;
         OkHttpClient httpsClient = createHueHttpsClient();
         RateLimiter rateLimiter = RateLimiter.create(requestsPerSecond);
         api = new HueApiImpl(new HttpResourceProviderImpl(httpsClient), apiHost, rateLimiter, apiCacheInvalidationIntervalInMinutes);
@@ -717,7 +717,7 @@ public final class HueScheduler implements Runnable {
     }
 
     private boolean doesNotSupportOffLightUpdates() {
-        return !supportOffLightUpdates;
+        return !supportsOffLightUpdates;
     }
 
     private boolean lastSeenAsOff(String id) {
