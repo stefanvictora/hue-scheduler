@@ -567,9 +567,11 @@ public final class HueScheduler implements Runnable {
                 return;
             }
             if (shouldSyncScene(snapshot)) {
-                // todo: reuse this background task also for repeated "off-state" updates
                 scheduleAsyncSceneSync(snapshot, false);
                 MDC.put("context", snapshot.getContextName());
+            }
+            if (shouldPerformBackgroundInterpolation(snapshot, now)) {
+                scheduleNextBackgroundInterpolation(snapshot, now);
             }
             if (shouldIgnoreState(snapshot)) {
                 LOG.debug("Ignore state: {}", snapshot);
@@ -649,6 +651,10 @@ public final class HueScheduler implements Runnable {
         }
     }
 
+    private boolean shouldPerformBackgroundInterpolation(ScheduledStateSnapshot state, ZonedDateTime now) {
+        return supportsOffLightUpdates && !state.isTemporary() && state.performsInterpolation(now);
+    }
+
     private boolean shouldSyncScene(ScheduledStateSnapshot state) {
         return enableSceneSync && !state.isTemporary();
     }
@@ -691,13 +697,45 @@ public final class HueScheduler implements Runnable {
     }
 
     private void scheduleNextSceneSync(ScheduledStateSnapshot stateSnapshot, boolean justOnce) {
-        ZonedDateTime end = stateSnapshot.getEnd();
+        scheduleIfNotYetEnded(stateSnapshot, () -> syncScene(stateSnapshot, justOnce),
+                currentTime.get().plusMinutes(sceneSyncIntervalInMinutes));
+    }
+
+    private void scheduleIfNotYetEnded(ScheduledStateSnapshot state, Runnable runnable, ZonedDateTime scheduledStart) {
+        ZonedDateTime end = state.getEnd();
         stateScheduler.schedule(() -> {
             if (currentTime.get().isAfter(end)) {
                 return;
             }
-            syncScene(stateSnapshot, justOnce);
-        }, currentTime.get().plusMinutes(sceneSyncIntervalInMinutes), end);
+            runnable.run();
+        }, scheduledStart, state.getEnd());
+    }
+
+    private void scheduleNextBackgroundInterpolation(ScheduledStateSnapshot state, ZonedDateTime now) {
+        scheduleNextBackgroundInterpolation(state, null, now);
+    }
+
+    private void scheduleNextBackgroundInterpolation(ScheduledStateSnapshot state, PutCall putCall, ZonedDateTime now) {
+        ZonedDateTime nextChangeTime = state.getNextPropertyChangeTime(putCall, now);
+        if (nextChangeTime != null) {
+            scheduleIfNotYetEnded(state, () -> performBackgroundInterpolation(state), nextChangeTime);
+        }
+    }
+
+    private void performBackgroundInterpolation(ScheduledStateSnapshot state) {
+        MDC.put("context", state.getContextName() + " (interpolation)");
+        ZonedDateTime now = currentTime.get();
+        try {
+            PutCall putCall = state.getInterpolatedFullPicturePutCall(now);
+            if (isConsideredOff(state)) {
+                putState(state, putCall);
+            }
+            scheduleNextBackgroundInterpolation(state, putCall, now);
+        } catch (Exception e) {
+            LOG.error("Background interpolation failed: '{}'", e.getLocalizedMessage(), e);
+            scheduleNextBackgroundInterpolation(state, now);
+        }
+        MDC.remove("context");
     }
 
     private boolean lightHasBeenManuallyOverriddenBefore(ScheduledStateSnapshot state) {
