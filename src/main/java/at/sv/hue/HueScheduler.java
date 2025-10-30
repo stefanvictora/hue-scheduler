@@ -595,7 +595,7 @@ public final class HueScheduler implements Runnable {
             try {
                 if (isConsideredOn(snapshot) || doesNotSupportOffLightUpdates()) {
                     if (isTimeSlotTriggered(snapshot) &&
-                        (lightHasBeenManuallyOverriddenBefore(snapshot) || lightIsOffAndDoesNotTurnOn(snapshot))) {
+                        (lightHasBeenManuallyOverriddenBefore(snapshot) || isConsideredOffAndDoesNotTurnOn(snapshot))) {
                         LOG.info("Off or manually overridden: Skip update");
                         createPowerTransitionCopyAndReschedule(snapshot);
                         return;
@@ -728,6 +728,7 @@ public final class HueScheduler implements Runnable {
         try {
             PutCall putCall = state.getInterpolatedFullPicturePutCall(now);
             if (isConsideredOff(state)) {
+                putCall.setOn(null); // do not turn on light during background interpolation
                 putState(state, putCall);
             }
             scheduleNextBackgroundInterpolation(state, putCall, now);
@@ -742,12 +743,16 @@ public final class HueScheduler implements Runnable {
         return manualOverrideTracker.isManuallyOverridden(state.getId());
     }
 
-    private boolean lightIsOffAndDoesNotTurnOn(ScheduledStateSnapshot state) {
+    private boolean isConsideredOffAndDoesNotTurnOn(ScheduledStateSnapshot state) {
         return !state.isOn() && isConsideredOff(state);
     }
 
     private boolean isConsideredOff(ScheduledStateSnapshot state) {
         return lastSeenAsOff(state.getId()) || isCurrentlyOff(state);
+    }
+
+    private boolean isConsideredOnOrDoesTurnOn(ScheduledStateSnapshot snapshot) {
+        return !isConsideredOffAndDoesNotTurnOn(snapshot);
     }
 
     private boolean isConsideredOn(ScheduledStateSnapshot snapshot) {
@@ -891,7 +896,7 @@ public final class HueScheduler implements Runnable {
     }
 
     private boolean isOnOrNoInterpolation(ScheduledStateSnapshot snapshot, boolean performedInterpolation) {
-        return isConsideredOn(snapshot) || !performedInterpolation;
+        return isConsideredOnOrDoesTurnOn(snapshot) || !performedInterpolation;
     }
 
     private void reschedule(ScheduledStateSnapshot snapshot) {
@@ -925,7 +930,7 @@ public final class HueScheduler implements Runnable {
     }
 
     private void putState(ScheduledStateSnapshot state, PutCall putCall) {
-        if (state.isGroupState() && controlGroupLightsIndividually) {
+        if (state.isGroupState() && (controlGroupLightsIndividually || isConsideredOffAndDoesNotTurnOn(state))) {
             for (PutCall call : stateRegistry.getPutCalls(state)) {
                 try {
                     performPutApiCall(state, call);
@@ -940,6 +945,9 @@ public final class HueScheduler implements Runnable {
 
     private void performPutApiCall(ScheduledStateSnapshot state, PutCall putCall) {
         LOG.debug("{}", putCall);
+        if (isConsideredOffAndDoesNotTurnOn(state)) {
+            putCall.setTransitionTime(null);
+        }
         api.putState(putCall);
         state.recordLastPutCall(putCall);
     }

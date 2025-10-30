@@ -5973,7 +5973,7 @@ class HueSchedulerTest {
     }
 
     @Test
-    void run_execution_lightsIsOff_apiAllowsOffUpdates_stillAppliesUpdates() {
+    void run_execution_lightIsOff_apiAllowsOffUpdates_stillAppliesUpdates() {
         enableSupportForOffLightUpdates();
         addKnownLightIdsWithDefaultCapabilities(1);
         addState(1, "00:00", "bri:50");
@@ -6001,7 +6001,7 @@ class HueSchedulerTest {
     }
 
     @Test
-    void run_execution_lightsIsOff_apiAllowsOffUpdates_manualOverrides_stillAppliesUpdates() {
+    void run_execution_lightIsOff_apiAllowsOffUpdates_manualOverrides_stillAppliesUpdates() {
         enableSupportForOffLightUpdates();
         enableUserModificationTracking();
         addKnownLightIdsWithDefaultCapabilities(1);
@@ -6051,11 +6051,11 @@ class HueSchedulerTest {
     }
 
     @Test
-    void run_execution_lightsIsOff_apiAllowsOffUpdates_lightHasOn_removesOnWhenLightIsTurnedOff() {
+    void run_execution_lightIsOff_apiAllowsOffUpdates_lightHasOn_removesOnWhenLightIsTurnedOff() {
         enableSupportForOffLightUpdates();
         addKnownLightIdsWithDefaultCapabilities(1);
         addState(1, "00:00", "bri:50", "on:true");
-        addState(1, "01:00", "ct:300");
+        addState(1, "01:00", "bri:100");
 
         List<ScheduledRunnable> scheduledRunnables = startScheduler(
                 expectedRunnable(now, now.plusHours(1)),
@@ -6063,7 +6063,7 @@ class HueSchedulerTest {
         );
 
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
-                expectedPutCall(1).bri(50).ct(300).on(true)
+                expectedPutCall(1).bri(50).on(true)
         );
 
         ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusHours(1)); // next day
@@ -6074,16 +6074,84 @@ class HueSchedulerTest {
         );
 
         advanceTimeAndRunAndAssertPutCalls(powerOffRunnables.getFirst(),
-                expectedPutCall(1).bri(50).ct(300) // removes "on:true", uses full picture
+                expectedPutCall(1).bri(50) // removes "on:true"
         );
     }
 
     @Test
-    void run_execution_lightsIsOff_apiAllowsOffUpdates_lightHasOn_andForce_forcesLightToBeOn() {
+    void run_execution_lightIsOff_apiAllowsOffUpdates_usesFullPicture() {
+        enableSupportForOffLightUpdates();
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, "00:00", "bri:50");
+        addState(1, "01:00", "ct:300");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusHours(1)),
+                expectedRunnable(now.plusHours(1), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).bri(50).ct(300) // uses full picture
+        );
+
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusHours(1)); // next day
+
+        simulateLightOffEvent("/lights/1");
+        List<ScheduledRunnable> powerOffRunnables = ensureScheduledStates(
+                expectedPowerOnEnd(initialNow.plusHours(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(powerOffRunnables.getFirst(),
+                expectedPutCall(1).bri(50).ct(300) // uses full picture
+        );
+    }
+
+    @Test
+    void run_execution_lightIsOff_apiAllowsOffUpdates_removesTransitionTime() {
+        enableSupportForOffLightUpdates();
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, "00:00", "bri:50", "tr:5s");
+        addState(1, "01:00", "bri:100");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusHours(1)),
+                expectedRunnable(now.plusHours(1), now.plusDays(1))
+        );
+
+        mockIsLightOff(1, true);
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).bri(50) // removes transition time
+        );
+
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusHours(1)); // next day
+    }
+
+    @Test
+    void run_execution_lightIsOff_apiAllowsOffUpdates_lightHasOn_doesNotRemoveTransitionEvenIfCurrentlyOff() {
+        enableSupportForOffLightUpdates();
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, "00:00", "bri:50", "on:true", "tr:5s");
+        addState(1, "01:00", "bri:100");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusHours(1)),
+                expectedRunnable(now.plusHours(1), now.plusDays(1))
+        );
+
+        mockIsLightOff(1, true);
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).bri(50).on(true).transitionTime(tr("5s")) // keeps transition time
+        );
+
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusHours(1)); // next day
+    }
+
+    @Test
+    void run_execution_lightIsOff_apiAllowsOffUpdates_lightHasOn_andForce_forcesLightToBeOn() {
         enableSupportForOffLightUpdates();
         addKnownLightIdsWithDefaultCapabilities(1);
         addState(1, "00:00", "bri:50", "on:true", "force:true");
-        addState(1, "01:00", "ct:300");
+        addState(1, "01:00", "bri:100");
 
         List<ScheduledRunnable> scheduledRunnables = startScheduler(
                 expectedRunnable(now, now.plusHours(1)),
@@ -6091,7 +6159,7 @@ class HueSchedulerTest {
         );
 
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
-                expectedPutCall(1).bri(50).ct(300).on(true)
+                expectedPutCall(1).bri(50).on(true)
         );
 
         ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusHours(1)); // next day
@@ -6102,12 +6170,12 @@ class HueSchedulerTest {
         );
 
         advanceTimeAndRunAndAssertPutCalls(powerOffRunnables.getFirst(),
-                expectedPutCall(1).bri(50).ct(300).on(true) // keeps "on:true" because of force:true
+                expectedPutCall(1).bri(50).on(true) // keeps "on:true" because of force:true
         );
     }
 
     @Test
-    void run_execution_lightsIsOff_apiAllowsOffUpdates_interpolation_stillAppliesUpdates() {
+    void run_execution_lightIsOff_apiAllowsOffUpdates_interpolation_stillAppliesUpdates() {
         enableSupportForOffLightUpdates();
         addKnownLightIdsWithDefaultCapabilities(1);
         addState(1, "00:00", "bri:50");
@@ -6240,6 +6308,72 @@ class HueSchedulerTest {
     }
 
     @Test
+    void run_execution_apiAllowsOffUpdates_interpolation_lightHasOn_stillSchedulesBackgroundInterpolation_onlyAppliedWhenOff_doesNotReuseOn() {
+        enableSupportForOffLightUpdates();
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, "00:00", "bri:50");
+        addState(1, "01:00", "bri:60", "on:true", "tr-before:30min");
+        addState(1, "02:00", "bri:70");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(30)),
+                expectedRunnable(now.plusMinutes(30), now.plusHours(2)),
+                expectedRunnable(now.plusHours(2), now.plusDays(1))
+        );
+
+        // Normal light state, applied as usual
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).bri(50)
+        );
+
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(30)); // next day
+
+        // Light is on: normal interpolation
+
+        mockIsLightOff(1, true); // even if off, on:true forces it to be treated as on
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(1),
+                expectedPutCall(1).bri(50).on(true),
+                expectedPutCall(1).bri(60).on(true).transitionTime(tr("30min"))
+        );
+
+        List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(
+                expectedRunnable(initialNow.plusMinutes(32), initialNow.plusHours(2)), // first change for background interpolation
+                expectedRunnable(initialNow.plusDays(1).plusMinutes(30), initialNow.plusDays(1).plusHours(2)) // next day
+        );
+
+        // simulate light turned on: applies state again (without on:true this time)
+
+        mockIsLightOff(1, false);
+        List<ScheduledRunnable> powerOnRunnables = simulateLightOnEvent(
+                expectedPowerOnEnd(initialNow.plusMinutes(30)), // already ended
+                expectedPowerOnEnd(initialNow.plusHours(2))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(powerOnRunnables.getFirst());
+        advanceTimeAndRunAndAssertPutCalls(powerOnRunnables.get(1),
+                expectedPutCall(1).bri(50),
+                expectedPutCall(1).bri(60).transitionTime(tr("30min"))
+        );
+
+        // background interpolation: light is still on -> no update
+        
+        advanceTimeAndRunAndAssertPutCalls(followUpRunnables.getFirst());
+
+        ScheduledRunnable nextBackgroundInterpolation1 = ensureRunnable(initialNow.plusMinutes(35), initialNow.plusHours(2));
+
+        // background interpolation: light is off -> updates
+
+        mockIsLightOff(1, true);
+
+        advanceTimeAndRunAndAssertPutCalls(nextBackgroundInterpolation1,
+                expectedPutCall(1).bri(52)
+        );
+
+        ensureRunnable(initialNow.plusMinutes(36), initialNow.plusHours(2)); // background interpolation 2
+    }
+
+    @Test
     void run_execution_lightIsOff_apiAllowsOffUpdates_interpolation_apiFailure_retries_backgroundInterpolationsStopOnceReached() {
         enableSupportForOffLightUpdates();
         addKnownLightIdsWithDefaultCapabilities(1);
@@ -6349,6 +6483,34 @@ class HueSchedulerTest {
 
         verify(mockedHueApi, times(1)).isGroupOff("/groups/1");
         verify(mockedHueApi, never()).isLightOff("/lights/1");
+    }
+
+    @Test
+    void run_execution_groupIsOff_apiAllowsOffUpdates_controlsLightsIndividually() {
+        enableSupportForOffLightUpdates();
+        mockGroupLightsForId(1, 1, 2);
+        mockDefaultGroupCapabilities(1);
+        addState("g1", "00:00", "bri:50", "tr:2s");
+        addState("g1", "01:00", "bri:60", "tr:5s");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusHours(1)),
+                expectedRunnable(now.plusHours(1), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedGroupPutCall(1).bri(50).transitionTime(tr("2s"))
+        );
+
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusHours(1)); // next day
+
+        mockIsGroupOff(1, true);
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(1),  // off lights updated individually, no transition time
+                expectedPutCall(1).bri(60),
+                expectedPutCall(2).bri(60)
+        );
+
+        ensureRunnable(initialNow.plusDays(1).plusHours(1), initialNow.plusDays(2)); // next day
     }
 
     @Test
