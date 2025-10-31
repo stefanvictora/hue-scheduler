@@ -56,6 +56,10 @@ public final class HueEventHandler implements BackgroundEventHandler {
             }
             for (JsonNode resourceNode : data) {
                 HueEvent hueEvent = objectMapper.treeToValue(resourceNode, HueEvent.class);
+                if (shouldFireModificationTrackingEvent(hueEvent, containerType)) {
+                    resourceModificationEventListener.onModification(hueEvent.getType(), hueEvent.getId(),
+                            getContent(containerType, resourceNode));
+                }
                 if (hueEvent.isLightOrGroup() && hueEvent.isOffEvent()) {
                     lightEventListener.onLightOff(hueEvent.getId());
                 } else if (hueEvent.isLightOrGroup() && hueEvent.isOnEvent()) {
@@ -67,15 +71,6 @@ public final class HueEventHandler implements BackgroundEventHandler {
                 } else if (hueEvent.isScene() && hueEvent.isSceneActivated()) {
                     sceneEventListener.onSceneActivated(hueEvent.getId());
                 }
-
-                if (hueEvent.getType() == null || hueEvent.getId() == null) {
-                    continue;
-                }
-                if ("update".equals(containerType) && hueEvent.notRelevantSceneModification()) {
-                    continue;
-                }
-                Object content = "delete".equals(containerType) ? null : resourceNode;
-                resourceModificationEventListener.onModification(hueEvent.getType(), hueEvent.getId(), content);
             }
         }
     }
@@ -89,6 +84,18 @@ public final class HueEventHandler implements BackgroundEventHandler {
         MDC.put("context", "events");
         log.error("An error occurred during event stream processing: {}", t.getLocalizedMessage());
         MDC.remove("context");
+    }
+
+    private static boolean shouldFireModificationTrackingEvent(HueEvent hueEvent, String containerType) {
+        return hueEvent.getType() != null && hueEvent.getId() != null &&
+               !"update".equals(containerType) || !hueEvent.notRelevantSceneModification();
+    }
+
+    private static Object getContent(String containerType, JsonNode resourceNode) {
+        if ("delete".equals(containerType)) {
+            return null;
+        }
+        return resourceNode;
     }
 
     @Data
