@@ -681,12 +681,10 @@ public final class HueApiImpl implements HueApi {
                                          JsonNode update, Class<T> targetType) throws IOException {
         Map<String, T> resources = cache.synchronous().getIfPresent(cacheKey);
         if (resources == null) {
-            log.trace("Resource cache for {} is not initialized yet. Skipping update.", targetType.getSimpleName());
             return;
         }
         if (update == null || update.isNull()) {
             resources.remove(id);
-            log.trace("Removed {} resource for {}.", targetType.getSimpleName(), id);
             return;
         }
 
@@ -695,11 +693,9 @@ public final class HueApiImpl implements HueApi {
             resource = mapper.treeToValue(update, targetType);
             if (resource != null) {
                 resources.put(id, resource);
-                log.trace("Added {} resource for {}: {}", targetType.getSimpleName(), id, resource);
             }
             return;
         }
-        log.trace("Applying {} update for {}: {}", targetType.getSimpleName(), id, update);
         mapper.readerForUpdating(resource).readValue(update.traverse(mapper));
     }
 
@@ -713,7 +709,6 @@ public final class HueApiImpl implements HueApi {
             case "room" -> availableRoomsCache.synchronous().invalidateAll();
             case "zigbee_connectivity" -> availableZigbeeConnectivityCache.synchronous().invalidateAll();
         }
-        log.trace("Invalidated {} cache.", type);
     }
 
     private interface DataListContainer<T> {
