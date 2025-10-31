@@ -3,7 +3,6 @@ package at.sv.hue.api.hue;
 import at.sv.hue.api.LightEventListener;
 import at.sv.hue.api.ResourceModificationEventListener;
 import at.sv.hue.api.SceneEventListener;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -13,13 +12,8 @@ import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 
-import java.util.ArrayList;
-import java.util.List;
-
 @Slf4j
 public final class HueEventHandler implements BackgroundEventHandler {
-    private static final TypeReference<List<HueEventContainer>> typeRef = new TypeReference<>() {
-    };
     private final LightEventListener lightEventListener;
     private final SceneEventListener sceneEventListener;
     private final ResourceModificationEventListener resourceModificationEventListener;
@@ -50,9 +44,18 @@ public final class HueEventHandler implements BackgroundEventHandler {
 
     @Override
     public void onMessage(String event, MessageEvent messageEvent) throws Exception {
-        List<HueEventContainer> hueEventContainers = objectMapper.readValue(messageEvent.getData(), typeRef);
-        for (HueEventContainer container : hueEventContainers) {
-            for (HueEvent hueEvent : container.getData()) {
+        JsonNode containers = objectMapper.readTree(messageEvent.getData());
+        if (!containers.isArray()) {
+            return;
+        }
+        for (JsonNode containerNode : containers) {
+            String containerType = containerNode.path("type").asText(null);
+            JsonNode data = containerNode.path("data");
+            if (!data.isArray()) {
+                continue;
+            }
+            for (JsonNode resourceNode : data) {
+                HueEvent hueEvent = objectMapper.treeToValue(resourceNode, HueEvent.class);
                 if (hueEvent.isLightOrGroup() && hueEvent.isOffEvent()) {
                     lightEventListener.onLightOff(hueEvent.getId());
                 } else if (hueEvent.isLightOrGroup() && hueEvent.isOnEvent()) {
@@ -65,18 +68,16 @@ public final class HueEventHandler implements BackgroundEventHandler {
                     sceneEventListener.onSceneActivated(hueEvent.getId());
                 }
 
-                if ("update".equals(container.type)) {
-                    if (isNotRelevantForUpdate(hueEvent.type) || hueEvent.notRelevantSceneModification()) {
-                        continue;
-                    }
+                if (hueEvent.getType() == null || hueEvent.getId() == null) {
+                    continue;
                 }
-                resourceModificationEventListener.onModification(hueEvent.getType(), hueEvent.getId(), null);
+                if ("update".equals(containerType) && hueEvent.notRelevantSceneModification()) {
+                    continue;
+                }
+                Object content = "delete".equals(containerType) ? null : resourceNode;
+                resourceModificationEventListener.onModification(hueEvent.getType(), hueEvent.getId(), content);
             }
         }
-    }
-
-    private static boolean isNotRelevantForUpdate(String type) {
-        return "light".equals(type) || "grouped_light".equals(type) || "device".equals(type);
     }
 
     @Override
@@ -88,14 +89,6 @@ public final class HueEventHandler implements BackgroundEventHandler {
         MDC.put("context", "events");
         log.error("An error occurred during event stream processing: {}", t.getLocalizedMessage());
         MDC.remove("context");
-    }
-
-    @Data
-    private static final class HueEventContainer {
-        private String creationtime;
-        private List<HueEvent> data = new ArrayList<>();
-        private String id;
-        private String type;
     }
 
     @Data
@@ -162,7 +155,7 @@ public final class HueEventHandler implements BackgroundEventHandler {
         }
 
         public boolean notRelevantSceneModification() {
-            return isScene() && actions==null && metadata==null;
+            return isScene() && actions == null && metadata == null;
         }
 
         @Data
