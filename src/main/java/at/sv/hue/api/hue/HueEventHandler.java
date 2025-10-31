@@ -88,7 +88,7 @@ public final class HueEventHandler implements BackgroundEventHandler {
 
     private static boolean shouldFireModificationTrackingEvent(HueEvent hueEvent, String containerType) {
         return hueEvent.getType() != null && hueEvent.getId() != null &&
-               !"update".equals(containerType) || !hueEvent.notRelevantSceneModification();
+               !("update".equals(containerType) && hueEvent.notRelevantSceneModification());
     }
 
     private static Object getContent(String containerType, JsonNode resourceNode) {
