@@ -716,7 +716,8 @@ public final class HueScheduler implements Runnable {
     }
 
     private void scheduleNextBackgroundInterpolation(ScheduledStateSnapshot state, PutCall putCall, ZonedDateTime now) {
-        ZonedDateTime nextChangeTime = state.getNextPropertyChangeTime(putCall, now);
+        ZonedDateTime nextChangeTime = state.getNextPropertyChangeTime(putCall, now, 8,
+                150, 5.0); // todo: find right thresholds
         if (nextChangeTime != null) {
             scheduleIfNotYetEnded(state, () -> performBackgroundInterpolation(state), nextChangeTime);
         }

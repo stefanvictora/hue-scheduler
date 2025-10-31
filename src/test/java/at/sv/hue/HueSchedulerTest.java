@@ -6179,8 +6179,8 @@ class HueSchedulerTest {
         enableSupportForOffLightUpdates();
         addKnownLightIdsWithDefaultCapabilities(1);
         addState(1, "00:00", "bri:50");
-        addState(1, "01:00", "bri:60", "tr-before:30min");
-        addState(1, "02:00", "bri:70");
+        addState(1, "01:00", "bri:100", "tr-before:30min");
+        addState(1, "02:00", "bri:150");
 
         List<ScheduledRunnable> scheduledRunnables = startScheduler(
                 expectedRunnable(now, now.plusMinutes(30)),
@@ -6204,37 +6204,37 @@ class HueSchedulerTest {
         );
 
         List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(
-                expectedRunnable(initialNow.plusMinutes(32), initialNow.plusHours(2)), // first change for background interpolation
+                expectedRunnable(initialNow.plusMinutes(35), initialNow.plusHours(2)), // first change for background interpolation
                 expectedRunnable(initialNow.plusDays(1).plusMinutes(30), initialNow.plusDays(1).plusHours(2)) // next day
         );
 
         // first background interpolation
 
         advanceTimeAndRunAndAssertPutCalls(followUpRunnables.getFirst(),
-                expectedPutCall(1).bri(51)
+                expectedPutCall(1).bri(58)
         );
 
-        ScheduledRunnable nextBackgroundInterpolation1 = ensureRunnable(initialNow.plusMinutes(35), initialNow.plusHours(2));
+        ScheduledRunnable nextBackgroundInterpolation1 = ensureRunnable(initialNow.plusMinutes(40), initialNow.plusHours(2));
 
         // second background interpolation
 
         advanceTimeAndRunAndAssertPutCalls(nextBackgroundInterpolation1,
-                expectedPutCall(1).bri(52)
+                expectedPutCall(1).bri(67)
         );
 
-        ScheduledRunnable nextBackgroundInterpolation2 = ensureRunnable(initialNow.plusMinutes(38), initialNow.plusHours(2));
+        ScheduledRunnable nextBackgroundInterpolation2 = ensureRunnable(initialNow.plusMinutes(45), initialNow.plusHours(2));
 
         // third background interpolation
 
         advanceTimeAndRunAndAssertPutCalls(nextBackgroundInterpolation2,
-                expectedPutCall(1).bri(53)
+                expectedPutCall(1).bri(75)
         );
 
-        ensureRunnable(initialNow.plusMinutes(41), initialNow.plusHours(2));
+        ensureRunnable(initialNow.plusMinutes(50), initialNow.plusHours(2));
 
         // simulate light turn off after time passing
 
-        setCurrentTimeTo(initialNow.plusMinutes(45));
+        setCurrentTimeTo(initialNow.plusMinutes(55));
 
         simulateLightOffEvent("/lights/1");
         List<ScheduledRunnable> powerOffRunnables = ensureScheduledStates(
@@ -6242,13 +6242,13 @@ class HueSchedulerTest {
                 expectedPowerOnEnd(initialNow.plusHours(2))
         );
         advanceTimeAndRunAndAssertPutCalls(powerOffRunnables.get(1),
-                expectedPutCall(1).bri(55)
+                expectedPutCall(1).bri(92)
         );
 
         // next state applied normally again
 
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(2),
-                expectedPutCall(1).bri(70)
+                expectedPutCall(1).bri(150)
         );
 
         ensureRunnable(initialNow.plusDays(1).plusHours(2), initialNow.plusDays(2)); // next day
@@ -6259,8 +6259,8 @@ class HueSchedulerTest {
         enableSupportForOffLightUpdates();
         addKnownLightIdsWithDefaultCapabilities(1);
         addState(1, "00:00", "bri:50");
-        addState(1, "01:00", "bri:60", "tr-before:30min");
-        addState(1, "02:00", "bri:70");
+        addState(1, "01:00", "bri:100", "tr-before:30min");
+        addState(1, "02:00", "bri:150");
 
         List<ScheduledRunnable> scheduledRunnables = startScheduler(
                 expectedRunnable(now, now.plusMinutes(30)),
@@ -6279,11 +6279,11 @@ class HueSchedulerTest {
         // Light is on: normal interpolation
 
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(1),
-                expectedPutCall(1).bri(60).transitionTime(tr("30min"))
+                expectedPutCall(1).bri(100).transitionTime(tr("30min"))
         );
 
         List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(
-                expectedRunnable(initialNow.plusMinutes(32), initialNow.plusHours(2)), // first change for background interpolation
+                expectedRunnable(initialNow.plusMinutes(35), initialNow.plusHours(2)), // first change for background interpolation
                 expectedRunnable(initialNow.plusDays(1).plusMinutes(30), initialNow.plusDays(1).plusHours(2)) // next day
         );
 
@@ -6291,16 +6291,16 @@ class HueSchedulerTest {
 
         advanceTimeAndRunAndAssertPutCalls(followUpRunnables.getFirst());
 
-        ScheduledRunnable nextBackgroundInterpolation1 = ensureRunnable(initialNow.plusMinutes(35), initialNow.plusHours(2));
+        ScheduledRunnable nextBackgroundInterpolation1 = ensureRunnable(initialNow.plusMinutes(40), initialNow.plusHours(2));
 
         // second background interpolation: light is off -> updates
 
         mockIsLightOff(1, true);
         advanceTimeAndRunAndAssertPutCalls(nextBackgroundInterpolation1,
-                expectedPutCall(1).bri(52)
+                expectedPutCall(1).bri(67)
         );
 
-        ScheduledRunnable nextBackgroundInterpolation2 = ensureRunnable(initialNow.plusMinutes(38), initialNow.plusHours(2));
+        ScheduledRunnable nextBackgroundInterpolation2 = ensureRunnable(initialNow.plusMinutes(45), initialNow.plusHours(2));
 
         setCurrentTimeTo(scheduledRunnables.get(2));
 
@@ -6312,8 +6312,8 @@ class HueSchedulerTest {
         enableSupportForOffLightUpdates();
         addKnownLightIdsWithDefaultCapabilities(1);
         addState(1, "00:00", "bri:50");
-        addState(1, "01:00", "bri:60", "on:true", "tr-before:30min");
-        addState(1, "02:00", "bri:70");
+        addState(1, "01:00", "bri:100", "on:true", "tr-before:30min");
+        addState(1, "02:00", "bri:150");
 
         List<ScheduledRunnable> scheduledRunnables = startScheduler(
                 expectedRunnable(now, now.plusMinutes(30)),
@@ -6334,11 +6334,11 @@ class HueSchedulerTest {
         mockIsLightOff(1, true); // even if off, on:true forces it to be treated as on
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(1),
                 expectedPutCall(1).bri(50).on(true),
-                expectedPutCall(1).bri(60).on(true).transitionTime(tr("30min"))
+                expectedPutCall(1).bri(100).on(true).transitionTime(tr("30min"))
         );
 
         List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(
-                expectedRunnable(initialNow.plusMinutes(32), initialNow.plusHours(2)), // first change for background interpolation
+                expectedRunnable(initialNow.plusMinutes(35), initialNow.plusHours(2)), // first change for background interpolation
                 expectedRunnable(initialNow.plusDays(1).plusMinutes(30), initialNow.plusDays(1).plusHours(2)) // next day
         );
 
@@ -6353,24 +6353,24 @@ class HueSchedulerTest {
         advanceTimeAndRunAndAssertPutCalls(powerOnRunnables.getFirst());
         advanceTimeAndRunAndAssertPutCalls(powerOnRunnables.get(1),
                 expectedPutCall(1).bri(50),
-                expectedPutCall(1).bri(60).transitionTime(tr("30min"))
+                expectedPutCall(1).bri(100).transitionTime(tr("30min"))
         );
 
         // background interpolation: light is still on -> no update
         
         advanceTimeAndRunAndAssertPutCalls(followUpRunnables.getFirst());
 
-        ScheduledRunnable nextBackgroundInterpolation1 = ensureRunnable(initialNow.plusMinutes(35), initialNow.plusHours(2));
+        ScheduledRunnable nextBackgroundInterpolation1 = ensureRunnable(initialNow.plusMinutes(40), initialNow.plusHours(2));
 
         // background interpolation: light is off -> updates
 
         mockIsLightOff(1, true);
 
         advanceTimeAndRunAndAssertPutCalls(nextBackgroundInterpolation1,
-                expectedPutCall(1).bri(52)
+                expectedPutCall(1).bri(67)
         );
 
-        ensureRunnable(initialNow.plusMinutes(36), initialNow.plusHours(2)); // background interpolation 2
+        ensureRunnable(initialNow.plusMinutes(41), initialNow.plusHours(2)); // background interpolation 2
     }
 
     @Test
@@ -6378,7 +6378,7 @@ class HueSchedulerTest {
         enableSupportForOffLightUpdates();
         addKnownLightIdsWithDefaultCapabilities(1);
         addState(1, "00:00", "bri:50");
-        addState(1, "01:00", "bri:60", "tr-before:5min");
+        addState(1, "01:00", "bri:100", "tr-before:5min");
 
         List<ScheduledRunnable> scheduledRunnables = startScheduler(
                 expectedRunnable(now, now.plusMinutes(55)),
@@ -6408,7 +6408,7 @@ class HueSchedulerTest {
         // first background interpolation: api failure -> retried
         doThrow(ApiFailure.class).when(mockedHueApi).putState(any());
         advanceTimeAndRunAndAssertPutCalls(followUpRunnables.getFirst(),
-                expectedPutCall(1).bri(52)
+                expectedPutCall(1).bri(60)
         );
 
         ScheduledRunnable retry = ensureRunnable(now.plusMinutes(1), initialNow.plusDays(1));
@@ -6416,26 +6416,26 @@ class HueSchedulerTest {
         resetMockedApi();
 
         advanceTimeAndRunAndAssertPutCalls(retry,
-                expectedPutCall(1).bri(54)
+                expectedPutCall(1).bri(70)
         );
 
         ScheduledRunnable nextBackgroundInterpolation1 = ensureRunnable(now.plusMinutes(1), initialNow.plusDays(1));
 
 
         advanceTimeAndRunAndAssertPutCalls(nextBackgroundInterpolation1,
-                expectedPutCall(1).bri(56)
+                expectedPutCall(1).bri(80)
         );
 
         ScheduledRunnable nextBackgroundInterpolation2 = ensureRunnable(now.plusMinutes(1), initialNow.plusDays(1));
 
         advanceTimeAndRunAndAssertPutCalls(nextBackgroundInterpolation2,
-                expectedPutCall(1).bri(58)
+                expectedPutCall(1).bri(90)
         );
 
         ScheduledRunnable nextBackgroundInterpolation3 = ensureRunnable(now.plusMinutes(1), initialNow.plusDays(1));
 
         advanceTimeAndRunAndAssertPutCalls(nextBackgroundInterpolation3,
-                expectedPutCall(1).bri(60)
+                expectedPutCall(1).bri(100)
         );
 
         // no further background interpolations scheduled

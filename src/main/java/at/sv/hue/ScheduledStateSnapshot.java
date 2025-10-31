@@ -3,6 +3,7 @@ package at.sv.hue;
 import at.sv.hue.api.PutCall;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import java.time.DayOfWeek;
 import java.time.Duration;
@@ -14,6 +15,7 @@ import java.util.function.Function;
 
 import static at.sv.hue.ScheduledState.MAX_TRANSITION_TIME_MS;
 
+@Slf4j
 @RequiredArgsConstructor
 public class ScheduledStateSnapshot {
     @Getter
@@ -312,15 +314,34 @@ public class ScheduledStateSnapshot {
         return getInterpolatedPutCallIfNeeded(now) != null;
     }
 
-    public ZonedDateTime getNextPropertyChangeTime(PutCall currentPutCall, ZonedDateTime now) {
-        StateInterpolator interpolator = getStateInterpolator(now, true);
-        if (interpolator == null) {
+    public ZonedDateTime getNextPropertyChangeTime(PutCall currentPutCall, ZonedDateTime now, int brightnessThreshold,
+                                                   int colorTemperatureThresholdKelvin, double colorThreshold) {
+        if (!hasTransitionBefore()) {
             return null;
+        }
+        ScheduledStateSnapshot previousState = getPreviousState();
+        if (previousState == null) {
+            return null;
+        }
+        if (isAlreadyReached(now)) {
+            return null; // the state is already reached
         }
         if (currentPutCall == null) {
             currentPutCall = getInterpolatedFullPicturePutCall(now);
         }
-        return interpolator.getNextPropertyChangeTime(currentPutCall);
+        ZonedDateTime nextTime = now.truncatedTo(ChronoUnit.MINUTES).plusMinutes(1);
+        ZonedDateTime endTime = getDefinedStart();
+        while (nextTime.isBefore(endTime)) {
+            StateInterpolator futureInterpolator = new StateInterpolator(this, previousState, nextTime, true);
+            PutCall future = futureInterpolator.getInterpolatedPutCall();
+            if (currentPutCall.hasNotSimilarLightState(future, brightnessThreshold, colorTemperatureThresholdKelvin, colorThreshold)) {
+                log.trace("Next property change for state {} at {}: {}. Current: {}", getId(),
+                        DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(nextTime), future, currentPutCall);
+                return nextTime;
+            }
+            nextTime = nextTime.plusMinutes(1);
+        }
+        return endTime; // Ensure last update at the end time
     }
 
     public void recordLastPutCall(PutCall putCall) {

@@ -2,6 +2,7 @@ package at.sv.hue.api;
 
 import at.sv.hue.ColorMode;
 import at.sv.hue.FormatUtil;
+import at.sv.hue.color.ColorComparator;
 import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -104,5 +105,55 @@ public final class PutCall {
                Objects.equals(this.x, other.x) &&
                Objects.equals(this.y, other.y) &&
                Objects.equals(this.ct, other.ct);
+    }
+
+    public boolean hasNotSimilarLightState(PutCall other, int brightnessThreshold,
+                                            int colorTemperatureThresholdKelvin,
+                                            double colorThreshold) {
+        if (other == null) {
+            return false;
+        }
+        return !Objects.equals(this.on, other.on) ||
+               brightnessIsNotSimilar(this.bri, other.bri, brightnessThreshold) ||
+               !Objects.equals(this.hue, other.hue) ||
+               !Objects.equals(this.sat, other.sat) ||
+               !Objects.equals(this.effect, other.effect) ||
+               colorIsNotSimilar(this, other, colorThreshold) ||
+               ctIsNotSimilar(this.ct, other.ct, colorTemperatureThresholdKelvin);
+    }
+
+    private boolean brightnessIsNotSimilar(Integer bri1, Integer bri2, int threshold) {
+        if (Objects.equals(bri1, bri2)) {
+            return false;
+        }
+        if (bri1 == null || bri2 == null) {
+            return true;
+        }
+        return Math.abs(bri1 - bri2) >= threshold;
+    }
+
+    private boolean colorIsNotSimilar(PutCall call1, PutCall call2, double threshold) {
+        // Only compare if both have x/y values set
+        if (call1.x == null || call1.y == null || call2.x == null || call2.y == null) {
+            return !Objects.equals(call1.x, call2.x) || !Objects.equals(call1.y, call2.y);
+        }
+        return ColorComparator.colorDiffers(
+                call1.x, call1.y, call2.x, call2.y, call1.gamut, threshold);
+    }
+
+    private boolean ctIsNotSimilar(Integer ct1, Integer ct2, int thresholdKelvin) {
+        if (Objects.equals(ct1, ct2)) {
+            return false;
+        }
+        if (ct1 == null || ct2 == null) {
+            return true;
+        }
+        int kelvin1 = convertToKelvin(ct1);
+        int kelvin2 = convertToKelvin(ct2);
+        return Math.abs(kelvin1 - kelvin2) >= thresholdKelvin;
+    }
+
+    private int convertToKelvin(int mired) {
+        return 1_000_000 / mired;
     }
 }

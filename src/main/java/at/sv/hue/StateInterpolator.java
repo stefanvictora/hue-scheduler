@@ -188,21 +188,4 @@ public final class StateInterpolator {
     private static boolean shouldReturnPrevious(Object target, boolean previousPropertiesForNullTargets) {
         return target == null && previousPropertiesForNullTargets;
     }
-
-    public ZonedDateTime getNextPropertyChangeTime(PutCall current) {
-        if (state.isAlreadyReached(dateTime)) {
-            return null; // the state is already reached
-        }
-        ZonedDateTime nextTime = dateTime.truncatedTo(ChronoUnit.MINUTES).plusMinutes(1);
-        ZonedDateTime endTime = state.getDefinedStart();
-        while (nextTime.isBefore(endTime)) {
-            StateInterpolator futureInterpolator = new StateInterpolator(state, previousState, nextTime, keepPreviousPropertiesForNullTargets);
-            PutCall future = futureInterpolator.getInterpolatedPutCall();
-            if (future != null && !current.hasSameLightState(future)) { // todo: use thresholds for difference comparison
-                return nextTime;
-            }
-            nextTime = nextTime.plusMinutes(1);
-        }
-        return endTime; // Ensure last update at the end time
-    }
 }
