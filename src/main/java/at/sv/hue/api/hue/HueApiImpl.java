@@ -77,6 +77,7 @@ public final class HueApiImpl implements HueApi {
         mapper = new ObjectMapper();
         mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+        mapper.setDefaultMergeable(true);
         assertNotHttpSchemeProvided(host);
         baseApi = "https://" + host + "/clip/v2/resource";
         this.rateLimiter = rateLimiter;
@@ -685,13 +686,10 @@ public final class HueApiImpl implements HueApi {
             resources.remove(id);
             return;
         }
-
         T resource = resources.get(id);
         if (resource == null) {
             resource = mapper.treeToValue(update, targetType);
-            if (resource != null) {
-                resources.put(id, resource);
-            }
+            resources.put(id, resource);
             return;
         }
         mapper.readerForUpdating(resource).readValue(update.traverse(mapper));
@@ -699,14 +697,19 @@ public final class HueApiImpl implements HueApi {
 
     private void invalidateCache(String type) {
         switch (type) {
-            case "light" -> availableLightsCache.synchronous().invalidateAll();
-            case "grouped_light" -> availableGroupedLightsCache.synchronous().invalidateAll();
-            case "scene" -> availableScenesCache.synchronous().invalidateAll();
-            case "device" -> availableDevicesCache.synchronous().invalidateAll();
-            case "zone" -> availableZonesCache.synchronous().invalidateAll();
-            case "room" -> availableRoomsCache.synchronous().invalidateAll();
-            case "zigbee_connectivity" -> availableZigbeeConnectivityCache.synchronous().invalidateAll();
+            case "light" -> invalidate(availableLightsCache);
+            case "grouped_light" -> invalidate(availableGroupedLightsCache);
+            case "scene" -> invalidate(availableScenesCache);
+            case "device" -> invalidate(availableDevicesCache);
+            case "zone" -> invalidate(availableZonesCache);
+            case "room" -> invalidate(availableRoomsCache);
+            case "zigbee_connectivity" -> invalidate(availableZigbeeConnectivityCache);
         }
+        log.trace("Invalidated {} cache.", type);
+    }
+
+    private void invalidate(AsyncLoadingCache<String, ?> availableLightsCache) {
+        availableLightsCache.synchronous().invalidateAll();
     }
 
     private interface DataListContainer<T> {

@@ -1,6 +1,8 @@
 package at.sv.hue.api.hue;
 
 import at.sv.hue.api.GroupNotFoundException;
+import com.fasterxml.jackson.annotation.JsonMerge;
+import com.fasterxml.jackson.annotation.OptBoolean;
 import lombok.Data;
 
 import java.util.List;
@@ -10,7 +12,9 @@ final class Group implements Resource {
     String id;
     String id_v1;
     Metadata metadata;
+    @JsonMerge(OptBoolean.FALSE)
     List<ResourceReference> children;
+    @JsonMerge(OptBoolean.FALSE)
     List<ResourceReference> services;
     String type;
 
