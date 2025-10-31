@@ -1,5 +1,7 @@
 package at.sv.hue.api.hue;
 
+import com.fasterxml.jackson.annotation.JsonMerge;
+import com.fasterxml.jackson.annotation.OptBoolean;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -14,6 +16,7 @@ final class Scene implements Resource {
     String id_v1;
     Metadata metadata;
     ResourceReference group;
+    @JsonMerge(OptBoolean.FALSE)
     List<SceneAction> actions;
     String type;
 

@@ -93,14 +93,14 @@ class HueApiTest {
 
     @Test
     void getState_lightNotFound_exception() {
-        when(resourceProviderMock.getResource(getUrl("/light/ABCD-1234"))).thenThrow(new ResourceNotFoundException(""));
+        when(resourceProviderMock.getResource(getUrl("/light"))).thenThrow(new ResourceNotFoundException(""));
 
         assertThrows(ResourceNotFoundException.class, () -> getLightState("ABCD-1234"));
     }
 
     @Test
     void getState_returnsLightState_effectActive_callsCorrectApiURL() {
-        setGetResponse("/light/9a40e007-8d76-4954-ba88-0f52444b7df6", """
+        setGetResponse("/light", """
                 {
                   "errors": [],
                   "data": [
@@ -216,7 +216,7 @@ class HueApiTest {
 
     @Test
     void getState_differentResult_colorTemperatureActive_correctState() {
-        setGetResponse("/light/9d8378df-fa1b-4988-b9d1-2ba568143116", """
+        setGetResponse("/light", """
                 {
                   "errors": [],
                   "data": [
@@ -338,7 +338,7 @@ class HueApiTest {
 
     @Test
     void getState_whiteBulbOnly_noOnProperty_treatedAsOff_noNullPointerException() {
-        setGetResponse("/light/94eb9b65-f310-4c31-907a-89da8ef7ccdd", """
+        setGetResponse("/light", """
                 {
                   "errors": [],
                   "data": [
@@ -406,7 +406,7 @@ class HueApiTest {
 
     @Test
     void getState_onOffBulbOnly_noNullPointerException() {
-        setGetResponse("/light/426ab1f6-c27f-42ba-b18d-0783665b4e21", """
+        setGetResponse("/light", """
                 {
                   "errors": [],
                   "data": [
@@ -463,7 +463,7 @@ class HueApiTest {
 
     @Test
     void getState_onOffBulbOnly_isUnavailable_correctlySet() {
-        setGetResponse("/light/unavailable_light", """
+        setGetResponse("/light", """
                 {
                   "errors": [],
                   "data": [
@@ -505,7 +505,7 @@ class HueApiTest {
                     }
                   ]
                 }""");
-        setGetResponse("/zigbee_connectivity/zigbee_id", """
+        setGetResponse("/zigbee_connectivity", """
                 {
                   "errors": [],
                   "data": [
@@ -2687,7 +2687,7 @@ class HueApiTest {
 
     @Test
     void isLightOff_stateIsOn_false() {
-        setGetResponse("/light/426ab1f6-c27f-42ba-b18d-0783665b4e21", """
+        setGetResponse("/light", """
                 {
                   "errors": [],
                   "data": [
@@ -2717,7 +2717,7 @@ class HueApiTest {
 
     @Test
     void isLightOff_stateIsOff_true() {
-        setGetResponse("/light/631f8419-1b41-495a-9708-81d679644b07", """
+        setGetResponse("/light", """
                 {
                   "errors": [],
                   "data": [
@@ -2813,7 +2813,7 @@ class HueApiTest {
 //                    }
 //                  ]
 //                }""");
-        setGetResponse("/grouped_light/eeb336d9-243b-4756-8455-1c69f50efd31", """
+        setGetResponse("/grouped_light", """
                 {
                     "errors": [],
                     "data": [
@@ -2868,7 +2868,7 @@ class HueApiTest {
 //                    }
 //                  ]
 //                }""");
-        setGetResponse("/grouped_light/b3bd0551-312f-4b6d-bf87-432e5ef56b69", """
+        setGetResponse("/grouped_light", """
                 {
                   "errors": [],
                   "data": [

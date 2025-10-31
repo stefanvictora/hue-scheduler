@@ -19,12 +19,14 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.benmanes.caffeine.cache.AsyncLoadingCache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.net.MalformedURLException;
@@ -49,6 +51,14 @@ import java.util.stream.Stream;
 @Slf4j
 public final class HueApiImpl implements HueApi {
 
+    private static final String CACHE_KEY_LIGHTS = "allLights";
+    private static final String CACHE_KEY_DEVICES = "allDevices";
+    private static final String CACHE_KEY_GROUPED_LIGHTS = "allGroupedLights";
+    private static final String CACHE_KEY_SCENES = "allScenes";
+    private static final String CACHE_KEY_ZONES = "allZones";
+    private static final String CACHE_KEY_ROOMS = "allRooms";
+    private static final String CACHE_KEY_ZIGBEE_CONNECTIVITY = "allZigbeeConnectivity";
+
     private final HttpResourceProvider resourceProvider;
     private final ObjectMapper mapper;
     private final String baseApi;
@@ -59,6 +69,7 @@ public final class HueApiImpl implements HueApi {
     private final AsyncLoadingCache<String, Map<String, Scene>> availableScenesCache;
     private final AsyncLoadingCache<String, Map<String, Group>> availableZonesCache;
     private final AsyncLoadingCache<String, Map<String, Group>> availableRoomsCache;
+    private final AsyncLoadingCache<String, Map<String, ZigbeeConnectivity>> availableZigbeeConnectivityCache;
 
     public HueApiImpl(HttpResourceProvider resourceProvider, String host, RateLimiter rateLimiter,
                       int apiCacheInvalidationIntervalInMinutes) {
@@ -66,6 +77,7 @@ public final class HueApiImpl implements HueApi {
         mapper = new ObjectMapper();
         mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+        mapper.setDefaultMergeable(true);
         assertNotHttpSchemeProvided(host);
         baseApi = "https://" + host + "/clip/v2/resource";
         this.rateLimiter = rateLimiter;
@@ -75,6 +87,7 @@ public final class HueApiImpl implements HueApi {
         availableScenesCache = createCache(this::lookupScenes, apiCacheInvalidationIntervalInMinutes);
         availableZonesCache = createCache(this::lookupZones, apiCacheInvalidationIntervalInMinutes);
         availableRoomsCache = createCache(this::lookupRooms, apiCacheInvalidationIntervalInMinutes);
+        availableZigbeeConnectivityCache = createCache(this::lookupZigbeeConnectivity, apiCacheInvalidationIntervalInMinutes);
     }
 
     private static void assertNotHttpSchemeProvided(String host) {
@@ -84,7 +97,7 @@ public final class HueApiImpl implements HueApi {
     }
 
     private static <T> AsyncLoadingCache<String, Map<String, T>> createCache(Supplier<Map<String, T>> supplier,
-                                                                        int apiCacheInvalidationIntervalInMinutes) {
+                                                                             int apiCacheInvalidationIntervalInMinutes) {
         return Caffeine.newBuilder()
                        .refreshAfterWrite(Duration.ofMinutes(apiCacheInvalidationIntervalInMinutes))
                        .expireAfterWrite(Duration.ofMinutes(apiCacheInvalidationIntervalInMinutes * 2L))
@@ -140,37 +153,35 @@ public final class HueApiImpl implements HueApi {
 
     @Override
     public LightState getLightState(String lightId) {
-        Light light = lookupLight(lightId);
-        return light.getLightState(isUnavailable(light, this::lookupZigbeeConnectivity));
+        Light light = getAndAssertLightExists(lightId);
+        return light.getLightState(isUnavailable(light));
     }
 
     @Override
     public List<LightState> getGroupStates(String groupedLightId) {
-        Map<String, Light> currentLights = lookupLights();
-        Map<String, ZigbeeConnectivity> connectivity = lookupZigbeeConnectivity();
+        Map<String, Light> currentLights = getAvailableLights();
         return getGroupLights(groupedLightId).stream()
-                                             .map(lightId -> getLightState(currentLights, connectivity, lightId))
+                                             .map(lightId -> getLightState(currentLights, lightId))
                                              .filter(Objects::nonNull)
                                              .collect(Collectors.toList());
     }
 
-    private LightState getLightState(Map<String, Light> lights, Map<String, ZigbeeConnectivity> connectivity,
-                                     String lightId) {
+    private LightState getLightState(Map<String, Light> lights, String lightId) {
         Light light = lights.get(lightId);
         if (light == null) {
             return null;
         }
-        return light.getLightState(isUnavailable(light, connectivity::get));
+        return light.getLightState(isUnavailable(light));
     }
 
-    private boolean isUnavailable(Light light, Function<String, ZigbeeConnectivity> lookupZigbeeConnectivity) {
+    private boolean isUnavailable(Light light) {
         String owner = light.getOwner().getRid();
-        Device device = getAvailableDevices().get(owner);
+        Device device = getDevice(owner);
         if (device == null) {
             return false;
         }
         return device.getZigbeeConnectivityResource()
-                     .map(lookupZigbeeConnectivity)
+                     .map(this::getZigbeeConnectivity)
                      .map(ZigbeeConnectivity::isUnavailable)
                      .orElse(false);
     }
@@ -190,7 +201,7 @@ public final class HueApiImpl implements HueApi {
 
     @Override
     public boolean isGroupOff(String groupedLightId) {
-        return lookupGroupedLight(groupedLightId).isOff();
+        return getAndAssertGroupedLightExists(groupedLightId).isOff();
     }
 
     @Override
@@ -317,12 +328,10 @@ public final class HueApiImpl implements HueApi {
             Scene newScene = new Scene(sceneSyncName, group.toResourceReference(), actions);
             String response = createScene(newScene);
             log.trace("Created scene: {}", response != null ? response.trim() : "");
-            availableScenesCache.synchronous().invalidateAll();
         } else if (actionsDiffer(existingScene, actions)) {
             Scene updatedScene = new Scene(actions);
             String response = updateScene(existingScene, updatedScene);
             log.trace("Updated scene: {}", response != null ? response.trim() : "");
-            availableScenesCache.synchronous().invalidateAll();
         }
     }
 
@@ -451,8 +460,10 @@ public final class HueApiImpl implements HueApi {
             if (resourceReference.isLight()) {
                 containedLights.add(resourceReference);
             } else if (resourceReference.isDevice()) {
-                Device device = getAvailableDevices().get(resourceReference.getRid());
-                containedLights.addAll(device.getLightResources());
+                Device device = getDevice(resourceReference.getRid());
+                if (device != null) {
+                    containedLights.addAll(device.getLightResources());
+                }
             }
         }
         return containedLights;
@@ -507,11 +518,11 @@ public final class HueApiImpl implements HueApi {
     }
 
     private Map<String, Light> getAvailableLights() {
-        return availableLightsCache.synchronous().get("allLights");
+        return availableLightsCache.synchronous().get(CACHE_KEY_LIGHTS);
     }
 
     private Map<String, Light> getAvailableGroupedLights() {
-        return availableGroupedLightsCache.synchronous().get("allGroupedLights");
+        return availableGroupedLightsCache.synchronous().get(CACHE_KEY_GROUPED_LIGHTS);
     }
 
     private Map<String, Group> getAvailableGroups() {
@@ -523,39 +534,36 @@ public final class HueApiImpl implements HueApi {
     }
 
     private Map<String, Scene> getAvailableScenes() {
-        return availableScenesCache.synchronous().get("allScenes");
+        return availableScenesCache.synchronous().get(CACHE_KEY_SCENES);
     }
 
     private Map<String, Device> getAvailableDevices() {
-        return availableDevicesCache.synchronous().get("allDevices");
+        return availableDevicesCache.synchronous().get(CACHE_KEY_DEVICES);
     }
 
     private Map<String, Group> getAvailableZones() {
-        return availableZonesCache.synchronous().get("allZones");
+        return availableZonesCache.synchronous().get(CACHE_KEY_ZONES);
     }
 
     private Map<String, Group> getAvailableRooms() {
-        return availableRoomsCache.synchronous().get("allRooms");
+        return availableRoomsCache.synchronous().get(CACHE_KEY_ROOMS);
     }
 
-    private Light lookupGroupedLight(String id) {
-        return lookup("/grouped_light/" + id, new TypeReference<LightResponse>() {
-        }, Light::getId).get(id);
+    private Map<String, ZigbeeConnectivity> getAvailableZigbeeConnectivity() {
+        return availableZigbeeConnectivityCache.synchronous().get(CACHE_KEY_ZIGBEE_CONNECTIVITY);
+    }
+
+    private Device getDevice(String deviceId) {
+        return getAvailableDevices().get(deviceId);
+    }
+
+    private ZigbeeConnectivity getZigbeeConnectivity(String connectivityId) {
+        return getAvailableZigbeeConnectivity().get(connectivityId);
     }
 
     private Map<String, Light> lookupGroupedLights() {
         return lookup("/grouped_light", new TypeReference<LightResponse>() {
         }, Light::getId);
-    }
-
-    private Light lookupLight(String id) {
-        return lookup("/light/" + id, new TypeReference<LightResponse>() {
-        }, Light::getId).get(id);
-    }
-
-    private ZigbeeConnectivity lookupZigbeeConnectivity(String id) {
-        return lookup("/zigbee_connectivity/" + id, new TypeReference<ZigbeeConnectivityResponse>() {
-        }, ZigbeeConnectivity::getId).get(id);
     }
 
     private Map<String, Light> lookupLights() {
@@ -594,7 +602,7 @@ public final class HueApiImpl implements HueApi {
         String response = resourceProvider.getResource(createUrl(endpoint));
         try {
             C container = mapper.readValue(response, typeReference);
-            return container.getData().stream().collect(Collectors.toMap(idFunction, Function.identity()));
+            return container.getData().stream().collect(Collectors.toConcurrentMap(idFunction, Function.identity()));
         } catch (Exception e) {
             throw new ApiFailure("Failed to parse response '" + response + "': " + e.getLocalizedMessage());
         }
@@ -639,15 +647,69 @@ public final class HueApiImpl implements HueApi {
 
     @Override
     public void onModification(String type, String id, Object content) {
-        // todo: maybe switch to different caching logic so we can invalidate individual entries instead of the full cache
-        switch (type) {
-            case "light" -> availableLightsCache.synchronous().invalidateAll();
-            case "grouped_light" -> availableGroupedLightsCache.synchronous().invalidateAll();
-            case "scene" -> availableScenesCache.synchronous().invalidateAll();
-            case "device" -> availableDevicesCache.synchronous().invalidateAll();
-            case "zone" -> availableZonesCache.synchronous().invalidateAll();
-            case "room" -> availableRoomsCache.synchronous().invalidateAll();
+        if (type == null || id == null) {
+            return;
         }
+        if (content != null && !(content instanceof JsonNode)) {
+            invalidateCache(type);
+            return;
+        }
+        JsonNode update = (JsonNode) content;
+        try {
+            switch (type) {
+                case "light" -> updateResourceCache(availableLightsCache, CACHE_KEY_LIGHTS, id, update, Light.class);
+                case "grouped_light" ->
+                        updateResourceCache(availableGroupedLightsCache, CACHE_KEY_GROUPED_LIGHTS, id, update, Light.class);
+                case "scene" -> updateResourceCache(availableScenesCache, CACHE_KEY_SCENES, id, update, Scene.class);
+                case "device" ->
+                        updateResourceCache(availableDevicesCache, CACHE_KEY_DEVICES, id, update, Device.class);
+                case "zone" -> updateResourceCache(availableZonesCache, CACHE_KEY_ZONES, id, update, Group.class);
+                case "room" -> updateResourceCache(availableRoomsCache, CACHE_KEY_ROOMS, id, update, Group.class);
+                case "zigbee_connectivity" ->
+                        updateResourceCache(availableZigbeeConnectivityCache, CACHE_KEY_ZIGBEE_CONNECTIVITY, id, update, ZigbeeConnectivity.class);
+                default -> {
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Failed to apply {} update for {}: {}", type, id, e.getMessage());
+            invalidateCache(type);
+        }
+    }
+
+    private <T> void updateResourceCache(AsyncLoadingCache<String, Map<String, T>> cache, String cacheKey, String id,
+                                         JsonNode update, Class<T> targetType) throws IOException {
+        Map<String, T> resources = cache.synchronous().getIfPresent(cacheKey);
+        if (resources == null) {
+            return;
+        }
+        if (update == null || update.isNull()) {
+            resources.remove(id);
+            return;
+        }
+        T resource = resources.get(id);
+        if (resource == null) {
+            resource = mapper.treeToValue(update, targetType);
+            resources.put(id, resource);
+            return;
+        }
+        mapper.readerForUpdating(resource).readValue(update.traverse(mapper));
+    }
+
+    private void invalidateCache(String type) {
+        switch (type) {
+            case "light" -> invalidate(availableLightsCache);
+            case "grouped_light" -> invalidate(availableGroupedLightsCache);
+            case "scene" -> invalidate(availableScenesCache);
+            case "device" -> invalidate(availableDevicesCache);
+            case "zone" -> invalidate(availableZonesCache);
+            case "room" -> invalidate(availableRoomsCache);
+            case "zigbee_connectivity" -> invalidate(availableZigbeeConnectivityCache);
+        }
+        log.trace("Invalidated {} cache.", type);
+    }
+
+    private void invalidate(AsyncLoadingCache<String, ?> availableLightsCache) {
+        availableLightsCache.synchronous().invalidateAll();
     }
 
     private interface DataListContainer<T> {

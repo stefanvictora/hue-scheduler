@@ -3,7 +3,6 @@ package at.sv.hue.api.hue;
 import at.sv.hue.api.LightEventListener;
 import at.sv.hue.api.ResourceModificationEventListener;
 import at.sv.hue.api.SceneEventListener;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -13,13 +12,8 @@ import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 
-import java.util.ArrayList;
-import java.util.List;
-
 @Slf4j
 public final class HueEventHandler implements BackgroundEventHandler {
-    private static final TypeReference<List<HueEventContainer>> typeRef = new TypeReference<>() {
-    };
     private final LightEventListener lightEventListener;
     private final SceneEventListener sceneEventListener;
     private final ResourceModificationEventListener resourceModificationEventListener;
@@ -50,9 +44,22 @@ public final class HueEventHandler implements BackgroundEventHandler {
 
     @Override
     public void onMessage(String event, MessageEvent messageEvent) throws Exception {
-        List<HueEventContainer> hueEventContainers = objectMapper.readValue(messageEvent.getData(), typeRef);
-        for (HueEventContainer container : hueEventContainers) {
-            for (HueEvent hueEvent : container.getData()) {
+        JsonNode containers = objectMapper.readTree(messageEvent.getData());
+        if (!containers.isArray()) {
+            return;
+        }
+        for (JsonNode containerNode : containers) {
+            String containerType = containerNode.path("type").asText(null);
+            JsonNode data = containerNode.path("data");
+            if (!data.isArray()) {
+                continue;
+            }
+            for (JsonNode resourceNode : data) {
+                HueEvent hueEvent = objectMapper.treeToValue(resourceNode, HueEvent.class);
+                if (shouldFireModificationTrackingEvent(hueEvent, containerType)) {
+                    resourceModificationEventListener.onModification(hueEvent.getType(), hueEvent.getId(),
+                            getContent(containerType, resourceNode));
+                }
                 if (hueEvent.isLightOrGroup() && hueEvent.isOffEvent()) {
                     lightEventListener.onLightOff(hueEvent.getId());
                 } else if (hueEvent.isLightOrGroup() && hueEvent.isOnEvent()) {
@@ -64,19 +71,8 @@ public final class HueEventHandler implements BackgroundEventHandler {
                 } else if (hueEvent.isScene() && hueEvent.isSceneActivated()) {
                     sceneEventListener.onSceneActivated(hueEvent.getId());
                 }
-
-                if ("update".equals(container.type)) {
-                    if (isNotRelevantForUpdate(hueEvent.type) || hueEvent.notRelevantSceneModification()) {
-                        continue;
-                    }
-                }
-                resourceModificationEventListener.onModification(hueEvent.getType(), hueEvent.getId(), null);
             }
         }
-    }
-
-    private static boolean isNotRelevantForUpdate(String type) {
-        return "light".equals(type) || "grouped_light".equals(type) || "device".equals(type);
     }
 
     @Override
@@ -90,12 +86,16 @@ public final class HueEventHandler implements BackgroundEventHandler {
         MDC.remove("context");
     }
 
-    @Data
-    private static final class HueEventContainer {
-        private String creationtime;
-        private List<HueEvent> data = new ArrayList<>();
-        private String id;
-        private String type;
+    private static boolean shouldFireModificationTrackingEvent(HueEvent hueEvent, String containerType) {
+        return hueEvent.getType() != null && hueEvent.getId() != null &&
+               !("update".equals(containerType) && hueEvent.notRelevantSceneModification());
+    }
+
+    private static Object getContent(String containerType, JsonNode resourceNode) {
+        if ("delete".equals(containerType)) {
+            return null;
+        }
+        return resourceNode;
     }
 
     @Data
@@ -162,7 +162,7 @@ public final class HueEventHandler implements BackgroundEventHandler {
         }
 
         public boolean notRelevantSceneModification() {
-            return isScene() && actions==null && metadata==null;
+            return isScene() && actions == null && metadata == null;
         }
 
         @Data

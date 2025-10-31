@@ -4,12 +4,15 @@ import at.sv.hue.api.LightEventListener;
 import at.sv.hue.api.ResourceModificationEventListener;
 import at.sv.hue.api.SceneEventListener;
 import com.launchdarkly.eventsource.MessageEvent;
+import org.hamcrest.Matcher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -343,7 +346,10 @@ class HueEventHandlerTest {
                 ]"""));
 
         verify(lightEventListener).onLightOff("cecb9d02-acd5-4aff-b46d-330f614dd1fb");
-        verifyNoInteractions(resourceModificationEventListener);
+        verifyResourceModification("grouped_light", "14871193-d3a9-4f09-9e7b-9ffacd616799");
+        verifyResourceModification("grouped_light", "cecb9d02-acd5-4aff-b46d-330f614dd1fb");
+
+        verifyNoMoreInteractions(resourceModificationEventListener);
     }
 
     @Test
@@ -417,8 +423,15 @@ class HueEventHandlerTest {
 
         verify(lightEventListener).onLightOff("d37eb9c4-d7eb-42ee-9a13-fa9148f8d403");
         verify(lightEventListener).onLightOn("db1d8ea4-d55d-47bd-b741-aa9d6ac0f0e7");
+        verifyResourceModification("light", "d37eb9c4-d7eb-42ee-9a13-fa9148f8d403");
+        verify(resourceModificationEventListener, times(3)).onModification(
+                eq("light"),
+                eq("db1d8ea4-d55d-47bd-b741-aa9d6ac0f0e7"),
+                isNotNull()
+        );
+
         verifyNoMoreInteractions(lightEventListener);
-        verifyNoInteractions(resourceModificationEventListener);
+        verifyNoMoreInteractions(resourceModificationEventListener);
     }
 
     @Test
@@ -518,9 +531,9 @@ class HueEventHandlerTest {
                 ]
                 """));
 
-        verifyResourceModification("grouped_light", "d74f17b1-bc07-4a13-9986-1e5c95860e17");
-        verifyResourceModification("light", "db1d8ea4-d55d-47bd-b741-aa9d6ac0f0e7");
-        verifyResourceModification("zone", "5cee5b29-9feb-4682-8641-7426066e5ba7");
+        verifyResourceRemoval("grouped_light", "d74f17b1-bc07-4a13-9986-1e5c95860e17");
+        verifyResourceRemoval("light", "db1d8ea4-d55d-47bd-b741-aa9d6ac0f0e7");
+        verifyResourceRemoval("zone", "5cee5b29-9feb-4682-8641-7426066e5ba7");
 
         verifyNoMoreInteractions(resourceModificationEventListener);
         verifyNoInteractions(lightEventListener);
@@ -669,7 +682,7 @@ class HueEventHandlerTest {
                   }
                 ]"""));
 
-        verifyResourceModification("scene", "46e3fb34-1f88-4b0f-b138-e8466b76928d");
+        verifyResourceRemoval("scene", "46e3fb34-1f88-4b0f-b138-e8466b76928d");
 
         verifyNoMoreInteractions(resourceModificationEventListener);
         verifyNoInteractions(lightEventListener);
@@ -708,7 +721,7 @@ class HueEventHandlerTest {
     }
 
     @Test
-    void onMessage_sceneActivated_noResourceModification() throws Exception {
+    void onMessage_sceneActivated_noSceneResourceModification_justLights() throws Exception {
         handler.onMessage("", new MessageEvent("""
                 [
                   {
@@ -795,14 +808,17 @@ class HueEventHandlerTest {
                 ]"""));
 
         verify(sceneEventListener).onSceneActivated("3010f4a4-e1f8-42e7-825b-035f36d2ad81");
-
+        verifyResourceModification("light", "1aa6083d-3692-49e5-92f7-b926b302dd49");
+        verifyResourceModification("light", "5b09ad56-a4bf-4f8a-b978-ad152c6e7751");
+        verifyResourceModification("grouped_light", "1b03060d-1c90-4bb5-92ea-529586aa285b");
+        
         verifyNoMoreInteractions(sceneEventListener);
         verifyNoInteractions(lightEventListener);
-        verifyNoInteractions(resourceModificationEventListener);
+        verifyNoMoreInteractions(resourceModificationEventListener);
     }
 
     @Test
-    void onMessage_addLightToZone_detectsResourceModification_zoneAndScene() throws Exception {
+    void onMessage_addLightToZone_detectsResourceModification() throws Exception {
         handler.onMessage("", new MessageEvent("""
                 [
                   {
@@ -922,13 +938,14 @@ class HueEventHandlerTest {
 
         verifyResourceModification("zone", "75ee4e3b-cacb-4b87-923b-d11d2480e8ff");
         verifyResourceModification("scene", "f6b7b1ee-31e1-4a24-b848-376a5dd6e2d4");
+        verifyResourceModification("grouped_light", "eeb336d9-243b-4756-8455-1c69f50efd31");
 
         verifyNoMoreInteractions(resourceModificationEventListener);
         verifyNoInteractions(sceneEventListener);
     }
 
     @Test
-    void onMessage_deviceRenamed_noModificationDetected() throws Exception {
+    void onMessage_deviceRenamed_detectsModification() throws Exception {
         handler.onMessage("", new MessageEvent("""
                 [
                   {
@@ -948,10 +965,24 @@ class HueEventHandlerTest {
                   }
                 ]"""));
 
-        verifyNoInteractions(resourceModificationEventListener);
+        verifyResourceModification("device", "23e0ec8f-f096-4e9c-a6d5-4d7efe98ace6");
+
+        verifyNoMoreInteractions(resourceModificationEventListener);
     }
 
     private void verifyResourceModification(String type, String id) {
-        verify(resourceModificationEventListener).onModification(type, id, null);
+        verifyResourceModification(type, id, notNullValue());
+    }
+
+    private void verifyResourceRemoval(String type, String id) {
+        verifyResourceModification(type, id, nullValue());
+    }
+
+    private <T> void verifyResourceModification(String type, String id, Matcher<T> contentMatcher) {
+        verify(resourceModificationEventListener).onModification(
+                eq(type),
+                eq(id),
+                argThat(contentMatcher::matches)
+        );
     }
 }
