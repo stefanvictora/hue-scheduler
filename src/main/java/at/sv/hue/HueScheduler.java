@@ -692,7 +692,7 @@ public final class HueScheduler implements Runnable {
     }
 
     private boolean shouldPerformBackgroundInterpolation(ScheduledStateSnapshot state, ZonedDateTime now) {
-        return supportsOffLightUpdates && !state.isTemporary() && state.performsInterpolation(now);
+        return supportsOffLightUpdates && !requireSceneActivation && !state.isTemporary() && state.performsInterpolation(now);
     }
 
     private boolean shouldSyncScene(ScheduledStateSnapshot state) {

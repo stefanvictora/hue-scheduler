@@ -6430,6 +6430,68 @@ class HueSchedulerTest {
     }
 
     @Test
+    void run_execution_lightIsOff_apiAllowsOffUpdates_interpolation_requireSceneActivation_notApplied() {
+        requireSceneActivation();
+        enableSupportForOffLightUpdates();
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, "00:00", "bri:50");
+        addState(1, "01:00", "bri:100", "tr-before:30min");
+        addState(1, "02:00", "bri:150");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(30)),
+                expectedRunnable(now.plusMinutes(30), now.plusHours(2)),
+                expectedRunnable(now.plusHours(2), now.plusDays(1))
+        );
+
+        // Normal light state, no scene activation, ignored
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst());
+
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(30)); // next day
+
+        // Light is off for interpolated state, no scene activation still ignored
+
+        mockIsLightOff(1, true);
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(1));
+
+        // no background interpolation scheduled
+        ensureRunnable(initialNow.plusDays(1).plusMinutes(30), initialNow.plusDays(1).plusHours(2)); // next day
+
+        // simulate light turn off after time passing
+
+        setCurrentTimeTo(initialNow.plusMinutes(55));
+
+        simulateLightOffEvent("/lights/1");
+        List<ScheduledRunnable> powerOffRunnables = ensureScheduledStates(
+                expectedPowerOnEnd(initialNow.plusMinutes(30)), // already ended
+                expectedPowerOnEnd(initialNow.plusHours(2))
+        );
+        advanceTimeAndRunAndAssertPutCalls(powerOffRunnables.get(1)); // no scene activation, ignored
+
+        mockIsLightOff(1, false);
+        simulateSyncedSceneActivated("/groups/another", "/lights/1");
+
+        ScheduledRunnable sceneRunnable = ensureScheduledStates(
+                expectedPowerOnEnd(initialNow.plusHours(2))
+        ).getFirst();
+
+        // turn on synced scene -> applied normally
+
+        advanceTimeAndRunAndAssertPutCalls(sceneRunnable,
+                expectedPutCall(1).bri(100).transitionTime(tr("5min"))
+        );
+        
+        // next state applied normally again (turned on by synced scene flag still activate)
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(2),
+                expectedPutCall(1).bri(150)
+        );
+
+        ensureRunnable(initialNow.plusDays(1).plusHours(2), initialNow.plusDays(2)); // next day
+    }
+
+    @Test
     void run_execution_groupIsOff_doesNotMakeAnyCalls_unlessStateHasOnProperty() {
         mockGroupLightsForId(1, 1, 2);
         mockDefaultGroupCapabilities(1);
