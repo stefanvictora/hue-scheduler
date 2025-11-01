@@ -13,22 +13,29 @@ import java.util.function.Predicate;
 public class LightEventListenerImpl implements LightEventListener {
 
     private final ManualOverrideTracker manualOverrideTracker;
-    private final ConcurrentHashMap<String, CopyOnWriteArrayList<Runnable>> onStateWaitingList;
+    private final ConcurrentHashMap<String, CopyOnWriteArrayList<Runnable>> powerTransitionWaitingList;
     private final Function<String, List<String>> affectedIdsByDeviceLookup;
     private final Predicate<String> wasRecentlyAffectedBySyncedScene;
+    private final boolean supportsOffLightUpdates;
 
     public LightEventListenerImpl(ManualOverrideTracker manualOverrideTracker,
                                   Function<String, List<String>> affectedIdsByDeviceLookup,
-                                  Predicate<String> wasRecentlyAffectedBySyncedScene) {
+                                  Predicate<String> wasRecentlyAffectedBySyncedScene, boolean supportsOffLightUpdates) {
         this.manualOverrideTracker = manualOverrideTracker;
         this.affectedIdsByDeviceLookup = affectedIdsByDeviceLookup;
         this.wasRecentlyAffectedBySyncedScene = wasRecentlyAffectedBySyncedScene;
-        onStateWaitingList = new ConcurrentHashMap<>();
+        this.supportsOffLightUpdates = supportsOffLightUpdates;
+        powerTransitionWaitingList = new ConcurrentHashMap<>();
     }
 
     @Override
     public void onLightOff(String id) {
         manualOverrideTracker.onLightOff(id);
+        if (supportsOffLightUpdates) {
+            MDC.put("context", "off-event " + id);
+            rescheduleWaitingStates(id);
+            MDC.remove("context");
+        }
     }
 
     @Override
@@ -44,7 +51,7 @@ public class LightEventListenerImpl implements LightEventListener {
     }
 
     private void rescheduleWaitingStates(String id) {
-        List<Runnable> waitingList = onStateWaitingList.remove(id);
+        List<Runnable> waitingList = powerTransitionWaitingList.remove(id);
         if (waitingList != null) {
             log.debug("Reschedule {} waiting states.", waitingList.size());
             waitingList.forEach(Runnable::run);
@@ -64,7 +71,7 @@ public class LightEventListenerImpl implements LightEventListener {
     }
 
     @Override
-    public void runWhenTurnedOn(String id, Runnable runnable) {
-        onStateWaitingList.computeIfAbsent(id, i -> new CopyOnWriteArrayList<>()).add(runnable);
+    public void runOnPowerTransition(String id, Runnable runnable) {
+        powerTransitionWaitingList.computeIfAbsent(id, i -> new CopyOnWriteArrayList<>()).add(runnable);
     }
 }
