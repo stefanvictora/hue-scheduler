@@ -849,7 +849,8 @@ public final class HueScheduler implements Runnable {
     }
 
     private boolean justTurnedOnBySyncedScene(ScheduledStateSnapshot state) {
-        return wasJustPowerTransition(state) && sceneEventListener.wasRecentlyAffectedBySyncedScene(state.getId());
+        return wasJustPowerTransition(state) && sceneEventListener.wasRecentlyAffectedBySyncedScene(state.getId())
+                && manualOverrideTracker.wasTurnedOnBySyncedScene(state.getId());
     }
 
     private boolean justTurnedOnThroughNormalScene(ScheduledStateSnapshot state) {

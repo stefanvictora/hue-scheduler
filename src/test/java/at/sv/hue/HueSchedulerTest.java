@@ -6358,7 +6358,7 @@ class HueSchedulerTest {
         );
 
         // background interpolation: light is still on -> no update
-        
+
         advanceTimeAndRunAndAssertPutCalls(followUpRunnables.getFirst());
 
         ScheduledRunnable nextBackgroundInterpolation1 = ensureRunnable(initialNow.plusMinutes(40), initialNow.plusHours(2));
@@ -6372,6 +6372,67 @@ class HueSchedulerTest {
         );
 
         ensureRunnable(initialNow.plusMinutes(41), initialNow.plusHours(2)); // background interpolation 2
+    }
+
+    @Test
+    void run_execution_lightIsOff_apiAllowsOffUpdates_interpolation_stillAppliesOnOffAfterSyncedSceneActivation() {
+        enableSupportForOffLightUpdates();
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, "00:00", "bri:50");
+        addState(1, "01:00", "bri:100", "tr-before:30min");
+        addState(1, "02:00", "bri:150");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(30)),
+                expectedRunnable(now.plusMinutes(30), now.plusHours(2)),
+                expectedRunnable(now.plusHours(2), now.plusDays(1))
+        );
+
+        // Normal light state, applied as usual
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).bri(50)
+        );
+
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(30)); // next day
+
+        // Light is on: normal interpolation
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(1),
+                expectedPutCall(1).bri(100).transitionTime(tr("30min"))
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusMinutes(35), initialNow.plusHours(2)), // first change for background interpolation
+                expectedRunnable(initialNow.plusDays(1).plusMinutes(30), initialNow.plusDays(1).plusHours(2)) // next day
+        );
+
+        // advance to already reached, then simulate synced scene activation
+
+        advanceCurrentTime(Duration.ofMinutes(30));
+
+        simulateSyncedSceneActivated("/groups/another", "/lights/1");
+
+        List<ScheduledRunnable> powerOnRunnables = ensureScheduledStates(
+                expectedPowerOnEnd(initialNow.plusMinutes(30)), // already ended
+                expectedPowerOnEnd(initialNow.plusHours(2))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(powerOnRunnables.get(1)); // synced scene and already reached, skipped
+
+        // turn off light still inside synced scene ignore window
+
+        advanceCurrentTime(Duration.ofSeconds(sceneActivationIgnoreWindowInSeconds).minusSeconds(1));
+
+        simulateLightOffEvent("/lights/1");
+
+        ScheduledRunnable powerOffRunnable = ensureScheduledStates(
+                expectedPowerOnEnd(initialNow.plusHours(2))
+        ).getFirst();
+
+        advanceTimeAndRunAndAssertPutCalls(powerOffRunnable,
+                expectedPutCall(1).bri(100) // still applied
+        );
     }
 
     @Test
@@ -6481,7 +6542,7 @@ class HueSchedulerTest {
         advanceTimeAndRunAndAssertPutCalls(sceneRunnable,
                 expectedPutCall(1).bri(100).transitionTime(tr("5min"))
         );
-        
+
         // next state applied normally again (turned on by synced scene flag still activate)
 
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.get(2),
