@@ -33,14 +33,14 @@ public final class InputConfigurationParser {
     private final boolean interpolateAll;
 
     public InputConfigurationParser(StartTimeProvider startTimeProvider, HueApi api, int minTrBeforeGapInMinutes,
-                                    int brightnessOverrideThresholdPercent, int colorTemperatureOverrideThresholdKelvin,
+                                    int brightnessOverrideThreshold, int colorTemperatureOverrideThresholdKelvin,
                                     double colorOverrideThreshold, boolean interpolateAll) {
         this.startTimeProvider = startTimeProvider;
         this.api = api;
         this.minTrBeforeGapInMinutes = minTrBeforeGapInMinutes;
         this.colorOverrideThreshold = colorOverrideThreshold;
         this.interpolateAll = interpolateAll;
-        brightnessOverrideThreshold = parseBrightnessPercentValue(brightnessOverrideThresholdPercent);
+        this.brightnessOverrideThreshold = brightnessOverrideThreshold;
         this.colorTemperatureOverrideThresholdKelvin = colorTemperatureOverrideThresholdKelvin;
     }
 
@@ -216,7 +216,7 @@ public final class InputConfigurationParser {
         return parseBrightnessPercentValue(percent);
     }
 
-    private int parseBrightnessPercentValue(double percent) {
+    static int parseBrightnessPercentValue(double percent) {
         if (percent < 1) {
             return 1;
         }

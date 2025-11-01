@@ -3,6 +3,7 @@ package at.sv.hue;
 import at.sv.hue.api.PutCall;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import java.time.DayOfWeek;
 import java.time.Duration;
@@ -14,6 +15,7 @@ import java.util.function.Function;
 
 import static at.sv.hue.ScheduledState.MAX_TRANSITION_TIME_MS;
 
+@Slf4j
 @RequiredArgsConstructor
 public class ScheduledStateSnapshot {
     @Getter
@@ -196,7 +198,7 @@ public class ScheduledStateSnapshot {
         return getNextTransitionTimeSplitStart(now).isBefore(definedStart);
     }
 
-    public ZonedDateTime calculateNextPowerOnEnd(ZonedDateTime now) {
+    public ZonedDateTime calculateNextPowerTransitionEnd(ZonedDateTime now) {
         if (isInsideSplitCallWindow(now)) {
             return getNextTransitionTimeSplitStart(now).minusSeconds(1);
         } else {
@@ -221,8 +223,8 @@ public class ScheduledStateSnapshot {
         return scheduledState.getRequiredGap();
     }
 
-    public boolean isRetryAfterPowerOnState() {
-        return scheduledState.isRetryAfterPowerOnState();
+    public boolean isTriggeredByPowerTransition() {
+        return scheduledState.isTriggeredByPowerTransition();
     }
 
     public PutCall getPutCall(ZonedDateTime now) {
@@ -303,6 +305,37 @@ public class ScheduledStateSnapshot {
 
     public boolean performsInterpolation(ZonedDateTime now) {
         return getInterpolatedPutCallIfNeeded(now) != null;
+    }
+
+    public ZonedDateTime getNextSignificantPropertyChangeTime(PutCall currentPutCall, ZonedDateTime now, int brightnessThreshold,
+                                                              int colorTemperatureThresholdKelvin, double colorThreshold) {
+        if (!hasTransitionBefore()) {
+            return null;
+        }
+        ScheduledStateSnapshot previousState = getPreviousState();
+        if (previousState == null) {
+            return null;
+        }
+        if (isAlreadyReached(now)) {
+            return null; // the state is already reached
+        }
+        if (currentPutCall == null) {
+            currentPutCall = getInterpolatedFullPicturePutCall(now);
+        }
+        ZonedDateTime nextTime = now.truncatedTo(ChronoUnit.MINUTES).plusMinutes(1);
+        ZonedDateTime endTime = getDefinedStart();
+        while (nextTime.isBefore(endTime)) {
+            StateInterpolator futureInterpolator = new StateInterpolator(this, previousState, nextTime, true);
+            PutCall future = futureInterpolator.getInterpolatedPutCall();
+            if (future != null && currentPutCall.hasNotSimilarLightState(future, brightnessThreshold,
+                    colorTemperatureThresholdKelvin, colorThreshold)) {
+                log.trace("Next property change in {}: {}. Current: {}",
+                        Duration.between(now, nextTime), future, currentPutCall);
+                return nextTime;
+            }
+            nextTime = nextTime.plusMinutes(1);
+        }
+        return endTime; // Ensure last update at the end time
     }
 
     public void recordLastPutCall(PutCall putCall) {

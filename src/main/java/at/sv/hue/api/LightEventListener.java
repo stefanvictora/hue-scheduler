@@ -13,5 +13,5 @@ public interface LightEventListener {
      */
     void onPhysicalOn(String deviceId);
 
-    void runWhenTurnedOn(String id, Runnable runnable);
+    void runOnPowerTransition(String id, Runnable runnable);
 }
