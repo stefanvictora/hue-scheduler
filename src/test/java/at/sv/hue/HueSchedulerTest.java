@@ -134,7 +134,8 @@ class HueSchedulerTest {
                 () -> now, 10.0, controlGroupLightsIndividually, disableUserModificationTracking,
                 requireSceneActivation, defaultInterpolationTransitionTimeInMs, 0, connectionFailureRetryDelay,
                 minTrGap, BRIGHTNESS_OVERRIDE_THRESHOLD_PERCENT, COLOR_TEMPERATURE_OVERRIDE_THRESHOLD_KELVIN,
-                COLOR_OVERRIDE_THRESHOLD, sceneActivationIgnoreWindowInSeconds, interpolateAll,
+                COLOR_OVERRIDE_THRESHOLD, 3.8, 150, 3.0,
+                sceneActivationIgnoreWindowInSeconds, interpolateAll,
                 enableSceneSync, sceneSyncName, sceneSyncInterpolationInterval, sceneSyncDelayInSeconds,
                 supportsOffLightUpdates);
         manualOverrideTracker = scheduler.getManualOverrideTracker();

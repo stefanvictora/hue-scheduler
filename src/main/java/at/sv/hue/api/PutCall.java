@@ -110,9 +110,6 @@ public final class PutCall {
     public boolean hasNotSimilarLightState(PutCall other, int brightnessThreshold,
                                             int colorTemperatureThresholdKelvin,
                                             double colorThreshold) {
-        if (other == null) {
-            return false;
-        }
         return !Objects.equals(this.on, other.on) ||
                brightnessIsNotSimilar(this.bri, other.bri, brightnessThreshold) ||
                !Objects.equals(this.hue, other.hue) ||

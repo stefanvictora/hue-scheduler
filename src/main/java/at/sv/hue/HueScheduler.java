@@ -58,6 +58,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
+import static at.sv.hue.InputConfigurationParser.parseBrightnessPercentValue;
+
 @Command(name = "HueScheduler", version = "0.14.0", mixinStandardHelpOptions = true, sortOptions = false)
 public final class HueScheduler implements Runnable {
 
@@ -182,13 +184,13 @@ public final class HueScheduler implements Runnable {
     int minTrBeforeGapInMinutes;
     @Option(
             names = "--brightness-override-threshold", paramLabel = "<percent>",
-            defaultValue = "${env:BRIGHTNESS_OVERRIDE_THRESHOLD:-10}",
+            defaultValue = "${env:BRIGHTNESS_OVERRIDE_THRESHOLD:-10.0}",
             description = "The brightness difference threshold (percentage points) above which a light's brightness " +
                           "is considered manually overridden. For example, 10 means a change from 50%% to 60%% " +
                           "brightness would trigger override detection. Typical range: 5-20. " +
                           "Default: ${DEFAULT-VALUE}."
     )
-    int brightnessOverrideThresholdPercentage;
+    double brightnessOverrideThresholdPercentage;
     @Option(
             names = "--ct-override-threshold", paramLabel = "<kelvin>",
             defaultValue = "${env:CT_OVERRIDE_THRESHOLD:-350}",
@@ -206,6 +208,31 @@ public final class HueScheduler implements Runnable {
                           "Typical range: 5-15. Default: ${DEFAULT-VALUE}."
     )
     double colorOverrideThreshold;
+
+    @Option(
+            names = "--brightness-sync-threshold", paramLabel = "<percent>",
+            defaultValue = "${env:BRIGHTNESS_SYNC_THRESHOLD:-5.0}",
+            description = "The brightness difference threshold (percentage points) above which a light's brightness " +
+                          "is considered significantly changed to schedule the next scene sync or background interpolation. " +
+                          "Default: ${DEFAULT-VALUE}."
+    )
+    double brightnessSyncThresholdPercentage;
+    @Option(
+            names = "--ct-sync-threshold", paramLabel = "<kelvin>",
+            defaultValue = "${env:CT_SYNC_THRESHOLD:-150}",
+            description = "The color temperature difference threshold (Kelvin) above which a light's temperature " +
+                          "is considered significantly changed to schedule the next scene sync or background interpolation. " +
+                          "Default: ${DEFAULT-VALUE}."
+    )
+    int colorTemperatureSyncThresholdKelvin;
+    @Option(
+            names = "--color-sync-threshold", paramLabel = "<delta>",
+            defaultValue = "${env:COLOR_SYNC_THRESHOLD:-3.0}",
+            description = "The color difference threshold (Delta-E CIE76) above which a light's color is considered " +
+                          "significantly changed to schedule the next scene sync or background interpolation. " +
+                          "Default: ${DEFAULT-VALUE}."
+    )
+    double colorSyncThreshold;
 
     @Option(names = "--scene-activation-ignore-window", paramLabel = "<duration>",
             defaultValue = "${env:SCENE_ACTIVATION_IGNORE_WINDOW:-8}",
@@ -239,8 +266,10 @@ public final class HueScheduler implements Runnable {
                         boolean disableUserModificationTracking, boolean requireSceneActivation,
                         String defaultInterpolationTransitionTimeString,
                         int powerTransitionRescheduleDelayInMs, int bridgeFailureRetryDelayInSeconds,
-                        int minTrBeforeGapInMinutes, int brightnessOverrideThresholdPercentage,
+                        int minTrBeforeGapInMinutes, double brightnessOverrideThresholdPercentage,
                         int colorTemperatureOverrideThresholdKelvin, double colorOverrideThreshold,
+                        double brightnessSyncThresholdPercentage, int colorTemperatureSyncThresholdKelvin,
+                        double colorSyncThreshold,
                         int sceneActivationIgnoreWindowInSeconds, boolean interpolateAll, boolean enableSceneSync,
                         String sceneSyncName, int sceneSyncIntervalInMinutes, int sceneSyncDelayInSeconds,
                         boolean supportsOffLightUpdates) {
@@ -262,6 +291,9 @@ public final class HueScheduler implements Runnable {
         this.brightnessOverrideThresholdPercentage = brightnessOverrideThresholdPercentage;
         this.colorTemperatureOverrideThresholdKelvin = colorTemperatureOverrideThresholdKelvin;
         this.colorOverrideThreshold = colorOverrideThreshold;
+        this.brightnessSyncThresholdPercentage = brightnessSyncThresholdPercentage;
+        this.colorTemperatureSyncThresholdKelvin = colorTemperatureSyncThresholdKelvin;
+        this.colorSyncThreshold = colorSyncThreshold;
         this.sceneActivationIgnoreWindowInSeconds = sceneActivationIgnoreWindowInSeconds;
         defaultInterpolationTransitionTime = parseInterpolationTransitionTime(defaultInterpolationTransitionTimeString);
         this.interpolateAll = interpolateAll;
@@ -382,6 +414,7 @@ public final class HueScheduler implements Runnable {
         assertRateLimitingConfiguration();
         assertSceneSyncConfigurations();
         assertManualOverrideThresholds();
+        assertSyncThresholds();
         assertApiConfigurations();
         assertTimingConfigurations();
     }
@@ -422,6 +455,18 @@ public final class HueScheduler implements Runnable {
         }
         if (colorOverrideThreshold <= 0) {
             fail("--color-override-threshold must be > 0.0");
+        }
+    }
+
+    private void assertSyncThresholds() {
+        if (brightnessSyncThresholdPercentage < 1 || brightnessSyncThresholdPercentage > 100) {
+            fail("--brightness-sync-threshold must be within [1,100]");
+        }
+        if (colorTemperatureSyncThresholdKelvin <= 0) {
+            fail("--ct-sync-threshold must be > 0");
+        }
+        if (colorSyncThreshold <= 0) {
+            fail("--color-sync-threshold must be > 0.0");
         }
     }
 
@@ -508,7 +553,8 @@ public final class HueScheduler implements Runnable {
     }
 
     public void addState(String input) {
-        new InputConfigurationParser(startTimeProvider, api, minTrBeforeGapInMinutes, brightnessOverrideThresholdPercentage,
+        new InputConfigurationParser(startTimeProvider, api, minTrBeforeGapInMinutes,
+                parseBrightnessPercentValue(brightnessOverrideThresholdPercentage),
                 colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold, interpolateAll)
                 .parse(input)
                 .forEach(stateRegistry::addState);
@@ -716,11 +762,16 @@ public final class HueScheduler implements Runnable {
     }
 
     private void scheduleNextBackgroundInterpolation(ScheduledStateSnapshot state, PutCall putCall, ZonedDateTime now) {
-        ZonedDateTime nextChangeTime = state.getNextPropertyChangeTime(putCall, now, 8,
-                150, 5.0); // todo: find right thresholds
+        ZonedDateTime nextChangeTime = getNextChangeTime(state, putCall, now);
         if (nextChangeTime != null) {
             scheduleIfNotYetEnded(state, () -> performBackgroundInterpolation(state), nextChangeTime);
         }
+    }
+
+    private ZonedDateTime getNextChangeTime(ScheduledStateSnapshot state, PutCall putCall, ZonedDateTime now) {
+        return state.getNextSignificantPropertyChangeTime(putCall, now,
+                parseBrightnessPercentValue(brightnessSyncThresholdPercentage),
+                colorTemperatureSyncThresholdKelvin, colorSyncThreshold);
     }
 
     private void performBackgroundInterpolation(ScheduledStateSnapshot state) {
