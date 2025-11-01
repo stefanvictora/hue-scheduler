@@ -94,9 +94,6 @@ public final class PutCall {
     }
 
     public boolean hasSameLightState(PutCall other) {
-        if (other == null) {
-            return false;
-        }
         return Objects.equals(this.on, other.on) &&
                Objects.equals(this.bri, other.bri) &&
                Objects.equals(this.hue, other.hue) &&
