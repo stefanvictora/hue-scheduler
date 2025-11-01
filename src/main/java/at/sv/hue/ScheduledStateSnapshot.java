@@ -292,14 +292,6 @@ public class ScheduledStateSnapshot {
     }
 
     private PutCall getInterpolatedPutCallIfNeeded(ZonedDateTime dateTime, boolean keepPreviousPropertiesForNullTargets) {
-        StateInterpolator interpolator = getStateInterpolator(dateTime, keepPreviousPropertiesForNullTargets);
-        if (interpolator == null) {
-            return null;
-        }
-        return interpolator.getInterpolatedPutCall();
-    }
-
-    private StateInterpolator getStateInterpolator(ZonedDateTime dateTime, boolean keepPreviousPropertiesForNullTargets) {
         if (!hasTransitionBefore()) {
             return null;
         }
@@ -307,7 +299,8 @@ public class ScheduledStateSnapshot {
         if (previousState == null) {
             return null;
         }
-        return new StateInterpolator(this, previousState, dateTime, keepPreviousPropertiesForNullTargets);
+        return new StateInterpolator(this, previousState, dateTime, keepPreviousPropertiesForNullTargets)
+                .getInterpolatedPutCall();
     }
 
     public boolean performsInterpolation(ZonedDateTime now) {
