@@ -157,7 +157,7 @@ public final class HueScheduler implements Runnable {
             description = "The delay in seconds for retrying an API call, if the bridge could not be reached due to " +
                           "network failure, or if it returned an API error code. Default: ${DEFAULT-VALUE} seconds.")
     int bridgeFailureRetryDelayInSeconds;
-    int sceneSyncFailureRetryInMinutes = 3;
+    int syncFailureRetryInMinutes = 3;
     @Option(names = "--event-stream-read-timeout", paramLabel = "<timeout>",
             defaultValue = "${env:EVENT_STREAM_READ_TIMEOUT:-120}",
             description = "The read timeout of the API v2 SSE event stream in minutes. " +
@@ -268,7 +268,7 @@ public final class HueScheduler implements Runnable {
                         double brightnessSyncThresholdPercentage, int colorTemperatureSyncThresholdKelvin,
                         double colorSyncThreshold,
                         int sceneActivationIgnoreWindowInSeconds, boolean interpolateAll, boolean enableSceneSync,
-                        String sceneSyncName, int sceneSyncFailureRetryInMinutes, int sceneSyncDelayInSeconds,
+                        String sceneSyncName, int syncFailureRetryInMinutes, int sceneSyncDelayInSeconds,
                         boolean supportsOffLightUpdates) {
         this();
         this.api = api;
@@ -296,7 +296,7 @@ public final class HueScheduler implements Runnable {
         this.interpolateAll = interpolateAll;
         this.enableSceneSync = enableSceneSync;
         this.sceneSyncName = sceneSyncName;
-        this.sceneSyncFailureRetryInMinutes = sceneSyncFailureRetryInMinutes;
+        this.syncFailureRetryInMinutes = syncFailureRetryInMinutes;
         this.sceneSyncDelayInSeconds = sceneSyncDelayInSeconds;
         this.supportsOffLightUpdates = supportsOffLightUpdates;
         apiCacheInvalidationIntervalInMinutes = 15;
@@ -611,7 +611,7 @@ public final class HueScheduler implements Runnable {
                 MDC.put("context", snapshot.getContextName());
             }
             if (shouldPerformBackgroundInterpolation(snapshot, now)) {
-                scheduleNextBackgroundInterpolation(snapshot, now);
+                scheduleInitialBackgroundInterpolation(snapshot, now);
             }
             if (shouldIgnoreState(snapshot)) {
                 LOG.debug("Ignore state: {}", snapshot);
@@ -727,8 +727,8 @@ public final class HueScheduler implements Runnable {
                 scheduleNextSceneSync(state, false, nextSyncTime);
             }
         } catch (Exception e) {
-            LOG.error("Scene sync failed: '{}'. Retry in {}min", e.getLocalizedMessage(), sceneSyncFailureRetryInMinutes, e);
-            scheduleNextSceneSync(state, justOnce, currentTime.get().plusMinutes(sceneSyncFailureRetryInMinutes));
+            LOG.error("Scene sync failed: '{}'. Retry in {} min", e.getLocalizedMessage(), syncFailureRetryInMinutes, e);
+            scheduleNextSceneSync(state, justOnce, currentTime.get().plusMinutes(syncFailureRetryInMinutes));
         }
         MDC.remove("context");
     }
@@ -741,8 +741,8 @@ public final class HueScheduler implements Runnable {
         scheduleIfNotYetEnded(stateSnapshot, () -> syncScene(stateSnapshot, justOnce), nextSyncTime);
     }
 
-    private ZonedDateTime getNextChangeTime(ScheduledStateSnapshot state, PutCall putCall, ZonedDateTime now) {
-        return state.getNextSignificantPropertyChangeTime(putCall, now,
+    private ZonedDateTime getNextChangeTime(ScheduledStateSnapshot state, PutCall currentPutCall, ZonedDateTime now) {
+        return state.getNextSignificantPropertyChangeTime(currentPutCall, now,
                 parseBrightnessPercentValue(brightnessSyncThresholdPercentage),
                 colorTemperatureSyncThresholdKelvin, colorSyncThreshold);
     }
@@ -757,15 +757,19 @@ public final class HueScheduler implements Runnable {
         }, scheduledStart, state.getEnd());
     }
 
-    private void scheduleNextBackgroundInterpolation(ScheduledStateSnapshot state, ZonedDateTime now) {
+    private void scheduleInitialBackgroundInterpolation(ScheduledStateSnapshot state, ZonedDateTime now) {
         scheduleNextBackgroundInterpolation(state, null, now);
     }
 
-    private void scheduleNextBackgroundInterpolation(ScheduledStateSnapshot state, PutCall putCall, ZonedDateTime now) {
-        ZonedDateTime nextChangeTime = getNextChangeTime(state, putCall, now);
+    private void scheduleNextBackgroundInterpolation(ScheduledStateSnapshot state, PutCall currentPutCall, ZonedDateTime now) {
+        ZonedDateTime nextChangeTime = getNextChangeTime(state, currentPutCall, now);
         if (nextChangeTime != null) {
-            scheduleIfNotYetEnded(state, () -> performBackgroundInterpolation(state), nextChangeTime);
+            scheduleNextBackgroundInterpolation(state, nextChangeTime);
         }
+    }
+
+    private void scheduleNextBackgroundInterpolation(ScheduledStateSnapshot state, ZonedDateTime nextChangeTime) {
+        scheduleIfNotYetEnded(state, () -> performBackgroundInterpolation(state), nextChangeTime);
     }
 
     private void performBackgroundInterpolation(ScheduledStateSnapshot state) {
@@ -779,8 +783,9 @@ public final class HueScheduler implements Runnable {
             }
             scheduleNextBackgroundInterpolation(state, putCall, now);
         } catch (Exception e) {
-            LOG.error("Background interpolation failed: '{}'", e.getLocalizedMessage(), e);
-            scheduleNextBackgroundInterpolation(state, now);
+            LOG.error("Background interpolation failed: '{}'. Retry in {} min.", e.getLocalizedMessage(),
+                    syncFailureRetryInMinutes, e);
+            scheduleNextBackgroundInterpolation(state, now.plusMinutes(syncFailureRetryInMinutes));
         }
         MDC.remove("context");
     }

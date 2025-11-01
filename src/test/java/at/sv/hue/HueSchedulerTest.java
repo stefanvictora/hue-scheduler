@@ -62,7 +62,7 @@ class HueSchedulerTest {
     private static final double COLOR_OVERRIDE_THRESHOLD = 8.0;
     private final String sceneSyncName = "synced-scene";
     private final String unsyncedSceneName = "user-scene";
-    private final int sceneSyncFailureRetryInMinutes = 1;
+    private final int syncFailureRetryInMinutes = 3;
 
     private TestStateScheduler stateScheduler;
     private ManualOverrideTracker manualOverrideTracker;
@@ -136,7 +136,7 @@ class HueSchedulerTest {
                 minTrGap, BRIGHTNESS_OVERRIDE_THRESHOLD_PERCENT, COLOR_TEMPERATURE_OVERRIDE_THRESHOLD_KELVIN,
                 COLOR_OVERRIDE_THRESHOLD, 3.8, 150, 3.0,
                 sceneActivationIgnoreWindowInSeconds, interpolateAll,
-                enableSceneSync, sceneSyncName, sceneSyncFailureRetryInMinutes, sceneSyncDelayInSeconds,
+                enableSceneSync, sceneSyncName, syncFailureRetryInMinutes, sceneSyncDelayInSeconds,
                 supportsOffLightUpdates);
         manualOverrideTracker = scheduler.getManualOverrideTracker();
     }
@@ -5904,7 +5904,7 @@ class HueSchedulerTest {
     }
 
     @Test
-    void run_execution_lightsIsOff_doesNotMakeAnyCalls_unlessStateHasOnProperty() {
+    void run_execution_lightIsOff_doesNotMakeAnyCalls_unlessStateHasOnProperty() {
         addKnownLightIdsWithDefaultCapabilities(1);
         addState(1, "00:00", "bri:" + DEFAULT_BRIGHTNESS);
         addState(1, "01:00", "bri:" + (DEFAULT_BRIGHTNESS + 10), "force:true"); // force does not have any effect
@@ -5947,7 +5947,7 @@ class HueSchedulerTest {
     }
 
     @Test
-    void run_execution_lightsIsOff_apiDoesNotAllowOffUpdates_notApplied() {
+    void run_execution_lightIsOff_apiDoesNotAllowOffUpdates_notApplied() {
         addKnownLightIdsWithDefaultCapabilities(1);
         addState(1, "00:00", "bri:50");
         addState(1, "01:00", "bri:60");
@@ -6412,30 +6412,17 @@ class HueSchedulerTest {
                 expectedPutCall(1).bri(60)
         );
 
-        ScheduledRunnable retry = ensureRunnable(now.plusMinutes(1), initialNow.plusDays(1));
+        ScheduledRunnable retry = ensureRunnable(now.plusMinutes(syncFailureRetryInMinutes), initialNow.plusDays(1));
 
         resetMockedApi();
 
         advanceTimeAndRunAndAssertPutCalls(retry,
-                expectedPutCall(1).bri(70)
+                expectedPutCall(1).bri(90)
         );
 
         ScheduledRunnable nextBackgroundInterpolation1 = ensureRunnable(now.plusMinutes(1), initialNow.plusDays(1));
 
-
         advanceTimeAndRunAndAssertPutCalls(nextBackgroundInterpolation1,
-                expectedPutCall(1).bri(80)
-        );
-
-        ScheduledRunnable nextBackgroundInterpolation2 = ensureRunnable(now.plusMinutes(1), initialNow.plusDays(1));
-
-        advanceTimeAndRunAndAssertPutCalls(nextBackgroundInterpolation2,
-                expectedPutCall(1).bri(90)
-        );
-
-        ScheduledRunnable nextBackgroundInterpolation3 = ensureRunnable(now.plusMinutes(1), initialNow.plusDays(1));
-
-        advanceTimeAndRunAndAssertPutCalls(nextBackgroundInterpolation3,
                 expectedPutCall(1).bri(100)
         );
 
@@ -6515,7 +6502,7 @@ class HueSchedulerTest {
     }
 
     @Test
-    void run_execution_lightsIsOff_doesNotMakeAnyCalls_ignoresOffCheckOnPowerOn() {
+    void run_execution_lightIsOff_doesNotMakeAnyCalls_ignoresOffCheckOnPowerOn() {
         addKnownLightIdsWithDefaultCapabilities(2);
         addState(2, "00:00", "bri:" + DEFAULT_BRIGHTNESS);
         addState(2, "01:00", "bri:" + (DEFAULT_BRIGHTNESS + 10));
@@ -6547,7 +6534,7 @@ class HueSchedulerTest {
     }
 
     @Test
-    void run_execution_lightsIsOff_detectedViaSingleOffEvent_doesNotMakeAnyCalls_restAfterOnEvent() {
+    void run_execution_lightIsOff_detectedViaSingleOffEvent_doesNotMakeAnyCalls_restAfterOnEvent() {
         addKnownLightIdsWithDefaultCapabilities(2);
         addState(2, "00:00", "bri:" + DEFAULT_BRIGHTNESS);
         addState(2, "01:00", "bri:" + (DEFAULT_BRIGHTNESS + 10));
@@ -8627,7 +8614,7 @@ class HueSchedulerTest {
         );
 
         List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(
-                expectedRunnable(now.plusMinutes(sceneSyncFailureRetryInMinutes), now.plusDays(1)), // sync retry
+                expectedRunnable(now.plusMinutes(syncFailureRetryInMinutes), now.plusDays(1)), // sync retry
                 expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
         );
         ScheduledRunnable retrySync = followUpRunnables.getFirst();
@@ -8642,7 +8629,7 @@ class HueSchedulerTest {
     }
 
     @Test
-    void sceneSync_apiThrowsError_interpolate_noAdditionalRetry() {
+    void sceneSync_apiThrowsError_interpolate_retries() {
         enableSceneSync();
 
         mockDefaultGroupCapabilities(2);
@@ -8664,7 +8651,7 @@ class HueSchedulerTest {
         expectedSceneUpdates++;
 
         ensureScheduledStates(
-                expectedRunnable(now.plusMinutes(1), now.plusDays(1)), // scene sync schedule; no additional retry
+                expectedRunnable(now.plusMinutes(syncFailureRetryInMinutes), now.plusDays(1)), // scene sync retry
                 expectedRunnable(initialNow.plusDays(1), initialNow.plusDays(2)) // next day
         );
     }
