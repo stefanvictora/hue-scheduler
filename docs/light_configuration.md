@@ -177,7 +177,7 @@ Desk  15:00  x:0.1652  y:0.3103
 
   > Note: Hue Scheduler uses the **previous state's** `tr` for the per-step interpolation calls. Set the previous state's `tr:0` to disable those transitions. If no `tr` is defined, the global default `--default-interpolation-transition-time` is used (default: `4` = 400 ms). If interpolation between two states is **not possible**, `tr-before` and `interpolate:true` are ignored.
 
-- `interpolate:true` — Start transitions **automatically** from the previous state (a shorthand for common `tr-before` patterns):
+- `interpolate:true` — Start transitions **automatically** from the start of the previous state (a shorthand for common `tr-before` patterns). Continuously transition between two defined states—effectively simulating what's often called *natural*, *adaptive* or *circadian lighting*:
 
   ```yacas
   # Instead of:
@@ -214,6 +214,8 @@ Desk  15:00  x:0.1652  y:0.3103
     Here, the sunset state is always applied—even if the user changed the light during the day.
 
     **Note**: `force:true` can also enforce `on:false`. In that case, lights **cannot** be turned on during the interval (they'll be turned off immediately).
+
+    From 0.14.0, setting `force:true` with `on:true` also forces the light to be **always on**.
 
     With `--require-scene-activation`, `force:true` still applies the state even if a synced scene wasn't activated.
 

@@ -10,7 +10,9 @@
 
 ## Introduction
 
-**New in 0.12.0** — **Sync schedules to scenes** so lights turn on in the desired state instantly (opt-in via ``--enable-scene-sync``). Now also with Home Assistant support.
+**New in 0.14.0** — **Update lights even if they are off** (requires Hue Bridge; enabled by default). Lights are now updated in the background, ensuring they turn on directly in the scheduled brightness, color temperature, and color. A lightweight alternative to synced scenes. For complex schedules where lights are intentionally turned off at specific times, **Scene Sync** remains the recommended approach.
+
+**New in 0.12.0** — **Sync schedules to scenes** (opt-in via ``--enable-scene-sync``). Creates synced scenes so lights turn on instantly in the desired state, with full **Home Assistant** support.
 
 Hue Scheduler goes beyond tools like Adaptive Lighting by giving you precise control over brightness, color temperature, color, power state, and custom interpolations between solar and absolute times. It's designed to work with dumb wall switches: as soon as lights become available, Hue Scheduler applies the correct settings consistently, even after physical on/off toggles.
 
@@ -55,7 +57,7 @@ Which light or group to control. Use names or IDs (e.g., `Couch` or `light.couch
 
 **Start Time Expression**
 
-Use fixed times (24-hour `HH:mm[:ss]`, e.g., `06:00`, `23:30:15`) or solar times (`sunrise`, `sunset`, etc.). You can offset solar times with +- minutes (e.g., `sunset-30`, `sunrise+60`). Available solar constants (chronological): `astronomical_dawn`, `nautical_dawn`, `civil_dawn`, `sunrise`, `noon`, `golden_hour`, `sunset`, `blue_hour`, `civil_dusk`, `night_hour`, `nautical_dusk`, `astronomical_dusk`.
+Use fixed times (24-hour `HH:mm[:ss]`, e.g., `06:00`, `23:30:15`) or solar times (`sunrise`, `sunset`, etc.). You can offset solar times with ± minutes (e.g., `sunset-30`, `sunrise+60`). Available solar constants (chronological): `astronomical_dawn`, `nautical_dawn`, `civil_dawn`, `sunrise`, `noon`, `golden_hour`, `sunset`, `blue_hour`, `civil_dusk`, `night_hour`, `nautical_dusk`, `astronomical_dusk`.
 
 **Properties**
 
@@ -75,7 +77,7 @@ Use fixed times (24-hour `HH:mm[:ss]`, e.g., `06:00`, `23:30:15`) or solar times
 - **Transitions**
     - **`tr`** — transition at start (e.g., `tr:10s`, `tr:1h5min`)
     - **`tr-before`** — pre-transition starting before the state (relative, absolute, or solar, e.g., `tr-before:30min`, `tr-before:06:00`, `tr-before:civil_dawn+5`)
-    - **`interpolate:true`** — auto-transition from the previous state; also spans across days
+    - **`interpolate:true`** — auto-transition from the start of the previous state; also spans across days
 
 > [!TIP]
 > Full syntax and edge cases: see the [full configuration guide](docs/light_configuration.md).
@@ -98,7 +100,7 @@ Run Hue Scheduler via Docker (recommended) or manually with Java. Configuration 
    services:
      hue-scheduler:
        container_name: hue-scheduler
-       image: stefanvictora/hue-scheduler:0.13
+       image: stefanvictora/hue-scheduler:0.14
        environment:
          - API_HOST=
          - ACCESS_TOKEN=
@@ -153,7 +155,11 @@ If your Raspberry Pi doesn't have Docker yet, see [docs/docker_on_raspberrypi.md
 
 ### Does Hue Scheduler work with motion sensors and smart switches?
 
-Yes. From **0.12.0**, with Scene Sync enabled (``--enable-scene-sync``), Hue Scheduler creates a synced scene (default: `HueScheduler`) that mirrors the current scheduled state of a room or zone. Select this scene in your motion sensor or smart switch so lights turn on in the desired state instantly.
+Yes. Starting with **0.12.0**, when Scene Sync is enabled (``--enable-scene-sync``), Hue Scheduler creates a synced scene (default: `HueScheduler`) that mirrors the current scheduled state of a room or zone. Select this scene in your motion sensor or smart switch so lights turn on in the desired state instantly.
+
+Since **0.14.0**, you can alternatively keep your sensors/switches configured to turn lights on in their **last on state**. Hue Scheduler now updates your lights **even while they’re off**, ensuring they power on directly in the scheduled brightness, color temperature, and color. *(Requires Hue Bridge.)*
+
+For complex schedules where lights are intentionally turned off at certain times, **Scene Sync** remains the recommended approach. Synced scenes also make it easy to reset manual overrides by simply reapplying the scene.
 
 ### Why is there a delay after physically switching lights on?
 

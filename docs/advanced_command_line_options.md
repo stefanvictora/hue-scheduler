@@ -4,7 +4,7 @@
 
 **Scene Sync & Activation**
 
-- [`--enable-scene-sync`](#--enable-scene-sync) · [`--require-scene-activation`](#--require-scene-activation) · [`--scene-sync-name`](#--scene-sync-name) · [`--scene-sync-interval`](#--scene-sync-interval) · [`--scene-activation-ignore-window`](#--scene-activation-ignore-window)
+- [`--enable-scene-sync`](#--enable-scene-sync) · [`--require-scene-activation`](#--require-scene-activation) · [`--scene-sync-name`](#--scene-sync-name) · [`--scene-activation-ignore-window`](#--scene-activation-ignore-window)
 
 **Interpolation & Transitions**
 
@@ -12,7 +12,7 @@
 
 **Manual Overrides & Sensitivity**
 
-- [`--disable-user-modification-tracking`](#--disable-user-modification-tracking) · [`--color-override-threshold`](#--color-override-threshold) · [`--brightness-override-threshold`](#--brightness-override-threshold) · [`--ct-override-threshold`](#--ct-override-threshold)
+- [`--disable-user-modification-tracking`](#--disable-user-modification-tracking) · [`--color-override-threshold`](#--color-override-threshold) · [`--brightness-override-threshold`](#--brightness-override-threshold) · [`--ct-override-threshold`](#--ct-override-threshold) · [`--color-sync-threshold`](#--color-sync-threshold) · [`--brightness-sync-threshold`](#--brightness-sync-threshold) · [`--ct-sync-threshold`](#--ct-sync-threshold)
 
 **Logging**
 
@@ -64,14 +64,6 @@ Use `force:true` to override this behavior for specific states.
 Sets the name of the synced scene (used with `--enable-scene-sync`).
 
 **Default:** `HueScheduler`
-
-### `--scene-sync-interval`
-
-*New in 0.12.0*
-
-Interval **in minutes** for syncing **interpolated** states to scenes (used with `--enable-scene-sync`).
-
-**Default:** `3` minutes
 
 ### `--scene-activation-ignore-window`
 
@@ -162,6 +154,30 @@ Relevant only when user-modification tracking is **enabled**.
 **Recommended range:** `100–500`
 
 **Default:** `350` K
+
+### `--color-sync-threshold`
+
+*New in 0.14.0*
+
+Color difference threshold (ΔE CIE76) above which a light’s color counts as **significantly changed** to schedule the next scene sync or background interpolation.
+
+**Default:** `3.0`
+
+### `--brightness-sync-threshold`
+
+*New in 0.14.0*
+
+Brightness difference threshold (percentage points) above which a light's brightness counts as **significantly changed** to schedule the next scene sync or background interpolation.
+
+**Default:** `5` (percentage points)
+
+### `--ct-sync-threshold`
+
+*New in 0.14.0*
+
+Color temperature difference threshold (**Kelvin**) above which a light's temperature counts as **significantly changed** to schedule the next scene sync or background interpolation.
+
+**Default:** `150` K
 
 ## Logging
 

@@ -1,4 +1,23 @@
-# Changelog
+## [0.14.0] - 2025-11-02
+
+### Added
+- **Update Hue lights even when they're off** (Hue Bridge only) (#38):
+    - Pre-sets off lights so they always turn on in the *scheduled* state.
+    - Background sync during interpolations keeps off lights aligned.
+    - Sync runs only when the delta exceeds thresholds.
+    - New thresholds (advanced):
+      - `--brightness-sync-threshold` — brightness delta in percentage points (**default:** `5`)
+      - `--ct-sync-threshold` — color temperature delta in Kelvin (**default:** `150`)
+      - `--color-sync-threshold` — color delta ΔE (CIE76) (**default:** `3.0`)
+
+- **Incremental, SSE-driven Hue API cache** (#39): Greatly reduces API traffic and improves responsiveness.
+
+### Changed
+- Scene Sync now also uses the sync thresholds to avoid unnecessary updates (#38).
+- `force:true` in combination with `on:true` now forces lights to always be on (#38).
+
+### Removed
+- Removed obsolete `--scene-sync-interval` flag (Scene Sync now uses thresholds) (#38).
 
 ## [0.13.1] - 2025-10-11
 

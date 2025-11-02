@@ -8,7 +8,7 @@ Below is a complete `docker-compose.yml` for a setup in **Vienna, Austria**, con
 services:
   hue-scheduler:
     container_name: hue-scheduler
-    image: stefanvictora/hue-scheduler:0.13
+    image: stefanvictora/hue-scheduler:0.14
     environment:
       - API_HOST=192.168.0.157
       - ACCESS_TOKEN=<TOKEN>
@@ -29,6 +29,23 @@ services:
 
 On Windows, adapt the source path, e.g. `C:\Users\user_name\.config\hue-scheduler\input.txt`. (If you use WSL, map from your Linux path instead.)
 
+**Note:** Since 0.13.1, Hue Scheduler is running as a non-root user inside the container. Therefore, ensure that the mounted configuration file has appropriate read permissions for non-root users. Or change the user the application is run like this:
+
+```yaml
+services:
+  hue-scheduler:
+    image: stefanvictora/hue-scheduler:0.14
+    user: "${UID}:${GID}"
+...
+```
+
+And then run with:
+                
+```bash
+UID=$(id -u) GID=$(id -g) docker compose up -d
+``` 
+
+Or provide the UID and GID some other way in your environment.
 
 ## `docker run` usage
 
@@ -40,7 +57,7 @@ docker run -d --name hue-scheduler \
   -e log.level=DEBUG \
   -e TZ=Europe/Vienna \
   --restart unless-stopped \
-  stefanvictora/hue-scheduler:0.13 \
+  stefanvictora/hue-scheduler:0.14 \
   <API_HOST> <ACCESS_TOKEN> \
   --lat <LATITUDE> --long <LONGITUDE> --elevation <ELEVATION> \
   --enable-scene-sync \
