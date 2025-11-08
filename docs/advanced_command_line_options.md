@@ -123,13 +123,13 @@ Disables tracking of manual changes. By default, Hue Scheduler compares the prev
 
 *New in 0.13.0*
 
-Color difference threshold (ΔE CIE76) above which a light’s color counts as **manually overridden**. Lower values catch smaller changes but may trigger during transitions; higher values ignore transition noise but might miss subtle tweaks.
+OKLab color distance threshold above which a light’s color counts as **manually overridden**. Lower values catch smaller changes but may trigger during transitions; higher values ignore transition noise but might miss subtle tweaks.
 
 Relevant only when user-modification tracking is **enabled**.
 
-**Recommended range:** `5–15`
+**Recommended range:** `0.03–0.10`
 
-**Default:** `6.0`
+**Default:** `0.06`
 
 ### `--brightness-override-threshold`
 
@@ -159,9 +159,9 @@ Relevant only when user-modification tracking is **enabled**.
 
 *New in 0.14.0*
 
-Color difference threshold (ΔE CIE76) above which a light’s color counts as **significantly changed** to schedule the next scene sync or background interpolation.
+The OKLab color distance threshold above which a light’s color counts as **significantly changed** to schedule the next scene sync or background interpolation.
 
-**Default:** `3.0`
+**Default:** `0.03`
 
 ### `--brightness-sync-threshold`
 

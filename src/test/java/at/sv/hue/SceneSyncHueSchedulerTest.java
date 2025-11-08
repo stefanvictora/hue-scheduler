@@ -222,7 +222,7 @@ public class SceneSyncHueSchedulerTest extends AbstractHueSchedulerTest {
         assertSceneUpdate("/groups/5", expectedPutCall(1).bri(100));
 
         List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(
-                expectedRunnable(now.plusMinutes(sceneSyncInterpolationInterval), initialNow.plusMinutes(20)), // scene sync schedule
+                expectedRunnable(now.plusMinutes(2), initialNow.plusMinutes(20)), // scene sync schedule
                 expectedRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(20)) // next day
         );
 
@@ -240,13 +240,12 @@ public class SceneSyncHueSchedulerTest extends AbstractHueSchedulerTest {
         assertAllSceneUpdatesAsserted(); // no additional scene sync on power-on
 
         // interpolated sync call schedule is not affected and continues independently
-        advanceCurrentTime(Duration.ofMinutes(sceneSyncInterpolationInterval));
-        followUpRunnables.getFirst().run();
+        setCurrentTimeToAndRun(followUpRunnables.getFirst());
 
-        assertSceneUpdate("/groups/5", expectedPutCall(1).bri(105));
+        assertSceneUpdate("/groups/5", expectedPutCall(1).bri(110));
 
         ensureScheduledStates(
-                expectedRunnable(now.plusMinutes(sceneSyncInterpolationInterval), initialNow.plusMinutes(20)) // next scene sync schedule
+                expectedRunnable(now.plusMinutes(2), initialNow.plusMinutes(20)) // next scene sync schedule
         );
     }
 
@@ -272,7 +271,7 @@ public class SceneSyncHueSchedulerTest extends AbstractHueSchedulerTest {
         assertSceneUpdate("/groups/1", expectedPutCall(5).bri(100));
 
         List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(
-                expectedRunnable(now.plusMinutes(1), now.plusDays(1)), // scene sync schedule
+                expectedRunnable(now.plusMinutes(9), now.plusDays(1)), // scene sync schedule
                 expectedRunnable(now.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), now.plusDays(1)), // split call
                 expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
         );
@@ -311,16 +310,16 @@ public class SceneSyncHueSchedulerTest extends AbstractHueSchedulerTest {
         assertSceneUpdate("/groups/2", expectedPutCall(5).bri(100));
 
         List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(
-                expectedRunnable(now.plusMinutes(1), now.plusMinutes(20)), // scene sync schedule
+                expectedRunnable(now.plusMinutes(2), now.plusMinutes(20)), // scene sync schedule
                 expectedRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(20)) // next day
         );
 
-        advanceCurrentTime(Duration.ofMinutes(sceneSyncInterpolationInterval));
+        setCurrentTimeTo(followUpRunnables.getFirst());
         followUpRunnables.getFirst().run();
 
-        assertSceneUpdate("/groups/2", expectedPutCall(5).bri(105));
+        assertSceneUpdate("/groups/2", expectedPutCall(5).bri(110));
 
-        ScheduledRunnable syncRunnable2 = ensureRunnable(now.plusMinutes(sceneSyncInterpolationInterval),
+        ScheduledRunnable syncRunnable2 = ensureRunnable(now.plusMinutes(2),
                 initialNow.plusMinutes(20)); // next sync, correct end
 
         // power on
@@ -331,8 +330,8 @@ public class SceneSyncHueSchedulerTest extends AbstractHueSchedulerTest {
         ).getFirst();
 
         advanceTimeAndRunAndAssertGroupPutCalls(powerOnRunnable,
-                expectedGroupPutCall(2).bri(125),
-                expectedGroupPutCall(2).bri(150).transitionTime(tr("5min"))
+                expectedGroupPutCall(2).bri(130),
+                expectedGroupPutCall(2).bri(150).transitionTime(tr("4min"))
         );
 
         setCurrentTimeTo(runnables.get(2)); // exactly at end
@@ -1376,8 +1375,8 @@ public class SceneSyncHueSchedulerTest extends AbstractHueSchedulerTest {
         assertSceneUpdate("/groups/5", expectedPutCall(1).bri(108));
 
         ensureScheduledStates(
-                expectedRunnable(now.plusMinutes(1), now.plusDays(1).minusHours(1)), // next scene sync
                 expectedRunnable(now.plusMinutes(40), initialNow.plusDays(1).minusHours(1)), // next split call
+                expectedRunnable(now.plusMinutes(61), now.plusDays(1).minusHours(1)), // next scene sync
                 expectedRunnable(initialNow.plusDays(1).minusHours(1), initialNow.plusDays(2).minusHours(1)) // next day
         );
     }
@@ -1461,7 +1460,7 @@ public class SceneSyncHueSchedulerTest extends AbstractHueSchedulerTest {
         );
 
         List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(
-                expectedRunnable(now.plusMinutes(sceneSyncInterpolationInterval), now.plusDays(1)), // sync retry
+                expectedRunnable(now.plusMinutes(syncFailureRetryInMinutes), now.plusDays(1)), // sync retry
                 expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
         );
         ScheduledRunnable retrySync = followUpRunnables.getFirst();
@@ -1476,7 +1475,7 @@ public class SceneSyncHueSchedulerTest extends AbstractHueSchedulerTest {
     }
 
     @Test
-    void sceneSync_apiThrowsError_interpolate_noAdditionalRetry() {
+    void sceneSync_apiThrowsError_interpolate_retries() {
         enableSceneSync();
 
         mockDefaultGroupCapabilities(2);
@@ -1498,7 +1497,7 @@ public class SceneSyncHueSchedulerTest extends AbstractHueSchedulerTest {
         expectedSceneUpdates++;
 
         ensureScheduledStates(
-                expectedRunnable(now.plusMinutes(1), now.plusDays(1)), // scene sync schedule; no additional retry
+                expectedRunnable(now.plusMinutes(syncFailureRetryInMinutes), now.plusDays(1)), // scene sync retry
                 expectedRunnable(initialNow.plusDays(1), initialNow.plusDays(2)) // next day
         );
     }

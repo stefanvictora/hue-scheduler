@@ -49,9 +49,9 @@ public class AbstractHueSchedulerTest {
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss ");
     private static final int BRIGHTNESS_OVERRIDE_THRESHOLD_PERCENT = 10;
     private static final int COLOR_TEMPERATURE_OVERRIDE_THRESHOLD_KELVIN = 350;
-    private static final double COLOR_OVERRIDE_THRESHOLD = 8.0;
+    private static final double COLOR_OVERRIDE_THRESHOLD = 0.06;
 
-    protected final int sceneSyncInterpolationInterval = 1;
+    protected final int syncFailureRetryInMinutes = 3;
     private final String sceneSyncName = "synced-scene";
     private final String unsyncedSceneName = "user-scene";
 
@@ -81,6 +81,7 @@ public class AbstractHueSchedulerTest {
     private int expectedGroupPutCalls;
     private int expectedScenePutCalls;
     private boolean enableSceneSync = false;
+    private boolean supportsOffLightUpdates = false;
 
     @BeforeEach
     void setUp() {
@@ -137,6 +138,11 @@ public class AbstractHueSchedulerTest {
         create();
     }
 
+    protected void enableSupportForOffLightUpdates() {
+        supportsOffLightUpdates = true;
+        create();
+    }
+
     protected void enableSceneSync() {
         enableSceneSync = true;
         create();
@@ -151,9 +157,11 @@ public class AbstractHueSchedulerTest {
         scheduler = new HueScheduler(mockedHueApi, stateScheduler, startTimeProvider,
                 () -> now, 10.0, controlGroupLightsIndividually, disableUserModificationTracking,
                 requireSceneActivation, defaultInterpolationTransitionTimeInMs, 0, connectionFailureRetryDelay,
-                minTrGap, AbstractHueSchedulerTest.BRIGHTNESS_OVERRIDE_THRESHOLD_PERCENT, AbstractHueSchedulerTest.COLOR_TEMPERATURE_OVERRIDE_THRESHOLD_KELVIN,
-                AbstractHueSchedulerTest.COLOR_OVERRIDE_THRESHOLD, sceneActivationIgnoreWindowInSeconds, interpolateAll,
-                enableSceneSync, sceneSyncName, sceneSyncInterpolationInterval, sceneSyncDelayInSeconds, autoFillGradient);
+                minTrGap, BRIGHTNESS_OVERRIDE_THRESHOLD_PERCENT, COLOR_TEMPERATURE_OVERRIDE_THRESHOLD_KELVIN,
+                COLOR_OVERRIDE_THRESHOLD,  3.8, 150, 0.06,
+                sceneActivationIgnoreWindowInSeconds, interpolateAll,
+                enableSceneSync, sceneSyncName, syncFailureRetryInMinutes, sceneSyncDelayInSeconds, autoFillGradient,
+                supportsOffLightUpdates);
         manualOverrideTracker = scheduler.getManualOverrideTracker();
     }
 

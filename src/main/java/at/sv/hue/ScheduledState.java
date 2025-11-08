@@ -100,7 +100,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
 
     private static ScheduledState createTemporaryCopy(ScheduledState state, String start) {
         ScheduledState copy = new ScheduledState(state.identifier, start,
-                state.lightStates, state.transitionTimeBeforeString, state.definedTransitionTime, state.daysOfWeek, state.startTimeProvider,
+                copyLightStates(state.lightStates), state.transitionTimeBeforeString, state.definedTransitionTime, state.daysOfWeek, state.startTimeProvider,
                 state.minTrBeforeGapInMinutes, state.brightnessOverrideThreshold, state.colorTemperatureOverrideThresholdKelvin,
                 state.colorOverrideThreshold, state.force, state.interpolate, state.groupState, true);
         copy.lastSeen = state.lastSeen;
@@ -108,6 +108,12 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
         copy.previousStateLookup = state.previousStateLookup;
         copy.nextStateLookup = state.nextStateLookup;
         return copy;
+    }
+
+    private static List<ScheduledLightState> copyLightStates(List<ScheduledLightState> lightStates) {
+        return lightStates.stream()
+                          .map(lightState -> lightState.toBuilder().build())
+                          .toList();
     }
 
     private Integer assertValidTransitionTime(Integer transitionTime) {
@@ -286,11 +292,8 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
         return identifier.id();
     }
 
-    public void setTriggeredByPowerTransition(boolean triggeredByPowerTransition) {
-        this.triggeredByPowerTransition = triggeredByPowerTransition;
-        if (force != Boolean.TRUE) {
-//            on = null; todo: fix after rebase
-        }
+    public void setTriggeredByPowerTransition() {
+        this.triggeredByPowerTransition = true;
     }
 
     @Override

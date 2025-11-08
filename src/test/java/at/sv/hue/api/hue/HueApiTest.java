@@ -107,7 +107,7 @@ class HueApiTest {
 
     @Test
     void getState_hasGradientSupport_currentlyActive() {
-        setGetResponse("/light/cb6f54e8-5071-478e-9c0a-949a51b117a2", """
+        setGetResponse("/light", """
                 {
                   "errors": [],
                   "data": [
@@ -292,7 +292,7 @@ class HueApiTest {
 
     @Test
     void getState_hasGradientSupport_notActive() {
-        setGetResponse("/light/cb6f54e8-5071-478e-9c0a-949a51b117a2", """
+        setGetResponse("/light", """
                 {
                   "errors": [],
                   "data": [
@@ -567,7 +567,7 @@ class HueApiTest {
 
     @Test
     void getState_returnsLightState_effectActive_ctAsParameter() {
-        setGetResponse("/light/cb6f54e8-5071-478e-9c0a-949a51b117a2", """
+        setGetResponse("/light", """
                 {
                   "errors": [],
                   "data": [
@@ -677,7 +677,7 @@ class HueApiTest {
 
     @Test
     void getState_returnsLightState_effectActive_justSpeed() {
-        setGetResponse("/light/cb6f54e8-5071-478e-9c0a-949a51b117a2", """
+        setGetResponse("/light", """
                 {
                   "errors": [],
                   "data": [
