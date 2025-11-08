@@ -160,6 +160,167 @@ public class SceneControlHueSchedulerTest extends AbstractHueSchedulerTest {
     }
 
     @Test
+    void sceneControl_interpolate_gradient_withSceneSync_sceneToScene_firstMoreGradientPoints_correctNextSyncTime() {
+        enableSceneSync();
+        mockDefaultGroupCapabilities(2);
+        mockGroupLightsForId(2, 4, 5);
+        mockSceneLightStates(2, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .gradient(Gradient.builder()
+                                                     .points(List.of(
+                                                             Pair.of(0.2, 0.2),
+                                                             Pair.of(0.2, 0.3),
+                                                             Pair.of(0.2, 0.4)
+                                                     ))
+                                                     .build()),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(150));
+        mockSceneLightStates(2, "AnotherTestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .gradient(Gradient.builder()
+                                                     .points(List.of(
+                                                             Pair.of(0.2, 0.3),
+                                                             Pair.of(0.5, 0.4)
+                                                     ))
+                                                     .build()),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(150));
+        addState("g2", now, "scene:TestScene");
+        addState("g2", now.plusMinutes(10), "scene:AnotherTestScene", "interpolate:true");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1)),
+                expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
+        );
+
+        setCurrentTimeToAndRun(runnables.getFirst());
+
+        assertScenePutCalls(2,
+                expectedPutCall(4).gradient(Gradient.builder()
+                                                    .points(List.of(
+                                                            Pair.of(0.2, 0.2),
+                                                            Pair.of(0.2, 0.3),
+                                                            Pair.of(0.2, 0.4)
+                                                    ))
+                                                    .build()),
+                expectedPutCall(5).bri(150)
+        );
+
+        assertScenePutCalls(2,
+                expectedPutCall(4).gradient(Gradient.builder()
+                                                    .points(List.of(
+                                                            Pair.of(0.2, 0.3),
+                                                            Pair.of(0.5, 0.4)
+                                                    ))
+                                                    .build())
+                                  .transitionTime(tr("10min")),
+                expectedPutCall(5).bri(150).transitionTime(tr("10min"))
+        );
+        assertAllScenePutCallsAsserted();
+
+        assertSceneUpdate("/groups/2",
+                expectedPutCall(4).gradient(Gradient.builder()
+                                                    .points(List.of(
+                                                            Pair.of(0.2, 0.2),
+                                                            Pair.of(0.2, 0.3),
+                                                            Pair.of(0.2, 0.4)
+                                                    ))
+                                                    .build()),
+                expectedPutCall(5).bri(150)
+        );
+
+        List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(
+                expectedRunnable(now.plusMinutes(2), now.plusDays(1)), // next scene sync
+                expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
+        );
+    }
+
+    @Test
+    void sceneControl_interpolate_gradient_withSceneSync_sceneToScene_secondMoreGradientPoints_correctNextSyncTime() {
+        enableSceneSync();
+        mockDefaultGroupCapabilities(2);
+        mockGroupLightsForId(2, 4, 5);
+        mockSceneLightStates(2, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .gradient(Gradient.builder()
+                                                     .points(List.of(
+                                                             Pair.of(0.2, 0.2),
+                                                             Pair.of(0.2, 0.4)
+                                                     ))
+                                                     .build()),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(150));
+        mockSceneLightStates(2, "AnotherTestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .gradient(Gradient.builder()
+                                                     .points(List.of(
+                                                             Pair.of(0.2, 0.2),
+                                                             Pair.of(0.3, 0.2),
+                                                             Pair.of(0.5, 0.4)
+                                                     ))
+                                                     .build()),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(150));
+        addState("g2", now, "scene:TestScene");
+        addState("g2", now.plusMinutes(10), "scene:AnotherTestScene", "interpolate:true");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1)),
+                expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
+        );
+
+        setCurrentTimeToAndRun(runnables.getFirst());
+
+        assertScenePutCalls(2,
+                expectedPutCall(4).gradient(Gradient.builder()
+                                                    .points(List.of(
+                                                            Pair.of(0.2, 0.2),
+                                                            Pair.of(0.2, 0.3),
+                                                            Pair.of(0.2, 0.4)
+                                                    ))
+                                                    .build()),
+                expectedPutCall(5).bri(150)
+        );
+
+        assertScenePutCalls(2,
+                expectedPutCall(4).gradient(Gradient.builder()
+                                                    .points(List.of(
+                                                            Pair.of(0.2, 0.2),
+                                                            Pair.of(0.3, 0.2),
+                                                            Pair.of(0.5, 0.4)
+                                                    ))
+                                                    .build())
+                                  .transitionTime(tr("10min")),
+                expectedPutCall(5).bri(150).transitionTime(tr("10min"))
+        );
+        assertAllScenePutCallsAsserted();
+
+        assertSceneUpdate("/groups/2",
+                expectedPutCall(4).gradient(Gradient.builder()
+                                                    .points(List.of(
+                                                            Pair.of(0.2, 0.2),
+                                                            Pair.of(0.2, 0.3),
+                                                            Pair.of(0.2, 0.4)
+                                                    ))
+                                                    .build()),
+                expectedPutCall(5).bri(150)
+        );
+
+        List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(
+                expectedRunnable(now.plusMinutes(2), now.plusDays(1)), // next scene sync
+                expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
+        );
+    }
+
+    @Test
     void sceneControl_init_withOnProperty_addsOnToIndividualLights_unlessTheyAreOff() {
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
@@ -179,6 +340,64 @@ public class SceneControlHueSchedulerTest extends AbstractHueSchedulerTest {
 
         advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
                 expectedPutCall(4).on(true).bri(100).ct(20),
+                expectedPutCall(5).on(false)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
+        );
+    }
+
+    @Test
+    void sceneControl_lightsAreOff_supportsOffUpdates_controlsLightsIndividually() {
+        enableSupportForOffLightUpdates();
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        mockSceneLightStates(1, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(200));
+        addState("g1", now, "scene:TestScene", "tr:5s"); // transition time ignored for off lights
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1))
+        );
+
+        mockIsGroupOff(1, true);
+        advanceTimeAndRunAndAssertPutCalls(runnables.getFirst(),
+                expectedPutCall(4).bri(100),
+                expectedPutCall(5).bri(200)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
+        );
+    }
+
+    @Test
+    void sceneControl_controlLightsIndividually_performsIndividualUpdates() {
+        controlGroupLightsIndividually = true;
+        create();
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        mockSceneLightStates(1, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .on(false));
+        addState("g1", now, "scene:TestScene");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(runnables.getFirst(),
+                expectedPutCall(4).bri(100),
                 expectedPutCall(5).on(false)
         );
 

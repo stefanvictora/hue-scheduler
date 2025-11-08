@@ -68,12 +68,29 @@ public final class PutCalls {
                                         .collect(Collectors.toList()), transitionTime, groupUpdate);
     }
 
+    public void resetOn() {
+        putCalls.forEach(PutCall::resetOn);
+    }
+
     public boolean isGeneralGroup() {
         return groupUpdate && putCalls.size() == 1;
     }
 
     public boolean hasSameLightStates(PutCalls other) {
         return allMatch(other, PutCall::hasSameLightState);
+    }
+
+    public boolean hasNotSimilarLightState(PutCalls other, int brightnessThreshold,
+                                           int colorTemperatureThresholdKelvin,
+                                           double colorThreshold) {
+        return anyMatch(other, (pc1, pc2) -> pc1.hasNotSimilarLightState(pc2,
+                                                                           brightnessThreshold,
+                                                                           colorTemperatureThresholdKelvin,
+                                                                           colorThreshold));
+    }
+
+    private boolean anyMatch(PutCalls other, BiPredicate<PutCall, PutCall> predicate) {
+        return matchWith(other).stream().anyMatch(pair -> pair.test(predicate));
     }
 
     public boolean allMatch(PutCalls other, BiPredicate<PutCall, PutCall> predicate) {

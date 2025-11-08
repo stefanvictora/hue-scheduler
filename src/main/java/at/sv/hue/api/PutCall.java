@@ -11,6 +11,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Objects;
 import java.util.stream.Stream;
 
@@ -50,6 +51,10 @@ public final class PutCall {
 
     public boolean isOff() {
         return on == Boolean.FALSE;
+    }
+
+    public void resetOn() {
+        this.on = null;
     }
 
     public Pair<Double, Double> getXY() {
@@ -114,10 +119,9 @@ public final class PutCall {
                                             double colorThreshold) {
         return !Objects.equals(this.on, other.on) ||
                brightnessIsNotSimilar(this.bri, other.bri, brightnessThreshold) ||
-               !Objects.equals(this.hue, other.hue) ||
-               !Objects.equals(this.sat, other.sat) ||
                !Objects.equals(this.effect, other.effect) ||
                colorIsNotSimilar(this, other, colorThreshold) ||
+               gradientIsNotSimilar(this, other, colorThreshold) ||
                ctIsNotSimilar(this.ct, other.ct, colorTemperatureThresholdKelvin);
     }
 
@@ -138,6 +142,26 @@ public final class PutCall {
         }
         return ColorComparator.colorDiffers(
                 call1.x, call1.y, call2.x, call2.y, call1.gamut, threshold);
+    }
+
+    private boolean gradientIsNotSimilar(PutCall putCall, PutCall other, double colorThreshold) {
+        if (putCall.gradient == null && other.gradient == null) {
+            return false;
+        }
+        if (putCall.gradient == null || other.gradient == null) {
+            return true;
+        }
+        List<Pair<Double, Double>> points = putCall.gradient.points();
+        List<Pair<Double, Double>> otherPoints = other.gradient.points();
+        for (int i = 0; i < otherPoints.size(); i++) {
+            Pair<Double, Double> point = points.get(i);
+            Pair<Double, Double> otherPoint = otherPoints.get(i);
+            if (ColorComparator.colorDiffers(point.first(), point.second(),
+                    otherPoint.first(), otherPoint.second(), putCall.gamut, colorThreshold)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean ctIsNotSimilar(Integer ct1, Integer ct2, int thresholdKelvin) {

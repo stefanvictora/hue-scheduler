@@ -227,8 +227,8 @@ public final class HueScheduler implements Runnable {
     int colorTemperatureSyncThresholdKelvin;
     @Option(
             names = "--color-sync-threshold", paramLabel = "<delta>",
-            defaultValue = "${env:COLOR_SYNC_THRESHOLD:-3.0}",
-            description = "The color difference threshold (Delta-E CIE76) above which a light's color is considered " +
+            defaultValue = "${env:COLOR_SYNC_THRESHOLD:-0.04}",
+            description = "The OKLab color distance threshold above which a light's color is considered " +
                           "significantly changed to schedule the next scene sync or background interpolation. " +
                           "Default: ${DEFAULT-VALUE}."
     )
@@ -748,8 +748,8 @@ public final class HueScheduler implements Runnable {
         scheduleIfNotYetEnded(stateSnapshot, () -> syncScene(stateSnapshot, justOnce), nextSyncTime);
     }
 
-    private ZonedDateTime getNextChangeTime(ScheduledStateSnapshot state, PutCall currentPutCall, ZonedDateTime now) {
-        return state.getNextSignificantPropertyChangeTime(currentPutCall, now,
+    private ZonedDateTime getNextChangeTime(ScheduledStateSnapshot state, PutCalls currentPutCalls, ZonedDateTime now) {
+        return state.getNextSignificantPropertyChangeTime(currentPutCalls, now,
                 parseBrightnessPercentValue(brightnessSyncThresholdPercentage),
                 colorTemperatureSyncThresholdKelvin, colorSyncThreshold);
     }
@@ -768,8 +768,8 @@ public final class HueScheduler implements Runnable {
         scheduleNextBackgroundInterpolation(state, null, now);
     }
 
-    private void scheduleNextBackgroundInterpolation(ScheduledStateSnapshot state, PutCall currentPutCall, ZonedDateTime now) {
-        ZonedDateTime nextChangeTime = getNextChangeTime(state, currentPutCall, now);
+    private void scheduleNextBackgroundInterpolation(ScheduledStateSnapshot state, PutCalls currentPutCalls, ZonedDateTime now) {
+        ZonedDateTime nextChangeTime = getNextChangeTime(state, currentPutCalls, now);
         if (nextChangeTime != null) {
             scheduleNextBackgroundInterpolation(state, nextChangeTime);
         }
@@ -783,12 +783,12 @@ public final class HueScheduler implements Runnable {
         MDC.put("context", state.getContextName() + " (interpolation)");
         ZonedDateTime now = currentTime.get();
         try {
-            PutCall putCall = state.getInterpolatedFullPicturePutCall(now);
+            PutCalls putCalls = state.getInterpolatedFullPicturePutCalls(now);
             if (isConsideredOff(state)) {
-                putCall.setOn(null); // do not turn on light during background interpolation
-                putState(state, putCall);
+                putCalls.resetOn(); // do not turn on light during background interpolation
+                putState(state, putCalls);
             }
-            scheduleNextBackgroundInterpolation(state, putCall, now);
+            scheduleNextBackgroundInterpolation(state, putCalls, now);
         } catch (Exception e) {
             LOG.error("Background interpolation failed: '{}'. Retry in {} min.", e.getLocalizedMessage(),
                     syncFailureRetryInMinutes, e);
@@ -975,7 +975,7 @@ public final class HueScheduler implements Runnable {
             if (interpolatedSplitPutCalls == null) {
                 return;
             }
-            performPutApiCall(state, interpolatedSplitPutCalls);
+            putState(state, interpolatedSplitPutCalls);
         } else {
             putState(state, getPutCallsWithAdjustedTr(state, now, performedInterpolation));
         }
@@ -989,32 +989,54 @@ public final class HueScheduler implements Runnable {
     }
 
     private void putState(ScheduledStateSnapshot state, PutCalls putCalls) {
-//        if (state.isGroupState() && (controlGroupLightsIndividually || isConsideredOffAndDoesNotTurnOn(state))) {
-//            for (PutCall call : stateRegistry.getPutCalls(state)) {
-//                try {
-//                    performPutApiCall(state, call);
-//                } catch (ApiFailure e) {
-//                    LOG.trace("Unsupported api call for light id {}: {}", call.getId(), e.getLocalizedMessage());
-//                }
-//            }
-//        } else {
-//        }
-        performPutApiCall(state, putCalls);
-    }
-
-    private void performPutApiCall(ScheduledStateSnapshot state, PutCalls putCalls) {
         LOG.debug("{}", putCalls);
         if (isConsideredOffAndDoesNotTurnOn(state)) {
             putCalls.setTransitionTime(null);
         }
+        if (wasJustPowerTransition(state) && isConsideredOff(state) && !state.isForced()) {
+            putCalls.resetOn();
+        }
         state.recordLastPutCalls(putCalls);
         // todo: are we sure that we always have at least one element here?
-        if (putCalls.isGeneralGroup()) {
-            api.putGroupState(putCalls.getFirst());
-        } else if (putCalls.isGroupUpdate()) {
-            api.putSceneState(putCalls.getId(), putCalls.toList());
+        if (putCalls.isGroupUpdate()) {
+            if (putCalls.isGeneralGroup()) {
+                PutCall putCall = putCalls.getFirst();
+                if (shouldControlIndividually(state)) {
+                    updateIndividualIgnoringError(getIndividualPutCalls(putCall, state.getId()));
+                } else {
+                    api.putGroupState(putCall);
+                }
+            } else {
+                List<PutCall> putCallList = putCalls.toList();
+                if (shouldControlIndividually(state)) {
+                    updateIndividualIgnoringError(putCallList);
+                } else {
+                    api.putSceneState(putCalls.getId(), putCallList);
+                }
+            }
         } else {
             api.putState(putCalls.getFirst());
+        }
+    }
+
+    private boolean shouldControlIndividually(ScheduledStateSnapshot state) {
+        return controlGroupLightsIndividually || isConsideredOffAndDoesNotTurnOn(state);
+    }
+
+    private List<PutCall> getIndividualPutCalls(PutCall putCall, String groupId) {
+        return api.getGroupLights(groupId)
+                  .stream()
+                  .map(lightId -> putCall.toBuilder().id(lightId).build())
+                  .toList();
+    }
+
+    private void updateIndividualIgnoringError(List<PutCall> putCallList) {
+        for (PutCall call : putCallList) {
+            try {
+                api.putState(call);
+            } catch (ApiFailure e) {
+                LOG.trace("Unsupported api call for light id {}: {}", call.getId(), e.getLocalizedMessage());
+            }
         }
     }
 
@@ -1078,7 +1100,7 @@ public final class HueScheduler implements Runnable {
 
     private ScheduledStateSnapshot createPowerTransitionCopy(ScheduledStateSnapshot state) {
         ScheduledState copy = ScheduledState.createTemporaryCopy(state.getScheduledState());
-        copy.setTriggeredByPowerTransition(true);
+        copy.setTriggeredByPowerTransition();
         ScheduledStateSnapshot snapshot = copy.getSnapshot(state.getDefinedStart());
         snapshot.overwriteEnd(state.calculateNextPowerTransitionEnd(currentTime.get()));
         return snapshot;

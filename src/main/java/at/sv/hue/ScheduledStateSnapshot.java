@@ -341,7 +341,7 @@ public class ScheduledStateSnapshot {
         return getInterpolatedPutCallsIfNeeded(now) != null;
     }
 
-    public ZonedDateTime getNextSignificantPropertyChangeTime(PutCall currentPutCall, ZonedDateTime now, int brightnessThreshold,
+    public ZonedDateTime getNextSignificantPropertyChangeTime(PutCalls currentPutCalls, ZonedDateTime now, int brightnessThreshold,
                                                               int colorTemperatureThresholdKelvin, double colorThreshold) {
         if (!hasTransitionBefore()) {
             return null;
@@ -353,18 +353,18 @@ public class ScheduledStateSnapshot {
         if (isAlreadyReached(now)) {
             return null; // the state is already reached
         }
-        if (currentPutCall == null) {
-            currentPutCall = getInterpolatedFullPicturePutCall(now);
+        if (currentPutCalls == null) {
+            currentPutCalls = getInterpolatedFullPicturePutCalls(now);
         }
         ZonedDateTime nextTime = now.truncatedTo(ChronoUnit.MINUTES).plusMinutes(1);
         ZonedDateTime endTime = getDefinedStart();
         while (nextTime.isBefore(endTime)) {
-            StateInterpolator futureInterpolator = new StateInterpolator(this, previousState, nextTime, true);
-            PutCall future = futureInterpolator.getInterpolatedPutCall();
-            if (future != null && currentPutCall.hasNotSimilarLightState(future, brightnessThreshold,
+            StateInterpolator futureInterpolator = new StateInterpolator(this, previousState, nextTime);
+            PutCalls future = futureInterpolator.getInterpolatedPutCalls();
+            if (future != null && currentPutCalls.hasNotSimilarLightState(future, brightnessThreshold,
                     colorTemperatureThresholdKelvin, colorThreshold)) {
                 log.trace("Next property change in {}: {}. Current: {}",
-                        Duration.between(now, nextTime), future, currentPutCall);
+                        Duration.between(now, nextTime), future, currentPutCalls);
                 return nextTime;
             }
             nextTime = nextTime.plusMinutes(1);
