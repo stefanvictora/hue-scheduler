@@ -11,7 +11,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-public class SceneControlHueSchedulerTest extends AbstractHueSchedulerTest {
+public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
 
     @Test
     void sceneControl_init_loadsLightPropertiesForGroupByName() {
