@@ -10,7 +10,7 @@ import java.util.List;
 import static org.mockito.Mockito.*;
 import static org.mockito.Mockito.verify;
 
-public class SceneSyncHueSchedulerTest extends AbstractHueSchedulerTest {
+public class HueSchedulerSceneSyncTest extends AbstractHueSchedulerTest {
 
     @Test
     void sceneSync_groupState_createsAndUpdatesScene_evenIfGroupIsOff_stillSchedulesForNextDay() {

@@ -11,7 +11,7 @@ import java.util.List;
 
 import static org.mockito.Mockito.*;
 
-public class ManualOverrideHueSchedulerTest extends AbstractHueSchedulerTest {
+public class HueSchedulerManualOverrideTest extends AbstractHueSchedulerTest {
 
     @Test
     void hassEntityId_detectsManualOverrides_brightness() {
