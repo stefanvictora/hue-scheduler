@@ -64,7 +64,6 @@ import static at.sv.hue.InputConfigurationParser.parseBrightnessPercentValue;
 public final class HueScheduler implements Runnable {
 
     private static final Logger LOG = LoggerFactory.getLogger(HueScheduler.class);
-    private static final String SCENE_SYNC_APP_DATA = "hue_sch:sync";
     private static final String SCENE_CONTROL_APP_DATA = "hue_sch:temp";
 
     @CommandLine.Spec
@@ -384,7 +383,7 @@ public final class HueScheduler implements Runnable {
         OkHttpClient httpsClient = createHueHttpsClient();
         RateLimiter rateLimiter = RateLimiter.create(requestsPerSecond);
         api = new HueApiImpl(new HttpResourceProviderImpl(httpsClient, maxConcurrentRequests), apiHost, rateLimiter,
-                apiCacheInvalidationIntervalInMinutes, SCENE_SYNC_APP_DATA, sceneControlName, SCENE_CONTROL_APP_DATA);
+                apiCacheInvalidationIntervalInMinutes, sceneControlName, SCENE_CONTROL_APP_DATA);
         lightEventListener = createLightEventListener();
         sceneEventListener = new SceneEventListenerImpl(api, Ticker.systemTicker(),
                 sceneActivationIgnoreWindowInSeconds, sceneSyncName::equals, lightEventListener);
