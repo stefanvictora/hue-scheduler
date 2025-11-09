@@ -525,7 +525,12 @@ public final class HueApiImpl implements HueApi {
 
     private String createScene(Scene newScene) {
         rateLimiter.acquire(10);
-        return getAffectedResourceId(resourceProvider.postResource(createUrl("/scene"), getBody(newScene)));
+        String response = resourceProvider.postResource(createUrl("/scene"), getBody(newScene));
+        String id = getAffectedResourceId(response);
+        if (id == null) {
+            throw new ApiFailure("Failed to create scene, no id returned in response: " + response);
+        }
+        return id;
     }
 
     private String getAffectedResourceId(String response) {
