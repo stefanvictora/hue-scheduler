@@ -60,10 +60,12 @@ import java.util.stream.Stream;
 
 import static at.sv.hue.InputConfigurationParser.parseBrightnessPercentValue;
 
-@Command(name = "HueScheduler", version = "0.14.3", mixinStandardHelpOptions = true, sortOptions = false)
+@Command(name = "HueScheduler", version = "0.15.0", mixinStandardHelpOptions = true, sortOptions = false)
 public final class HueScheduler implements Runnable {
 
     private static final Logger LOG = LoggerFactory.getLogger(HueScheduler.class);
+    private static final String SCENE_SYNC_APP_DATA = "hue_sch:sync";
+    private static final String SCENE_CONTROL_APP_DATA = "hue_sch:temp";
 
     @CommandLine.Spec
     CommandLine.Model.CommandSpec spec;
@@ -136,6 +138,11 @@ public final class HueScheduler implements Runnable {
             description = "The name of the synced scene. Related to '--enable-scene-sync'." +
                           " Default: ${DEFAULT-VALUE}")
     String sceneSyncName;
+    @Option(names = "--scene-control-name",
+            defaultValue = "${env:SCENE_CONTROL_NAME:-HueTemp}",
+            description = "The name of the temp scene to perform scene scheduling." +
+                          " Default: ${DEFAULT-VALUE}")
+    String sceneControlName;
 
     @Option(names = "--interpolate-all",
             defaultValue = "${env:INTERPOLATE_ALL:-false}",
@@ -376,7 +383,8 @@ public final class HueScheduler implements Runnable {
         supportsOffLightUpdates = true;
         OkHttpClient httpsClient = createHueHttpsClient();
         RateLimiter rateLimiter = RateLimiter.create(requestsPerSecond);
-        api = new HueApiImpl(new HttpResourceProviderImpl(httpsClient, maxConcurrentRequests), apiHost, rateLimiter, apiCacheInvalidationIntervalInMinutes);
+        api = new HueApiImpl(new HttpResourceProviderImpl(httpsClient, maxConcurrentRequests), apiHost, rateLimiter,
+                apiCacheInvalidationIntervalInMinutes, SCENE_SYNC_APP_DATA, sceneControlName, SCENE_CONTROL_APP_DATA);
         lightEventListener = createLightEventListener();
         sceneEventListener = new SceneEventListenerImpl(api, Ticker.systemTicker(),
                 sceneActivationIgnoreWindowInSeconds, sceneSyncName::equals, lightEventListener);

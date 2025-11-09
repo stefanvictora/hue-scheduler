@@ -51,6 +51,9 @@ class HueApiTest {
               "data": []
             }
             """;
+    private static final String SCENE_SYNC_APP_DATA = "hue_sch:sync";
+    private static final String SCENE_CONTROL_APP_DATA = "hue_sch:temp";
+    private static final String SCENE_CONTROL_NAME = "HueTemp";
     private HueApi api;
     private String baseUrl;
     private HttpResourceProvider resourceProviderMock;
@@ -59,15 +62,15 @@ class HueApiTest {
     void setUp() {
         String host = "localhost";
         resourceProviderMock = Mockito.mock(HttpResourceProvider.class);
-        api = new HueApiImpl(resourceProviderMock, host, permits -> {
-        }, 5);
+        api = new HueApiImpl(resourceProviderMock, host, _ -> {
+        }, 5, SCENE_SYNC_APP_DATA, SCENE_CONTROL_NAME, SCENE_CONTROL_APP_DATA);
         baseUrl = "https://" + host + "/clip/v2/resource";
     }
 
     @Test
     void invalidHost_cantUseScheme_exception() {
         assertThrows(InvalidConnectionException.class, () -> new HueApiImpl(resourceProviderMock, "hTtps://localhost", permits -> {
-        }, 5));
+        }, 5, null, null, null));
     }
 
     @Test
@@ -4997,7 +5000,7 @@ class HueApiTest {
                 {
                   "metadata": {
                     "name": "Scene_3",
-                    "appdata": "huescheduler:app"
+                    "appdata": "hue_sch:sync"
                   },
                   "group": {
                     "rid": "ROOM_1",
@@ -5067,6 +5070,9 @@ class HueApiTest {
 
         verifyPut("/scene/SCENE_1", """
                 {
+                  "metadata": {
+                    "appdata": "hue_sch:sync"
+                  },
                   "actions": [
                     {
                       "target": {
@@ -5125,6 +5131,9 @@ class HueApiTest {
 
         verifyPut("/scene/SCENE_3", """
                 {
+                  "metadata": {
+                    "appdata": "hue_sch:sync"
+                  },
                   "actions": [
                     {
                       "target": {
@@ -5159,6 +5168,9 @@ class HueApiTest {
 
         verifyPut("/scene/SCENE_3", """
                 {
+                  "metadata": {
+                    "appdata": "hue_sch:sync"
+                  },
                   "actions": [
                     {
                       "target": {
@@ -5429,7 +5441,7 @@ class HueApiTest {
                 {
                   "metadata": {
                     "name": "SCENE",
-                    "appdata": "huescheduler:app"
+                    "appdata": "hue_sch:sync"
                   },
                   "group": {
                     "rid": "ZONE",
@@ -5515,7 +5527,7 @@ class HueApiTest {
                 {
                   "metadata": {
                     "name": "SCENE",
-                    "appdata": "huescheduler:app"
+                    "appdata": "hue_sch:sync"
                   },
                   "group": {
                     "rid": "ZONE",
@@ -5598,7 +5610,7 @@ class HueApiTest {
                 {
                   "metadata": {
                     "name": "SCENE",
-                    "appdata": "huescheduler:app"
+                    "appdata": "hue_sch:sync"
                   },
                   "group": {
                     "rid": "ZONE",
@@ -5883,6 +5895,9 @@ class HueApiTest {
 
         verifyPut("/scene/SCENE", """
                 {
+                  "metadata": {
+                    "appdata": "hue_sch:sync"
+                  },
                   "actions": [
                     {
                       "target": {
@@ -5930,6 +5945,9 @@ class HueApiTest {
 
         verifyPut("/scene/SCENE", """
                 {
+                  "metadata": {
+                    "appdata": "hue_sch:sync"
+                  },
                   "actions": [
                     {
                       "target": {
@@ -6100,8 +6118,8 @@ class HueApiTest {
         verifyPost("/scene", """
                 {
                   "metadata": {
-                    "name": "•",
-                    "appdata": "huescheduler:app"
+                    "name": "HueTemp",
+                    "appdata": "hue_sch:temp"
                   },
                   "group": {
                     "rid": "ZONE_1",

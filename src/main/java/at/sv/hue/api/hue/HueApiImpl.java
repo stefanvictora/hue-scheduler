@@ -70,6 +70,9 @@ public final class HueApiImpl implements HueApi {
     private final ObjectMapper mapper;
     private final String baseApi;
     private final RateLimiter rateLimiter;
+    private final String sceneSyncAppData;
+    private final String sceneControlName;
+    private final String sceneControlAppData;
     private final AsyncLoadingCache<String, Map<String, Light>> availableLightsCache;
     private final AsyncLoadingCache<String, Map<String, Device>> availableDevicesCache;
     private final AsyncLoadingCache<String, Map<String, Light>> availableGroupedLightsCache;
@@ -79,7 +82,8 @@ public final class HueApiImpl implements HueApi {
     private final AsyncLoadingCache<String, Map<String, ZigbeeConnectivity>> availableZigbeeConnectivityCache;
 
     public HueApiImpl(HttpResourceProvider resourceProvider, String host, RateLimiter rateLimiter,
-                      int apiCacheInvalidationIntervalInMinutes) {
+                      int apiCacheInvalidationIntervalInMinutes, String sceneSyncAppData, String sceneControlName,
+                      String sceneControlAppData) {
         this.resourceProvider = resourceProvider;
         mapper = new ObjectMapper();
         mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
@@ -88,6 +92,9 @@ public final class HueApiImpl implements HueApi {
         assertNotHttpSchemeProvided(host);
         baseApi = "https://" + host + "/clip/v2/resource";
         this.rateLimiter = rateLimiter;
+        this.sceneSyncAppData = sceneSyncAppData;
+        this.sceneControlName = sceneControlName;
+        this.sceneControlAppData = sceneControlAppData;
         availableLightsCache = createCache(this::lookupLights, apiCacheInvalidationIntervalInMinutes);
         availableDevicesCache = createCache(this::lookupDevices, apiCacheInvalidationIntervalInMinutes);
         availableGroupedLightsCache = createCache(this::lookupGroupedLights, apiCacheInvalidationIntervalInMinutes);
@@ -230,7 +237,7 @@ public final class HueApiImpl implements HueApi {
 
     @Override
     public void putSceneState(String groupedLightId, List<PutCall> putCalls) {
-        String sceneId = createOrUpdateSceneInternal(groupedLightId, "•", putCalls);
+        String sceneId = createOrUpdateSceneInternal(groupedLightId, sceneControlName, putCalls, sceneControlAppData);
         recallScene(sceneId);
         log.trace("Recalled temp scene for {}", groupedLightId);
     }
@@ -352,20 +359,21 @@ public final class HueApiImpl implements HueApi {
 
     @Override
     public synchronized void createOrUpdateScene(String groupedLightId, String sceneSyncName, List<PutCall> putCalls) {
-        createOrUpdateSceneInternal(groupedLightId, sceneSyncName, putCalls);
+        createOrUpdateSceneInternal(groupedLightId, sceneSyncName, putCalls, sceneSyncAppData);
     }
 
-    private String createOrUpdateSceneInternal(String groupedLightId, String sceneSyncName, List<PutCall> putCalls) {
+    private String createOrUpdateSceneInternal(String groupedLightId, String sceneSyncName, List<PutCall> putCalls,
+                                               String appdata) {
         Group group = getAndAssertGroupExists(groupedLightId);
         Scene existingScene = getScene(group, sceneSyncName);
         List<SceneAction> actions = createSceneActions(group, putCalls);
         String sceneId;
         if (existingScene == null) {
-            Scene newScene = new Scene(sceneSyncName, group.toResourceReference(), actions);
+            Scene newScene = new Scene(sceneSyncName, group.toResourceReference(), actions, appdata);
             sceneId = createScene(newScene);
             log.trace("Created scene id={}", sceneId);
         } else if (actionsDiffer(existingScene, actions)) {
-            Scene updatedScene = new Scene(actions);
+            Scene updatedScene = new Scene(actions, appdata);
             updateScene(existingScene, updatedScene);
             log.trace("Updated scene id={}", existingScene.getId());
             sceneId = existingScene.getId();
