@@ -2,9 +2,9 @@ package at.sv.hue.api;
 
 import at.sv.hue.ColorMode;
 import at.sv.hue.Effect;
+import at.sv.hue.FormatUtil;
 import at.sv.hue.Gradient;
 import at.sv.hue.Pair;
-import at.sv.hue.FormatUtil;
 import at.sv.hue.color.ColorComparator;
 import lombok.Builder;
 import lombok.Data;
@@ -114,15 +114,23 @@ public final class PutCall {
                Objects.equals(this.ct, other.ct);
     }
 
+    /**
+     * Used to determine inside an interpolation if the light state has changed significantly enough to send an update.
+     *
+     * @param other                           the same PutCall several minutes later to compare with
+     * @param brightnessThreshold             the brightness difference threshold (0-254) to consider two brightness values as similar
+     * @param colorTemperatureThresholdKelvin the color temperature difference threshold in Kelvin to consider two ct values as similar
+     * @param colorThreshold                  the color difference threshold (0.0-1.0) to consider two colors as similar
+     * @return true, if the light states are not similar, false if they are similar enough
+     */
     public boolean hasNotSimilarLightState(PutCall other, int brightnessThreshold,
-                                            int colorTemperatureThresholdKelvin,
-                                            double colorThreshold) {
-        return !Objects.equals(this.on, other.on) ||
-               brightnessIsNotSimilar(this.bri, other.bri, brightnessThreshold) ||
-               !Objects.equals(this.effect, other.effect) ||
+                                           int colorTemperatureThresholdKelvin,
+                                           double colorThreshold) {
+        return brightnessIsNotSimilar(this.bri, other.bri, brightnessThreshold) ||
                colorIsNotSimilar(this, other, colorThreshold) ||
                gradientIsNotSimilar(this, other, colorThreshold) ||
                ctIsNotSimilar(this.ct, other.ct, colorTemperatureThresholdKelvin);
+        // no need to compare effect here, as they don't change during interpolation
     }
 
     private boolean brightnessIsNotSimilar(Integer bri1, Integer bri2, int threshold) {

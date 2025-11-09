@@ -267,7 +267,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
     }
 
     public PutCalls getPutCalls(ZonedDateTime now, ZonedDateTime definedStart) {
-        Integer transitionTime = now != null && definedStart != null ? getTransitionTime(now, definedStart) : null; // todo: mutation coverage
+        Integer transitionTime = now != null && definedStart != null ? getTransitionTime(now, definedStart) : null;
         List<PutCall> putCallList = lightStates.stream()
                                                .map(this::getPutCall)
                                                .toList();
