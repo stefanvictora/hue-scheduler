@@ -234,7 +234,7 @@ public final class HueApiImpl implements HueApi {
 
     @Override
     public void putSceneState(String groupedLightId, List<PutCall> putCalls) {
-        String sceneId = createOrUpdateSceneInternal(groupedLightId, sceneControlName, putCalls, sceneControlAppData);
+        String sceneId = createOrUpdateSceneInternal(groupedLightId, sceneControlAppData, sceneControlName, putCalls);
         recallScene(sceneId);
         log.trace("Recalled temp scene for {}", groupedLightId);
     }
@@ -356,21 +356,21 @@ public final class HueApiImpl implements HueApi {
 
     @Override
     public synchronized void createOrUpdateScene(String groupedLightId, String sceneSyncName, List<PutCall> putCalls) {
-        createOrUpdateSceneInternal(groupedLightId, sceneSyncName, putCalls, null);
+        createOrUpdateSceneInternal(groupedLightId, null, sceneSyncName, putCalls);
     }
 
-    private String createOrUpdateSceneInternal(String groupedLightId, String sceneSyncName, List<PutCall> putCalls,
-                                               String appdata) {
+    private String createOrUpdateSceneInternal(String groupedLightId, String appdata, String sceneSyncName,
+                                               List<PutCall> putCalls) {
         Group group = getAndAssertGroupExists(groupedLightId);
-        Scene existingScene = getScene(group, sceneSyncName);
+        Scene existingScene = getScene(group, appdata, sceneSyncName);
         List<SceneAction> actions = createSceneActions(group, putCalls);
         String sceneId;
         if (existingScene == null) {
-            Scene newScene = new Scene(sceneSyncName, group.toResourceReference(), actions, appdata);
+            Scene newScene = new Scene(sceneSyncName, appdata, group.toResourceReference(), actions);
             sceneId = createScene(newScene);
             log.trace("Created scene id={}", sceneId);
         } else if (actionsDiffer(existingScene, actions)) {
-            Scene updatedScene = new Scene(actions);
+            Scene updatedScene = getUpdatedScene(sceneSyncName, appdata, actions);
             updateScene(existingScene, updatedScene);
             log.trace("Updated scene id={}", existingScene.getId());
             sceneId = existingScene.getId();
@@ -680,11 +680,25 @@ public final class HueApiImpl implements HueApi {
         return group;
     }
 
-    private Scene getScene(Group group, String name) {
-        return findScenesByGroupAndName(group, name)
-                .stream()
-                .findFirst()
-                .orElse(null);
+    private Scene getScene(Group group, String appdata, String sceneSyncName) {
+        if (appdata != null) {
+            return findScenesByGroupAndAppdata(group, appdata)
+                    .stream()
+                    .findFirst()
+                    .orElse(null);
+        } else {
+            return findScenesByGroupAndName(group, sceneSyncName)
+                    .stream()
+                    .findFirst()
+                    .orElse(null);
+        }
+    }
+
+    private static Scene getUpdatedScene(String sceneSyncName, String appdata, List<SceneAction> actions) {
+        if (appdata == null) {
+            return new Scene(actions);
+        }
+        return new Scene(sceneSyncName, appdata, actions);
     }
 
     private Scene getUniqueScene(Group group, String name) {
@@ -702,6 +716,13 @@ public final class HueApiImpl implements HueApi {
         return getAvailableScenes().values()
                                    .stream()
                                    .filter(scene -> scene.isPartOf(group) && name.equals(scene.metadata.name))
+                                   .toList();
+    }
+
+    private List<Scene> findScenesByGroupAndAppdata(Group group, String appdata) {
+        return getAvailableScenes().values()
+                                   .stream()
+                                   .filter(scene -> scene.isPartOf(group) && appdata.equals(scene.metadata.appdata))
                                    .toList();
     }
 

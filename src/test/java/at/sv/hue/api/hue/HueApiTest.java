@@ -6174,6 +6174,177 @@ class HueApiTest {
                 """);
     }
 
+    @Test
+    void putSceneState_hasExistingTempScene_lookedUpByAppData_updatesAndRecall() {
+        setGetResponse("/grouped_light", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "GL_ZONE_1",
+                      "owner": {
+                        "rid": "ZONE_1",
+                        "rtype": "zone"
+                      },
+                      "type": "grouped_light"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/zone", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "ZONE_1",
+                      "id_v1": "/groups/3",
+                      "children": [
+                        {
+                          "rid": "LIGHT_A",
+                          "rtype": "light"
+                        }
+                      ],
+                      "services": [
+                        {
+                          "rid": "GL_ZONE_1",
+                          "rtype": "grouped_light"
+                        }
+                      ],
+                      "metadata": {
+                        "name": "Zone One",
+                        "archetype": "lounge"
+                      },
+                      "type": "zone"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/light", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "LIGHT_A",
+                      "metadata": {
+                        "name": "LA"
+                      },
+                      "owner": {
+                        "rid": "DEV_A",
+                        "rtype": "device"
+                      },
+                      "on": {
+                        "on": true
+                      },
+                      "dimming": {
+                        "brightness": 100.0
+                      },
+                      "color_temperature": {
+                        "mirek": 250,
+                        "mirek_valid": true,
+                        "mirek_schema": {
+                          "mirek_minimum": 153,
+                          "mirek_maximum": 500
+                        }
+                      },
+                      "color": {
+                        "xy": {
+                          "x": 0.3,
+                          "y": 0.3
+                        }
+                      },
+                      "type": "light"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/scene", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "SCENE_ID",
+                      "actions": [
+                        {
+                          "target": {
+                            "rid": "LIGHT_A",
+                            "rtype": "light"
+                          },
+                          "action": {
+                            "on": {
+                              "on": true
+                            },
+                            "dimming": {
+                              "brightness": 100.0
+                            },
+                            "color_temperature": {
+                              "mirek": 199
+                            }
+                          }
+                        }
+                      ],
+                      "metadata": {
+                        "name": "SCENE",
+                        "appdata": "hue_sch:temp"
+                      },
+                      "group": {
+                        "rid": "ZONE_1",
+                        "rtype": "zone"
+                      },
+                      "speed": 0.6031746031746031,
+                      "auto_dynamic": false,
+                      "status": {
+                        "active": "inactive"
+                      },
+                      "type": "scene"
+                    }
+                  ]
+                }
+                """);
+
+        api.putSceneState("GL_ZONE_1", List.of(
+                PutCall.builder().id("LIGHT_A").ct(300).bri(100).transitionTime(5).build()
+        ));
+
+        verifyPut("/scene/SCENE_ID", """
+                {
+                  "metadata": {
+                    "name": "HueTemp",
+                    "appdata": "hue_sch:temp"
+                  },
+                  "actions": [
+                    {
+                      "target": {
+                        "rid": "LIGHT_A",
+                        "rtype": "light"
+                      },
+                      "action": {
+                        "on": {
+                          "on": true
+                        },
+                        "dimming": {
+                          "brightness": 39.37
+                        },
+                        "color_temperature": {
+                          "mirek": 300
+                        },
+                        "dynamics": {
+                          "duration": 500
+                        }
+                      }
+                    }
+                  ]
+                }
+                """);
+
+        verifyPut("/scene/SCENE_ID", """
+                {
+                  "recall": {
+                    "action": "active"
+                  }
+                }
+                """);
+    }
+
     private void mockSceneCreationResult(String sceneId) {
         when(resourceProviderMock.postResource(eq(getUrl("/scene")), any()))
                 .thenReturn("{\n" +
