@@ -901,6 +901,18 @@ public final class HueApiImpl implements HueApi {
         availableLightsCache.synchronous().invalidateAll();
     }
 
+    public void migrateSyncedScenes(String oldSceneName, String newSceneName) {
+        List<Scene> oldScenes = getAvailableScenes().values()
+                                                    .stream()
+                                                    .filter(scene -> oldSceneName.equals(scene.metadata.name))
+                                                    .toList();
+        for (Scene oldScene : oldScenes) {
+            Scene updatedScene = new Scene(newSceneName);
+            updateScene(oldScene, updatedScene);
+            log.trace("Migrated old synced scene id={}", oldScene.getId());
+        }
+    }
+
     private interface DataListContainer<T> {
         List<T> getData();
     }

@@ -20,7 +20,11 @@ final class Scene implements Resource {
     List<SceneAction> actions;
     String type;
 
-    public Scene(List<SceneAction> actions) {
+    Scene(String name) {
+        this.metadata = new Metadata(name, null);
+    }
+
+    Scene(List<SceneAction> actions) {
         this.actions = actions;
     }
 

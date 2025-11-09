@@ -133,7 +133,7 @@ public final class HueScheduler implements Runnable {
                           " Default: ${DEFAULT-VALUE}")
     boolean enableSceneSync;
     @Option(names = "--scene-sync-name",
-            defaultValue = "${env:SCENE_SYNC_NAME:-HueScheduler}",
+            defaultValue = "${env:SCENE_SYNC_NAME:-Hue Scheduler}",
             description = "The name of the synced scene. Related to '--enable-scene-sync'." +
                           " Default: ${DEFAULT-VALUE}")
     String sceneSyncName;
@@ -519,6 +519,7 @@ public final class HueScheduler implements Runnable {
             stateScheduler.schedule(this::assertConnectionAndStart, currentTime.get().plusSeconds(5), null);
         } else {
             parseInput();
+            performSyncedSceneMigration();
             start();
         }
     }
@@ -1145,6 +1146,12 @@ public final class HueScheduler implements Runnable {
                 api::clearCaches, apiCacheInvalidationIntervalInMinutes, apiCacheInvalidationIntervalInMinutes, TimeUnit.MINUTES);
         stateScheduler.scheduleAtFixedRate(
                 startTimeProvider::clearCaches, 3, 3, TimeUnit.DAYS);
+    }
+
+    private void performSyncedSceneMigration() {
+        if (enableSceneSync && api instanceof HueApiImpl) {
+            ((HueApiImpl) api).migrateSyncedScenes("HueScheduler", sceneSyncName);
+        }
     }
 
     /**

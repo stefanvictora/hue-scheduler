@@ -2140,7 +2140,7 @@ public class HassApiTest {
         createOrUpdateScene(groupId, sceneName, List.of(putCall));
 
         verify(http).postResource(eq(sceneSyncUrl), argThat(body ->
-                body.contains("\"scene_id\":\"movie_time__living_room\"")
+                body.contains("\"scene_id\":\"movietime__living_room\"")
         ));
     }
 
