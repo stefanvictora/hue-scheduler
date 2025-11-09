@@ -51,7 +51,6 @@ public class HassApiImpl implements HueApi {
     private final HttpResourceProvider httpResourceProvider;
     private final HassAreaRegistry hassAreaRegistry;
     private final RateLimiter rateLimiter;
-    private final String sceneSyncName;
     private final HassAvailabilityListener availabilityListener;
     private final ObjectMapper mapper;
     private final String baseUrl;
@@ -63,13 +62,12 @@ public class HassApiImpl implements HueApi {
     private boolean nameToStatesMapInvalidated;
 
     public HassApiImpl(String origin, HttpResourceProvider httpResourceProvider, HassAreaRegistry hassAreaRegistry,
-                       HassAvailabilityListener availabilityListener, RateLimiter rateLimiter, String sceneSyncName) {
+                       HassAvailabilityListener availabilityListener, RateLimiter rateLimiter) {
         baseUrl = origin + "/api";
         this.httpResourceProvider = httpResourceProvider;
         this.hassAreaRegistry = hassAreaRegistry;
         this.availabilityListener = availabilityListener;
         this.rateLimiter = rateLimiter;
-        this.sceneSyncName = sceneSyncName;
         mapper = new ObjectMapper();
         mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         mapper.setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL);
@@ -326,7 +324,7 @@ public class HassApiImpl implements HueApi {
     }
 
     @Override
-    public void createOrUpdateSyncedScene(String groupId, List<PutCall> putCalls) {
+    public void createOrUpdateScene(String groupId, String sceneSyncName, List<PutCall> putCalls) {
         CreateScene createScene = new CreateScene();
         createScene.setScene_id(HassApiUtils.getNormalizedSceneSyncName(sceneSyncName + "_" + groupId));
         Map<String, ChangeState> sceneStates = new LinkedHashMap<>();

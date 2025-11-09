@@ -568,7 +568,7 @@ public class AbstractHueSchedulerTest {
     }
 
     protected void mockSceneSyncFailure(String groupId) {
-        doThrow(ApiFailure.class).when(mockedHueApi).createOrUpdateSyncedScene(eq(groupId), any());
+        doThrow(ApiFailure.class).when(mockedHueApi).createOrUpdateScene(eq(groupId), eq(sceneSyncName), any());
     }
 
     /* Events */
@@ -632,7 +632,7 @@ public class AbstractHueSchedulerTest {
     }
 
     protected void assertAllSceneUpdatesAsserted() {
-        verify(mockedHueApi, times(expectedSceneUpdates)).createOrUpdateSyncedScene(any(), any());
+        verify(mockedHueApi, times(expectedSceneUpdates)).createOrUpdateScene(any(), any(), any());
     }
 
     /* Scene Sync Assertions */
@@ -640,7 +640,7 @@ public class AbstractHueSchedulerTest {
     protected void assertSceneUpdate(String groupId, PutCall.PutCallBuilder... expectedPutCalls) {
         expectedSceneUpdates++;
         List<PutCall> putCalls = Arrays.stream(expectedPutCalls).map(PutCall.PutCallBuilder::build).toList();
-        sceneSyncOrderVerifier.verify(mockedHueApi, calls(1)).createOrUpdateSyncedScene(groupId, putCalls);
+        sceneSyncOrderVerifier.verify(mockedHueApi, calls(1)).createOrUpdateScene(groupId, sceneSyncName, putCalls);
     }
 
     protected void advanceTimeAndRunAndAssertScenePutCalls(ScheduledRunnable runnable, int groupId,
