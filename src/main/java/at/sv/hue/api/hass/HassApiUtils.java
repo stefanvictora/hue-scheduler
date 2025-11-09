@@ -17,7 +17,7 @@ public final class HassApiUtils {
     }
 
     private static String normalize(String s) {
-        return s.toLowerCase(Locale.ROOT).replaceAll("\\W", "_");
+        return s.toLowerCase(Locale.ROOT).replaceAll("\\s", "").replaceAll("\\W", "_");
     }
 
     /**
