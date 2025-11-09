@@ -48,8 +48,8 @@ class HueApiCacheUpdateTest {
     @BeforeEach
     void init() {
         http = mock(HttpResourceProvider.class);
-        api = new HueApiImpl(http, HOST, permits -> {
-        }, 5);
+        api = new HueApiImpl(http, HOST, _ -> {
+        }, 5, null, null, null);
         mapper = new ObjectMapper();
         reset(http);
     }

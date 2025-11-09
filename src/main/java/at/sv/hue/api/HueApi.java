@@ -68,8 +68,14 @@ public interface HueApi extends ResourceModificationEventListener {
      */
     void putState(PutCall putCall);
 
+    /**
+     * @throws ApiFailure if the api call failed
+     */
     void putGroupState(PutCall putCall);
 
+    /**
+     * @throws ApiFailure if the api call failed
+     */
     void putSceneState(String groupId, List<PutCall> list);
 
     /**
