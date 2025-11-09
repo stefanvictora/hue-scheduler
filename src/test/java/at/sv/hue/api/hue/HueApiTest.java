@@ -51,7 +51,6 @@ class HueApiTest {
               "data": []
             }
             """;
-    private static final String SCENE_SYNC_APP_DATA = "hue_sch:sync";
     private static final String SCENE_CONTROL_APP_DATA = "hue_sch:temp";
     private static final String SCENE_CONTROL_NAME = "HueTemp";
     private HueApi api;
@@ -63,14 +62,14 @@ class HueApiTest {
         String host = "localhost";
         resourceProviderMock = Mockito.mock(HttpResourceProvider.class);
         api = new HueApiImpl(resourceProviderMock, host, _ -> {
-        }, 5, SCENE_SYNC_APP_DATA, SCENE_CONTROL_NAME, SCENE_CONTROL_APP_DATA);
+        }, 5, SCENE_CONTROL_NAME, SCENE_CONTROL_APP_DATA);
         baseUrl = "https://" + host + "/clip/v2/resource";
     }
 
     @Test
     void invalidHost_cantUseScheme_exception() {
         assertThrows(InvalidConnectionException.class, () -> new HueApiImpl(resourceProviderMock, "hTtps://localhost", permits -> {
-        }, 5, null, null, null));
+        }, 5, null, null));
     }
 
     @Test
@@ -4999,8 +4998,7 @@ class HueApiTest {
         verifyPost("/scene", """
                 {
                   "metadata": {
-                    "name": "Scene_3",
-                    "appdata": "hue_sch:sync"
+                    "name": "Scene_3"
                   },
                   "group": {
                     "rid": "ROOM_1",
@@ -5070,9 +5068,6 @@ class HueApiTest {
 
         verifyPut("/scene/SCENE_1", """
                 {
-                  "metadata": {
-                    "appdata": "hue_sch:sync"
-                  },
                   "actions": [
                     {
                       "target": {
@@ -5131,9 +5126,6 @@ class HueApiTest {
 
         verifyPut("/scene/SCENE_3", """
                 {
-                  "metadata": {
-                    "appdata": "hue_sch:sync"
-                  },
                   "actions": [
                     {
                       "target": {
@@ -5168,9 +5160,6 @@ class HueApiTest {
 
         verifyPut("/scene/SCENE_3", """
                 {
-                  "metadata": {
-                    "appdata": "hue_sch:sync"
-                  },
                   "actions": [
                     {
                       "target": {
@@ -5440,8 +5429,7 @@ class HueApiTest {
         verifyPost("/scene", """
                 {
                   "metadata": {
-                    "name": "SCENE",
-                    "appdata": "hue_sch:sync"
+                    "name": "SCENE"
                   },
                   "group": {
                     "rid": "ZONE",
@@ -5526,8 +5514,7 @@ class HueApiTest {
         verifyPut("/scene/SCENE_ID", """
                 {
                   "metadata": {
-                    "name": "SCENE",
-                    "appdata": "hue_sch:sync"
+                    "name": "SCENE"
                   },
                   "group": {
                     "rid": "ZONE",
@@ -5609,8 +5596,7 @@ class HueApiTest {
         verifyPost("/scene", """
                 {
                   "metadata": {
-                    "name": "SCENE",
-                    "appdata": "hue_sch:sync"
+                    "name": "SCENE"
                   },
                   "group": {
                     "rid": "ZONE",
@@ -5895,9 +5881,6 @@ class HueApiTest {
 
         verifyPut("/scene/SCENE", """
                 {
-                  "metadata": {
-                    "appdata": "hue_sch:sync"
-                  },
                   "actions": [
                     {
                       "target": {
@@ -5945,9 +5928,6 @@ class HueApiTest {
 
         verifyPut("/scene/SCENE", """
                 {
-                  "metadata": {
-                    "appdata": "hue_sch:sync"
-                  },
                   "actions": [
                     {
                       "target": {

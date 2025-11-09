@@ -70,7 +70,6 @@ public final class HueApiImpl implements HueApi {
     private final ObjectMapper mapper;
     private final String baseApi;
     private final RateLimiter rateLimiter;
-    private final String sceneSyncAppData;
     private final String sceneControlName;
     private final String sceneControlAppData;
     private final AsyncLoadingCache<String, Map<String, Light>> availableLightsCache;
@@ -82,8 +81,7 @@ public final class HueApiImpl implements HueApi {
     private final AsyncLoadingCache<String, Map<String, ZigbeeConnectivity>> availableZigbeeConnectivityCache;
 
     public HueApiImpl(HttpResourceProvider resourceProvider, String host, RateLimiter rateLimiter,
-                      int apiCacheInvalidationIntervalInMinutes, String sceneSyncAppData, String sceneControlName,
-                      String sceneControlAppData) {
+                      int apiCacheInvalidationIntervalInMinutes, String sceneControlName, String sceneControlAppData) {
         this.resourceProvider = resourceProvider;
         mapper = new ObjectMapper();
         mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
@@ -92,7 +90,6 @@ public final class HueApiImpl implements HueApi {
         assertNotHttpSchemeProvided(host);
         baseApi = "https://" + host + "/clip/v2/resource";
         this.rateLimiter = rateLimiter;
-        this.sceneSyncAppData = sceneSyncAppData;
         this.sceneControlName = sceneControlName;
         this.sceneControlAppData = sceneControlAppData;
         availableLightsCache = createCache(this::lookupLights, apiCacheInvalidationIntervalInMinutes);
@@ -359,7 +356,7 @@ public final class HueApiImpl implements HueApi {
 
     @Override
     public synchronized void createOrUpdateScene(String groupedLightId, String sceneSyncName, List<PutCall> putCalls) {
-        createOrUpdateSceneInternal(groupedLightId, sceneSyncName, putCalls, sceneSyncAppData);
+        createOrUpdateSceneInternal(groupedLightId, sceneSyncName, putCalls, null);
     }
 
     private String createOrUpdateSceneInternal(String groupedLightId, String sceneSyncName, List<PutCall> putCalls,
@@ -373,7 +370,7 @@ public final class HueApiImpl implements HueApi {
             sceneId = createScene(newScene);
             log.trace("Created scene id={}", sceneId);
         } else if (actionsDiffer(existingScene, actions)) {
-            Scene updatedScene = new Scene(actions, appdata);
+            Scene updatedScene = new Scene(actions);
             updateScene(existingScene, updatedScene);
             log.trace("Updated scene id={}", existingScene.getId());
             sceneId = existingScene.getId();
