@@ -70,6 +70,7 @@ public final class HueApiImpl implements HueApi {
     private final ObjectMapper mapper;
     private final String baseApi;
     private final RateLimiter rateLimiter;
+    private final String sceneSyncName;
     private final String sceneSyncAppData;
     private final String sceneControlName;
     private final String sceneControlAppData;
@@ -82,7 +83,7 @@ public final class HueApiImpl implements HueApi {
     private final AsyncLoadingCache<String, Map<String, ZigbeeConnectivity>> availableZigbeeConnectivityCache;
 
     public HueApiImpl(HttpResourceProvider resourceProvider, String host, RateLimiter rateLimiter,
-                      int apiCacheInvalidationIntervalInMinutes, String sceneSyncAppData, String sceneControlName,
+                      int apiCacheInvalidationIntervalInMinutes, String sceneSyncName, String sceneSyncAppData, String sceneControlName,
                       String sceneControlAppData) {
         this.resourceProvider = resourceProvider;
         mapper = new ObjectMapper();
@@ -92,6 +93,7 @@ public final class HueApiImpl implements HueApi {
         assertNotHttpSchemeProvided(host);
         baseApi = "https://" + host + "/clip/v2/resource";
         this.rateLimiter = rateLimiter;
+        this.sceneSyncName = sceneSyncName;
         this.sceneSyncAppData = sceneSyncAppData;
         this.sceneControlName = sceneControlName;
         this.sceneControlAppData = sceneControlAppData;
@@ -237,7 +239,7 @@ public final class HueApiImpl implements HueApi {
 
     @Override
     public void putSceneState(String groupedLightId, List<PutCall> putCalls) {
-        String sceneId = createOrUpdateSceneInternal(groupedLightId, sceneControlName, putCalls, sceneControlAppData);
+        String sceneId = createOrUpdateSceneInternal(groupedLightId, sceneControlAppData, sceneControlName, putCalls);
         recallScene(sceneId);
         log.trace("Recalled temp scene for {}", groupedLightId);
     }
@@ -358,22 +360,21 @@ public final class HueApiImpl implements HueApi {
     }
 
     @Override
-    public synchronized void createOrUpdateScene(String groupedLightId, String sceneSyncName, List<PutCall> putCalls) {
-        createOrUpdateSceneInternal(groupedLightId, sceneSyncName, putCalls, sceneSyncAppData);
+    public synchronized void createOrUpdateSyncedScene(String groupedLightId, List<PutCall> putCalls) {
+        createOrUpdateSceneInternal(groupedLightId, sceneSyncAppData, sceneSyncName, putCalls);
     }
 
-    private String createOrUpdateSceneInternal(String groupedLightId, String sceneSyncName, List<PutCall> putCalls,
-                                               String appdata) {
+    private String createOrUpdateSceneInternal(String groupedLightId, String appdata, String sceneName, List<PutCall> putCalls) {
         Group group = getAndAssertGroupExists(groupedLightId);
-        Scene existingScene = getScene(group, sceneSyncName);
+        Scene existingScene = getInternalScene(group, appdata);
         List<SceneAction> actions = createSceneActions(group, putCalls);
         String sceneId;
         if (existingScene == null) {
-            Scene newScene = new Scene(sceneSyncName, group.toResourceReference(), actions, appdata);
+            Scene newScene = new Scene(sceneName, appdata, group.toResourceReference(), actions);
             sceneId = createScene(newScene);
             log.trace("Created scene id={}", sceneId);
         } else if (actionsDiffer(existingScene, actions)) {
-            Scene updatedScene = new Scene(actions, appdata);
+            Scene updatedScene = new Scene(sceneName, appdata, actions);
             updateScene(existingScene, updatedScene);
             log.trace("Updated scene id={}", existingScene.getId());
             sceneId = existingScene.getId();
@@ -683,11 +684,12 @@ public final class HueApiImpl implements HueApi {
         return group;
     }
 
-    private Scene getScene(Group group, String name) {
-        return findScenesByGroupAndName(group, name)
-                .stream()
-                .findFirst()
-                .orElse(null);
+    private Scene getInternalScene(Group group, String appData) {
+        return getAvailableScenes().values()
+                                   .stream()
+                                   .filter(scene -> scene.isPartOf(group) && appData.equals(scene.metadata.appdata))
+                                   .findFirst()
+                                   .orElse(null);
     }
 
     private Scene getUniqueScene(Group group, String name) {

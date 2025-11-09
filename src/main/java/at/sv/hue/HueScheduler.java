@@ -369,7 +369,8 @@ public final class HueScheduler implements Runnable {
         HassAreaRegistry areaRegistry = new HassAreaRegistryImpl(
                 new HassWebSocketClientImpl(websocketOrigin, accessToken, httpClient, 5));
         HassAvailabilityListener availabilityListener = new HassAvailabilityListener(this::clearCachesAndReSyncScenes);
-        api = new HassApiImpl(apiHost, new HttpResourceProviderImpl(httpClient, maxConcurrentRequests), areaRegistry, availabilityListener, rateLimiter);
+        api = new HassApiImpl(apiHost, new HttpResourceProviderImpl(httpClient, maxConcurrentRequests), areaRegistry, availabilityListener,
+                rateLimiter, sceneSyncName);
         lightEventListener = createLightEventListener();
         sceneEventListener = new SceneEventListenerImpl(api, Ticker.systemTicker(),
                 sceneActivationIgnoreWindowInSeconds,
@@ -384,7 +385,7 @@ public final class HueScheduler implements Runnable {
         OkHttpClient httpsClient = createHueHttpsClient();
         RateLimiter rateLimiter = RateLimiter.create(requestsPerSecond);
         api = new HueApiImpl(new HttpResourceProviderImpl(httpsClient, maxConcurrentRequests), apiHost, rateLimiter,
-                apiCacheInvalidationIntervalInMinutes, SCENE_SYNC_APP_DATA, sceneControlName, SCENE_CONTROL_APP_DATA);
+                apiCacheInvalidationIntervalInMinutes, sceneSyncName, SCENE_SYNC_APP_DATA, sceneControlName, SCENE_CONTROL_APP_DATA);
         lightEventListener = createLightEventListener();
         sceneEventListener = new SceneEventListenerImpl(api, Ticker.systemTicker(),
                 sceneActivationIgnoreWindowInSeconds, sceneSyncName::equals, lightEventListener);
@@ -749,7 +750,7 @@ public final class HueScheduler implements Runnable {
     }
 
     private void syncScene(String groupId, List<PutCall> putCalls) {
-        api.createOrUpdateScene(groupId, sceneSyncName, putCalls);
+        api.createOrUpdateSyncedScene(groupId, putCalls);
     }
 
     private void scheduleNextSceneSync(ScheduledStateSnapshot stateSnapshot, boolean justOnce, ZonedDateTime nextSyncTime) {
