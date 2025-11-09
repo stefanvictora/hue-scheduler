@@ -36,25 +36,34 @@ import static org.mockito.Mockito.when;
 
 public class HassApiTest {
 
+
     private HassApiImpl api;
     private HttpResourceProvider http;
     private HassAreaRegistry areaRegistry;
     private String baseUrl;
     private URL sceneSyncUrl;
+    private String sceneSyncName;
+    private String origin;
 
     @BeforeEach
     void setUp() {
         http = Mockito.mock(HttpResourceProvider.class);
         areaRegistry = Mockito.mock(HassAreaRegistry.class);
-        setupApi("http://localhost:8123");
+        sceneSyncName = "HueScheduler";
+        origin = "http://localhost:8123";
+        setupApi(origin);
         sceneSyncUrl = getUrl("/services/scene/create");
+    }
+
+    private void setupApi() {
+        setupApi(origin);
     }
 
     private void setupApi(String origin) {
         HassAvailabilityListener availabilityListener = new HassAvailabilityListener(() -> {
         });
-        api = new HassApiImpl(origin, http, areaRegistry, availabilityListener, permits -> {
-        });
+        api = new HassApiImpl(origin, http, areaRegistry, availabilityListener, _ -> {
+        }, sceneSyncName);
         baseUrl = origin + "/api";
     }
 
@@ -2068,7 +2077,6 @@ public class HassApiTest {
     @Test
     void createOrUpdateScene_withMultipleLights_createsSceneWithAllLights_implicitlySetsOn() {
         String groupId = "kitchen";
-        String sceneName = "HueScheduler";
         List<PutCall> putCalls = List.of(
                 PutCall.builder()
                        .id("light.kitchen_main")
@@ -2090,7 +2098,7 @@ public class HassApiTest {
                        .build()
         );
 
-        createOrUpdateScene(groupId, sceneName, putCalls);
+        createOrUpdateScene(groupId, putCalls);
 
         verify(http).postResource(sceneSyncUrl, removeSpaces("""
                 {
@@ -2117,10 +2125,11 @@ public class HassApiTest {
     @Test
     void createOrUpdateScene_withEmptyPutCalls_createsSceneWithNoStates() {
         String groupId = "bedroom";
-        String sceneName = "night";
+        sceneSyncName = "night";
+        setupApi();
         List<PutCall> putCalls = List.of();
 
-        createOrUpdateScene(groupId, sceneName, putCalls);
+        createOrUpdateScene(groupId, putCalls);
 
         verify(http).postResource(eq(sceneSyncUrl), argThat(body ->
                 body.contains("\"scene_id\":\"night_bedroom\"") &&
@@ -2131,13 +2140,14 @@ public class HassApiTest {
     @Test
     void createOrUpdateScene_withSpecialCharactersInName_normalizesSceneId() {
         String groupId = "living-room";
-        String sceneName = "Movie Time!";
+        sceneSyncName = "Movie Time!";
+        setupApi();
         PutCall putCall = PutCall.builder()
                                  .id("light.living_room_main")
                                  .on(true)
                                  .build();
 
-        createOrUpdateScene(groupId, sceneName, List.of(putCall));
+        createOrUpdateScene(groupId, List.of(putCall));
 
         verify(http).postResource(eq(sceneSyncUrl), argThat(body ->
                 body.contains("\"scene_id\":\"movie_time__living_room\"")
@@ -2812,8 +2822,8 @@ public class HassApiTest {
         when(areaRegistry.lookupAreaForEntity(entityId)).thenReturn(area);
     }
 
-    private void createOrUpdateScene(String groupId, String sceneName, List<PutCall> putCalls) {
-        api.createOrUpdateScene(groupId, sceneName, putCalls);
+    private void createOrUpdateScene(String groupId, List<PutCall> putCalls) {
+        api.createOrUpdateSyncedScene(groupId, putCalls);
     }
 
     private static String removeSpaces(@Language("JSON") String expectedBody) {

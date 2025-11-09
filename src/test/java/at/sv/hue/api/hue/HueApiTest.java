@@ -51,6 +51,7 @@ class HueApiTest {
               "data": []
             }
             """;
+    private static final String SCENE_SYNC_NAME = "HueScheduler";
     private static final String SCENE_SYNC_APP_DATA = "hue_sch:sync";
     private static final String SCENE_CONTROL_APP_DATA = "hue_sch:temp";
     private static final String SCENE_CONTROL_NAME = "HueTemp";
@@ -63,14 +64,14 @@ class HueApiTest {
         String host = "localhost";
         resourceProviderMock = Mockito.mock(HttpResourceProvider.class);
         api = new HueApiImpl(resourceProviderMock, host, _ -> {
-        }, 5, SCENE_SYNC_APP_DATA, SCENE_CONTROL_NAME, SCENE_CONTROL_APP_DATA);
+        }, 5, SCENE_SYNC_NAME, SCENE_SYNC_APP_DATA, SCENE_CONTROL_NAME, SCENE_CONTROL_APP_DATA);
         baseUrl = "https://" + host + "/clip/v2/resource";
     }
 
     @Test
     void invalidHost_cantUseScheme_exception() {
         assertThrows(InvalidConnectionException.class, () -> new HueApiImpl(resourceProviderMock, "hTtps://localhost", permits -> {
-        }, 5, null, null, null));
+        }, 5, null, null, null, null));
     }
 
     @Test
@@ -4430,74 +4431,8 @@ class HueApiTest {
         assertThat(isLightOff("631f8419-1b41-495a-9708-81d679644b07")).isTrue();
     }
 
-//    @Test
-//    void isGroupOff_noGroupedLightServiceFound_groupNotFoundException() {
-//        setGetResponse("/room", EMPTY_RESPONSE);
-//        setGetResponse("/zone", """
-//                {
-//                  "errors": [],
-//                  "data": [
-//                    {
-//                      "id": "3346a743-5c88-4198-b21f-4632dfa3549f",
-//                      "id_v1": "/groups/81",
-//                      "children": [
-//                        {
-//                          "rid": "414f0d82-d00c-41da-b56a-b728b8cf2445",
-//                          "rtype": "light"
-//                        }
-//                      ],
-//                      "services": [
-//                      ],
-//                      "metadata": {
-//                        "name": "Bad Decke",
-//                        "archetype": "top_floor"
-//                      },
-//                      "type": "zone"
-//                    }
-//                  ]
-//                }""");
-//
-//        assertThrows(GroupNotFoundException.class, () -> api.isGroupOff("b3bd0551-312f-4b6d-bf87-432e5ef56b69"));
-//    }
-
     @Test
     void isGroupOff_isOn_returnsFalse() {
-//        setGetResponse("/room", EMPTY_RESPONSE);
-//        setGetResponse("/zone", """
-//                {
-//                  "errors": [],
-//                  "data": [
-//                    {
-//                      "id": "75ee4e3b-cacb-4b87-923b-d11d2480e8ff",
-//                      "id_v1": "/groups/3",
-//                      "children": [
-//                        {
-//                          "rid": "1271bf6f-be63-42fc-b18c-3ad462914d8e",
-//                          "rtype": "light"
-//                        },
-//                        {
-//                          "rid": "1aa6083d-3692-49e5-92f7-b926b302dd49",
-//                          "rtype": "light"
-//                        }
-//                      ],
-//                      "services": [
-//                        {
-//                          "rid": "ANOTHER_ID_IGNORED",
-//                          "rtype": "device"
-//                        },
-//                        {
-//                          "rid": "eeb336d9-243b-4756-8455-1c69f50efd31",
-//                          "rtype": "grouped_light"
-//                        }
-//                      ],
-//                      "metadata": {
-//                        "name": "Couch",
-//                        "archetype": "lounge"
-//                      },
-//                      "type": "zone"
-//                    }
-//                  ]
-//                }""");
         setGetResponse("/grouped_light", """
                 {
                     "errors": [],
@@ -4525,34 +4460,6 @@ class HueApiTest {
 
     @Test
     void isGroupOff_isFalse_returnsTrue() {
-//        setGetResponse("/room", EMPTY_RESPONSE);
-//        setGetResponse("/zone", """
-//                {
-//                  "errors": [],
-//                  "data": [
-//                    {
-//                      "id": "3346a743-5c88-4198-b21f-4632dfa3549f",
-//                      "id_v1": "/groups/81",
-//                      "children": [
-//                        {
-//                          "rid": "414f0d82-d00c-41da-b56a-b728b8cf2445",
-//                          "rtype": "light"
-//                        }
-//                      ],
-//                      "services": [
-//                        {
-//                          "rid": "b3bd0551-312f-4b6d-bf87-432e5ef56b69",
-//                          "rtype": "grouped_light"
-//                        }
-//                      ],
-//                      "metadata": {
-//                        "name": "Bad Decke",
-//                        "archetype": "top_floor"
-//                      },
-//                      "type": "zone"
-//                    }
-//                  ]
-//                }""");
         setGetResponse("/grouped_light", """
                 {
                   "errors": [],
@@ -4579,15 +4486,15 @@ class HueApiTest {
     }
 
     @Test
-    void getOrCreateScene_groupNotFound_exception() {
+    void getOrCreateSyncedScene_groupNotFound_exception() {
         setGetResponse("/grouped_light", EMPTY_RESPONSE);
 
         assertThrows(GroupNotFoundException.class,
-                () -> api.createOrUpdateScene("UNKNOWN_GROUPED_LIGHT_ID", "SCENE NAME", List.of()));
+                () -> api.createOrUpdateSyncedScene("UNKNOWN_GROUPED_LIGHT_ID", List.of()));
     }
 
     @Test
-    void getOrCreateScene_ifSceneNotFound_createsNewScene_otherwiseUpdatesExistingOne() {
+    void getOrCreateSyncedScene_noSceneFound_createsNewScene() {
         setGetResponse("/grouped_light", """
                 {
                   "errors": [],
@@ -4783,7 +4690,8 @@ class HueApiTest {
                       },
                       "recall": {},
                       "metadata": {
-                        "name": "Scene_1"
+                        "name": "Scene_1",
+                        "appdata": "hue_sch:sync"
                       },
                       "group": {
                         "rid": "ROOM_1",
@@ -4865,7 +4773,8 @@ class HueApiTest {
                       },
                       "recall": {},
                       "metadata": {
-                        "name": "Scene_3"
+                        "name": "Scene_3",
+                        "appdata": "hue_sch:sync"
                       },
                       "group": {
                         "rid": "ZONE_1",
@@ -4988,23 +4897,18 @@ class HueApiTest {
                 }""");
         mockSceneCreationResult("SCENE_ID");
 
-        // "Scene_3" does not yet exist for Room -> create it
-        createOrUpdateScene("GROUPED_LIGHT_1",
-                "Scene_3",
+        // Scene already exists for Room -> update it
+        createOrUpdateSyncedScene("GROUPED_LIGHT_1",
                 PutCall.builder().id("LIGHT_1").ct(250).bri(20).transitionTime(5),
                 PutCall.builder().id("LIGHT_2_1").bri(20).transitionTime(2),
                 PutCall.builder().id("LIGHT_2_2").ct(250)
         );
 
-        verifyPost("/scene", """
+        verifyPut("/scene/SCENE_1", """
                 {
                   "metadata": {
-                    "name": "Scene_3",
+                    "name": "HueScheduler",
                     "appdata": "hue_sch:sync"
-                  },
-                  "group": {
-                    "rid": "ROOM_1",
-                    "rtype": "room"
                   },
                   "actions": [
                     {
@@ -5062,8 +4966,8 @@ class HueApiTest {
                 }
                 """);
 
-        // "Scene_1" already exists for Room -> update it; missing light treated as off
-        createOrUpdateScene("GROUPED_LIGHT_1", "Scene_1",
+        // Synced Scene already exists for Zone -> update it; missing light treated as off
+        createOrUpdateSyncedScene("GROUPED_LIGHT_1",
                 PutCall.builder().id("LIGHT_1").x(0.623).y(0.3435),
                 PutCall.builder().id("LIGHT_2_1").x(0.623).y(0.3435)
         );
@@ -5071,6 +4975,7 @@ class HueApiTest {
         verifyPut("/scene/SCENE_1", """
                 {
                   "metadata": {
+                    "name": "HueScheduler",
                     "appdata": "hue_sch:sync"
                   },
                   "actions": [
@@ -5122,9 +5027,9 @@ class HueApiTest {
                   ]
                 }""");
 
-        // "Scene_3" already exists for Zone -> update it
+        // Synced Scene already exists for Zone -> update it
 
-        createOrUpdateScene("GROUPED_LIGHT_2", "Scene_3",
+        createOrUpdateSyncedScene("GROUPED_LIGHT_2",
                 PutCall.builder().id("LIGHT_1"),
                 PutCall.builder().id("LIGHT_2_1")
         );
@@ -5132,6 +5037,7 @@ class HueApiTest {
         verifyPut("/scene/SCENE_3", """
                 {
                   "metadata": {
+                    "name": "HueScheduler",
                     "appdata": "hue_sch:sync"
                   },
                   "actions": [
@@ -5161,7 +5067,7 @@ class HueApiTest {
                 }""");
 
         // special case for providing effect -> remove any color attribute
-        createOrUpdateScene("GROUPED_LIGHT_2", "Scene_3",
+        createOrUpdateSyncedScene("GROUPED_LIGHT_2",
                 PutCall.builder().id("LIGHT_1").effect(Effect.builder().effect("opal").build()).x(0.123).y(0.456),
                 PutCall.builder().id("LIGHT_2_1")
         );
@@ -5169,6 +5075,7 @@ class HueApiTest {
         verifyPut("/scene/SCENE_3", """
                 {
                   "metadata": {
+                    "name": "HueScheduler",
                     "appdata": "hue_sch:sync"
                   },
                   "actions": [
@@ -5204,7 +5111,7 @@ class HueApiTest {
     }
 
     @Test
-    void getOrCreateScene_adjustsSceneActionBasedOnLightCapability() {
+    void getOrCreateSyncedScene_createsNewScene_adjustsSceneActionBasedOnLightCapability() {
         setGetResponse("/grouped_light", """
                 {
                   "errors": [],
@@ -5430,7 +5337,7 @@ class HueApiTest {
 
         mockSceneCreationResult("SCENE_ID");
 
-        createOrUpdateScene("GROUPED_LIGHT", "SCENE",
+        createOrUpdateSyncedScene("GROUPED_LIGHT",
                 PutCall.builder().id("COLOR").x(0.8).y(0.2).bri(20), // out of gamut
                 PutCall.builder().id("CT_ONLY").x(0.8).y(0.2).bri(20),
                 PutCall.builder().id("BRI_ONLY").x(0.8).y(0.2).bri(20),
@@ -5440,7 +5347,7 @@ class HueApiTest {
         verifyPost("/scene", """
                 {
                   "metadata": {
-                    "name": "SCENE",
+                    "name": "HueScheduler",
                     "appdata": "hue_sch:sync"
                   },
                   "group": {
@@ -5516,7 +5423,7 @@ class HueApiTest {
 
         // CT and brightness (uses max mirek):
 
-        createOrUpdateScene("GROUPED_LIGHT", "SCENE",
+        createOrUpdateSyncedScene("GROUPED_LIGHT",
                 PutCall.builder().id("COLOR").bri(254).ct(499),
                 PutCall.builder().id("CT_ONLY").bri(254).ct(499),
                 PutCall.builder().id("BRI_ONLY").bri(254).ct(499),
@@ -5526,7 +5433,7 @@ class HueApiTest {
         verifyPut("/scene/SCENE_ID", """
                 {
                   "metadata": {
-                    "name": "SCENE",
+                    "name": "HueScheduler",
                     "appdata": "hue_sch:sync"
                   },
                   "group": {
@@ -5599,7 +5506,7 @@ class HueApiTest {
 
         // effect and brightness:
 
-        createOrUpdateScene("GROUPED_LIGHT", "SCENE",
+        createOrUpdateSyncedScene("GROUPED_LIGHT",
                 PutCall.builder().id("COLOR").bri(254).effect(Effect.builder().effect("candle").build()),
                 PutCall.builder().id("CT_ONLY").bri(254).effect(Effect.builder().effect("candle").build()),
                 PutCall.builder().id("BRI_ONLY").bri(254).effect(Effect.builder().effect("candle").build()),
@@ -5609,7 +5516,7 @@ class HueApiTest {
         verifyPost("/scene", """
                 {
                   "metadata": {
-                    "name": "SCENE",
+                    "name": "HueScheduler",
                     "appdata": "hue_sch:sync"
                   },
                   "group": {
@@ -5686,7 +5593,7 @@ class HueApiTest {
     }
 
     @Test
-    void getOrCreateScene_updateExistingOne_sameActions_noSceneCreationOrUpdateCallMade() {
+    void getOrCreateSyncedScene_updateExistingOne_sameActions_noSceneCreationOrUpdateCallMade() {
         setGetResponse("/grouped_light", """
                 {
                   "errors": [],
@@ -5775,7 +5682,8 @@ class HueApiTest {
                         }
                       ],
                       "metadata": {
-                        "name": "SCENE"
+                        "name": "SCENE",
+                        "appdata": "hue_sch:sync"
                       },
                       "group": {
                         "rid": "ZONE",
@@ -5878,7 +5786,7 @@ class HueApiTest {
 
         // same state -> no update
 
-        createOrUpdateScene("GROUPED_LIGHT", "SCENE",
+        createOrUpdateSyncedScene("GROUPED_LIGHT",
                 PutCall.builder().id("CT_ONLY").ct(199).bri(254),
                 PutCall.builder().id("COLOR").ct(199).bri(254)
         );
@@ -5888,7 +5796,7 @@ class HueApiTest {
 
         // change ct -> performs update
 
-        createOrUpdateScene("GROUPED_LIGHT", "SCENE",
+        createOrUpdateSyncedScene("GROUPED_LIGHT",
                 PutCall.builder().id("CT_ONLY").ct(300).bri(254),
                 PutCall.builder().id("COLOR").ct(300).bri(254)
         );
@@ -5896,6 +5804,7 @@ class HueApiTest {
         verifyPut("/scene/SCENE", """
                 {
                   "metadata": {
+                    "name": "HueScheduler",
                     "appdata": "hue_sch:sync"
                   },
                   "actions": [
@@ -5938,7 +5847,7 @@ class HueApiTest {
 
         // overrides single light -> performs update
 
-        createOrUpdateScene("GROUPED_LIGHT", "SCENE",
+        createOrUpdateSyncedScene("GROUPED_LIGHT",
                 PutCall.builder().id("CT_ONLY").on(false).transitionTime(10).ct(200), // ignores other properties for off states
                 PutCall.builder().id("COLOR").ct(199).bri(254)
         );
@@ -5946,6 +5855,7 @@ class HueApiTest {
         verifyPut("/scene/SCENE", """
                 {
                   "metadata": {
+                    "name": "HueScheduler",
                     "appdata": "hue_sch:sync"
                   },
                   "actions": [
@@ -6289,9 +6199,9 @@ class HueApiTest {
         assertThat(identifier).isEqualTo(new Identifier(id, name));
     }
 
-    private void createOrUpdateScene(String groupedLightId, String sceneSyncName,
-                                     PutCall.PutCallBuilder... overriddenPutCallBuilders) {
-        api.createOrUpdateScene(groupedLightId, sceneSyncName,
+    private void createOrUpdateSyncedScene(String groupedLightId,
+                                           PutCall.PutCallBuilder... overriddenPutCallBuilders) {
+        api.createOrUpdateSyncedScene(groupedLightId,
                 Stream.of(overriddenPutCallBuilders).map(PutCall.PutCallBuilder::build).toList());
     }
 
