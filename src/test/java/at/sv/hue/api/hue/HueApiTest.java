@@ -6175,6 +6175,106 @@ class HueApiTest {
     }
 
     @Test
+    void putSceneState_noExistingTempScene_failsToCreateScene_exception() {
+        setGetResponse("/grouped_light", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "GL_ZONE_1",
+                      "owner": {
+                        "rid": "ZONE_1",
+                        "rtype": "zone"
+                      },
+                      "type": "grouped_light"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/zone", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "ZONE_1",
+                      "id_v1": "/groups/3",
+                      "children": [
+                        {
+                          "rid": "LIGHT_A",
+                          "rtype": "light"
+                        }
+                      ],
+                      "services": [
+                        {
+                          "rid": "GL_ZONE_1",
+                          "rtype": "grouped_light"
+                        }
+                      ],
+                      "metadata": {
+                        "name": "Zone One",
+                        "archetype": "lounge"
+                      },
+                      "type": "zone"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/light", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "LIGHT_A",
+                      "metadata": {
+                        "name": "LA"
+                      },
+                      "owner": {
+                        "rid": "DEV_A",
+                        "rtype": "device"
+                      },
+                      "on": {
+                        "on": true
+                      },
+                      "dimming": {
+                        "brightness": 100.0
+                      },
+                      "color_temperature": {
+                        "mirek": 250,
+                        "mirek_valid": true,
+                        "mirek_schema": {
+                          "mirek_minimum": 153,
+                          "mirek_maximum": 500
+                        }
+                      },
+                      "color": {
+                        "xy": {
+                          "x": 0.3,
+                          "y": 0.3
+                        }
+                      },
+                      "type": "light"
+                    }
+                  ]
+                }
+                """);
+
+        setGetResponse("/scene", EMPTY_RESPONSE);
+        when(resourceProviderMock.postResource(eq(getUrl("/scene")), any()))
+                .thenReturn("""
+                        {
+                        "data": [
+                        ],
+                        "errors": []
+                        }
+                        """);
+
+
+        assertThrows(ApiFailure.class, () -> api.putSceneState("GL_ZONE_1", List.of(
+                PutCall.builder().id("LIGHT_A").ct(300).bri(100).transitionTime(5).build()
+        )));
+    }
+
+    @Test
     void putSceneState_hasExistingTempScene_lookedUpByAppData_updatesAndRecall() {
         setGetResponse("/grouped_light", """
                 {
