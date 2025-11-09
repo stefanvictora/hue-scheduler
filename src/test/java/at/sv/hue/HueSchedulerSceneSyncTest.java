@@ -95,8 +95,6 @@ public class HueSchedulerSceneSyncTest extends AbstractHueSchedulerTest {
         );
     }
 
-    // todo: test scene sync with scene states; getting the relevant put calls may not work as expected
-
     @Test
     void sceneSync_delayGreaterThanZero_createsScheduledTaskForSync() {
         sceneSyncDelayInSeconds = 5;

@@ -6262,7 +6262,78 @@ class HueApiTest {
                   "errors": [],
                   "data": [
                     {
-                      "id": "SCENE_ID",
+                      "id": "SCENE_ID_3",
+                      "actions": [
+                        {
+                          "target": {
+                            "rid": "LIGHT_A",
+                            "rtype": "light"
+                          },
+                          "action": {
+                            "on": {
+                              "on": true
+                            },
+                            "dimming": {
+                              "brightness": 80.0
+                            },
+                            "color_temperature": {
+                              "mirek": 200
+                            }
+                          }
+                        }
+                      ],
+                      "metadata": {
+                        "name": "SCENE FOR ANOTHER ZONE",
+                        "appdata": "hue_sch:temp"
+                      },
+                      "group": {
+                        "rid": "ZONE_2",
+                        "rtype": "zone"
+                      },
+                      "speed": 0.6031746031746031,
+                      "auto_dynamic": false,
+                      "status": {
+                        "active": "inactive"
+                      },
+                      "type": "scene"
+                    },
+                    {
+                      "id": "SCENE_ID_2",
+                      "actions": [
+                        {
+                          "target": {
+                            "rid": "LIGHT_A",
+                            "rtype": "light"
+                          },
+                          "action": {
+                            "on": {
+                              "on": true
+                            },
+                            "dimming": {
+                              "brightness": 80.0
+                            },
+                            "color_temperature": {
+                              "mirek": 200
+                            }
+                          }
+                        }
+                      ],
+                      "metadata": {
+                        "name": "IGNORED SCENE"
+                      },
+                      "group": {
+                        "rid": "ZONE_1",
+                        "rtype": "zone"
+                      },
+                      "speed": 0.6031746031746031,
+                      "auto_dynamic": false,
+                      "status": {
+                        "active": "inactive"
+                      },
+                      "type": "scene"
+                    },
+                    {
+                      "id": "SCENE_ID_1",
                       "actions": [
                         {
                           "target": {
@@ -6305,7 +6376,7 @@ class HueApiTest {
                 PutCall.builder().id("LIGHT_A").ct(300).bri(100).transitionTime(5).build()
         ));
 
-        verifyPut("/scene/SCENE_ID", """
+        verifyPut("/scene/SCENE_ID_1", """
                 {
                   "metadata": {
                     "name": "HueTemp",
@@ -6336,7 +6407,7 @@ class HueApiTest {
                 }
                 """);
 
-        verifyPut("/scene/SCENE_ID", """
+        verifyPut("/scene/SCENE_ID_1", """
                 {
                   "recall": {
                     "action": "active"

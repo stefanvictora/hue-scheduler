@@ -480,7 +480,7 @@ public class HueSchedulerOffUpdateTest extends AbstractHueSchedulerTest {
                 expectedPutCall(1).bri(67)
         );
 
-        ensureRunnable(initialNow.plusMinutes(41), initialNow.plusHours(2)); // background interpolation 2
+        ensureRunnable(initialNow.plusMinutes(45), initialNow.plusHours(2)); // background interpolation 2
     }
 
     @Test
