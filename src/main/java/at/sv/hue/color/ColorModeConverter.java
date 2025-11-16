@@ -21,26 +21,17 @@ public final class ColorModeConverter {
             setXYFromRgb(putCall, rgb);
         } else if (source == XY && target == CT) {
             setCtFromXY(putCall);
+        } else if (source == CT && target == GRADIENT) {
+            convertIfNeeded(putCall, XY);
+            convertIfNeeded(putCall, GRADIENT);
         } else if (source == GRADIENT && target == XY) {
-            gradientToXY(putCall);
+            setXYFromGradient(putCall);
         } else if (source == XY && target == GRADIENT) {
-            Pair<Double, Double> point = Pair.of(putCall.getX(), putCall.getY());
-            putCall.setGradient(Gradient.builder()
-                                        .points(List.of(point, point))
-                                        .build());
-            putCall.setX(null);
-            putCall.setY(null);
+            setGradientFromXY(putCall);
         } else if (source == GRADIENT && target == CT) {
-            gradientToXY(putCall);
-            convertIfNeeded(putCall, target);
+            convertIfNeeded(putCall, XY);
+            convertIfNeeded(putCall, CT);
         }
-    }
-
-    private static void gradientToXY(PutCall putCall) {
-        Pair<Double, Double> firstPoint = putCall.getGradient().points().getFirst();
-        putCall.setGradient(null);
-        putCall.setX(firstPoint.first());
-        putCall.setY(firstPoint.second());
     }
 
     private static int[] convertCtToRgb(PutCall putCall) {
@@ -65,5 +56,21 @@ public final class ColorModeConverter {
         putCall.setX(null);
         putCall.setY(null);
         putCall.setCt(mired);
+    }
+
+    private static void setXYFromGradient(PutCall putCall) {
+        Pair<Double, Double> firstPoint = putCall.getGradient().points().getFirst();
+        putCall.setGradient(null);
+        putCall.setX(firstPoint.first());
+        putCall.setY(firstPoint.second());
+    }
+
+    private static void setGradientFromXY(PutCall putCall) {
+        Pair<Double, Double> point = Pair.of(putCall.getX(), putCall.getY());
+        putCall.setGradient(Gradient.builder()
+                                    .points(List.of(point, point))
+                                    .build());
+        putCall.setX(null);
+        putCall.setY(null);
     }
 }
