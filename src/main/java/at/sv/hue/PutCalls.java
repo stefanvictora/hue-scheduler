@@ -94,7 +94,7 @@ public final class PutCalls {
     }
 
     public boolean allMatch(PutCalls other, BiPredicate<PutCall, PutCall> predicate) {
-        return matchWith(other).stream().allMatch(pair -> pair.test(predicate)); // todo: handle null values
+        return matchWith(other).stream().allMatch(pair -> pair.test(predicate));
     }
 
     private List<Pair<PutCall, PutCall>> matchWith(PutCalls target) {

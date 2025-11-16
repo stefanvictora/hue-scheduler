@@ -233,7 +233,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedPutCall(5).bri(150)
         );
 
-        List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(
+        ensureScheduledStates(
                 expectedRunnable(now.plusMinutes(2), now.plusDays(1)), // next scene sync
                 expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
         );
@@ -314,7 +314,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedPutCall(5).bri(150)
         );
 
-        List<ScheduledRunnable> followUpRunnables = ensureScheduledStates(
+        ensureScheduledStates(
                 expectedRunnable(now.plusMinutes(2), now.plusDays(1)), // next scene sync
                 expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
         );
@@ -715,7 +715,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now, now.plusDays(1))
         );
 
-        // Light 4 gets scaled, Light 5 gets the override brightness directly
+        // Light 4 gets scaled, Light 5 is ignored (since no bri in scene)
         advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
                 expectedPutCall(4).bri(59).ct(20),  // 100 * (150/254) ≈ 59
                 expectedPutCall(5).ct(40) // ignored
@@ -900,6 +900,60 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
 
         ensureScheduledStates(
                 expectedRunnable(initialNow.plusDays(2), initialNow.plusDays(2).plusMinutes(10)) // next day
+        );
+    }
+
+    @Test
+    void sceneControl_sceneThenScene_correctlyHandlesGroupMissmatch() {
+        mockDefaultGroupCapabilities(2);
+        mockGroupLightsForId(2, 5, 6);
+        mockSceneLightStates(2, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(100)
+                                   .ct(300),
+                ScheduledLightState.builder()
+                                   .id("/lights/6")
+                                   .bri(150)
+                                   .ct(400));
+        mockSceneLightStates(2, "AnotherTestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(200)
+                                   .ct(400),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(250)
+                                   .ct(500),
+                ScheduledLightState.builder()
+                                   .id("/lights/6")
+                                   .bri(300)
+                                   .ct(500));
+        addState("g2", now, "scene:TestScene");
+        addState("g2", now.plusMinutes(10), "scene:AnotherTestScene", "tr-before:5min");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(5)),
+                expectedRunnable(now.plusMinutes(5), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 2,
+                expectedPutCall(5).bri(100).ct(300),
+                expectedPutCall(6).bri(150).ct(400)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(5)) // next day
+        );
+
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.get(1), 2,
+                expectedPutCall(4).bri(200).ct(400).transitionTime(tr("5min")),
+                expectedPutCall(5).bri(250).ct(500).transitionTime(tr("5min")),
+                expectedPutCall(6).bri(300).ct(500).transitionTime(tr("5min"))
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusDays(1).plusMinutes(5), initialNow.plusDays(2)) // next day
         );
     }
 
@@ -1129,9 +1183,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
         );
 
-        ScheduledRunnable runnable = runnables.getFirst();
-        setCurrentTimeTo(runnable);
-        runnable.run();
+        setCurrentTimeToAndRun(runnables.getFirst());
 
         assertScenePutCalls(2,
                 expectedPutCall(4).bri(50).ct(200),
@@ -1203,9 +1255,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
         );
 
-        ScheduledRunnable runnable = runnables.getFirst();
-        setCurrentTimeTo(runnable);
-        runnable.run();
+        setCurrentTimeToAndRun(runnables.getFirst());
 
         assertScenePutCalls(2,
                 expectedPutCall(4).x(0.2013).y(0.5974), // gamut corrected for gamut A
@@ -1260,9 +1310,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
         );
 
-        ScheduledRunnable runnable = runnables.getFirst();
-        setCurrentTimeTo(runnable);
-        runnable.run();
+        setCurrentTimeToAndRun(runnables.getFirst());
 
         assertScenePutCalls(2,
                 expectedPutCall(4).x(0.2037).y(0.6171), // gamut corrected for gamut A
@@ -1300,9 +1348,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
         );
 
-        ScheduledRunnable runnable = runnables.getFirst();
-        setCurrentTimeTo(runnable);
-        runnable.run();
+        setCurrentTimeToAndRun(runnables.getFirst());
 
         assertScenePutCalls(2,
                 expectedPutCall(4).bri(40).x(0.6024).y(0.3433).transitionTime(tr("2s")),
@@ -1362,9 +1408,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
         );
 
-        ScheduledRunnable runnable = runnables.getFirst();
-        setCurrentTimeTo(runnable);
-        runnable.run();
+        setCurrentTimeToAndRun(runnables.getFirst());
 
         // previous state
         assertScenePutCalls(2,
@@ -1432,9 +1476,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
         );
 
-        ScheduledRunnable runnable = runnables.getFirst();
-        setCurrentTimeTo(runnable);
-        runnable.run();
+        setCurrentTimeToAndRun(runnables.getFirst());
 
         assertScenePutCalls(2,
                 expectedPutCall(4).bri(100).ct(300),
@@ -1499,9 +1541,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
         );
 
-        ScheduledRunnable runnable = runnables.getFirst();
-        setCurrentTimeTo(runnable);
-        runnable.run();
+        setCurrentTimeToAndRun(runnables.getFirst());
 
         assertScenePutCalls(2,
                 expectedPutCall(4).on(false),
@@ -1545,9 +1585,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
         );
 
-        ScheduledRunnable runnable = runnables.getFirst();
-        setCurrentTimeTo(runnable);
-        runnable.run();
+        setCurrentTimeToAndRun(runnables.getFirst());
 
         assertScenePutCalls(2,
                 expectedPutCall(4).bri(1), // min brightness value
@@ -1623,9 +1661,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
         );
 
-        ScheduledRunnable runnable = runnables.getFirst();
-        setCurrentTimeTo(runnable);
-        runnable.run();
+        setCurrentTimeToAndRun(runnables.getFirst());
 
         assertScenePutCalls(2,
                 expectedPutCall(4).gradient(Gradient.builder()
@@ -1724,9 +1760,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
         );
 
-        ScheduledRunnable runnable = runnables.getFirst();
-        setCurrentTimeTo(runnable);
-        runnable.run();
+        setCurrentTimeToAndRun(runnables.getFirst());
 
         assertScenePutCalls(2,
                 expectedPutCall(4).gradient(Gradient.builder()

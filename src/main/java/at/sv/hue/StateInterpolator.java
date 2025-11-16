@@ -227,6 +227,7 @@ public final class StateInterpolator {
         final var targetPoints = target.points();
         final int maxPoints = Math.max(previousPoints.size(), targetPoints.size());
         List<Pair<Double, Double>> points = new ArrayList<>(maxPoints);
+        // API guarantees minimum 2 gradient points, so maxPoints >= 2 and division is safe
         for (int i = 0; i < maxPoints; i++) {
             double pos = (double) i / (double) (maxPoints - 1);
 
