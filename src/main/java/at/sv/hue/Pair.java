@@ -8,6 +8,9 @@ public record Pair<F, S>(F first, S second) {
     }
 
     public boolean test(BiPredicate<F, S> predicate) {
+        if (first == null || second == null) {
+            return false;
+        }
         return predicate.test(first, second);
     }
 

@@ -161,6 +161,7 @@ public final class PutCall {
         }
         List<Pair<Double, Double>> points = putCall.gradient.points();
         List<Pair<Double, Double>> otherPoints = other.gradient.points();
+        // we know both gradients have the same number of points due to the interpolation happening before
         for (int i = 0; i < otherPoints.size(); i++) {
             Pair<Double, Double> point = points.get(i);
             Pair<Double, Double> otherPoint = otherPoints.get(i);
