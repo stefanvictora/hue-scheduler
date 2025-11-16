@@ -88,10 +88,27 @@ class ColorModeConverterTest {
     }
 
     @Test
-    void convert_Gradient_CT_takesFirstPoint() {
+    void convert_CT_Gradient_convertsToXYAndUsesAsTwoPoints() {
+        PutCall putCall = PutCall.builder()
+                                 .ct(500)
+                                 .build();
+
+        ColorModeConverter.convertIfNeeded(putCall, ColorMode.GRADIENT);
+
+        assertThat(putCall).isEqualTo(PutCall.builder()
+                                             .gradient(Gradient.builder()
+                                                               .points(List.of(
+                                                                       Pair.of(0.5317, 0.4127),
+                                                                       Pair.of(0.5317, 0.4127)))
+                                                               .build())
+                                             .build());
+    }
+
+    @Test
+    void convert_Gradient_CT_takesFirstPointAndConvertsToCT() {
         PutCall putCall = PutCall.builder()
                                  .gradient(Gradient.builder()
-                                                   .points(List.of(Pair.of(0.1532, 0.0475),
+                                                   .points(List.of(Pair.of(0.5317, 0.4127),
                                                            Pair.of(0.6915, 0.3083),
                                                            Pair.of(0.17, 0.7)))
                                                    .build())
@@ -100,7 +117,7 @@ class ColorModeConverterTest {
         ColorModeConverter.convertIfNeeded(putCall, ColorMode.CT);
 
         assertThat(putCall).isEqualTo(PutCall.builder()
-                                             .ct(580)
+                                             .ct(507)
                                              .build());
     }
 
