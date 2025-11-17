@@ -153,7 +153,7 @@ public interface HueApi extends ResourceModificationEventListener {
      * @throws GroupNotFoundException if no group with the given id exists
      * @throws NonUniqueNameException if multiple scenes with the same name exist for the specified group
      */
-    List<ScheduledLightState> getSceneLightState(String groupId, String sceneName);
+    List<ScheduledLightState> getSceneLightStates(String groupId, String sceneName);
 
     /**
      * Creates or updates a existing scene with the given name for the given group id.

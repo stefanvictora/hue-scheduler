@@ -193,7 +193,7 @@ public final class InputConfigurationParser {
                             "When 'scene' is used, only 'on', 'bri', 'tr', 'tr-before', 'days', 'force', 'interpolate' are allowed.");
                 }
 
-                scheduledLightStates = api.getSceneLightState(identifier.id(), scene);
+                scheduledLightStates = api.getSceneLightStates(identifier.id(), scene);
                 if (bri != null) {
                     scheduledLightStates = scaleBrightness(bri, scheduledLightStates);
                 }
