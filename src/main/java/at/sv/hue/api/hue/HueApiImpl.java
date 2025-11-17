@@ -346,7 +346,7 @@ public final class HueApiImpl implements HueApi {
     }
 
     @Override
-    public List<ScheduledLightState> getSceneLightState(String groupedLightId, String sceneName) {
+    public List<ScheduledLightState> getSceneLightStates(String groupedLightId, String sceneName) {
         Group group = getAndAssertGroupExists(groupedLightId);
         return getUniqueScene(group, sceneName).getActions()
                                                .stream()
