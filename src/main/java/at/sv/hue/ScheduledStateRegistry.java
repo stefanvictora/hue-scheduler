@@ -12,6 +12,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -145,6 +146,7 @@ public class ScheduledStateRegistry {
                 .map(GroupInfo::groupId)
                 .flatMap(groupId -> findActivePutCalls(groupId, now).stream())
                 .flatMap(putCalls -> createOverriddenLightPutCalls(putCalls, groupLights))
+                .filter(Objects::nonNull)
                 .collect(Collectors.toMap(PutCall::getId, putCall -> putCall, (_, replacement) -> replacement, LinkedHashMap::new));
     }
 
