@@ -19,20 +19,22 @@ public final class ScheduledLightStateValidator {
     private final Double x;
     private final Double y;
     private final Boolean on;
-    private final String effect;
+    private final String effectValue;
+    private final Double effectSpeed;
     private final boolean autoFillGradient;
     private final Gradient gradient;
 
     public ScheduledLightStateValidator(Identifier identifier, boolean groupState, LightCapabilities capabilities,
-                                        Integer brightness, Integer ct, Double x, Double y, Boolean on, String effect,
-                                        Gradient gradient, boolean autoFillGradient) {
+                                        Integer brightness, Integer ct, Double x, Double y, Boolean on, String effectValue,
+                                        Double effectSpeed, Gradient gradient, boolean autoFillGradient) {
         this.identifier = identifier;
         this.groupState = groupState;
         this.capabilities = capabilities;
         this.on = on;
         this.brightness = assertValidBrightnessValue(brightness);
         this.ct = assertCtSupportAndValue(ct);
-        this.effect = assertValidEffectValue(effect);
+        this.effectValue = assertValidEffectValue(effectValue);
+        this.effectSpeed = assertValidEffectSpeed(effectSpeed);
         assertValidXyPair(x, y);
         if (x != null) { // y is not null, because of assertValidXyPair
             assertColorCapabilities();
@@ -54,10 +56,11 @@ public final class ScheduledLightStateValidator {
                                       .bri(brightness)
                                       .on(on)
                                       .effect(Effect.builder()
-                                                    .effect(effect)
+                                                    .effect(effectValue)
                                                     .ct(ct)
                                                     .x(x)
                                                     .y(y)
+                                                    .speed(effectSpeed)
                                                     .build())
                                       .build();
         } else {
@@ -68,7 +71,7 @@ public final class ScheduledLightStateValidator {
                                       .x(x)
                                       .y(y)
                                       .on(on)
-                                      .effect(effect)
+                                      .effect(effectValue)
                                       .gradient(gradient)
                                       .gamut(capabilities.getColorGamut())
                                       .build();
@@ -76,7 +79,7 @@ public final class ScheduledLightStateValidator {
     }
 
     private boolean isEffectState() {
-        return effect != null && !"none".equals(effect);
+        return effectValue != null && !"none".equals(effectValue);
     }
 
     private String assertValidEffectValue(String effect) {
@@ -98,6 +101,16 @@ public final class ScheduledLightStateValidator {
                                            " Supported effects: " + supportedEffects);
         }
         return effect;
+    }
+
+    private Double assertValidEffectSpeed(Double effectSpeed) {
+        if (effectSpeed == null) {
+            return null;
+        }
+        if (effectSpeed < 0 || effectSpeed > 1) {
+            throw new InvalidPropertyValue("Effect speed must be between 0 and 1. Provided value: " + effectSpeed);
+        }
+        return effectSpeed;
     }
 
     private Integer assertValidBrightnessValue(Integer brightness) {
@@ -210,7 +223,7 @@ public final class ScheduledLightStateValidator {
     }
 
     private void assertNoOtherColorPropertiesThanGradient() {
-        if (ct != null || x != null || effect != null) { // y is not checked, because x and y must be set together
+        if (ct != null || x != null || effectValue != null) { // y is not checked, because x and y must be set together
             throw new InvalidPropertyValue("When setting a gradient, no other color properties (ct, x, y, effect) are allowed.");
         }
     }

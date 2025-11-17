@@ -4029,6 +4029,50 @@ class HueSchedulerTest extends AbstractHueSchedulerTest {
     }
 
     @Test
+    void parse_canHandleEffect_withSpeed() {
+        mockDefaultLightCapabilities(1);
+        addStateNow(1, "effect:candle@0.5");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
+                expectedPutCall(1).effect(Effect.builder()
+                                                .effect("candle")
+                                                .speed(0.5)
+                                                .build())
+        );
+
+        ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
+    void parse_canHandleEffect_withSpeed_tooBig() {
+        mockDefaultLightCapabilities(1);
+
+        assertThatThrownBy(() -> addStateNow("1", "effect:candle@1.1"))
+                .isInstanceOf(InvalidPropertyValue.class)
+                .hasMessage("Effect speed must be between 0 and 1. Provided value: 1.1");
+    }
+
+    @Test
+    void parse_canHandleEffect_withSpeed_tooLow() {
+        mockDefaultLightCapabilities(1);
+
+        assertThatThrownBy(() -> addStateNow("1", "effect:candle@-0.5"))
+                .isInstanceOf(InvalidPropertyValue.class)
+                .hasMessage("Effect speed must be between 0 and 1. Provided value: -0.5");
+    }
+
+    @Test
+    void parse_canHandleEffect_invalidSpeed() {
+        mockDefaultLightCapabilities(1);
+
+        assertThatThrownBy(() -> addStateNow("1", "effect:candle@"))
+                .isInstanceOf(InvalidPropertyValue.class)
+                .hasMessageContaining("Invalid effect value");
+    }
+
+    @Test
     void parse_canHandleEffect_buildsFullPicture_reusesPreviousColorAsParameter_xy() {
         mockDefaultLightCapabilities(1);
         addState(1, now, "effect:candle");

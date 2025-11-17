@@ -94,7 +94,8 @@ public final class InputConfigurationParser {
             Gradient gradient = null;
             String transitionTimeBefore = null;
             Integer transitionTime = null;
-            String effect = null;
+            String effectValue = null;
+            Double effectSpeed = null;
             String scene = null;
             if (interpolateAll) {
                 interpolate = Boolean.TRUE;
@@ -166,7 +167,17 @@ public final class InputConfigurationParser {
                                            .build();
                         break;
                     case "effect":
-                        effect = value;
+                        if (value.contains("@")) {
+                            String[] split = value.split("@");
+                            if (split.length != 2) {
+                                throw new InvalidPropertyValue("Invalid effect value '" + value +
+                                                               "'. Expected format: <effect>@<speed>");
+                            }
+                            effectValue = split[0];
+                            effectSpeed = parseDouble(split[1], parameter);
+                        } else {
+                            effectValue = value;
+                        }
                         break;
                     case "days":
                         DayOfWeeksParser.parseDayOfWeeks(value, dayOfWeeks);
@@ -188,7 +199,7 @@ public final class InputConfigurationParser {
 
             List<ScheduledLightState> scheduledLightStates;
             if (scene != null) {
-                if (ct != null || x != null || y != null || effect != null || gradient != null) {
+                if (ct != null || x != null || y != null || effectValue != null || gradient != null) {
                     throw new InvalidConfigurationLine(
                             "When 'scene' is used, only 'on', 'bri', 'tr', 'tr-before', 'days', 'force', 'interpolate' are allowed.");
                 }
@@ -205,7 +216,7 @@ public final class InputConfigurationParser {
                 }
             } else {
                 ScheduledLightStateValidator validator = new ScheduledLightStateValidator(identifier, groupState, capabilities,
-                        capBrightness(bri), ct, x, y, on, effect, gradient, autoFillGradient);
+                        capBrightness(bri), ct, x, y, on, effectValue, effectSpeed, gradient, autoFillGradient);
                 scheduledLightStates = List.of(validator.getScheduledLightState());
             }
 
