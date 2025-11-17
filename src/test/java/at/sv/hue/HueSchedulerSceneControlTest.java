@@ -904,7 +904,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
     }
 
     @Test
-    void sceneControl_sceneThenScene_correctlyHandlesGroupMissmatch() {
+    void sceneControl_sceneThenScene_correctlyHandlesGroupMismatch() {
         mockDefaultGroupCapabilities(2);
         mockGroupLightsForId(2, 5, 6);
         mockSceneLightStates(2, "TestScene",
@@ -954,6 +954,52 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
 
         ensureScheduledStates(
                 expectedRunnable(initialNow.plusDays(1).plusMinutes(5), initialNow.plusDays(2)) // next day
+        );
+    }
+
+    @Test
+    void sceneControl_sceneThenScene_sceneSync_correctlyHandlesGroupMismatch() {
+        enableSceneSync();
+        mockDefaultGroupCapabilities(2);
+        mockGroupLightsForId(2, 5, 6, 7); // one additional light, not included in scene
+        mockSceneLightStates(2, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(100)
+                                   .ct(300),
+                ScheduledLightState.builder()
+                                   .id("/lights/6")
+                                   .bri(150)
+                                   .ct(400));
+        mockSceneLightStates(2, "AnotherTestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(250)
+                                   .ct(500),
+                ScheduledLightState.builder()
+                                   .id("/lights/6")
+                                   .bri(300)
+                                   .ct(500));
+        addState("g2", now, "scene:TestScene");
+        addState("g2", now.plusMinutes(10), "scene:AnotherTestScene");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 2,
+                expectedPutCall(5).bri(100).ct(300),
+                expectedPutCall(6).bri(150).ct(400)
+        );
+        
+        assertSceneUpdate("/groups/2",
+                expectedPutCall(5).bri(100).ct(300),
+                expectedPutCall(6).bri(150).ct(400)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
         );
     }
 
