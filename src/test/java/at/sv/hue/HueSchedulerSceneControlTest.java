@@ -88,7 +88,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
         mockGroupLightsForId(2, 4, 5, 6);
         mockAssignedGroups(4, 1, 2);
         mockAssignedGroups(5, 1, 2);
-        mockAssignedGroups(6, 1);
+        mockAssignedGroups(6, 2);
         mockSceneLightStates(1, "TestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
