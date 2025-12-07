@@ -5513,13 +5513,6 @@ class HueApiTest {
 
         verifyPut("/scene/SCENE_ID", """
                 {
-                  "metadata": {
-                    "name": "SCENE"
-                  },
-                  "group": {
-                    "rid": "ZONE",
-                    "rtype": "zone"
-                  },
                   "actions": [
                     {
                       "target": {
@@ -5593,15 +5586,8 @@ class HueApiTest {
                 PutCall.builder().id("ON_OFF_ONLY").bri(254).effect(Effect.builder().effect("candle").build())
         );
 
-        verifyPost("/scene", """
+        verifyPut("/scene/SCENE_ID", """
                 {
-                  "metadata": {
-                    "name": "SCENE"
-                  },
-                  "group": {
-                    "rid": "ZONE",
-                    "rtype": "zone"
-                  },
                   "actions": [
                     {
                       "target": {

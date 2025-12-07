@@ -369,6 +369,8 @@ public final class HueApiImpl implements HueApi {
             Scene newScene = new Scene(sceneSyncName, appdata, group.toResourceReference(), actions);
             sceneId = createScene(newScene);
             log.trace("Created scene id={}", sceneId);
+            newScene.setId(sceneId);
+            getAvailableScenes().put(sceneId, newScene); // prepopulate cache
         } else if (actionsDiffer(existingScene, actions)) {
             Scene updatedScene = getUpdatedScene(sceneSyncName, appdata, actions);
             updateScene(existingScene, updatedScene);
