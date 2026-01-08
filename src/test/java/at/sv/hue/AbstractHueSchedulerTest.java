@@ -585,10 +585,12 @@ public class AbstractHueSchedulerTest {
 
     protected void simulateLightOnEvent(String id) {
         scheduler.getHueEventListener().onLightOn(id);
+        mockIsLightOff(id, false);
     }
 
     protected void simulateLightOffEvent(String id) {
         scheduler.getHueEventListener().onLightOff(id);
+        mockIsLightOff(id, true);
     }
 
     protected ScheduledRunnable simulateLightOnEventExpectingSingleScheduledState() {

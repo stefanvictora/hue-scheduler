@@ -13,7 +13,7 @@ import static org.mockito.Mockito.never;
 public class HueSchedulerOffUpdateTest extends AbstractHueSchedulerTest {
 
     @Test
-    void lightIsOff_doesNotMakeAnyCalls_unlessStateHasOnProperty() {
+    void lightIsOff_doesNotUpdateLights_unlessStateHasOnProperty() {
         addKnownLightIdsWithDefaultCapabilities(1);
         addState(1, "00:00", "bri:" + DEFAULT_BRIGHTNESS);
         addState(1, "01:00", "bri:" + (DEFAULT_BRIGHTNESS + 10), "force:true"); // force does not have any effect
@@ -24,14 +24,14 @@ public class HueSchedulerOffUpdateTest extends AbstractHueSchedulerTest {
         ScheduledRunnable secondState = scheduledRunnables.get(1);
         ScheduledRunnable thirdState = scheduledRunnables.get(2);
 
-        mockIsLightOff(1, true);
+        simulateLightOffEvent("/lights/1");
         advanceTimeAndRunAndAssertPutCalls(firstState); // no put call
 
         ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusHours(1)); // next day
 
         // second state is skipped
 
-        advanceTimeAndRunAndAssertPutCalls(secondState); // still no put calls, does not check "off" state again
+        advanceTimeAndRunAndAssertPutCalls(secondState); // still no put calls
 
         ensureRunnable(initialNow.plusDays(1).plusHours(1), initialNow.plusDays(1).plusHours(2)); // next day
 
@@ -51,7 +51,6 @@ public class HueSchedulerOffUpdateTest extends AbstractHueSchedulerTest {
         advanceTimeAndRunAndAssertPutCalls(powerOnRunnables.get(0)); // already ended
         advanceTimeAndRunAndAssertPutCalls(powerOnRunnables.get(1)); // already ended
 
-        verify(mockedHueApi, times(1)).isLightOff("/lights/1");
         verify(mockedHueApi, never()).isGroupOff("/groups/1");
     }
 
@@ -96,7 +95,7 @@ public class HueSchedulerOffUpdateTest extends AbstractHueSchedulerTest {
 
         // light is off, still applied
 
-        mockIsLightOff(1, true);
+        simulateLightOffEvent("/lights/1");
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
                 expectedPutCall(1).bri(50)
         );
@@ -228,7 +227,7 @@ public class HueSchedulerOffUpdateTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now.plusHours(1), now.plusDays(1))
         );
 
-        mockIsLightOff(1, true);
+        simulateLightOffEvent("/lights/1");
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
                 expectedPutCall(1).bri(50) // removes transition time
         );
@@ -248,7 +247,7 @@ public class HueSchedulerOffUpdateTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now.plusHours(1), now.plusDays(1))
         );
 
-        mockIsLightOff(1, true);
+        simulateLightOffEvent("/lights/1");
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
                 expectedPutCall(1).bri(50).on(true).transitionTime(tr("5s")) // keeps transition time
         );
@@ -454,7 +453,6 @@ public class HueSchedulerOffUpdateTest extends AbstractHueSchedulerTest {
 
         // simulate light turned on: applies state again (without on:true this time)
 
-        mockIsLightOff(1, false);
         List<ScheduledRunnable> powerOnRunnables = simulateLightOnEvent(
                 expectedPowerOnEnd(initialNow.plusMinutes(30)), // already ended
                 expectedPowerOnEnd(initialNow.plusHours(2))
@@ -585,6 +583,7 @@ public class HueSchedulerOffUpdateTest extends AbstractHueSchedulerTest {
         ScheduledRunnable retry = ensureRunnable(now.plusMinutes(syncFailureRetryInMinutes), initialNow.plusDays(1));
 
         resetMockedApi();
+        mockIsLightOff(1, true);
 
         advanceTimeAndRunAndAssertPutCalls(retry,
                 expectedPutCall(1).bri(90)
@@ -662,7 +661,7 @@ public class HueSchedulerOffUpdateTest extends AbstractHueSchedulerTest {
     }
 
     @Test
-    void groupIsOff_doesNotMakeAnyCalls_unlessStateHasOnProperty() {
+    void groupIsOff_doesNotUpdateLights_unlessStateHasOnProperty() {
         mockGroupLightsForId(1, 1, 2);
         mockDefaultGroupCapabilities(1);
         addState("g1", "00:00", "bri:" + DEFAULT_BRIGHTNESS);
@@ -681,7 +680,7 @@ public class HueSchedulerOffUpdateTest extends AbstractHueSchedulerTest {
 
         // second state is skipped
 
-        advanceTimeAndRunAndAssertGroupPutCalls(secondState); // still no put calls, does not check "off" state again
+        advanceTimeAndRunAndAssertGroupPutCalls(secondState); // still no put calls
 
         ensureRunnable(initialNow.plusDays(1).plusHours(1), initialNow.plusDays(1).plusHours(2)); // next day
 
@@ -701,7 +700,6 @@ public class HueSchedulerOffUpdateTest extends AbstractHueSchedulerTest {
         advanceTimeAndRunAndAssertGroupPutCalls(powerOnRunnables.get(0)); // already ended
         advanceTimeAndRunAndAssertGroupPutCalls(powerOnRunnables.get(1)); // already ended
 
-        verify(mockedHueApi, times(1)).isGroupOff("/groups/1");
         verify(mockedHueApi, never()).isLightOff("/lights/1");
     }
 
@@ -743,7 +741,7 @@ public class HueSchedulerOffUpdateTest extends AbstractHueSchedulerTest {
         ScheduledRunnable firstState = scheduledRunnables.get(0);
         ScheduledRunnable secondState = scheduledRunnables.get(1);
 
-        mockIsLightOff(2, true);
+        simulateLightOffEvent("/lights/2");
         advanceTimeAndRunAndAssertPutCalls(firstState); // no put call
 
         ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusHours(1)); // next day
@@ -759,6 +757,7 @@ public class HueSchedulerOffUpdateTest extends AbstractHueSchedulerTest {
         );
 
         // second state, detects off again
+        simulateLightOffEvent("/lights/2");
 
         advanceTimeAndRunAndAssertPutCalls(secondState);
 
