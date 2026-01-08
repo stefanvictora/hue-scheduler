@@ -2,6 +2,7 @@ package at.sv.hue.api.hass;
 
 import at.sv.hue.ColorMode;
 import at.sv.hue.Effect;
+import at.sv.hue.api.AffectedId;
 import at.sv.hue.api.ApiFailure;
 import at.sv.hue.api.BridgeAuthenticationFailure;
 import at.sv.hue.api.BridgeConnectionFailure;
@@ -2405,8 +2406,24 @@ public class HassApiTest {
                     }
                   },
                   {
-                    "entity_id": "light.3",
+                    "entity_id": "light.2",
                     "state": "on",
+                    "attributes": {
+                      "friendly_name": "Light 2",
+                      "supported_features": 40
+                    },
+                    "last_changed": "2024-06-28T07:15:30.790775+00:00",
+                    "last_reported": "2024-06-28T07:15:32.442080+00:00",
+                    "last_updated": "2024-06-28T07:15:32.442080+00:00",
+                    "context": {
+                      "id": "01J1EV61YTBP7RKF3H66D2XD7W",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  },
+                  {
+                    "entity_id": "light.3",
+                    "state": "off",
                     "attributes": {
                       "friendly_name": "Light 3",
                       "supported_features": 40
@@ -2424,8 +2441,12 @@ public class HassApiTest {
                 """);
 
         assertThat(api.getAffectedIdsByScene("scene.unknown")).isEmpty();
-        assertThat(api.getAffectedIdsByScene("scene.test_scene")).containsExactly("light.1", "light.2");
-        assertThat(api.getAffectedIdsByScene("scene.hue_scene")).containsExactly("light.wohnzimmer", "light.1", "light.3");
+        assertThat(api.getAffectedIdsByScene("scene.test_scene"))
+                .extracting(AffectedId::id, AffectedId::alreadyOn)
+                .containsExactly(tuple("light.1", true), tuple("light.2", true));
+        assertThat(api.getAffectedIdsByScene("scene.hue_scene"))
+                .extracting(AffectedId::id, AffectedId::alreadyOn)
+                .containsExactly(tuple("light.wohnzimmer", true), tuple("light.1", true), tuple("light.3", false));
         assertThat(api.getAffectedIdsByScene("scene.hue_scene_broken1")).isEmpty();
         assertThat(api.getAffectedIdsByScene("scene.hue_scene_broken2")).isEmpty();
 

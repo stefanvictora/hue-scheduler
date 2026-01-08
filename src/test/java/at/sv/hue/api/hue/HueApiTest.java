@@ -5,6 +5,7 @@ import at.sv.hue.Effect;
 import at.sv.hue.Gradient;
 import at.sv.hue.Pair;
 import at.sv.hue.ScheduledLightState;
+import at.sv.hue.api.AffectedId;
 import at.sv.hue.api.ApiFailure;
 import at.sv.hue.api.BridgeAuthenticationFailure;
 import at.sv.hue.api.BridgeConnectionFailure;
@@ -36,6 +37,7 @@ import java.util.List;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -1621,9 +1623,7 @@ class HueApiTest {
     void getAffectedIdsByScene_returnsLightIds_empty_ignoredAffectedByScene() {
         setGetResponse("/scene", EMPTY_RESPONSE);
 
-        List<String> sceneLights = api.getAffectedIdsByScene("0314f5ad-b424-4f63-aa2e-f55cac83e306");
-
-        assertThat(sceneLights).isEmpty();
+        assertThat(api.getAffectedIdsByScene("0314f5ad-b424-4f63-aa2e-f55cac83e306")).isEmpty();
     }
 
     @Test
@@ -1640,11 +1640,26 @@ class HueApiTest {
                   "errors": [],
                   "data": [
                     {
-                      "id": "3cfd5fad-2811-430a-a099-ae692b2185f8",
+                      "id": "GROUPED_LIGHT_ID_ZONE",
                       "id_v1": "/groups/3",
                       "owner": {
-                        "rid": "75ee4e3b-cacb-4b87-923b-d11d2480e8ff",
+                        "rid": "ZONE_ID",
                         "rtype": "zone"
+                      },
+                      "on": {
+                        "on": true
+                      },
+                      "type": "grouped_light"
+                    },
+                    {
+                      "id": "GROUPED_LIGHT_ID_ROOM",
+                      "id_v1": "/groups/1",
+                      "owner": {
+                        "rid": "ROOM_ID",
+                        "rtype": "room"
+                      },
+                      "on": {
+                        "on": false
                       },
                       "type": "grouped_light"
                     }
@@ -1655,21 +1670,21 @@ class HueApiTest {
                   "errors": [],
                   "data": [
                     {
-                      "id": "3cfd5fad-2811-430a-a099-ae692b2185f8",
+                      "id": "ROOM_ID",
                       "id_v1": "/groups/1",
                       "children": [
                         {
-                          "rid": "6f10b317-e118-4259-a6b8-d4a2ac960756",
+                          "rid": "DEVICE_ID_1",
                           "rtype": "device"
                         },
                         {
-                          "rid": "2f279281-3e45-462c-9e89-6b2d3363d883",
+                          "rid": "DEVICE_ID_2",
                           "rtype": "device"
                         }
                       ],
                       "services": [
                         {
-                          "rid": "4c69c282-3e45-4e87-adb0-fa52e03b4620",
+                          "rid": "GROUPED_LIGHT_ID_ROOM",
                           "rtype": "grouped_light"
                         }
                       ],
@@ -1687,21 +1702,21 @@ class HueApiTest {
                   "errors": [],
                   "data": [
                     {
-                      "id": "75ee4e3b-cacb-4b87-923b-d11d2480e8ff",
+                      "id": "ZONE_ID",
                       "id_v1": "/groups/3",
                       "children": [
                         {
-                          "rid": "1271bf6f-be63-42fc-b18c-3ad462914d8e",
+                          "rid": "LIGHT_ID_1",
                           "rtype": "light"
                         },
                         {
-                          "rid": "1aa6083d-3692-49e5-92f7-b926b302dd49",
+                          "rid": "LIGHT_ID_2",
                           "rtype": "light"
                         }
                       ],
                       "services": [
                         {
-                          "rid": "eeb336d9-243b-4756-8455-1c69f50efd31",
+                          "rid": "GROUPED_LIGHT_ID_ZONE",
                           "rtype": "grouped_light"
                         }
                       ],
@@ -1719,12 +1734,11 @@ class HueApiTest {
                   "errors": [],
                   "data": [
                     {
-                      "id": "4b5a905c-cc5e-48be-bc15-84da7deb5da7",
-                      "id_v1": "/scenes/CYpbjqIplpzquoRn",
+                      "id": "SCENE_ID_1",
                       "actions": [
                         {
                           "target": {
-                            "rid": "a24f1683-3cd9-466f-8072-3eed721af248",
+                            "rid": "LIGHT_ID_1",
                             "rtype": "light"
                           },
                           "action": {
@@ -1741,7 +1755,7 @@ class HueApiTest {
                         },
                         {
                           "target": {
-                            "rid": "57eaaeee-cd72-4b3b-b2dc-7cccbce0bbd7",
+                            "rid": "LIGHT_ID_2",
                             "rtype": "light"
                           },
                           "action": {
@@ -1764,7 +1778,7 @@ class HueApiTest {
                         "name": "Scene_1"
                       },
                       "group": {
-                        "rid": "3cfd5fad-2811-430a-a099-ae692b2185f8",
+                        "rid": "ROOM_ID",
                         "rtype": "room"
                       },
                       "status": {
@@ -1773,12 +1787,11 @@ class HueApiTest {
                       "type": "scene"
                     },
                     {
-                      "id": "f96f02db-9765-401c-9aa5-86d59fbdde8e",
-                      "id_v1": "/scenes/dWmQtCtTLkoJZPtD",
+                      "id": "SCENE_ID_2",
                       "actions": [
                         {
                           "target": {
-                            "rid": "1aa6083d-3692-49e5-92f7-b926b302dd49",
+                            "rid": "LIGHT_ID_1",
                             "rtype": "light"
                           },
                           "action": {
@@ -1795,7 +1808,7 @@ class HueApiTest {
                         },
                         {
                           "target": {
-                            "rid": "1271bf6f-be63-42fc-b18c-3ad462914d8e",
+                            "rid": "LIGHT_ID_2",
                             "rtype": "light"
                           },
                           "action": {
@@ -1820,7 +1833,7 @@ class HueApiTest {
                         "name": "Scene_2"
                       },
                       "group": {
-                        "rid": "75ee4e3b-cacb-4b87-923b-d11d2480e8ff",
+                        "rid": "ZONE_ID",
                         "rtype": "zone"
                       },
                       "status": {
@@ -1831,15 +1844,72 @@ class HueApiTest {
                   ]
                 }
                 """);
+        setGetResponse("/light", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "LIGHT_ID_1",
+                      "owner": {
+                        "rid": "a5fdefc3-8471-43fd-b5ee-642a6561696f",
+                        "rtype": "device"
+                      },
+                      "metadata": {
+                        "name": "Light 1",
+                        "archetype": "hue_lightstrip",
+                        "function": "mixed"
+                      },
+                      "on": {
+                        "on": true
+                      },
+                      "dimming": {
+                        "brightness": 100.0,
+                        "min_dim_level": 0.01
+                      },
+                      "color_temperature": {
+                        "mirek": 199,
+                        "mirek_valid": true,
+                        "mirek_schema": {
+                          "mirek_minimum": 153,
+                          "mirek_maximum": 500
+                        }
+                      },
+                      "type": "light"
+                    },
+                    {
+                      "id": "LIGHT_ID_2",
+                      "owner": {
+                        "rid": "cf704269-6f65-47f1-8423-677b65d3f874",
+                        "rtype": "device"
+                      },
+                      "metadata": {
+                        "name": "Light 2",
+                        "archetype": "hue_lightstrip",
+                        "function": "decorative"
+                      },
+                      "on": {
+                        "on": false
+                      },
+                      "dimming": {
+                        "brightness": 100.0,
+                        "min_dim_level": 10.0
+                      },
+                      "type": "light"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/device", EMPTY_RESPONSE);
 
-        assertThat(api.getAffectedIdsByScene("4b5a905c-cc5e-48be-bc15-84da7deb5da7"))
-                .containsExactly("a24f1683-3cd9-466f-8072-3eed721af248", "4c69c282-3e45-4e87-adb0-fa52e03b4620"); // ignores off light
-        assertThat(api.getAffectedIdsByScene("f96f02db-9765-401c-9aa5-86d59fbdde8e"))
-                .containsExactly("1aa6083d-3692-49e5-92f7-b926b302dd49", "1271bf6f-be63-42fc-b18c-3ad462914d8e",
-                        "eeb336d9-243b-4756-8455-1c69f50efd31");
+        assertThat(api.getAffectedIdsByScene("SCENE_ID_1"))
+                .extracting(AffectedId::id, AffectedId::alreadyOn)
+                .containsExactly(tuple("LIGHT_ID_1", true), tuple("GROUPED_LIGHT_ID_ROOM", false)); // ignores scene-off light
+        assertThat(api.getAffectedIdsByScene("SCENE_ID_2"))
+                .extracting(AffectedId::id, AffectedId::alreadyOn)
+                .containsExactly(tuple("LIGHT_ID_1", true), tuple("LIGHT_ID_2", false), tuple("GROUPED_LIGHT_ID_ZONE", true));
 
-        assertThat(api.getSceneName("4b5a905c-cc5e-48be-bc15-84da7deb5da7")).isEqualTo("Scene_1");
-        assertThat(api.getSceneName("f96f02db-9765-401c-9aa5-86d59fbdde8e")).isEqualTo("Scene_2");
+        assertThat(api.getSceneName("SCENE_ID_1")).isEqualTo("Scene_1");
+        assertThat(api.getSceneName("SCENE_ID_2")).isEqualTo("Scene_2");
     }
 
     @Test

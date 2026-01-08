@@ -5,6 +5,7 @@ import at.sv.hue.Effect;
 import at.sv.hue.Gradient;
 import at.sv.hue.Pair;
 import at.sv.hue.ScheduledLightState;
+import at.sv.hue.api.AffectedId;
 import at.sv.hue.api.ApiFailure;
 import at.sv.hue.api.Capability;
 import at.sv.hue.api.EmptyGroupException;
@@ -273,7 +274,7 @@ public final class HueApiImpl implements HueApi {
     }
 
     @Override
-    public List<String> getAffectedIdsByScene(String sceneId) {
+    public List<AffectedId> getAffectedIdsByScene(String sceneId) {
         Scene scene = getAvailableScenes().get(sceneId);
         if (scene == null) {
             return List.of();
@@ -281,15 +282,17 @@ public final class HueApiImpl implements HueApi {
         return getAffectedIdsByScene(scene);
     }
 
-    private List<String> getAffectedIdsByScene(Scene scene) {
-        List<String> resourceIds = new ArrayList<>(scene.getActions().stream()
-                                                        .filter(HueApiImpl::isOn)
-                                                        .map(SceneAction::getTarget)
-                                                        .map(ResourceReference::getRid)
-                                                        .toList());
+    private List<AffectedId> getAffectedIdsByScene(Scene scene) {
+        List<AffectedId> affectedIds = new ArrayList<>();
+        scene.getActions().stream()
+             .filter(HueApiImpl::isOn)
+             .map(SceneAction::getTarget)
+             .map(ResourceReference::getRid)
+             .map(id -> new AffectedId(id, !isLightOff(id)))
+             .forEach(affectedIds::add);
         String groupedLightId = getAndAssertGroupExists(scene.getGroup()).getGroupedLightId();
-        resourceIds.add(groupedLightId);
-        return resourceIds;
+        affectedIds.add(new AffectedId(groupedLightId, !isGroupOff(groupedLightId)));
+        return affectedIds;
     }
 
     private static boolean isOn(SceneAction action) {

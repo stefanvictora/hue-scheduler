@@ -1,5 +1,6 @@
 package at.sv.hue.api.hue;
 
+import at.sv.hue.api.AffectedId;
 import at.sv.hue.api.HttpResourceProvider;
 import at.sv.hue.api.LightCapabilities;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -12,7 +13,9 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -280,16 +283,19 @@ class HueApiCacheUpdateTest {
 
     @Test
     void sceneCache_update_actions_overridesOldValues_avoidsHttp() throws Exception {
+        stubGet(EP_LIGHT, lights("old-light", "new-light"));
+        stubGet(EP_DEVICE, device("device-1", "Bridge"));
+        stubGet(EP_GROUPED_LIGHT, groupedLight("grouped-light-1"));
         stubGet(EP_SCENE, scene("scene-1", "Bright"));
         stubGet(EP_ZONE, zone("zone-1", "Living Room", "grouped-light-1"));
-        assertThat(api.getAffectedIdsByScene("scene-1")).containsExactlyInAnyOrder("old-light", "grouped-light-1");
+        assertThat(api.getAffectedIdsByScene("scene-1")).extracting(AffectedId::id).containsExactlyInAnyOrder("old-light", "grouped-light-1");
         clearHttp();
 
         api.onModification("scene", "scene-1", json("""
                 { "actions": [ { "target": { "rid": "new-light", "rtype": "light" }, "action": { "on": { "on": true } } } ] }
                 """));
 
-        assertThat(api.getAffectedIdsByScene("scene-1")).containsExactlyInAnyOrder("new-light", "grouped-light-1");
+        assertThat(api.getAffectedIdsByScene("scene-1")).extracting(AffectedId::id).containsExactlyInAnyOrder("new-light", "grouped-light-1");
         verifyNoHttpCalls();
     }
 
@@ -423,6 +429,26 @@ class HueApiCacheUpdateTest {
                   "dimming": { "brightness": 50.0 },
                   "type": "light"
                 } ] }""".formatted(id, name);
+    }
+
+    private String lights(String... ids) {
+        if (ids.length == 0) {
+            return EMPTY;
+        }
+        String lightData = Arrays.stream(ids)
+                                 .map("""
+                                         {
+                                           "id": "%s",
+                                           "id_v1": "/lights/1",
+                                           "owner": { "rid": "device-1", "rtype": "device" },
+                                           "on": { "on": true },
+                                           "dimming": { "brightness": 50.0 },
+                                           "type": "light"
+                                         }"""::formatted)
+                                 .collect(Collectors.joining(", "));
+
+        return """
+                { "errors": [], "data": [ %s ] }""".formatted(lightData);
     }
 
     private String groupedLight(String id) {
