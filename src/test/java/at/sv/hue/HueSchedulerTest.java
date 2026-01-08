@@ -433,6 +433,13 @@ class HueSchedulerTest extends AbstractHueSchedulerTest {
     }
 
     @Test
+    void parse_canParseInterpolateProperty_correctErrorHandling() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+
+        assertThrows(InvalidPropertyValue.class, () -> addState("1", "00:00", "bri:1", "interpolate:true tr:5"));
+    }
+
+    @Test
     void parse_interpolateProperty_andTrBefore_prefersTrBefore() {
         addKnownLightIdsWithDefaultCapabilities(1);
         addState("1", "00:00", "bri:1");
