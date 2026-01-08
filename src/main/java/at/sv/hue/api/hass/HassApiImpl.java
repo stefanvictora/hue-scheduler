@@ -132,7 +132,9 @@ public class HassApiImpl implements HueApi {
 
     @Override
     public boolean isLightOff(String id) {
-        return getLightState(id).isOff();
+        assertSupportedStateType(id);
+        State state = getAndAssertLightExists(id);
+        return createLightState(state).isOff();
     }
 
     @Override

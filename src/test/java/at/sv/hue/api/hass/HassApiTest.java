@@ -2727,8 +2727,8 @@ public class HassApiTest {
 
     @Test
     void isLightOff_isOn_false() {
-        setGetResponse("/states/light.on_off", """
-                {
+        setGetResponse("/states", """
+                [{
                   "entity_id": "light.on_off",
                   "state": "on",
                   "attributes": {
@@ -2746,7 +2746,7 @@ public class HassApiTest {
                     "parent_id": null,
                     "user_id": null
                   }
-                }""");
+                }]""");
 
 
         assertThat(api.isLightOff("light.on_off")).isFalse();
@@ -2755,8 +2755,8 @@ public class HassApiTest {
 
     @Test
     void isLightOff_off_true() {
-        setGetResponse("/states/light.on_off", """
-                {
+        setGetResponse("/states", """
+                [{
                   "entity_id": "light.on_off",
                   "state": "off",
                   "attributes": {
@@ -2774,7 +2774,7 @@ public class HassApiTest {
                     "parent_id": null,
                     "user_id": null
                   }
-                }""");
+                }]""");
 
 
         assertThat(api.isLightOff("light.on_off")).isTrue();
@@ -2783,8 +2783,8 @@ public class HassApiTest {
 
     @Test
     void isLightOff_unavailable_true() {
-        setGetResponse("/states/light.on_off", """
-                {
+        setGetResponse("/states", """
+                [{
                   "entity_id": "light.on_off",
                   "state": "unavailable",
                   "attributes": {
@@ -2802,7 +2802,7 @@ public class HassApiTest {
                     "parent_id": null,
                     "user_id": null
                   }
-                }""");
+                }]""");
 
 
         assertThat(api.isLightOff("light.on_off")).isTrue();
