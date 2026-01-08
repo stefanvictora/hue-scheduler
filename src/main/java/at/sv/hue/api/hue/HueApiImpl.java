@@ -236,8 +236,17 @@ public final class HueApiImpl implements HueApi {
     @Override
     public void putSceneState(String groupedLightId, List<PutCall> putCalls) {
         String sceneId = createOrUpdateSceneInternal(groupedLightId, sceneControlAppData, sceneControlName, putCalls);
+        sleep();
         recallScene(sceneId);
         log.trace("Recalled temp scene for {}", groupedLightId);
+        sleep();
+    }
+
+    private static void sleep() {
+        try {
+            Thread.sleep(Duration.ofSeconds(2));
+        } catch (InterruptedException ignored) {
+        }
     }
 
     private void recallScene(String sceneId) {
