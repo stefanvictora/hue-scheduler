@@ -76,7 +76,7 @@ public interface HueApi extends ResourceModificationEventListener {
     /**
      * @throws ApiFailure if the api call failed
      */
-    void putSceneState(String groupId, List<PutCall> list);
+    void putSceneState(String groupId, List<PutCall> putCalls);
 
     /**
      * @return the lights associated with the group of the given id. Not null.
