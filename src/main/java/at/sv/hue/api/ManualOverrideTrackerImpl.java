@@ -31,7 +31,6 @@ public class ManualOverrideTrackerImpl implements ManualOverrideTracker {
     public void onLightTurnedOn(String id) {
         TrackedState trackedState = getOrCreateTrackedState(id);
         trackedState.setManuallyOverridden(false);
-        trackedState.setLightIsOff(false);
     }
 
     @Override
@@ -43,13 +42,7 @@ public class ManualOverrideTrackerImpl implements ManualOverrideTracker {
     @Override
     public void onLightOff(String id) {
         TrackedState trackedState = getOrCreateTrackedState(id);
-        trackedState.setLightIsOff(true);
         trackedState.setTurnedOnBySyncedScene(false);
-    }
-
-    @Override
-    public boolean isOff(String id) {
-        return getOrDefaultState(id).isLightIsOff();
     }
 
     @Override
@@ -70,6 +63,5 @@ public class ManualOverrideTrackerImpl implements ManualOverrideTracker {
     private static final class TrackedState {
         private volatile boolean manuallyOverridden;
         private volatile boolean turnedOnBySyncedScene;
-        private volatile boolean lightIsOff;
     }
 }

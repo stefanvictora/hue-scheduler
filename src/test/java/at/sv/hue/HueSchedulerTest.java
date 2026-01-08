@@ -5313,7 +5313,9 @@ class HueSchedulerTest extends AbstractHueSchedulerTest {
 
         ScheduledRunnable nextDayRunnable = ensureRunnable(initialNow.plusDays(1)); // next day
 
-        advanceTimeAndRunAndAssertPutCalls(nextDayRunnable);
+        advanceTimeAndRunAndAssertPutCalls(nextDayRunnable,
+                expectedPutCall(ID).on(false)
+        );
 
         ensureRunnable(initialNow.plusDays(2)); // next day
 

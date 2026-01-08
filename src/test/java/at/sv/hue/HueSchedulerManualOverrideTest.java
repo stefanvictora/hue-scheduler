@@ -1002,8 +1002,6 @@ public class HueSchedulerManualOverrideTest extends AbstractHueSchedulerTest {
 
         ensureRunnable(initialNow.plusDays(1).plusHours(1)); // for next day
 
-        mockIsLightOff(1, false);
-
         advanceTimeAndRunAndAssertPutCalls(thirdState); // still no put call expected, as light has been set to off
 
         ensureRunnable(initialNow.plusDays(1).plusHours(2)); // for next day
@@ -1013,6 +1011,7 @@ public class HueSchedulerManualOverrideTest extends AbstractHueSchedulerTest {
                 expectedPowerOnEnd(initialNow.plusHours(2)), // already ended
                 expectedPowerOnEnd(initialNow.plusHours(3))
         );
+        mockIsLightOff(1, false);
         // light state is still like first state -> not recognized as override as last seen state has not been updated through second state
 
         advanceTimeAndRunAndAssertPutCalls(powerOnRunnables.get(2),
