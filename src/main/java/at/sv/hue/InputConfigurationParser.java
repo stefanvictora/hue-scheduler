@@ -274,7 +274,8 @@ public final class InputConfigurationParser {
         return scheduledLightStates.stream()
                                    .map(state -> {
                                        if (state.getBri() != null) {
-                                           // Proportional scaling: targetBrightness acts as percentage of maximum
+                                           // Proportional scaling: each light's brightness is multiplied by (targetBrightness/254).
+                                           // E.g., bri:127 scales all lights to ~50% of their scene-defined brightness.
                                            double scaleFactor = targetBrightness / 254.0;
                                            int newBri = capBrightness((int) Math.round(state.getBri() * scaleFactor));
                                            return state.toBuilder().bri(newBri).build();

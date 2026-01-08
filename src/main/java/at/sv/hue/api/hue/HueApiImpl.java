@@ -246,6 +246,7 @@ public final class HueApiImpl implements HueApi {
         try {
             Thread.sleep(Duration.ofSeconds(2));
         } catch (InterruptedException ignored) {
+            Thread.currentThread().interrupt();
         }
     }
 
