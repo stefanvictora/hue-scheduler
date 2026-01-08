@@ -1,5 +1,6 @@
 package at.sv.hue;
 
+import at.sv.hue.api.AffectedId;
 import at.sv.hue.api.ApiFailure;
 import at.sv.hue.api.Capability;
 import at.sv.hue.api.HueApi;
@@ -52,7 +53,7 @@ public class AbstractHueSchedulerTest {
     private static final double COLOR_OVERRIDE_THRESHOLD = 0.06;
 
     protected final int syncFailureRetryInMinutes = 3;
-    private final String sceneSyncName = "synced-scene";
+    protected final String sceneSyncName = "synced-scene";
     private final String unsyncedSceneName = "user-scene";
 
     protected ManualOverrideTracker manualOverrideTracker;
@@ -158,7 +159,7 @@ public class AbstractHueSchedulerTest {
                 () -> now, 10.0, controlGroupLightsIndividually, disableUserModificationTracking,
                 requireSceneActivation, defaultInterpolationTransitionTimeInMs, 0, connectionFailureRetryDelay,
                 minTrGap, BRIGHTNESS_OVERRIDE_THRESHOLD_PERCENT, COLOR_TEMPERATURE_OVERRIDE_THRESHOLD_KELVIN,
-                COLOR_OVERRIDE_THRESHOLD,  3.8, 150, 0.06,
+                COLOR_OVERRIDE_THRESHOLD, 3.8, 150, 0.06,
                 sceneActivationIgnoreWindowInSeconds, interpolateAll,
                 enableSceneSync, sceneSyncName, syncFailureRetryInMinutes, sceneSyncDelayInSeconds, autoFillGradient,
                 supportsOffLightUpdates);
@@ -608,10 +609,16 @@ public class AbstractHueSchedulerTest {
     }
 
     protected void simulateSceneWithNameActivated(String groupId, String sceneName, String... containedLights) {
-        String sceneId = "/scene/mocked_scene_" + sceneName;
         List<String> affectedIds = new ArrayList<>(Arrays.asList(containedLights));
         affectedIds.add(groupId);
-        when(mockedHueApi.getAffectedIdsByScene(sceneId)).thenReturn(affectedIds);
+        simulateSceneWithNameActivated(sceneName, affectedIds.stream()
+                                                             .map(id -> new AffectedId(id, true))
+                                                             .toList().toArray(AffectedId[]::new));
+    }
+
+    protected void simulateSceneWithNameActivated(String sceneName, AffectedId... affectedIds) {
+        String sceneId = "/scene/mocked_scene_" + sceneName;
+        when(mockedHueApi.getAffectedIdsByScene(sceneId)).thenReturn(Arrays.asList(affectedIds));
         when(mockedHueApi.getSceneName(sceneId)).thenReturn(sceneName);
 
         scheduler.getSceneEventListener().onSceneActivated(sceneId);

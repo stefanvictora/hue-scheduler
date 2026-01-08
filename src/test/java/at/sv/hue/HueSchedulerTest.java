@@ -1,5 +1,6 @@
 package at.sv.hue;
 
+import at.sv.hue.api.AffectedId;
 import at.sv.hue.api.ApiFailure;
 import at.sv.hue.api.BridgeConnectionFailure;
 import at.sv.hue.api.Capability;
@@ -5454,6 +5455,58 @@ class HueSchedulerTest extends AbstractHueSchedulerTest {
         advanceCurrentTime(Duration.ofSeconds(sceneActivationIgnoreWindowInSeconds - 1)); // inside ignore window
 
         runAndAssertPutCalls(powerOnRunnable); // no additional update
+    }
+
+    @Test
+    void sceneTurnedOn_syncedScene_noInterpolation_affectedLightCurrentlyOff_doesNotTriggerAutomaticLightOn() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now, "bri:50");
+        addState(1, now.plusMinutes(10), "bri:60");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).bri(50)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
+        );
+
+        // simulate synced scene activated with light currently off -> does not trigger light on event
+        simulateSceneWithNameActivated(sceneSyncName, new AffectedId("/lights/1", false),
+                new AffectedId("/lights/2", true));
+
+        ensureScheduledStates(); // no scheduled states
+    }
+
+    @Test
+    void sceneTurnedOn_syncedScene_noInterpolation_affectedLightCurrentlyOn_triggersAutomaticLightOn() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now, "bri:50");
+        addState(1, now.plusMinutes(10), "bri:60");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).bri(50)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(10)) // next day
+        );
+
+        // simulate synced scene activated with light currently on -> triggers light on event
+        simulateSceneWithNameActivated(sceneSyncName, new AffectedId("/lights/1", true),
+                new AffectedId("/lights/2", false));
+
+        ensureScheduledStates(expectedPowerOnEnd(now.plusMinutes(10))); // light on event scheduled
     }
 
     @Test

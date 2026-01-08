@@ -3,6 +3,7 @@ package at.sv.hue.api.hass;
 import at.sv.hue.ColorMode;
 import at.sv.hue.Effect;
 import at.sv.hue.ScheduledLightState;
+import at.sv.hue.api.AffectedId;
 import at.sv.hue.api.ApiFailure;
 import at.sv.hue.api.BridgeAuthenticationFailure;
 import at.sv.hue.api.BridgeConnectionFailure;
@@ -226,7 +227,7 @@ public class HassApiImpl implements HueApi {
     }
 
     @Override
-    public List<String> getAffectedIdsByScene(String sceneId) {
+    public List<AffectedId> getAffectedIdsByScene(String sceneId) {
         State scene = getOrLookupStates().get(sceneId);
         if (scene == null) {
             return List.of();
@@ -244,7 +245,9 @@ public class HassApiImpl implements HueApi {
             } catch (Exception ignore) {
             }
         }
-        return affectedIds;
+        return affectedIds.stream()
+                   .map(id -> new AffectedId(id, !isLightOff(id)))
+                   .toList();
     }
 
     @Override
