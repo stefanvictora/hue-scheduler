@@ -45,7 +45,10 @@ public final class SceneEventListenerImpl implements SceneEventListener {
         Set<AffectedId> affectedIdsByScene = getAffectedIdsForScene(id);
         if (isSyncedScene(sceneName)) {
             log.info("Synced scene activated. Re-engage scheduler.");
-            affectedIdsByScene.forEach(lightOrGroupId -> recentlyAffectedSyncedIds.put(lightOrGroupId.id(), lightOrGroupId.id()));
+            affectedIdsByScene.forEach(lightOrGroupId -> {
+                recentlyAffectedSyncedIds.put(lightOrGroupId.id(), lightOrGroupId.id());
+                recentlyAffectedIds.invalidate(lightOrGroupId.id());
+            });
             List<String> alreadyOnIds = affectedIdsByScene.stream()
                                                           .filter(AffectedId::alreadyOn)
                                                           .map(AffectedId::id)
@@ -54,7 +57,10 @@ public final class SceneEventListenerImpl implements SceneEventListener {
             MDC.remove("context");
             return;
         }
-        affectedIdsByScene.forEach(lightOrGroupId -> recentlyAffectedIds.put(lightOrGroupId.id(), lightOrGroupId.id()));
+        affectedIdsByScene.forEach(lightOrGroupId -> {
+            recentlyAffectedIds.put(lightOrGroupId.id(), lightOrGroupId.id());
+            recentlyAffectedSyncedIds.invalidate(lightOrGroupId.id());
+        });
         MDC.remove("context");
     }
 
