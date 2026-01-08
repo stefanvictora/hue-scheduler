@@ -335,7 +335,13 @@ public final class InputConfigurationParser {
     }
 
     private static Boolean parseBoolean(String value, String parameter) {
-        return parseValueWithErrorHandling(value, parameter, "boolean", Boolean::parseBoolean);
+        if ("true".equalsIgnoreCase(value)) {
+            return Boolean.TRUE;
+        }
+        if ("false".equalsIgnoreCase(value)) {
+            return Boolean.FALSE;
+        }
+        throw new InvalidPropertyValue("Invalid boolean '" + value + "' for property '" + parameter + "'.");
     }
 
     private static <T> T parseValueWithErrorHandling(String value, String parameter, String type, Function<String, T> function) {
