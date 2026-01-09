@@ -1,5 +1,5 @@
 # -------- Build --------
-FROM --platform=$BUILDPLATFORM maven:3.9.11-eclipse-temurin-25 AS build
+FROM --platform=$BUILDPLATFORM maven:3.9.12-eclipse-temurin-25 AS build
 WORKDIR /build
 COPY pom.xml .
 RUN --mount=type=cache,target=/root/.m2,sharing=locked mvn -B -ntp dependency:go-offline
