@@ -43,6 +43,34 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
     }
 
     @Test
+    void sceneControl_init_allSameState_performsGroupUpdate() {
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        mockSceneLightStates(1, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100)
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(100)
+                                   .ct(20));
+        addState("g1", now, "scene:TestScene");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertGroupPutCalls(runnables.getFirst(),
+                expectedGroupPutCall(1).bri(100).ct(20)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
+        );
+    }
+
+    @Test
     void sceneControl_withSceneSync_considersThem() {
         enableSceneSync();
 
@@ -1366,9 +1394,8 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
 
         setCurrentTimeToAndRun(runnables.getFirst());
 
-        assertScenePutCalls(2,
-                expectedPutCall(4).bri(50).ct(200),
-                expectedPutCall(5).bri(50).ct(200)
+        assertGroupPutCalls(
+                expectedGroupPutCall(2).bri(50).ct(200)
         );
 
         assertScenePutCalls(2,
@@ -1480,7 +1507,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 ScheduledLightState.builder()
                                    .id("/lights/5")
                                    .x(0.18)
-                                   .y(0.62)
+                                   .y(0.63)
                                    .gamut(GAMUT_C)
         );
         addState("g2", now, "scene:TestScene");
@@ -1495,7 +1522,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
 
         assertScenePutCalls(2,
                 expectedPutCall(4).x(0.2037).y(0.6171), // gamut corrected for gamut A
-                expectedPutCall(5).x(0.2037).y(0.6171) // gamut corrected for gamut A
+                expectedPutCall(5).x(0.2049).y(0.627) // gamut corrected for gamut A
         );
         assertAllScenePutCallsAsserted();
 
@@ -1531,9 +1558,8 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
 
         setCurrentTimeToAndRun(runnables.getFirst());
 
-        assertScenePutCalls(2,
-                expectedPutCall(4).bri(40).x(0.6024).y(0.3433).transitionTime(tr("2s")),
-                expectedPutCall(5).bri(40).x(0.6024).y(0.3433).transitionTime(tr("2s"))
+        assertGroupPutCalls(
+                expectedGroupPutCall(2).bri(40).x(0.6024).y(0.3433).transitionTime(tr("2s"))
         );
 
         assertScenePutCalls(2,
