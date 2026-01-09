@@ -4803,6 +4803,12 @@ class HueSchedulerTest extends AbstractHueSchedulerTest {
     }
 
     @Test
+    void parse_invalidOnValue_exception() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        assertThrows(InvalidPropertyValue.class, () -> addStateNow("1", "on:yes"));
+    }
+
+    @Test
     void parse_invalidXAndYValue_xTooHigh_exception() {
         addKnownLightIdsWithDefaultCapabilities(1);
         assertThrows(InvalidXAndYValue.class, () -> addStateNow("1", "x:1.1", "y:0.1"));
