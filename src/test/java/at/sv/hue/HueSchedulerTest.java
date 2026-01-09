@@ -3558,7 +3558,7 @@ class HueSchedulerTest extends AbstractHueSchedulerTest {
     @Test
     void parse_canHandleColorInput_viaHexRGB_setsXAndYAndBrightness() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        addStateNow("1", "color:#5eba7d");
+        addStateNow("1", "color: #5eba7d");
 
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
@@ -3877,17 +3877,17 @@ class HueSchedulerTest extends AbstractHueSchedulerTest {
     }
 
     @Test
-    void parse_gradient_rgbAndHex_twoPoints() {
+    void parse_gradient_rgbAndHex_twoPoints_canHandleSpaces() {
         addKnownLightIdsWithDefaultCapabilities(1);
-        addStateNow("1", "gradient:[rgb(150 90 77),#5eba7d]");
+        addStateNow("1", "gradient:[ #5eba7d, rgb(150 90 77) ]");
 
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
                 expectedPutCall(ID).gradient(Gradient.builder()
                                                      .points(List.of(
-                                                             Pair.of(0.4311, 0.3516),
-                                                             Pair.of(0.2862, 0.4311)
+                                                             Pair.of(0.2862, 0.4311),
+                                                             Pair.of(0.4311, 0.3516)
                                                      ))
                                                      .build())
         );

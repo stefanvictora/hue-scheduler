@@ -228,41 +228,42 @@ public final class InputConfigurationParser {
     }
 
     private static XYColor parseColorValue(String value, LightCapabilities capabilities) {
-        if (value.startsWith("rgb(") && value.endsWith(")")) {
-            String rgbString = value.substring(4, value.length() - 1).trim();
+        String v = value.trim();
+        if (v.startsWith("rgb(") && v.endsWith(")")) {
+            String rgbString = v.substring(4, v.length() - 1).trim();
             String[] rgb = rgbString.split(" ");
             if (rgb.length != 3) {
-                throw new InvalidPropertyValue("Invalid RGB value '" + value + "'. Make sure to separate the color values with ' '.");
+                throw new InvalidPropertyValue("Invalid RGB value '" + v + "'. Make sure to separate the color values with ' '.");
             }
             var r = parseInteger(rgb[0], "color");
             var g = parseInteger(rgb[1], "color");
             var b = parseInteger(rgb[2], "color");
             return convertToXY(r, g, b, capabilities);
-        } else if (value.startsWith("#")) {
-            Color color = Color.decode(value);
+        } else if (v.startsWith("#")) {
+            Color color = Color.decode(v);
             return convertToXY(color.getRed(), color.getGreen(), color.getBlue(), capabilities);
-        } else if (value.startsWith("xy(") && value.endsWith(")")) {
-            String xyString = value.substring(3, value.length() - 1).trim();
+        } else if (v.startsWith("xy(") && v.endsWith(")")) {
+            String xyString = v.substring(3, v.length() - 1).trim();
             String[] xy = xyString.split(" ");
             if (xy.length != 2) {
-                throw new InvalidPropertyValue("Invalid xy value '" + value + "'. Make sure to separate the color values with ' '.");
+                throw new InvalidPropertyValue("Invalid xy value '" + v + "'. Make sure to separate the color values with ' '.");
             }
             double x = parseDouble(xy[0], "color");
             double y = parseDouble(xy[1], "color");
             return new XYColor(x, y, null);
-        } else if (value.startsWith("oklch(") && value.endsWith(")")) {
-            return OkLchParser.parseOkLch(value);
-        } else if (value.contains(",")) { // legacy support for comma-separated rgb
-            String[] rgb = value.split(",");
+        } else if (v.startsWith("oklch(") && v.endsWith(")")) {
+            return OkLchParser.parseOkLch(v);
+        } else if (v.contains(",")) { // legacy support for comma-separated rgb
+            String[] rgb = v.split(",");
             if (rgb.length != 3) {
-                throw new InvalidPropertyValue("Invalid RGB value '" + value + "'. Make sure to separate the color values with ','.");
+                throw new InvalidPropertyValue("Invalid RGB value '" + v + "'. Make sure to separate the color values with ','.");
             }
             int red = parseInteger(rgb[0], "color");
             int green = parseInteger(rgb[1], "color");
             int blue = parseInteger(rgb[2], "color");
             return convertToXY(red, green, blue, capabilities);
         }
-        throw new InvalidPropertyValue("Invalid color value '" + value + "'. Supported formats are: " +
+        throw new InvalidPropertyValue("Invalid color value '" + v + "'. Supported formats are: " +
                                        "'rgb(r g b)', '#rrggbb', 'xy(x y)', 'oklch(L C h)'. Use space not comma as value separator.");
     }
 
