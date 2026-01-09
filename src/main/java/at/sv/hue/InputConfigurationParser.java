@@ -128,7 +128,7 @@ public final class InputConfigurationParser {
                         }
                         break;
                     case "on":
-                        on = Boolean.valueOf(value);
+                        on = parseBoolean(value, parameter);
                         break;
                     case "tr":
                         transitionTime = parseTransitionTime(parameter, value);
