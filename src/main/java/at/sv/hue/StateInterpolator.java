@@ -71,7 +71,7 @@ public final class StateInterpolator {
         PutCall putCall = copy(previous);
         convertColorModeIfNeeded(putCall, target);
 
-        putCall.setBri(interpolateInteger(interpolatedTime, getBriConsideringOff(putCall), getBriConsideringOff(target)));
+        putCall.setBri(interpolateInteger(interpolatedTime, getBriConsideringOff(putCall), getBriConsideringOff(target))); // todo: for target we currently can't use off since this conflicts with off light updates
         putCall.setCt(interpolateInteger(interpolatedTime, putCall.getCt(), target.getCt()));
         var xy = interpolateXY(interpolatedTime, putCall.getXY(), target.getXY(), target.getGamut());
         if (xy != null) {
