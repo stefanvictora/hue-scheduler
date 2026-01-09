@@ -3286,6 +3286,7 @@ class HueApiTest {
                     }
                   ]
                 }""");
+        mockSceneCreationResult("SCENE_ID");
 
         // "Scene_3" does not yet exist for Room -> create it
         createOrUpdateScene("GROUPED_LIGHT_1",
@@ -3670,6 +3671,8 @@ class HueApiTest {
 
         // Color and brightness (uses min mirek):
 
+        mockSceneCreationResult("SCENE_ID");
+
         createOrUpdateScene("GROUPED_LIGHT", "SCENE",
                 PutCall.builder().id("COLOR").x(0.280).y(0.280).bri(20),
                 PutCall.builder().id("CT_ONLY").x(0.280).y(0.280).bri(20),
@@ -3762,15 +3765,8 @@ class HueApiTest {
                 PutCall.builder().id("ON_OFF_ONLY").bri(254).ct(499)
         );
 
-        verifyPost("/scene", """
+        verifyPut("/scene/SCENE_ID", """
                 {
-                  "metadata": {
-                    "name": "SCENE"
-                  },
-                  "group": {
-                    "rid": "ZONE",
-                    "rtype": "zone"
-                  },
                   "actions": [
                     {
                       "target": {
@@ -3844,15 +3840,8 @@ class HueApiTest {
                 PutCall.builder().id("ON_OFF_ONLY").hue(2000).sat(254)
         );
 
-        verifyPost("/scene", """
+        verifyPut("/scene/SCENE_ID", """
                 {
-                  "metadata": {
-                    "name": "SCENE"
-                  },
-                  "group": {
-                    "rid": "ZONE",
-                    "rtype": "zone"
-                  },
                   "actions": [
                     {
                       "target": {
@@ -4203,6 +4192,19 @@ class HueApiTest {
                     }
                   ]
                 }""");
+    }
+
+    private void mockSceneCreationResult(String sceneId) {
+        when(resourceProviderMock.postResource(eq(getUrl("/scene")), any()))
+                .thenReturn("{\n" +
+                            "  \"data\": [\n" +
+                            "    {\n" +
+                            "      \"rid\": \"" + sceneId + "\",\n" +
+                            "      \"rtype\": \"scene\"\n" +
+                            "    }\n" +
+                            "  ],\n" +
+                            "  \"errors\": []\n" +
+                            "}\n");
     }
 
     private boolean isLightOff(String lightId) {

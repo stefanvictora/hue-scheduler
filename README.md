@@ -238,7 +238,7 @@ docker run --rm -e "log.level=TRACE" --name hue-scheduler ...
 ## License
 
 ```text
-Copyright 2021-2025 Stefan Victora
+Copyright 2021-2026 Stefan Victora
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

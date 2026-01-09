@@ -326,12 +326,14 @@ public final class HueApiImpl implements HueApi {
         List<SceneAction> actions = createSceneActions(group, putCalls);
         if (existingScene == null) {
             Scene newScene = new Scene(sceneSyncName, group.toResourceReference(), actions);
-            String response = createScene(newScene);
-            log.trace("Created scene: {}", response != null ? response.trim() : "");
+            String sceneId = createScene(newScene);
+            log.trace("Created scene id={}", sceneId);
+            newScene.setId(sceneId);
+            getAvailableScenes().put(sceneId, newScene); // prepopulate cache
         } else if (actionsDiffer(existingScene, actions)) {
             Scene updatedScene = new Scene(actions);
-            String response = updateScene(existingScene, updatedScene);
-            log.trace("Updated scene: {}", response != null ? response.trim() : "");
+            updateScene(existingScene, updatedScene);
+            log.trace("Updated scene id={}", existingScene.getId());
         }
     }
 
@@ -440,12 +442,34 @@ public final class HueApiImpl implements HueApi {
 
     private String createScene(Scene newScene) {
         rateLimiter.acquire(10);
-        return resourceProvider.postResource(createUrl("/scene"), getBody(newScene));
+        String response = resourceProvider.postResource(createUrl("/scene"), getBody(newScene));
+        String id = getAffectedResourceId(response);
+        if (id == null) {
+            throw new ApiFailure("Failed to create scene, no id returned in response: " + response);
+        }
+        return id;
     }
 
-    private String updateScene(Scene scene, Scene updatedScene) {
+    private String getAffectedResourceId(String response) {
+        ResourceReferenceResponse ref = parseResourceReferenceResponse(response);
+        if (ref == null || ref.data == null || ref.data.isEmpty()) {
+            return null;
+        }
+        return ref.data.getFirst().getRid();
+    }
+
+    private ResourceReferenceResponse parseResourceReferenceResponse(String response) {
+        try {
+            return mapper.readValue(response, new TypeReference<>() {
+            });
+        } catch (JsonProcessingException e) {
+            throw new ApiFailure("Failed to parse response '" + response + "': " + e.getLocalizedMessage());
+        }
+    }
+
+    private void updateScene(Scene scene, Scene updatedScene) {
         rateLimiter.acquire(10);
-        return resourceProvider.putResource(createUrl("/scene/" + scene.getId()), getBody(updatedScene));
+        resourceProvider.putResource(createUrl("/scene/" + scene.getId()), getBody(updatedScene));
     }
 
     private List<String> getContainedLightIds(Group group) {
@@ -739,5 +763,10 @@ public final class HueApiImpl implements HueApi {
     @Data
     private static final class DeviceResponse implements DataListContainer<Device> {
         List<Device> data;
+    }
+
+    @Data
+    private static final class ResourceReferenceResponse implements DataListContainer<ResourceReference> {
+        List<ResourceReference> data;
     }
 }

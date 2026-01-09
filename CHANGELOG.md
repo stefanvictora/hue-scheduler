@@ -1,3 +1,8 @@
+## [0.14.1] - 2026-01-09
+
+### Fixed
+- **Scene Sync**: Fixed caching issue during Scene Sync which may have created multiple synced scenes for overlapping zones
+
 ## [0.14.0] - 2025-11-02
 
 ### Added
