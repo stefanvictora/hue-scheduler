@@ -6176,9 +6176,6 @@ class HueApiTest {
                         },
                         "color_temperature": {
                           "mirek": 300
-                        },
-                        "dynamics": {
-                          "duration": 500
                         }
                       }
                     },
@@ -6211,9 +6208,6 @@ class HueApiTest {
                             }
                           ],
                           "mode": "interpolated_palette_mirrored"
-                        },
-                        "dynamics": {
-                          "duration": 200
                         }
                       }
                     }
@@ -6224,7 +6218,8 @@ class HueApiTest {
         verifyPut("/scene/SCENE_NEW", """
                 {
                   "recall": {
-                    "action": "active"
+                    "action": "active",
+                    "duration": 500
                   }
                 }
                 """);
@@ -6529,7 +6524,7 @@ class HueApiTest {
                 """);
 
         api.putSceneState("GL_ZONE_1", List.of(
-                PutCall.builder().id("LIGHT_A").ct(300).bri(100).transitionTime(5).build()
+                PutCall.builder().id("LIGHT_A").ct(300).bri(100).build()
         ));
 
         verifyPut("/scene/SCENE_ID_1", """
@@ -6553,9 +6548,6 @@ class HueApiTest {
                         },
                         "color_temperature": {
                           "mirek": 300
-                        },
-                        "dynamics": {
-                          "duration": 500
                         }
                       }
                     }
