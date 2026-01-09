@@ -235,11 +235,28 @@ public final class HueApiImpl implements HueApi {
 
     @Override
     public void putSceneState(String groupedLightId, List<PutCall> putCalls) {
-        String sceneId = createOrUpdateSceneInternal(groupedLightId, sceneControlAppData, sceneControlName, putCalls);
+        String sceneId = createOrUpdateSceneInternal(groupedLightId, sceneControlAppData, sceneControlName,
+                removeTransitionTime(putCalls));
         sleep();
-        recallScene(sceneId);
-        log.trace("Recalled temp scene for {}", groupedLightId);
+        Integer recallDuration = getRecallDuration(putCalls);
+        recallScene(sceneId, recallDuration);
+        log.trace("Recalled temp scene for {}. Transition time: {}", groupedLightId, recallDuration);
         sleep();
+    }
+
+    private static List<PutCall> removeTransitionTime(List<PutCall> putCalls) {
+        return putCalls.stream()
+                       .map(putCall -> putCall.toBuilder().transitionTime(null).build())
+                       .toList();
+    }
+
+    private static Integer getRecallDuration(List<PutCall> putCalls) {
+        return putCalls.stream()
+                       .map(PutCall::getTransitionTime)
+                       .filter(Objects::nonNull)
+                       .max(Integer::compareTo)
+                       .map(tr -> tr * 100)
+                       .orElse(null);
     }
 
     private static void sleep() {
@@ -250,8 +267,8 @@ public final class HueApiImpl implements HueApi {
         }
     }
 
-    private void recallScene(String sceneId) {
-        RecallRequest recallBody = new RecallRequest(new Recall("active", null));
+    private void recallScene(String sceneId, Integer duration) {
+        RecallRequest recallBody = new RecallRequest(new Recall("active", duration));
         rateLimiter.acquire(10);
         resourceProvider.putResource(createUrl("/scene/" + sceneId), getBody(recallBody));
     }
