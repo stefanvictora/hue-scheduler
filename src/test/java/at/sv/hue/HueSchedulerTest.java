@@ -2604,6 +2604,29 @@ class HueSchedulerTest extends AbstractHueSchedulerTest {
     }
 
     @Test
+    void parse_interpolate_offStateAsTarget_treatedAsZeroBrightness_interpolates() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now, "bri:100");
+        addState(1, now.plusMinutes(10), "on:false", "interpolate:true");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1)),
+                expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
+        );
+
+        advanceCurrentTime(Duration.ofMinutes(5));
+
+        runAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).bri(50), // interpolated
+                expectedPutCall(1).on(false).transitionTime(tr("5min"))
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusDays(1), initialNow.plusDays(2)) // next day
+        );
+    }
+
+    @Test
     void parse_interpolate_longDuration_offStateAsTarget_treatedAsZeroBrightness_interpolates() {
         addKnownLightIdsWithDefaultCapabilities(1);
         addState(1, now, "bri:100", "ct:200");
