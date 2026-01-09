@@ -322,7 +322,7 @@ public class ScheduledStateSnapshot {
         if (interpolatedSplitPutCalls == null) {
             return null; // no interpolation possible; todo: write test or remove if not needed anymore
         }
-        interpolatedSplitPutCalls.setTransitionTime((int) between.toMillis() / 100);
+        interpolatedSplitPutCalls.setTransitionTime(Math.toIntExact(between.toMillis() / 100));
         return interpolatedSplitPutCalls;
     }
 
