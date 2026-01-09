@@ -34,10 +34,14 @@ public final class PutCalls {
     }
 
     private static List<PutCall> convertPutCallsIfNeeded(String id, List<PutCall> putCalls, boolean groupUpdate) {
-        if (groupUpdate && putCalls.size() == 1) { // for non groups the id of the putCall is already the light id
-            return List.of(putCalls.getFirst().toBuilder()
-                                   .id(id) // use group id instead of light id
-                                   .build());
+        if (!groupUpdate || putCalls.isEmpty()) {
+            return putCalls;
+        }
+        PutCall first = putCalls.getFirst();
+        boolean convertToGroupUpdate = putCalls.size() == 1 ||
+                                       putCalls.stream().skip(1).allMatch(first::hasSameLightState);
+        if (convertToGroupUpdate) {
+            return List.of(first.toBuilder().id(id).build());
         }
         return putCalls;
     }
@@ -81,9 +85,9 @@ public final class PutCalls {
                                            int colorTemperatureThresholdKelvin,
                                            double colorThreshold) {
         return anyMatch(other, (pc1, pc2) -> pc1.hasNotSimilarLightState(pc2,
-                                                                           brightnessThreshold,
-                                                                           colorTemperatureThresholdKelvin,
-                                                                           colorThreshold));
+                brightnessThreshold,
+                colorTemperatureThresholdKelvin,
+                colorThreshold));
     }
 
     private boolean anyMatch(PutCalls other, BiPredicate<PutCall, PutCall> predicate) {
