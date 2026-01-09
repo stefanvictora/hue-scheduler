@@ -44,10 +44,7 @@ public final class PutCalls {
 
     public Stream<PutCall> stream() {
         return putCalls.stream()
-                       .map(putCall -> {
-                           putCall.setTransitionTime(transitionTime);
-                           return putCall;
-                       });
+                       .map(putCall -> putCall.toBuilder().transitionTime(transitionTime).build());
     }
 
     public List<PutCall> toList() {
