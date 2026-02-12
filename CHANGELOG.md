@@ -1,3 +1,8 @@
+## [0.14.2] - 2026-02-12
+
+### Fixed
+- **Scene Sync** (HA): Fixed a sync issue for disabled HA entities (#45)
+
 ## [0.14.1] - 2026-01-09
 
 ### Fixed

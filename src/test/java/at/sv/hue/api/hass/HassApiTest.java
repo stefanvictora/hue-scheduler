@@ -2043,6 +2043,7 @@ public class HassApiTest {
         assertThat(api.getAssignedGroups("light.couch_light")).containsExactlyInAnyOrder("light.couch_group",
                 "light.couch_group2", "light.couch_group3");
         assertThat(api.getAssignedGroups("light.another_light")).containsExactlyInAnyOrder("light.another_group");
+        assertThat(api.getAssignedGroups("light.unknown_light")).isEmpty();
     }
 
     @Test

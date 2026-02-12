@@ -89,6 +89,10 @@ public class HassApiImpl implements HueApi {
     public Identifier getLightIdentifier(String id) {
         assertSupportedStateType(id);
         State state = getAndAssertLightExists(id);
+        return getLightIdentifier(id, state);
+    }
+
+    private static Identifier getLightIdentifier(String id, State state) {
         return new Identifier(id, state.attributes.friendly_name);
     }
 
@@ -236,7 +240,12 @@ public class HassApiImpl implements HueApi {
 
     @Override
     public List<String> getAssignedGroups(String lightId) {
-        String lightName = getLightIdentifier(lightId).name();
+        assertSupportedStateType(lightId);
+        State lightState = getOrLookupStates().get(lightId);
+        if (lightState == null) {
+            return List.of();
+        }
+        String lightName = getLightIdentifier(lightId, lightState).name();
         return getOrLookupStates().values()
                                   .stream()
                                   .filter(HassApiImpl::isGroupState)
