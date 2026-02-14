@@ -64,14 +64,14 @@ class HueApiTest {
         String host = "localhost";
         resourceProviderMock = Mockito.mock(HttpResourceProvider.class);
         api = new HueApiImpl(resourceProviderMock, host, _ -> {
-        }, 5, SCENE_CONTROL_NAME, SCENE_CONTROL_APP_DATA);
+        }, 5, SCENE_CONTROL_NAME, SCENE_CONTROL_APP_DATA, 2000);
         baseUrl = "https://" + host + "/clip/v2/resource";
     }
 
     @Test
     void invalidHost_cantUseScheme_exception() {
         assertThrows(InvalidConnectionException.class, () -> new HueApiImpl(resourceProviderMock, "hTtps://localhost", permits -> {
-        }, 5, null, null));
+        }, 5, null, null, 2000));
     }
 
     @Test
