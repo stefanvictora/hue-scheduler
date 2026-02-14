@@ -73,6 +73,7 @@ public final class HueApiImpl implements HueApi {
     private final RateLimiter rateLimiter;
     private final String sceneControlName;
     private final String sceneControlAppData;
+    private final int sceneUpdateSleepDelayInMs;
     private final AsyncLoadingCache<String, Map<String, Light>> availableLightsCache;
     private final AsyncLoadingCache<String, Map<String, Device>> availableDevicesCache;
     private final AsyncLoadingCache<String, Map<String, Light>> availableGroupedLightsCache;
@@ -82,7 +83,8 @@ public final class HueApiImpl implements HueApi {
     private final AsyncLoadingCache<String, Map<String, ZigbeeConnectivity>> availableZigbeeConnectivityCache;
 
     public HueApiImpl(HttpResourceProvider resourceProvider, String host, RateLimiter rateLimiter,
-                      int apiCacheInvalidationIntervalInMinutes, String sceneControlName, String sceneControlAppData) {
+                      int apiCacheInvalidationIntervalInMinutes, String sceneControlName, String sceneControlAppData,
+                      int sceneUpdateSleepDelayInMs) {
         this.resourceProvider = resourceProvider;
         mapper = new ObjectMapper();
         mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
@@ -93,6 +95,7 @@ public final class HueApiImpl implements HueApi {
         this.rateLimiter = rateLimiter;
         this.sceneControlName = sceneControlName;
         this.sceneControlAppData = sceneControlAppData;
+        this.sceneUpdateSleepDelayInMs = sceneUpdateSleepDelayInMs;
         availableLightsCache = createCache(this::lookupLights, apiCacheInvalidationIntervalInMinutes);
         availableDevicesCache = createCache(this::lookupDevices, apiCacheInvalidationIntervalInMinutes);
         availableGroupedLightsCache = createCache(this::lookupGroupedLights, apiCacheInvalidationIntervalInMinutes);
@@ -241,7 +244,6 @@ public final class HueApiImpl implements HueApi {
         Integer recallDuration = getRecallDuration(putCalls);
         recallScene(sceneId, recallDuration);
         log.trace("Recalled temp scene for {}. Transition time: {}", groupedLightId, recallDuration);
-        sleep();
     }
 
     private static List<PutCall> removeTransitionTime(List<PutCall> putCalls) {
@@ -259,9 +261,11 @@ public final class HueApiImpl implements HueApi {
                        .orElse(null);
     }
 
-    private static void sleep() {
+    private void sleep() {
         try {
-            Thread.sleep(Duration.ofSeconds(2));
+            log.trace("Sleep for {} to ensure scene is properly recalled before next operation.",
+                    Duration.ofMillis(sceneUpdateSleepDelayInMs));
+            Thread.sleep(sceneUpdateSleepDelayInMs);
         } catch (InterruptedException ignored) {
             Thread.currentThread().interrupt();
         }

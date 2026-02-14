@@ -168,6 +168,11 @@ public final class HueScheduler implements Runnable {
             description = "The delay in seconds for retrying an API call, if the bridge could not be reached due to " +
                           "network failure, or if it returned an API error code. Default: ${DEFAULT-VALUE} seconds.")
     int bridgeFailureRetryDelayInSeconds;
+    @Option(names = "--scene-update-sleep-delay", paramLabel = "<delay>",
+            defaultValue = "${env:SCENE_UPDATE_SLEEP_DELAY:-13000}",
+            description = "The delay in milliseconds between scene creation/update and scene recall operations. " +
+                          "This ensures the bridge has processed the scene changes. Default: ${DEFAULT-VALUE} ms.")
+    int sceneUpdateSleepDelayInMs;
     int syncFailureRetryInMinutes = 3;
     @Option(names = "--event-stream-read-timeout", paramLabel = "<timeout>",
             defaultValue = "${env:EVENT_STREAM_READ_TIMEOUT:-120}",
@@ -383,7 +388,8 @@ public final class HueScheduler implements Runnable {
         OkHttpClient httpsClient = createHueHttpsClient();
         RateLimiter rateLimiter = RateLimiter.create(requestsPerSecond);
         api = new HueApiImpl(new HttpResourceProviderImpl(httpsClient, maxConcurrentRequests), apiHost, rateLimiter,
-                apiCacheInvalidationIntervalInMinutes, sceneControlName, SCENE_CONTROL_APP_DATA);
+                apiCacheInvalidationIntervalInMinutes, sceneControlName, SCENE_CONTROL_APP_DATA,
+                sceneUpdateSleepDelayInMs);
         lightEventListener = createLightEventListener();
         sceneEventListener = new SceneEventListenerImpl(api, Ticker.systemTicker(),
                 sceneActivationIgnoreWindowInSeconds, sceneSyncName::equals, lightEventListener);
