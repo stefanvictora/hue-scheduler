@@ -15,14 +15,9 @@ import java.util.concurrent.Semaphore;
 public class HttpResourceProviderImpl implements HttpResourceProvider {
 
     public static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
-    private static final int DEFAULT_MAX_CONCURRENT_REQUESTS = 2;
 
     private final OkHttpClient httpClient;
     private final Semaphore semaphore;
-
-    public HttpResourceProviderImpl(OkHttpClient httpClient) {
-        this(httpClient, DEFAULT_MAX_CONCURRENT_REQUESTS);
-    }
 
     public HttpResourceProviderImpl(OkHttpClient httpClient, int maxConcurrentRequests) {
         this.httpClient = httpClient;

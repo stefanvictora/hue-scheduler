@@ -23,7 +23,7 @@ class HttpResourceProviderTest {
     @BeforeEach
     void setUp() throws IOException {
         OkHttpClient client = new OkHttpClient.Builder().build();
-        provider = new HttpResourceProviderImpl(client);
+        provider = new HttpResourceProviderImpl(client, 2);
         mockServer = new MockWebServer();
         mockServer.start();
         url = mockServer.url("/test").url();
