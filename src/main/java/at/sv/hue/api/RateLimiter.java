@@ -6,7 +6,7 @@ public interface RateLimiter {
     void acquire(int permits);
 
     static RateLimiter create(double permitsPerSecond) {
-        return new RateLimiterImpl(permitsPerSecond, System::nanoTime, RateLimiter::sleep);
+        return new RateLimiterImpl(permitsPerSecond, 1, System::nanoTime, RateLimiter::sleep);
     }
 
     static void sleep(Long time) {

@@ -1,6 +1,10 @@
 package at.sv.hue.api.hue;
 
 import lombok.extern.slf4j.Slf4j;
+import okhttp3.Call;
+import okhttp3.Connection;
+import okhttp3.EventListener;
+import okhttp3.Handshake;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 
@@ -8,6 +12,7 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
+import java.io.IOException;
 import java.io.InputStream;
 import java.security.KeyStore;
 import java.security.cert.Certificate;
@@ -36,6 +41,20 @@ public class HueHttpsClientFactory {
                                                      .header("hue-application-key", accessToken)
                                                      .build();
                     return chain.proceed(modifiedRequest);
+                })
+                .eventListener(new EventListener() {
+                    @Override public void connectionAcquired(Call call, Connection connection) {
+                        log.debug("acquired connId={} {}", System.identityHashCode(connection), connection);
+                    }
+                    @Override public void secureConnectStart(Call call) {
+                        log.debug("tls start {}", call.request().url());
+                    }
+                    @Override public void secureConnectEnd(Call call, Handshake handshake) {
+                        log.debug("tls end {}", handshake != null ? handshake.tlsVersion() : null);
+                    }
+                    @Override public void callFailed(Call call, IOException ioe) {
+                        log.warn("call failed {} {}", call.request().url(), ioe.toString());
+                    }
                 })
                 .build();
     }

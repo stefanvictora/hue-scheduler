@@ -24,7 +24,7 @@
 
 **Performance & Rate Limiting**
 
-- [`--max-requests-per-second`](#--max-requests-per-second) · [`--control-group-lights-individually`](#--control-group-lights-individually-experimental)
+- [`--max-requests-per-second`](#--max-requests-per-second) · [`--max-concurrent-requests`](#--max-concurrent-requests) · [`--control-group-lights-individually`](#--control-group-lights-individually-experimental)
 
 **Security**
 
@@ -218,6 +218,16 @@ Note: Groups are controlled via broadcast messages, which are more expensive. Ph
 To keep the convenience of groups while improving performance, you can try the experimental `--control-group-lights-individually` option below.
 
 **Default & recommended:** `10`
+
+### `--max-concurrent-requests`
+
+*New in 0.14.3*
+
+Max number of **concurrent in-flight HTTP requests**. This limits parallel TLS handshakes and connections to the bridge, preventing connection resets when many states fire at once (e.g., morning schedules after an idle night).
+
+Lower values are safer for bridge stability; higher values allow more throughput.
+
+**Default:** `2`
 
 ### `--control-group-lights-individually` *(Experimental)*
 

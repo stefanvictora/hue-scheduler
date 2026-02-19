@@ -15,7 +15,11 @@ public class RateLimiterTest {
     private RateLimiter limiter;
 
     private void create(int permitsPerSecond) {
-        limiter = new RateLimiterImpl(permitsPerSecond, () -> time, sleepTime::set);
+        create(permitsPerSecond, 1);
+    }
+
+    private void create(int permitsPerSecond, double maxStoredPermits) {
+        limiter = new RateLimiterImpl(permitsPerSecond, maxStoredPermits, () -> time, sleepTime::set);
     }
 
     private void acquireAndAssertSleepTime(int permits) {
@@ -89,5 +93,29 @@ public class RateLimiterTest {
         advanceTime(1, TimeUnit.SECONDS);
 
         acquireAndAssertSleepTime(10, 100, TimeUnit.MILLISECONDS);
+    }
+
+    @Test
+    void acquire_tenPermitsPerSecond_afterLongIdle_doesNotBurst_maxStoredPermitsOne() {
+        create(10, 1);
+
+        acquireAndAssertSleepTime(1);
+
+        advanceTime(10, TimeUnit.SECONDS);
+
+        acquireAndAssertSleepTime(1); // only 1 stored permit available, no sleep
+        acquireAndAssertSleepTime(1); // need fresh permit, but returns previous nextFree which is in the past
+    }
+
+    @Test
+    void acquire_tenPermitsPerSecond_afterLongIdle_doesNotBurst_maxStoredPermitsZero() {
+        create(10, 0);
+
+        acquireAndAssertSleepTime(1);
+
+        advanceTime(10, TimeUnit.SECONDS);
+
+        acquireAndAssertSleepTime(1); // no stored permits, but nextFree in the past so no sleep
+        acquireAndAssertSleepTime(1, 100, TimeUnit.MILLISECONDS); // need fresh permit, must wait
     }
 }

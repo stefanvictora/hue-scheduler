@@ -9,16 +9,24 @@ import okhttp3.Response;
 
 import java.io.IOException;
 import java.net.URL;
+import java.util.concurrent.Semaphore;
 
 @Slf4j
 public class HttpResourceProviderImpl implements HttpResourceProvider {
 
     public static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
+    private static final int DEFAULT_MAX_CONCURRENT_REQUESTS = 2;
 
     private final OkHttpClient httpClient;
+    private final Semaphore semaphore;
 
     public HttpResourceProviderImpl(OkHttpClient httpClient) {
+        this(httpClient, DEFAULT_MAX_CONCURRENT_REQUESTS);
+    }
+
+    public HttpResourceProviderImpl(OkHttpClient httpClient, int maxConcurrentRequests) {
         this.httpClient = httpClient;
+        this.semaphore = new Semaphore(maxConcurrentRequests);
     }
 
     @Override
@@ -66,12 +74,15 @@ public class HttpResourceProviderImpl implements HttpResourceProvider {
     }
 
     private String performCall(Request request) {
+        semaphore.acquireUninterruptibly();
         try (Response response = callHttpClient(request)) {
             assertSuccessful(response);
             return getBody(response);
         } catch (IOException e) {
             log.error("Failed '{}': {}", request, e.getLocalizedMessage());
             throw new BridgeConnectionFailure("Failed '" + request + "'", e);
+        } finally {
+            semaphore.release();
         }
     }
 
