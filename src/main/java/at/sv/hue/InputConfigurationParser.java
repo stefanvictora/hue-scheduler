@@ -6,7 +6,9 @@ import at.sv.hue.api.Identifier;
 import at.sv.hue.api.LightCapabilities;
 import at.sv.hue.api.hass.HassSupportedEntityType;
 import at.sv.hue.color.CTToRGBConverter;
+import at.sv.hue.color.OkLchParser;
 import at.sv.hue.color.RGBToXYConverter;
+import at.sv.hue.color.XYColor;
 import at.sv.hue.time.StartTimeProvider;
 
 import java.awt.*;
@@ -23,23 +25,27 @@ public final class InputConfigurationParser {
 
     private static final Pattern TR_PATTERN = Pattern.compile("(?:(\\d+)h)?(?:(\\d+)min)?(?:(\\d+)s)?(\\d*)?",
             Pattern.CASE_INSENSITIVE);
+    private static final Pattern GRADIENT_VALUE = Pattern.compile("^\\[(?<list>.+?)](?:@(?<mode>[A-Za-z_]+))?$",
+            Pattern.CASE_INSENSITIVE);
 
     private final StartTimeProvider startTimeProvider;
     private final HueApi api;
     private final int minTrBeforeGapInMinutes;
     private final int brightnessOverrideThreshold;
     private final int colorTemperatureOverrideThresholdKelvin;
+    private final boolean autoFillGradient;
     private final double colorOverrideThreshold;
     private final boolean interpolateAll;
 
     public InputConfigurationParser(StartTimeProvider startTimeProvider, HueApi api, int minTrBeforeGapInMinutes,
                                     int brightnessOverrideThreshold, int colorTemperatureOverrideThresholdKelvin,
-                                    double colorOverrideThreshold, boolean interpolateAll) {
+                                    double colorOverrideThreshold, boolean interpolateAll, boolean autoFillGradient) {
         this.startTimeProvider = startTimeProvider;
         this.api = api;
         this.minTrBeforeGapInMinutes = minTrBeforeGapInMinutes;
         this.colorOverrideThreshold = colorOverrideThreshold;
         this.interpolateAll = interpolateAll;
+        this.autoFillGradient = autoFillGradient;
         this.brightnessOverrideThreshold = brightnessOverrideThreshold;
         this.colorTemperatureOverrideThresholdKelvin = colorTemperatureOverrideThresholdKelvin;
     }
@@ -85,11 +91,12 @@ public final class InputConfigurationParser {
             Boolean interpolate = null;
             Double x = null;
             Double y = null;
-            Integer hue = null;
-            Integer sat = null;
+            Gradient gradient = null;
             String transitionTimeBefore = null;
             Integer transitionTime = null;
-            String effect = null;
+            String effectValue = null;
+            Double effectSpeed = null;
+            String scene = null;
             if (interpolateAll) {
                 interpolate = Boolean.TRUE;
             }
@@ -114,15 +121,14 @@ public final class InputConfigurationParser {
                         }
                         if (capabilities.isColorSupported() && ct > capabilities.getCtMax()) {
                             int[] rgb = CTToRGBConverter.approximateRGBFromMired(ct);
-                            RGBToXYConverter.XYColor xyColor = RGBToXYConverter.rgbToXY(rgb[0], rgb[1], rgb[2],
-                                    capabilities.getColorGamut());
-                            x = xyColor.x();
-                            y = xyColor.y();
+                            var xy = convertToXY(rgb[0], rgb[1], rgb[2], capabilities);
+                            x = xy.x();
+                            y = xy.y();
                             ct = null;
                         }
                         break;
                     case "on":
-                        on = Boolean.valueOf(value);
+                        on = parseBoolean(value, parameter);
                         break;
                     case "tr":
                         transitionTime = parseTransitionTime(parameter, value);
@@ -136,40 +142,42 @@ public final class InputConfigurationParser {
                     case "y":
                         y = parseDouble(value, parameter);
                         break;
-                    case "hue":
-                        hue = parseInteger(value, parameter);
-                        break;
-                    case "sat":
-                        sat = parseSaturation(value);
-                        break;
                     case "color":
-                        int red;
-                        int green;
-                        int blue;
-                        if (value.contains(",")) {
-                            String[] rgb = value.split(",");
-                            if (rgb.length != 3) {
-                                throw new InvalidPropertyValue("Invalid RGB value '" + value + "'. Make sure to separate the color values with ','.");
-                            }
-                            red = parseInteger(rgb[0], "color");
-                            green = parseInteger(rgb[1], "color");
-                            blue = parseInteger(rgb[2], "color");
-                        } else {
-                            Color color = Color.decode(value);
-                            red = color.getRed();
-                            green = color.getGreen();
-                            blue = color.getBlue();
-                        }
-                        RGBToXYConverter.XYColor xyColor = RGBToXYConverter.rgbToXY(red, green, blue,
-                                capabilities.getColorGamut());
+                        XYColor xyColor = parseColorValue(value, capabilities);
                         x = xyColor.x();
                         y = xyColor.y();
                         if (bri == null) {
-                            bri = xyColor.brightness();
+                            bri = xyColor.bri();
                         }
                         break;
+                    case "gradient":
+                        Matcher m = GRADIENT_VALUE.matcher(value.trim());
+                        if (!m.matches()) {
+                            throw new InvalidPropertyValue("Invalid gradient value '" + value +
+                                                           "'. Expected: gradient:[<color>, <color>[, ...]]@<mode?>");
+                        }
+                        String gradientList = m.group("list");
+                        var points = Arrays.stream(gradientList.split(",\\s*"))
+                                           .map(point -> parseColorValue(point, capabilities))
+                                           .map(color -> Pair.of(color.x(), color.y()))
+                                           .toList();
+                        gradient = Gradient.builder()
+                                           .points(points)
+                                           .mode(m.group("mode"))
+                                           .build();
+                        break;
                     case "effect":
-                        effect = value;
+                        if (value.contains("@")) {
+                            String[] split = value.split("@");
+                            if (split.length != 2) {
+                                throw new InvalidPropertyValue("Invalid effect value '" + value +
+                                                               "'. Expected format: <effect>@<speed>");
+                            }
+                            effectValue = split[0];
+                            effectSpeed = parseDouble(split[1], parameter);
+                        } else {
+                            effectValue = value;
+                        }
                         break;
                     case "days":
                         DayOfWeeksParser.parseDayOfWeeks(value, dayOfWeeks);
@@ -180,16 +188,120 @@ public final class InputConfigurationParser {
                     case "interpolate":
                         interpolate = parseBoolean(value, parameter);
                         break;
+                    case "scene":
+                        scene = value;
+                        break;
                     default:
                         throw new UnknownStateProperty("Unknown state property '" + parameter + "' with value '" + value + "'");
                 }
             }
             String start = parts[1];
-            states.add(new ScheduledState(identifier, start, bri, ct, x, y, hue, sat, effect, on, transitionTimeBefore,
-                    transitionTime, dayOfWeeks, startTimeProvider, capabilities, minTrBeforeGapInMinutes, brightnessOverrideThreshold,
+
+            List<ScheduledLightState> scheduledLightStates;
+            if (scene != null) {
+                if (ct != null || x != null || y != null || effectValue != null || gradient != null) {
+                    throw new InvalidConfigurationLine(
+                            "When 'scene' is used, only 'on', 'bri', 'tr', 'tr-before', 'days', 'force', 'interpolate' are allowed.");
+                }
+
+                scheduledLightStates = api.getSceneLightStates(identifier.id(), scene);
+                if (bri != null) {
+                    scheduledLightStates = scaleBrightness(bri, scheduledLightStates);
+                }
+                if (on == Boolean.TRUE) {
+                    scheduledLightStates = turnOnIfNotOff(scheduledLightStates);
+                }
+                if (on == Boolean.FALSE) {
+                    throw new InvalidConfigurationLine("Can't combine 'on:false' with a scene: " + Arrays.toString(parts));
+                }
+            } else {
+                ScheduledLightStateValidator validator = new ScheduledLightStateValidator(identifier, groupState, capabilities,
+                        capBrightness(bri), ct, x, y, on, effectValue, effectSpeed, gradient, autoFillGradient);
+                scheduledLightStates = List.of(validator.getScheduledLightState());
+            }
+
+            states.add(new ScheduledState(identifier, start, scheduledLightStates, transitionTimeBefore,
+                    transitionTime, dayOfWeeks, startTimeProvider, minTrBeforeGapInMinutes, brightnessOverrideThreshold,
                     colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold, force, interpolate, groupState, false));
         }
         return states;
+    }
+
+    private static XYColor parseColorValue(String value, LightCapabilities capabilities) {
+        String v = value.trim();
+        if (v.startsWith("rgb(") && v.endsWith(")")) {
+            String rgbString = v.substring(4, v.length() - 1).trim();
+            String[] rgb = rgbString.split(" ");
+            if (rgb.length != 3) {
+                throw new InvalidPropertyValue("Invalid RGB value '" + v + "'. Make sure to separate the color values with ' '.");
+            }
+            var r = parseInteger(rgb[0], "color");
+            var g = parseInteger(rgb[1], "color");
+            var b = parseInteger(rgb[2], "color");
+            return convertToXY(r, g, b, capabilities);
+        } else if (v.startsWith("#")) {
+            Color color = Color.decode(v);
+            return convertToXY(color.getRed(), color.getGreen(), color.getBlue(), capabilities);
+        } else if (v.startsWith("xy(") && v.endsWith(")")) {
+            String xyString = v.substring(3, v.length() - 1).trim();
+            String[] xy = xyString.split(" ");
+            if (xy.length != 2) {
+                throw new InvalidPropertyValue("Invalid xy value '" + v + "'. Make sure to separate the color values with ' '.");
+            }
+            double x = parseDouble(xy[0], "color");
+            double y = parseDouble(xy[1], "color");
+            return new XYColor(x, y, null);
+        } else if (v.startsWith("oklch(") && v.endsWith(")")) {
+            return OkLchParser.parseOkLch(v);
+        } else if (v.contains(",")) { // legacy support for comma-separated rgb
+            String[] rgb = v.split(",");
+            if (rgb.length != 3) {
+                throw new InvalidPropertyValue("Invalid RGB value '" + v + "'. Make sure to separate the color values with ','.");
+            }
+            int red = parseInteger(rgb[0], "color");
+            int green = parseInteger(rgb[1], "color");
+            int blue = parseInteger(rgb[2], "color");
+            return convertToXY(red, green, blue, capabilities);
+        }
+        throw new InvalidPropertyValue("Invalid color value '" + v + "'. Supported formats are: " +
+                                       "'rgb(r g b)', '#rrggbb', 'xy(x y)', 'oklch(L C h)'. Use space not comma as value separator.");
+    }
+
+    private static XYColor convertToXY(int r, int g, int b, LightCapabilities capabilities) {
+        return RGBToXYConverter.rgbToXY(r, g, b, capabilities.getColorGamut());
+    }
+
+    private static List<ScheduledLightState> scaleBrightness(Integer targetBrightness, List<ScheduledLightState> scheduledLightStates) {
+        return scheduledLightStates.stream()
+                                   .map(state -> {
+                                       if (state.getBri() != null) {
+                                           // Proportional scaling: each light's brightness is multiplied by (targetBrightness/254).
+                                           // E.g., bri:127 scales all lights to ~50% of their scene-defined brightness.
+                                           double scaleFactor = targetBrightness / 254.0;
+                                           int newBri = capBrightness((int) Math.round(state.getBri() * scaleFactor));
+                                           return state.toBuilder().bri(newBri).build();
+                                       }
+                                       return state;
+                                   })
+                                   .toList();
+    }
+
+    private static Integer capBrightness(Integer targetBrightness) {
+        if (targetBrightness == null) {
+            return null;
+        }
+        return Math.max(1, Math.min(254, targetBrightness));
+    }
+
+    private static List<ScheduledLightState> turnOnIfNotOff(List<ScheduledLightState> scheduledLightStates) {
+        return scheduledLightStates.stream().map(InputConfigurationParser::turnOnIfNotOff).toList();
+    }
+
+    private static ScheduledLightState turnOnIfNotOff(ScheduledLightState state) {
+        if (state.isOff()) {
+            return state;
+        }
+        return state.toBuilder().on(true).build();
     }
 
     private Integer parseBrightness(String value) {
@@ -197,13 +309,6 @@ public final class InputConfigurationParser {
             return parseBrightnessPercentValue(value);
         }
         return parseInteger(value, "bri");
-    }
-
-    private Integer parseSaturation(String value) {
-        if (value.endsWith("%")) {
-            return parseSaturationPercentValue(value);
-        }
-        return parseInteger(value, "sat");
     }
 
     /**
@@ -220,34 +325,25 @@ public final class InputConfigurationParser {
         if (percent < 1) {
             return 1;
         }
-        if (percent > 100) {
-            return 254;
-        }
         return (int) Math.round((254.0 - 1.0) * (percent - 1) / 99.0 + 1.0);
-    }
-
-    private int parseSaturationPercentValue(String value) {
-        String percentString = value.replace("%", "").trim();
-        Double percent = parseDouble(percentString, "sat");
-        if (percent < 0) {
-            return 0;
-        }
-        if (percent > 100) {
-            return 254;
-        }
-        return (int) Math.round(254.0 * percent / 100.0);
     }
 
     private static Integer parseInteger(String value, String parameter) {
         return parseValueWithErrorHandling(value.trim(), parameter, "integer", Integer::valueOf);
     }
 
-    private Double parseDouble(String value, String parameter) {
+    private static Double parseDouble(String value, String parameter) {
         return parseValueWithErrorHandling(value, parameter, "double", Double::parseDouble);
     }
 
-    private Boolean parseBoolean(String value, String parameter) {
-        return parseValueWithErrorHandling(value, parameter, "boolean", Boolean::parseBoolean);
+    private static Boolean parseBoolean(String value, String parameter) {
+        if ("true".equalsIgnoreCase(value)) {
+            return Boolean.TRUE;
+        }
+        if ("false".equalsIgnoreCase(value)) {
+            return Boolean.FALSE;
+        }
+        throw new InvalidPropertyValue("Invalid boolean '" + value + "' for property '" + parameter + "'.");
     }
 
     private static <T> T parseValueWithErrorHandling(String value, String parameter, String type, Function<String, T> function) {

@@ -1,13 +1,17 @@
 package at.sv.hue.api;
 
 import at.sv.hue.ColorMode;
+import at.sv.hue.Effect;
 import at.sv.hue.FormatUtil;
+import at.sv.hue.Gradient;
+import at.sv.hue.Pair;
 import at.sv.hue.color.ColorComparator;
 import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Objects;
 import java.util.stream.Stream;
 
@@ -19,26 +23,24 @@ public final class PutCall {
     Integer ct;
     Double x;
     Double y;
-    Integer hue;
-    Integer sat;
     Boolean on;
-    String effect;
+    Effect effect;
+    Gradient gradient;
     Integer transitionTime;
-    boolean groupState;
     @EqualsAndHashCode.Exclude
     Double[][] gamut;
 
     public boolean isNullCall() {
-        return Stream.of(bri, ct, x, y, hue, sat, on, effect).allMatch(Objects::isNull);
+        return Stream.of(bri, ct, x, y, on, effect, gradient).allMatch(Objects::isNull);
     }
 
     public ColorMode getColorMode() {
         if (ct != null) {
             return ColorMode.CT;
-        } else if (x != null && y != null) {
+        } else if (getXY() != null) {
             return ColorMode.XY;
-        } else if (hue != null || sat != null) {
-            return ColorMode.HS;
+        } else if (gradient != null) {
+            return ColorMode.GRADIENT;
         }
         return ColorMode.NONE;
     }
@@ -47,24 +49,33 @@ public final class PutCall {
         return on == Boolean.TRUE;
     }
 
-    public boolean hasNonDefaultTransitionTime() {
-        return transitionTime != null && transitionTime != 4;
+    public boolean isOff() {
+        return on == Boolean.FALSE;
+    }
+
+    public void resetOn() {
+        this.on = null;
+    }
+
+    public Pair<Double, Double> getXY() {
+        if (x == null || y == null) {
+            return null;
+        }
+        return Pair.of(x, y);
     }
 
     @Override
     public String toString() {
-        return "PutCall {" +
+        return "{" +
                "id=" + id +
                getFormattedPropertyIfSet("on", on) +
                getFormattedBriIfSet() +
                getFormattedCtIfSet() +
                getFormattedPropertyIfSet("x", x) +
                getFormattedPropertyIfSet("y", y) +
-               getFormattedPropertyIfSet("hue", hue) +
-               getFormattedPropertyIfSet("sat", sat) +
                getFormattedPropertyIfSet("effect", effect) +
+               getFormattedPropertyIfSet("gradient", gradient) +
                getFormattedTransitionTimeIfSet() +
-               (groupState ? ", group=true" : "") +
                "}";
     }
 
@@ -94,26 +105,32 @@ public final class PutCall {
     }
 
     public boolean hasSameLightState(PutCall other) {
-        return Objects.equals(this.on, other.on) &&
+        return Objects.equals(this.on, other.on) && // todo: mutation coverage
                Objects.equals(this.bri, other.bri) &&
-               Objects.equals(this.hue, other.hue) &&
-               Objects.equals(this.sat, other.sat) &&
                Objects.equals(this.effect, other.effect) &&
+               Objects.equals(this.gradient, other.gradient) &&
                Objects.equals(this.x, other.x) &&
                Objects.equals(this.y, other.y) &&
                Objects.equals(this.ct, other.ct);
     }
 
+    /**
+     * Used to determine inside an interpolation if the light state has changed significantly enough to send an update.
+     *
+     * @param other                           the same PutCall several minutes later to compare with
+     * @param brightnessThreshold             the brightness difference threshold (0-254) to consider two brightness values as similar
+     * @param colorTemperatureThresholdKelvin the color temperature difference threshold in Kelvin to consider two ct values as similar
+     * @param colorThreshold                  the color difference threshold (0.0-1.0) to consider two colors as similar
+     * @return true, if the light states are not similar, false if they are similar enough
+     */
     public boolean hasNotSimilarLightState(PutCall other, int brightnessThreshold,
-                                            int colorTemperatureThresholdKelvin,
-                                            double colorThreshold) {
-        return !Objects.equals(this.on, other.on) ||
-               brightnessIsNotSimilar(this.bri, other.bri, brightnessThreshold) ||
-               !Objects.equals(this.hue, other.hue) ||
-               !Objects.equals(this.sat, other.sat) ||
-               !Objects.equals(this.effect, other.effect) ||
+                                           int colorTemperatureThresholdKelvin,
+                                           double colorThreshold) {
+        return brightnessIsNotSimilar(this.bri, other.bri, brightnessThreshold) ||
                colorIsNotSimilar(this, other, colorThreshold) ||
+               gradientIsNotSimilar(this, other, colorThreshold) ||
                ctIsNotSimilar(this.ct, other.ct, colorTemperatureThresholdKelvin);
+        // no need to compare effect here, as they don't change during interpolation
     }
 
     private boolean brightnessIsNotSimilar(Integer bri1, Integer bri2, int threshold) {
@@ -133,6 +150,27 @@ public final class PutCall {
         }
         return ColorComparator.colorDiffers(
                 call1.x, call1.y, call2.x, call2.y, call1.gamut, threshold);
+    }
+
+    private boolean gradientIsNotSimilar(PutCall putCall, PutCall other, double colorThreshold) {
+        if (putCall.gradient == null && other.gradient == null) {
+            return false;
+        }
+        if (putCall.gradient == null || other.gradient == null) {
+            return true;
+        }
+        List<Pair<Double, Double>> points = putCall.gradient.points();
+        List<Pair<Double, Double>> otherPoints = other.gradient.points();
+        // we know both gradients have the same number of points due to the interpolation happening before
+        for (int i = 0; i < otherPoints.size(); i++) {
+            Pair<Double, Double> point = points.get(i);
+            Pair<Double, Double> otherPoint = otherPoints.get(i);
+            if (ColorComparator.colorDiffers(point.first(), point.second(),
+                    otherPoint.first(), otherPoint.second(), putCall.gamut, colorThreshold)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean ctIsNotSimilar(Integer ct1, Integer ct2, int thresholdKelvin) {

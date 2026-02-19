@@ -1,6 +1,9 @@
 package at.sv.hue.api.hass;
 
 import at.sv.hue.ColorMode;
+import at.sv.hue.Effect;
+import at.sv.hue.ScheduledLightState;
+import at.sv.hue.api.AffectedId;
 import at.sv.hue.api.ApiFailure;
 import at.sv.hue.api.BridgeAuthenticationFailure;
 import at.sv.hue.api.BridgeConnectionFailure;
@@ -14,9 +17,11 @@ import at.sv.hue.api.Identifier;
 import at.sv.hue.api.LightCapabilities;
 import at.sv.hue.api.LightNotFoundException;
 import at.sv.hue.api.LightState;
+import at.sv.hue.api.NonUniqueNameException;
 import at.sv.hue.api.PutCall;
 import at.sv.hue.api.RateLimiter;
 import at.sv.hue.api.hass.area.HassAreaRegistry;
+import at.sv.hue.color.XYColorGamutCorrection;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -66,7 +71,7 @@ public class HassApiImpl implements HueApi {
         this.rateLimiter = rateLimiter;
         mapper = new ObjectMapper();
         mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
-        mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+        mapper.setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL);
     }
 
     @Override
@@ -127,7 +132,9 @@ public class HassApiImpl implements HueApi {
 
     @Override
     public boolean isLightOff(String id) {
-        return getLightState(id).isOff();
+        assertSupportedStateType(id);
+        State state = getAndAssertLightExists(id);
+        return createLightState(state).isOff();
     }
 
     @Override
@@ -137,13 +144,24 @@ public class HassApiImpl implements HueApi {
 
     @Override
     public void putState(PutCall putCall) {
+        rateLimiter.acquire(1);
+        putStateInternal(putCall);
+    }
+
+    @Override
+    public void putGroupState(PutCall putCall) {
+        rateLimiter.acquire(10);
+        putStateInternal(putCall);
+    }
+
+    @Override
+    public void putSceneState(String groupId, List<PutCall> putCalls) {
+        putCalls.forEach(this::putState);
+    }
+
+    private void putStateInternal(PutCall putCall) {
         String id = putCall.getId();
         assertSupportedStateType(id);
-        if (putCall.isGroupState()) {
-            rateLimiter.acquire(10);
-        } else {
-            rateLimiter.acquire(1);
-        }
         ChangeState changeState = getChangeState(putCall);
         changeState.setEntity_id(id);
         httpResourceProvider.postResource(getUpdateUrl(putCall), getBody(changeState));
@@ -153,25 +171,29 @@ public class HassApiImpl implements HueApi {
         ChangeState changeState = new ChangeState();
         changeState.setBrightness(hueToHassBrightness(putCall.getBri()));
         changeState.setColor_temp(putCall.getCt());
-        changeState.setEffect(putCall.getEffect());
+        changeState.setEffect(getEffect(putCall));
         // transition in seconds (float ≥ 0); HA applies no global max (device integration may enforce limits)
         changeState.setTransition(convertToSeconds(putCall.getTransitionTime()));
-        if (putCall.getHue() != null && putCall.getSat() != null) {
-            changeState.setHs_color(getHsColor(putCall));
-        } else if (putCall.getX() != null && putCall.getY() != null) {
+        if (putCall.getX() != null && putCall.getY() != null) {
             changeState.setXy_color(getXyColor(putCall));
         }
         return changeState;
     }
 
-    private Integer[] getHsColor(PutCall putCall) {
-        int hue = (int) (putCall.getHue() / 65535.0 * 360.0);
-        int sat = (int) (putCall.getSat() / 254.0 * 100.0);
-        return new Integer[]{hue, sat};
+    private static String getEffect(PutCall putCall) {
+        Effect effect = putCall.getEffect();
+        if (effect == null) {
+            return null;
+        }
+        if ("none".equals(effect.effect())) {
+            return "off"; // "none" has been deprecated in HA
+        }
+        return effect.effect();
     }
 
     private static Double[] getXyColor(PutCall putCall) {
-        return new Double[]{putCall.getX(), putCall.getY()};
+        XYColorGamutCorrection correction = new XYColorGamutCorrection(putCall.getX(), putCall.getY(), putCall.getGamut());
+        return new Double[]{correction.getX(), correction.getY()};
     }
 
     @Override
@@ -207,7 +229,7 @@ public class HassApiImpl implements HueApi {
     }
 
     @Override
-    public List<String> getAffectedIdsByScene(String sceneId) {
+    public List<AffectedId> getAffectedIdsByScene(String sceneId) {
         State scene = getOrLookupStates().get(sceneId);
         if (scene == null) {
             return List.of();
@@ -225,7 +247,9 @@ public class HassApiImpl implements HueApi {
             } catch (Exception ignore) {
             }
         }
-        return affectedIds;
+        return affectedIds.stream()
+                   .map(id -> new AffectedId(id, !isLightOff(id)))
+                   .toList();
     }
 
     @Override
@@ -300,6 +324,11 @@ public class HassApiImpl implements HueApi {
     }
 
     @Override
+    public List<ScheduledLightState> getSceneLightStates(String groupId, String sceneName) {
+        throw new UnsupportedOperationException("Scene scheduling is not supported by Home Assistant");
+    }
+
+    @Override
     public void createOrUpdateScene(String groupId, String sceneSyncName, List<PutCall> putCalls) {
         CreateScene createScene = new CreateScene();
         createScene.setScene_id(HassApiUtils.getNormalizedSceneSyncName(sceneSyncName + "_" + groupId));
@@ -333,8 +362,8 @@ public class HassApiImpl implements HueApi {
         synchronized (lightMapLock) {
             if (nameToStatesMap == null || nameToStatesMapInvalidated) {
                 nameToStatesMap = new HashMap<>();
-                getOrLookupStates().forEach((id, state) ->
-                        nameToStatesMap.computeIfAbsent(state.attributes.friendly_name, s -> new ArrayList<>()).add(state));
+                getOrLookupStates().forEach((_, state) ->
+                        nameToStatesMap.computeIfAbsent(state.attributes.friendly_name, _ -> new ArrayList<>()).add(state));
                 nameToStatesMapInvalidated = false;
             }
         }
@@ -384,7 +413,7 @@ public class HassApiImpl implements HueApi {
         StateAttributes attributes = state.getAttributes();
         return new LightState(state.entity_id, hassToHueBrightness(attributes.brightness), attributes.color_temp, getXY(attributes.xy_color, 0),
                 getXY(attributes.xy_color, 1),
-                getEffect(attributes.effect), getColorMode(attributes.color_mode),
+                getEffect(attributes.effect), null, getColorMode(attributes.color_mode),
                 getOn(state.state), getUnavailable(state.state), createLightCapabilities(state));
     }
 
@@ -395,11 +424,14 @@ public class HassApiImpl implements HueApi {
         return null;
     }
 
-    private static String getEffect(String effect) {
+    private static Effect getEffect(String effect) {
         if (effect == null) {
             return null;
         }
-        return effect.toLowerCase(Locale.ROOT);
+        if ("off".equals(effect)) {
+            return Effect.builder().effect("none").build(); // treat "off" as "none" internally
+        }
+        return Effect.builder().effect(effect.toLowerCase(Locale.ROOT)).build();
     }
 
     private static ColorMode getColorMode(String colorMode) {
@@ -425,6 +457,7 @@ public class HassApiImpl implements HueApi {
     private static LightCapabilities createLightCapabilities(State state) {
         StateAttributes attributes = state.attributes;
         return new LightCapabilities(null, null, attributes.min_mireds, attributes.max_mireds,
+                null, null,
                 getCapabilities(state), getEffects(state));
     }
 

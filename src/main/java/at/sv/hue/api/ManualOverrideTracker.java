@@ -12,7 +12,5 @@ public interface ManualOverrideTracker {
 
     void onLightOff(String id);
 
-    boolean isOff(String id);
-
     boolean wasTurnedOnBySyncedScene(String id);
 }

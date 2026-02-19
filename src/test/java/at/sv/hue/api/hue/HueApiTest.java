@@ -1,6 +1,11 @@
 package at.sv.hue.api.hue;
 
 import at.sv.hue.ColorMode;
+import at.sv.hue.Effect;
+import at.sv.hue.Gradient;
+import at.sv.hue.Pair;
+import at.sv.hue.ScheduledLightState;
+import at.sv.hue.api.AffectedId;
 import at.sv.hue.api.ApiFailure;
 import at.sv.hue.api.BridgeAuthenticationFailure;
 import at.sv.hue.api.BridgeConnectionFailure;
@@ -13,8 +18,10 @@ import at.sv.hue.api.Identifier;
 import at.sv.hue.api.LightCapabilities;
 import at.sv.hue.api.LightNotFoundException;
 import at.sv.hue.api.LightState;
+import at.sv.hue.api.NonUniqueNameException;
 import at.sv.hue.api.PutCall;
 import at.sv.hue.api.ResourceNotFoundException;
+import at.sv.hue.api.SceneNotFoundException;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,11 +31,13 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -44,6 +53,8 @@ class HueApiTest {
               "data": []
             }
             """;
+    private static final String SCENE_CONTROL_APP_DATA = "hue_sch:temp";
+    private static final String SCENE_CONTROL_NAME = "HueTemp";
     private HueApi api;
     private String baseUrl;
     private HttpResourceProvider resourceProviderMock;
@@ -52,15 +63,15 @@ class HueApiTest {
     void setUp() {
         String host = "localhost";
         resourceProviderMock = Mockito.mock(HttpResourceProvider.class);
-        api = new HueApiImpl(resourceProviderMock, host, permits -> {
-        }, 5);
+        api = new HueApiImpl(resourceProviderMock, host, _ -> {
+        }, 5, SCENE_CONTROL_NAME, SCENE_CONTROL_APP_DATA, 2000);
         baseUrl = "https://" + host + "/clip/v2/resource";
     }
 
     @Test
     void invalidHost_cantUseScheme_exception() {
         assertThrows(InvalidConnectionException.class, () -> new HueApiImpl(resourceProviderMock, "hTtps://localhost", permits -> {
-        }, 5));
+        }, 5, null, null, 2000));
     }
 
     @Test
@@ -99,7 +110,324 @@ class HueApiTest {
     }
 
     @Test
-    void getState_returnsLightState_effectActive_callsCorrectApiURL() {
+    void getState_hasGradientSupport_currentlyActive() {
+        setGetResponse("/light", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "cb6f54e8-5071-478e-9c0a-949a51b117a2",
+                      "id_v1": "/lights/55",
+                      "owner": {
+                        "rid": "2d019cd6-7de4-46dc-b8af-963add43a000",
+                        "rtype": "device"
+                      },
+                      "metadata": {
+                        "name": "Fernseher Play",
+                        "archetype": "hue_lightstrip_tv",
+                        "function": "decorative"
+                      },
+                      "product_data": {
+                        "function": "decorative"
+                      },
+                      "identify": {},
+                      "service_id": 0,
+                      "on": {
+                        "on": true
+                      },
+                      "dimming": {
+                        "brightness": 7.91,
+                        "min_dim_level": 0.01
+                      },
+                      "dimming_delta": {},
+                      "color_temperature": {
+                        "mirek": null,
+                        "mirek_valid": false,
+                        "mirek_schema": {
+                          "mirek_minimum": 153,
+                          "mirek_maximum": 500
+                        }
+                      },
+                      "color_temperature_delta": {},
+                      "color": {
+                        "xy": {
+                          "x": 0.1969,
+                          "y": 0.0688
+                        },
+                        "gamut": {
+                          "red": {
+                            "x": 0.6915,
+                            "y": 0.3083
+                          },
+                          "green": {
+                            "x": 0.17,
+                            "y": 0.7
+                          },
+                          "blue": {
+                            "x": 0.1532,
+                            "y": 0.0475
+                          }
+                        },
+                        "gamut_type": "C"
+                      },
+                      "dynamics": {
+                        "status": "none",
+                        "status_values": [
+                          "none",
+                          "dynamic_palette"
+                        ],
+                        "speed": 0.0,
+                        "speed_valid": false
+                      },
+                      "mode": "normal",
+                      "gradient": {
+                        "points": [
+                          {
+                            "color": {
+                              "xy": {
+                                "x": 0.1969,
+                                "y": 0.0688
+                              }
+                            }
+                          },
+                          {
+                            "color": {
+                              "xy": {
+                                "x": 0.3352,
+                                "y": 0.1357
+                              }
+                            }
+                          },
+                          {
+                            "color": {
+                              "xy": {
+                                "x": 0.5501,
+                                "y": 0.2398
+                              }
+                            }
+                          },
+                          {
+                            "color": {
+                              "xy": {
+                                "x": 0.6079,
+                                "y": 0.3554
+                              }
+                            }
+                          },
+                          {
+                            "color": {
+                              "xy": {
+                                "x": 0.4813,
+                                "y": 0.45
+                              }
+                            }
+                          }
+                        ],
+                        "mode": "interpolated_palette",
+                        "points_capable": 5,
+                        "mode_values": [
+                          "interpolated_palette",
+                          "interpolated_palette_mirrored",
+                          "random_pixelated"
+                        ],
+                        "pixel_count": 24
+                      },
+                      "effects_v2": {
+                        "action": {
+                          "effect_values": [
+                            "no_effect",
+                            "candle"
+                          ]
+                        },
+                        "status": {
+                          "effect": "no_effect",
+                          "effect_values": [
+                            "no_effect",
+                            "candle"
+                          ]
+                        }
+                      },
+                      "type": "light"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/device", EMPTY_RESPONSE);
+
+        LightState lightState = getLightState("cb6f54e8-5071-478e-9c0a-949a51b117a2");
+
+        assertLightState(
+                lightState,
+                LightState.builder()
+                          .id("cb6f54e8-5071-478e-9c0a-949a51b117a2")
+                          .on(true)
+                          .brightness(20)
+                          .colorTemperature(null)
+                          .x(0.1969)
+                          .y(0.0688)
+                          .colormode(ColorMode.GRADIENT)
+                          .effect("none")
+                          .gradient(Gradient.builder()
+                                            .points(List.of(
+                                                    Pair.of(0.1969, 0.0688),
+                                                    Pair.of(0.3352, 0.1357),
+                                                    Pair.of(0.5501, 0.2398),
+                                                    Pair.of(0.6079, 0.3554),
+                                                    Pair.of(0.4813, 0.45)
+                                            ))
+                                            .mode("interpolated_palette")
+                                            .build())
+                          .lightCapabilities(LightCapabilities.builder()
+                                                              .colorGamutType("C")
+                                                              .colorGamut(GAMUT_C)
+                                                              .ctMin(153)
+                                                              .ctMax(500)
+                                                              .gradientModes(List.of("interpolated_palette", "interpolated_palette_mirrored",
+                                                                      "random_pixelated"))
+                                                              .maxGradientPoints(5)
+                                                              .effects(List.of("candle"))
+                                                              .capabilities(EnumSet.of(Capability.GRADIENT, Capability.COLOR, Capability.COLOR_TEMPERATURE,
+                                                                      Capability.BRIGHTNESS, Capability.ON_OFF))
+                                                              .build()
+                          )
+                          .build()
+        );
+    }
+
+    @Test
+    void getState_hasGradientSupport_notActive() {
+        setGetResponse("/light", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "cb6f54e8-5071-478e-9c0a-949a51b117a2",
+                      "owner": {
+                        "rid": "2d019cd6-7de4-46dc-b8af-963add43a000",
+                        "rtype": "device"
+                      },
+                      "metadata": {
+                        "name": "TV Play",
+                        "archetype": "hue_lightstrip_tv",
+                        "function": "decorative"
+                      },
+                      "product_data": {
+                        "function": "decorative"
+                      },
+                      "on": {
+                        "on": true
+                      },
+                      "dimming": {
+                        "brightness": 7.91,
+                        "min_dim_level": 0.01
+                      },
+                      "color_temperature": {
+                        "mirek": null,
+                        "mirek_valid": false,
+                        "mirek_schema": {
+                          "mirek_minimum": 153,
+                          "mirek_maximum": 500
+                        }
+                      },
+                      "color": {
+                        "xy": {
+                          "x": 0.6025,
+                          "y": 0.3433
+                        },
+                        "gamut": {
+                          "red": {
+                            "x": 0.6915,
+                            "y": 0.3083
+                          },
+                          "green": {
+                            "x": 0.17,
+                            "y": 0.7
+                          },
+                          "blue": {
+                            "x": 0.1532,
+                            "y": 0.0475
+                          }
+                        },
+                        "gamut_type": "C"
+                      },
+                      "dynamics": {
+                        "status": "none",
+                        "status_values": [
+                          "none",
+                          "dynamic_palette"
+                        ],
+                        "speed": 0.0,
+                        "speed_valid": false
+                      },
+                      "alert": {
+                        "action_values": [
+                          "breathe"
+                        ]
+                      },
+                      "mode": "normal",
+                      "gradient": {
+                        "points": [],
+                        "mode": "interpolated_palette",
+                        "points_capable": 5,
+                        "mode_values": [
+                          "interpolated_palette",
+                          "random_pixelated"
+                        ],
+                        "pixel_count": 24
+                      },
+                      "effects_v2": {
+                        "action": {
+                          "effect_values": [
+                            "no_effect",
+                            "candle"
+                          ]
+                        },
+                        "status": {
+                          "effect": "no_effect",
+                          "effect_values": [
+                            "no_effect",
+                            "candle"
+                          ]
+                        }
+                      },
+                      "type": "light"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/device", EMPTY_RESPONSE);
+
+        LightState lightState = getLightState("cb6f54e8-5071-478e-9c0a-949a51b117a2");
+
+        assertLightState(
+                lightState,
+                LightState.builder()
+                          .id("cb6f54e8-5071-478e-9c0a-949a51b117a2")
+                          .on(true)
+                          .brightness(20)
+                          .colorTemperature(null)
+                          .x(0.6025)
+                          .y(0.3433)
+                          .colormode(ColorMode.XY)
+                          .effect("none")
+                          .lightCapabilities(LightCapabilities.builder()
+                                                              .colorGamutType("C")
+                                                              .colorGamut(GAMUT_C)
+                                                              .ctMin(153)
+                                                              .ctMax(500)
+                                                              .gradientModes(List.of("interpolated_palette", "random_pixelated"))
+                                                              .maxGradientPoints(5)
+                                                              .effects(List.of("candle"))
+                                                              .capabilities(EnumSet.of(Capability.GRADIENT, Capability.COLOR, Capability.COLOR_TEMPERATURE,
+                                                                      Capability.BRIGHTNESS, Capability.ON_OFF))
+                                                              .build()
+                          )
+                          .build()
+        );
+    }
+
+    @Test
+    void getState_returnsLightState_effectActive_xyAsParameter() {
         setGetResponse("/light", """
                 {
                   "errors": [],
@@ -163,16 +491,33 @@ class HueApiTest {
                         ]
                       },
                       "mode": "normal",
-                      "effects": {
-                        "status_values": [
-                          "no_effect",
-                          "opal"
-                        ],
-                        "status": "opal",
-                        "effect_values": [
-                          "no_effect",
-                          "opal"
-                        ]
+                      "effects_v2": {
+                        "action": {
+                          "effect_values": [
+                            "no_effect",
+                            "opal"
+                          ]
+                        },
+                        "status": {
+                          "effect": "opal",
+                          "effect_values": [
+                            "no_effect",
+                            "opal"
+                          ],
+                          "parameters": {
+                            "color": {
+                              "xy": {
+                                "x": 0.2116,
+                                "y": 0.0759
+                              }
+                            },
+                            "color_temperature": {
+                              "mirek": 153,
+                              "mirek_valid": false
+                            },
+                            "speed": 0.5
+                          }
+                        }
                       },
                       "timed_effects": {
                         "status_values": [
@@ -204,11 +549,230 @@ class HueApiTest {
                         .x(0.3082)
                         .y(0.2482)
                         .brightness(254) // todo: we need to switch to APIv2 brightness probably in the whole application
-                        .effect("opal")
+                        .effect(Effect.builder()
+                                      .effect("opal")
+                                      .x(0.2116)
+                                      .y(0.0759)
+                                      .speed(0.5)
+                                      .build())
                         .colormode(ColorMode.XY)
                         .lightCapabilities(LightCapabilities.builder()
                                                             .effects(List.of("opal"))
-                                                            .capabilities(EnumSet.allOf(Capability.class))
+                                                            .capabilities(EnumSet.of(
+                                                                    Capability.COLOR,
+                                                                    Capability.BRIGHTNESS,
+                                                                    Capability.COLOR_TEMPERATURE,
+                                                                    Capability.ON_OFF)
+                                                            )
+                                                            .build())
+                        .build()
+        );
+    }
+
+    @Test
+    void getState_returnsLightState_effectActive_ctAsParameter() {
+        setGetResponse("/light", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "cb6f54e8-5071-478e-9c0a-949a51b117a2",
+                      "id_v1": "/lights/55",
+                      "owner": {
+                        "rid": "2d019cd6-7de4-46dc-b8af-963add43a000",
+                        "rtype": "device"
+                      },
+                      "metadata": {
+                        "name": "TV Play",
+                        "archetype": "hue_lightstrip_tv",
+                        "function": "decorative"
+                      },
+                      "product_data": {
+                        "function": "decorative"
+                      },
+                      "on": {
+                        "on": true
+                      },
+                      "dimming": {
+                        "brightness": 26.09,
+                        "min_dim_level": 0.01
+                      },
+                      "color_temperature": {
+                        "mirek": 493,
+                        "mirek_valid": true,
+                        "mirek_schema": {
+                          "mirek_minimum": 153,
+                          "mirek_maximum": 500
+                        }
+                      },
+                      "color": {
+                        "xy": {
+                          "x": 0.5236,
+                          "y": 0.4137
+                        }
+                      },
+                      "mode": "normal",
+                      "effects_v2": {
+                        "action": {
+                          "effect_values": [
+                            "no_effect",
+                            "candle"
+                          ]
+                        },
+                        "status": {
+                          "effect": "candle",
+                          "effect_values": [
+                            "no_effect",
+                            "candle"
+                          ],
+                          "parameters": {
+                            "color": {
+                              "xy": {
+                                "x": 0.5236,
+                                "y": 0.4137
+                              }
+                            },
+                            "color_temperature": {
+                              "mirek": 493,
+                              "mirek_valid": true
+                            },
+                            "speed": 0.1825
+                          }
+                        }
+                      },
+                      "type": "light"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/device", EMPTY_RESPONSE);
+
+        LightState lightState = getLightState("cb6f54e8-5071-478e-9c0a-949a51b117a2");
+
+        assertLightState(
+                lightState, LightState
+                        .builder()
+                        .id("cb6f54e8-5071-478e-9c0a-949a51b117a2")
+                        .on(true)
+                        .x(0.5236)
+                        .y(0.4137)
+                        .colorTemperature(493)
+                        .brightness(66)
+                        .effect(Effect.builder()
+                                      .effect("candle")
+                                      .ct(493)
+                                      .speed(0.1825)
+                                      .build())
+                        .colormode(ColorMode.CT)
+                        .lightCapabilities(LightCapabilities.builder()
+                                                            .effects(List.of("candle"))
+                                                            .capabilities(EnumSet.of(
+                                                                    Capability.COLOR,
+                                                                    Capability.BRIGHTNESS,
+                                                                    Capability.COLOR_TEMPERATURE,
+                                                                    Capability.ON_OFF)
+                                                            )
+                                                            .ctMin(153)
+                                                            .ctMax(500)
+                                                            .build())
+                        .build()
+        );
+    }
+
+    @Test
+    void getState_returnsLightState_effectActive_justSpeed() {
+        setGetResponse("/light", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "cb6f54e8-5071-478e-9c0a-949a51b117a2",
+                      "id_v1": "/lights/55",
+                      "owner": {
+                        "rid": "2d019cd6-7de4-46dc-b8af-963add43a000",
+                        "rtype": "device"
+                      },
+                      "metadata": {
+                        "name": "TV Play",
+                        "archetype": "hue_lightstrip_tv",
+                        "function": "decorative"
+                      },
+                      "product_data": {
+                        "function": "decorative"
+                      },
+                      "on": {
+                        "on": true
+                      },
+                      "dimming": {
+                        "brightness": 26.09,
+                        "min_dim_level": 0.01
+                      },
+                      "color_temperature": {
+                        "mirek": 493,
+                        "mirek_valid": true,
+                        "mirek_schema": {
+                          "mirek_minimum": 153,
+                          "mirek_maximum": 500
+                        }
+                      },
+                      "color": {
+                        "xy": {
+                          "x": 0.5236,
+                          "y": 0.4137
+                        }
+                      },
+                      "mode": "normal",
+                      "effects_v2": {
+                        "action": {
+                          "effect_values": [
+                            "no_effect",
+                            "candle"
+                          ]
+                        },
+                        "status": {
+                          "effect": "candle",
+                          "effect_values": [
+                            "no_effect",
+                            "candle"
+                          ],
+                          "parameters": {
+                            "speed": 0.5
+                          }
+                        }
+                      },
+                      "type": "light"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/device", EMPTY_RESPONSE);
+
+        LightState lightState = getLightState("cb6f54e8-5071-478e-9c0a-949a51b117a2");
+
+        assertLightState(
+                lightState, LightState
+                        .builder()
+                        .id("cb6f54e8-5071-478e-9c0a-949a51b117a2")
+                        .on(true)
+                        .x(0.5236)
+                        .y(0.4137)
+                        .colorTemperature(493)
+                        .brightness(66)
+                        .effect(Effect.builder()
+                                      .effect("candle")
+                                      .speed(0.5)
+                                      .build())
+                        .colormode(ColorMode.CT)
+                        .lightCapabilities(LightCapabilities.builder()
+                                                            .effects(List.of("candle"))
+                                                            .capabilities(EnumSet.of(
+                                                                    Capability.COLOR,
+                                                                    Capability.BRIGHTNESS,
+                                                                    Capability.COLOR_TEMPERATURE,
+                                                                    Capability.ON_OFF)
+                                                            )
+                                                            .ctMin(153)
+                                                            .ctMax(500)
                                                             .build())
                         .build()
         );
@@ -283,16 +847,20 @@ class HueApiTest {
                         ]
                       },
                       "mode": "normal",
-                      "effects": {
-                        "status_values": [
-                          "sparkle",
-                          "opal",
-                          "glisten"
-                        ],
-                        "status": "no_effect",
-                        "effect_values": [
-                          "fire"
-                        ]
+                      "effects_v2": {
+                        "action": {
+                          "effect_values": [
+                            "no_effect",
+                            "fire"
+                          ]
+                        },
+                        "status": {
+                          "effect": "no_effect",
+                          "effect_values": [
+                            "no_effect",
+                            "fire"
+                          ]
+                        }
                       },
                       "timed_effects": {
                         "status_values": [
@@ -330,7 +898,12 @@ class HueApiTest {
                                                     .ctMin(153)
                                                     .ctMax(500)
                                                     .effects(List.of("fire"))
-                                                    .capabilities(EnumSet.allOf(Capability.class))
+                                                    .capabilities(EnumSet.of(
+                                                            Capability.COLOR,
+                                                            Capability.BRIGHTNESS,
+                                                            Capability.COLOR_TEMPERATURE,
+                                                            Capability.ON_OFF)
+                                                    )
                                                     .build())
                 .build()
         );
@@ -493,12 +1066,12 @@ class HueApiTest {
                       "id": "device_id",
                       "services": [
                         {
-                          "rid": "zigbee_id",
-                          "rtype": "zigbee_connectivity"
-                        },
-                        {
                           "rid": "unavailable_light",
                           "rtype": "light"
+                        },
+                        {
+                          "rid": "zigbee_id",
+                          "rtype": "zigbee_connectivity"
                         }
                       ],
                       "type": "device"
@@ -1050,9 +1623,7 @@ class HueApiTest {
     void getAffectedIdsByScene_returnsLightIds_empty_ignoredAffectedByScene() {
         setGetResponse("/scene", EMPTY_RESPONSE);
 
-        List<String> sceneLights = api.getAffectedIdsByScene("0314f5ad-b424-4f63-aa2e-f55cac83e306");
-
-        assertThat(sceneLights).isEmpty();
+        assertThat(api.getAffectedIdsByScene("0314f5ad-b424-4f63-aa2e-f55cac83e306")).isEmpty();
     }
 
     @Test
@@ -1064,26 +1635,56 @@ class HueApiTest {
 
     @Test
     void getAffectedIdsByScene_getSceneName_returnsLightIdsAndGroupLightId_correctIdsAffectedByScene() {
+        setGetResponse("/grouped_light", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "GROUPED_LIGHT_ID_ZONE",
+                      "id_v1": "/groups/3",
+                      "owner": {
+                        "rid": "ZONE_ID",
+                        "rtype": "zone"
+                      },
+                      "on": {
+                        "on": true
+                      },
+                      "type": "grouped_light"
+                    },
+                    {
+                      "id": "GROUPED_LIGHT_ID_ROOM",
+                      "id_v1": "/groups/1",
+                      "owner": {
+                        "rid": "ROOM_ID",
+                        "rtype": "room"
+                      },
+                      "on": {
+                        "on": false
+                      },
+                      "type": "grouped_light"
+                    }
+                  ]
+                }""");
         setGetResponse("/room", """
                 {
                   "errors": [],
                   "data": [
                     {
-                      "id": "3cfd5fad-2811-430a-a099-ae692b2185f8",
+                      "id": "ROOM_ID",
                       "id_v1": "/groups/1",
                       "children": [
                         {
-                          "rid": "6f10b317-e118-4259-a6b8-d4a2ac960756",
+                          "rid": "DEVICE_ID_1",
                           "rtype": "device"
                         },
                         {
-                          "rid": "2f279281-3e45-462c-9e89-6b2d3363d883",
+                          "rid": "DEVICE_ID_2",
                           "rtype": "device"
                         }
                       ],
                       "services": [
                         {
-                          "rid": "4c69c282-3e45-4e87-adb0-fa52e03b4620",
+                          "rid": "GROUPED_LIGHT_ID_ROOM",
                           "rtype": "grouped_light"
                         }
                       ],
@@ -1101,21 +1702,21 @@ class HueApiTest {
                   "errors": [],
                   "data": [
                     {
-                      "id": "75ee4e3b-cacb-4b87-923b-d11d2480e8ff",
+                      "id": "ZONE_ID",
                       "id_v1": "/groups/3",
                       "children": [
                         {
-                          "rid": "1271bf6f-be63-42fc-b18c-3ad462914d8e",
+                          "rid": "LIGHT_ID_1",
                           "rtype": "light"
                         },
                         {
-                          "rid": "1aa6083d-3692-49e5-92f7-b926b302dd49",
+                          "rid": "LIGHT_ID_2",
                           "rtype": "light"
                         }
                       ],
                       "services": [
                         {
-                          "rid": "eeb336d9-243b-4756-8455-1c69f50efd31",
+                          "rid": "GROUPED_LIGHT_ID_ZONE",
                           "rtype": "grouped_light"
                         }
                       ],
@@ -1133,12 +1734,11 @@ class HueApiTest {
                   "errors": [],
                   "data": [
                     {
-                      "id": "4b5a905c-cc5e-48be-bc15-84da7deb5da7",
-                      "id_v1": "/scenes/CYpbjqIplpzquoRn",
+                      "id": "SCENE_ID_1",
                       "actions": [
                         {
                           "target": {
-                            "rid": "a24f1683-3cd9-466f-8072-3eed721af248",
+                            "rid": "LIGHT_ID_1",
                             "rtype": "light"
                           },
                           "action": {
@@ -1155,7 +1755,7 @@ class HueApiTest {
                         },
                         {
                           "target": {
-                            "rid": "57eaaeee-cd72-4b3b-b2dc-7cccbce0bbd7",
+                            "rid": "LIGHT_ID_2",
                             "rtype": "light"
                           },
                           "action": {
@@ -1178,7 +1778,7 @@ class HueApiTest {
                         "name": "Scene_1"
                       },
                       "group": {
-                        "rid": "3cfd5fad-2811-430a-a099-ae692b2185f8",
+                        "rid": "ROOM_ID",
                         "rtype": "room"
                       },
                       "status": {
@@ -1187,24 +1787,20 @@ class HueApiTest {
                       "type": "scene"
                     },
                     {
-                      "id": "f96f02db-9765-401c-9aa5-86d59fbdde8e",
-                      "id_v1": "/scenes/dWmQtCtTLkoJZPtD",
+                      "id": "SCENE_ID_2",
                       "actions": [
                         {
                           "target": {
-                            "rid": "1aa6083d-3692-49e5-92f7-b926b302dd49",
+                            "rid": "LIGHT_ID_1",
                             "rtype": "light"
                           },
                           "action": {
                             "on": {
                               "on": true
                             },
-                            "dimming": {
-                              "brightness": 7.51
-                            },
                             "color": {
                               "xy": {
-                                "x": 0.5451999999999998,
+                                "x": 0.5452,
                                 "y": 0.2408
                               }
                             }
@@ -1212,12 +1808,247 @@ class HueApiTest {
                         },
                         {
                           "target": {
-                            "rid": "1271bf6f-be63-42fc-b18c-3ad462914d8e",
+                            "rid": "LIGHT_ID_2",
                             "rtype": "light"
                           },
                           "action": {
                             "on": {
                               "on": true
+                            },
+                            "color_temperature": {
+                                "mirek": 199,
+                                "mirek_valid": true,
+                                "mirek_schema": {
+                                  "mirek_minimum": 153,
+                                  "mirek_maximum": 454
+                                }
+                              },
+                            "dimming": {
+                              "brightness": 44.51
+                            }
+                          }
+                        }
+                      ],
+                      "metadata": {
+                        "name": "Scene_2"
+                      },
+                      "group": {
+                        "rid": "ZONE_ID",
+                        "rtype": "zone"
+                      },
+                      "status": {
+                        "active": "inactive"
+                      },
+                      "type": "scene"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/light", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "LIGHT_ID_1",
+                      "owner": {
+                        "rid": "a5fdefc3-8471-43fd-b5ee-642a6561696f",
+                        "rtype": "device"
+                      },
+                      "metadata": {
+                        "name": "Light 1",
+                        "archetype": "hue_lightstrip",
+                        "function": "mixed"
+                      },
+                      "on": {
+                        "on": true
+                      },
+                      "dimming": {
+                        "brightness": 100.0,
+                        "min_dim_level": 0.01
+                      },
+                      "color_temperature": {
+                        "mirek": 199,
+                        "mirek_valid": true,
+                        "mirek_schema": {
+                          "mirek_minimum": 153,
+                          "mirek_maximum": 500
+                        }
+                      },
+                      "type": "light"
+                    },
+                    {
+                      "id": "LIGHT_ID_2",
+                      "owner": {
+                        "rid": "cf704269-6f65-47f1-8423-677b65d3f874",
+                        "rtype": "device"
+                      },
+                      "metadata": {
+                        "name": "Light 2",
+                        "archetype": "hue_lightstrip",
+                        "function": "decorative"
+                      },
+                      "on": {
+                        "on": false
+                      },
+                      "dimming": {
+                        "brightness": 100.0,
+                        "min_dim_level": 10.0
+                      },
+                      "type": "light"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/device", EMPTY_RESPONSE);
+
+        assertThat(api.getAffectedIdsByScene("SCENE_ID_1"))
+                .extracting(AffectedId::id, AffectedId::alreadyOn)
+                .containsExactly(tuple("LIGHT_ID_1", true), tuple("GROUPED_LIGHT_ID_ROOM", false)); // ignores scene-off light
+        assertThat(api.getAffectedIdsByScene("SCENE_ID_2"))
+                .extracting(AffectedId::id, AffectedId::alreadyOn)
+                .containsExactly(tuple("LIGHT_ID_1", true), tuple("LIGHT_ID_2", false), tuple("GROUPED_LIGHT_ID_ZONE", true));
+
+        assertThat(api.getSceneName("SCENE_ID_1")).isEqualTo("Scene_1");
+        assertThat(api.getSceneName("SCENE_ID_2")).isEqualTo("Scene_2");
+    }
+
+    @Test
+    void getSceneLightStates_includesGamut() {
+        setGetResponse("/grouped_light", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "GROUPED_LIGHT_1",
+                      "owner": {
+                        "rid": "ZONE_ID",
+                        "rtype": "zone"
+                      },
+                      "type": "grouped_light"
+                    }
+                  ]
+                }""");
+        setGetResponse("/zone", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "ZONE_ID",
+                      "children": [
+                        {
+                          "rid": "LIGHT_1",
+                          "rtype": "light"
+                        },
+                        {
+                          "rid": "LIGHT_2",
+                          "rtype": "light"
+                        }
+                      ],
+                      "services": [
+                        {
+                          "rid": "GROUPED_LIGHT_1",
+                          "rtype": "grouped_light"
+                        }
+                      ],
+                      "metadata": {
+                        "name": "Couch",
+                        "archetype": "lounge"
+                      },
+                      "type": "zone"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/scene", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "SCENE_1",
+                      "actions": [
+                        {
+                          "target": {
+                            "rid": "LIGHT_1",
+                            "rtype": "light"
+                          },
+                          "action": {
+                            "on": {
+                              "on": true
+                            },
+                            "dimming": {
+                              "brightness": 100.0
+                            },
+                            "color_temperature": {
+                              "mirek": 153
+                            }
+                          }
+                        },
+                        {
+                          "target": {
+                            "rid": "LIGHT_2",
+                            "rtype": "light"
+                          },
+                          "action": {
+                            "on": {
+                              "on": false
+                            },
+                            "dimming": {
+                              "brightness": 47.43
+                            },
+                            "color": {
+                              "xy": {
+                                "x": 0.2,
+                                "y": 0.1
+                              }
+                            }
+                          }
+                        }
+                      ],
+                      "metadata": {
+                        "name": "Scene_1"
+                      },
+                      "group": {
+                        "rid": "ZONE_ID",
+                        "rtype": "zone"
+                      },
+                      "status": {
+                        "active": "inactive"
+                      },
+                      "type": "scene"
+                    },
+                    {
+                      "id": "SCENE_2",
+                      "actions": [
+                        {
+                          "target": {
+                            "rid": "LIGHT_1",
+                            "rtype": "light"
+                          },
+                          "action": {
+                            "on": {
+                              "on": true
+                            },
+                            "color": {
+                              "xy": {
+                                "x": 0.543,
+                                "y": 0.321
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "target": {
+                            "rid": "LIGHT_2",
+                            "rtype": "light"
+                          },
+                          "action": {
+                            "color_temperature": {
+                              "mirek": 199,
+                              "mirek_valid": true,
+                              "mirek_schema": {
+                                "mirek_minimum": 153,
+                                "mirek_maximum": 454
+                              }
                             },
                             "dimming": {
                               "brightness": 44.51
@@ -1229,7 +2060,191 @@ class HueApiTest {
                         "name": "Scene_2"
                       },
                       "group": {
-                        "rid": "75ee4e3b-cacb-4b87-923b-d11d2480e8ff",
+                        "rid": "ZONE_ID",
+                        "rtype": "zone"
+                      },
+                      "status": {
+                        "active": "inactive"
+                      },
+                      "type": "scene"
+                    },
+                    {
+                      "id": "SCENE_3",
+                      "actions": [
+                        {
+                          "target": {
+                            "rid": "LIGHT_1",
+                            "rtype": "light"
+                          },
+                          "action": {
+                            "on": {
+                              "on": true
+                            },
+                            "effects_v2": {
+                              "action": {
+                                "effect": "candle",
+                                "parameters": {
+                                  "color_temperature": {
+                                    "mirek": 497
+                                  },
+                                  "speed": 0.1825
+                                }
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "target": {
+                            "rid": "LIGHT_2",
+                            "rtype": "light"
+                          },
+                          "action": {
+                            "on": {
+                              "on": true
+                            },
+                            "dimming": {
+                              "brightness": 100.0
+                            },
+                            "effects_v2": {
+                              "action": {
+                                "effect": "prism",
+                                "parameters": {
+                                  "color": {
+                                    "xy": {
+                                      "x": 0.211,
+                                      "y": 0.075
+                                    }
+                                  },
+                                  "speed": 0.5
+                                }
+                              }
+                            }
+                          }
+                        }
+                      ],
+                      "metadata": {
+                        "name": "Scene_3"
+                      },
+                      "group": {
+                        "rid": "ZONE_ID",
+                        "rtype": "zone"
+                      },
+                      "status": {
+                        "active": "inactive"
+                      },
+                      "type": "scene"
+                    },
+                    {
+                      "id": "SCENE_4",
+                      "actions": [
+                        {
+                          "target": {
+                            "rid": "LIGHT_1",
+                            "rtype": "light"
+                          },
+                          "action": {
+                            "on": {
+                              "on": true
+                            },
+                            "effects_v2": {
+                              "action": {
+                                "effect": "candle",
+                                "parameters": {
+                                  "speed": 0.1825
+                                }
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "target": {
+                            "rid": "LIGHT_2",
+                            "rtype": "light"
+                          },
+                          "action": {
+                            "on": {
+                              "on": true
+                            },
+                            "effects_v2": {
+                              "action": {
+                                "effect": "prism"
+                              }
+                            }
+                          }
+                        }
+                      ],
+                      "metadata": {
+                        "name": "Scene_4"
+                      },
+                      "group": {
+                        "rid": "ZONE_ID",
+                        "rtype": "zone"
+                      },
+                      "status": {
+                        "active": "inactive"
+                      },
+                      "type": "scene"
+                    },
+                    {
+                      "id": "SCENE_5",
+                      "actions": [
+                        {
+                          "target": {
+                            "rid": "LIGHT_1",
+                            "rtype": "light"
+                          },
+                          "action": {
+                            "on": {
+                              "on": true
+                            },
+                            "gradient": {
+                              "points": [
+                                {
+                                  "color": {
+                                    "xy": {
+                                      "x": 0.15352,
+                                      "y": 0.06006
+                                    }
+                                  }
+                                },
+                                {
+                                  "color": {
+                                    "xy": {
+                                      "x": 0.18649,
+                                      "y": 0.09751
+                                    }
+                                  }
+                                },
+                                {
+                                  "color": {
+                                    "xy": {
+                                      "x": 0.2256,
+                                      "y": 0.09818
+                                    }
+                                  }
+                                }
+                              ],
+                              "mode": "interpolated_palette"
+                            }
+                          }
+                        },
+                        {
+                          "target": {
+                            "rid": "LIGHT_2",
+                            "rtype": "light"
+                          },
+                          "action": {
+                            "on": {
+                              "on": true
+                            }
+                          }
+                        }
+                      ],
+                      "metadata": {
+                        "name": "Scene_5"
+                      },
+                      "group": {
+                        "rid": "ZONE_ID",
                         "rtype": "zone"
                       },
                       "status": {
@@ -1240,15 +2255,429 @@ class HueApiTest {
                   ]
                 }
                 """);
+        setGetResponse("/light", """
+                
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "LIGHT_1",
+                      "owner": {
+                        "rid": "a5fdefc3-8471-43fd-b5ee-642a6561696f",
+                        "rtype": "device"
+                      },
+                      "metadata": {
+                        "name": "Light 1",
+                        "archetype": "hue_lightstrip",
+                        "function": "mixed"
+                      },
+                      "on": {
+                        "on": false
+                      },
+                      "dimming": {
+                        "brightness": 100.0,
+                        "min_dim_level": 0.01
+                      },
+                      "color_temperature": {
+                        "mirek": 199,
+                        "mirek_valid": true,
+                        "mirek_schema": {
+                          "mirek_minimum": 153,
+                          "mirek_maximum": 500
+                        }
+                      },
+                      "color": {
+                        "xy": {
+                          "x": 0.3448,
+                          "y": 0.3553
+                        },
+                        "gamut": {
+                          "red": {
+                            "x": 0.6915,
+                            "y": 0.3083
+                          },
+                          "green": {
+                            "x": 0.17,
+                            "y": 0.7
+                          },
+                          "blue": {
+                            "x": 0.1532,
+                            "y": 0.0475
+                          }
+                        },
+                        "gamut_type": "C"
+                      },
+                      "mode": "normal",
+                      "gradient": {
+                        "points": [],
+                        "mode": "interpolated_palette",
+                        "points_capable": 5,
+                        "mode_values": [
+                          "interpolated_palette",
+                          "interpolated_palette_mirrored",
+                          "random_pixelated"
+                        ],
+                        "pixel_count": 16
+                      },
+                      "effects_v2": {
+                        "action": {
+                          "effect_values": [
+                            "no_effect",
+                            "candle",
+                            "prism"
+                          ]
+                        },
+                        "status": {
+                          "effect": "no_effect",
+                          "effect_values": [
+                            "no_effect",
+                            "candle",
+                            "prism"
+                          ]
+                        }
+                      },
+                      "type": "light"
+                    },
+                    {
+                      "id": "LIGHT_2",
+                      "owner": {
+                        "rid": "cf704269-6f65-47f1-8423-677b65d3f874",
+                        "rtype": "device"
+                      },
+                      "metadata": {
+                        "name": "Light 2",
+                        "archetype": "hue_lightstrip",
+                        "function": "decorative"
+                      },
+                      "on": {
+                        "on": false
+                      },
+                      "dimming": {
+                        "brightness": 100.0,
+                        "min_dim_level": 10.0
+                      },
+                      "color_temperature": {
+                        "mirek": 199,
+                        "mirek_valid": true,
+                        "mirek_schema": {
+                          "mirek_minimum": 153,
+                          "mirek_maximum": 500
+                        }
+                      },
+                      "color": {
+                        "xy": {
+                          "x": 0.3448,
+                          "y": 0.3553
+                        },
+                        "gamut": {
+                          "red": {
+                            "x": 0.704,
+                            "y": 0.296
+                          },
+                          "green": {
+                            "x": 0.2151,
+                            "y": 0.7106
+                          },
+                          "blue": {
+                            "x": 0.138,
+                            "y": 0.08
+                          }
+                        },
+                        "gamut_type": "A"
+                      },
+                      "mode": "normal",
+                      "type": "light"
+                    }
+                  ]
+                }
+                """);
 
-        assertThat(api.getAffectedIdsByScene("4b5a905c-cc5e-48be-bc15-84da7deb5da7"))
-                .containsExactly("a24f1683-3cd9-466f-8072-3eed721af248", "4c69c282-3e45-4e87-adb0-fa52e03b4620"); // ignores off light
-        assertThat(api.getAffectedIdsByScene("f96f02db-9765-401c-9aa5-86d59fbdde8e"))
-                .containsExactly("1aa6083d-3692-49e5-92f7-b926b302dd49", "1271bf6f-be63-42fc-b18c-3ad462914d8e",
-                        "eeb336d9-243b-4756-8455-1c69f50efd31");
+        assertSceneLightStates("GROUPED_LIGHT_1", "Scene_1",
+                ScheduledLightState.builder()
+                                   .id("LIGHT_1")
+                                   // no "on"
+                                   .bri(254)
+                                   .ct(153)
+                                   .gamut(GAMUT_C),
+                ScheduledLightState.builder()
+                                   .id("LIGHT_2")
+                                   .on(false)
+                                   .bri(120)
+                                   .x(0.2)
+                                   .y(0.1)
+                                   .gamut(GAMUT_A)
+        );
 
-        assertThat(api.getSceneName("4b5a905c-cc5e-48be-bc15-84da7deb5da7")).isEqualTo("Scene_1");
-        assertThat(api.getSceneName("f96f02db-9765-401c-9aa5-86d59fbdde8e")).isEqualTo("Scene_2");
+        assertSceneLightStates("GROUPED_LIGHT_1", "Scene_2",
+                ScheduledLightState.builder()
+                                   .id("LIGHT_1")
+                                   // no "on"
+                                   .x(0.543)
+                                   .y(0.321)
+                                   .gamut(GAMUT_C),
+                ScheduledLightState.builder()
+                                   .id("LIGHT_2")
+                                   // no "on"
+                                   .bri(113)
+                                   .ct(199)
+                                   .gamut(GAMUT_A)
+        );
+
+        assertSceneLightStates("GROUPED_LIGHT_1", "Scene_3",
+                ScheduledLightState.builder()
+                                   .id("LIGHT_1")
+                                   .gamut(GAMUT_C)
+                                   .effect(Effect.builder()
+                                                 .effect("candle")
+                                                 .ct(497)
+                                                 .speed(0.1825)
+                                                 .build()),
+                ScheduledLightState.builder()
+                                   .id("LIGHT_2")
+                                   .bri(254)
+                                   .gamut(GAMUT_A)
+                                   .effect(Effect.builder()
+                                                 .effect("prism")
+                                                 .x(0.211)
+                                                 .y(0.075)
+                                                 .speed(0.5)
+                                                 .build())
+        );
+
+        assertSceneLightStates("GROUPED_LIGHT_1", "Scene_4",
+                ScheduledLightState.builder()
+                                   .id("LIGHT_1")
+                                   .gamut(GAMUT_C)
+                                   .effect(Effect.builder()
+                                                 .effect("candle")
+                                                 .speed(0.1825)
+                                                 .build()),
+                ScheduledLightState.builder()
+                                   .id("LIGHT_2")
+                                   .gamut(GAMUT_A)
+                                   .effect(Effect.builder()
+                                                 .effect("prism")
+                                                 .build())
+        );
+
+        assertSceneLightStates("GROUPED_LIGHT_1", "Scene_5",
+                ScheduledLightState.builder()
+                                   .id("LIGHT_1")
+                                   .gamut(GAMUT_C)
+                                   .gradient(Gradient.builder()
+                                                     .points(List.of(
+                                                             Pair.of(0.15352, 0.06006),
+                                                             Pair.of(0.18649, 0.09751),
+                                                             Pair.of(0.2256, 0.09818)
+                                                     ))
+                                                     .mode("interpolated_palette")
+                                                     .build()),
+                ScheduledLightState.builder()
+                                   .id("LIGHT_2")
+                                   .gamut(GAMUT_A)
+        );
+
+        assertThrows(SceneNotFoundException.class, () -> api.getSceneLightStates("GROUPED_LIGHT_1", "UNKNOWN_SCENE"));
+
+        assertThrows(GroupNotFoundException.class, () -> api.getSceneLightStates("UNKNOWN_GROUP", "Scene_1"));
+    }
+
+    @Test
+    void getSceneLightStates_duplicateSceneNameForGroup_exception() {
+        setGetResponse("/grouped_light", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "GROUPED_LIGHT_1",
+                      "owner": {
+                        "rid": "ZONE_ID",
+                        "rtype": "zone"
+                      },
+                      "type": "grouped_light"
+                    }
+                  ]
+                }""");
+        setGetResponse("/zone", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "ZONE_ID",
+                      "children": [
+                        {
+                          "rid": "LIGHT_1",
+                          "rtype": "light"
+                        },
+                        {
+                          "rid": "LIGHT_2",
+                          "rtype": "light"
+                        }
+                      ],
+                      "services": [
+                        {
+                          "rid": "GROUPED_LIGHT_1",
+                          "rtype": "grouped_light"
+                        }
+                      ],
+                      "metadata": {
+                        "name": "Couch",
+                        "archetype": "lounge"
+                      },
+                      "type": "zone"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/scene", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "SCENE_1",
+                      "actions": [
+                        {
+                          "target": {
+                            "rid": "LIGHT_1",
+                            "rtype": "light"
+                          },
+                          "action": {
+                            "on": {
+                              "on": true
+                            }
+                          }
+                        }
+                      ],
+                      "metadata": {
+                        "name": "SCENE NAME"
+                      },
+                      "group": {
+                        "rid": "ZONE_ID",
+                        "rtype": "zone"
+                      },
+                      "status": {
+                        "active": "inactive"
+                      },
+                      "type": "scene"
+                    },
+                    {
+                      "id": "SCENE_2",
+                      "actions": [
+                        {
+                          "target": {
+                            "rid": "LIGHT_1",
+                            "rtype": "light"
+                          },
+                          "action": {
+                            "on": {
+                              "on": false
+                            }
+                          }
+                        }
+                      ],
+                      "metadata": {
+                        "name": "SCENE NAME"
+                      },
+                      "group": {
+                        "rid": "ZONE_ID",
+                        "rtype": "zone"
+                      },
+                      "status": {
+                        "active": "inactive"
+                      },
+                      "type": "scene"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/light", """
+                
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "LIGHT_1",
+                      "owner": {
+                        "rid": "a5fdefc3-8471-43fd-b5ee-642a6561696f",
+                        "rtype": "device"
+                      },
+                      "metadata": {
+                        "name": "Light 1",
+                        "archetype": "hue_lightstrip",
+                        "function": "mixed"
+                      },
+                      "on": {
+                        "on": false
+                      },
+                      "dimming": {
+                        "brightness": 100.0,
+                        "min_dim_level": 0.01
+                      },
+                      "color_temperature": {
+                        "mirek": 199,
+                        "mirek_valid": true,
+                        "mirek_schema": {
+                          "mirek_minimum": 153,
+                          "mirek_maximum": 500
+                        }
+                      },
+                      "color": {
+                        "xy": {
+                          "x": 0.3448,
+                          "y": 0.3553
+                        },
+                        "gamut": {
+                          "red": {
+                            "x": 0.6915,
+                            "y": 0.3083
+                          },
+                          "green": {
+                            "x": 0.17,
+                            "y": 0.7
+                          },
+                          "blue": {
+                            "x": 0.1532,
+                            "y": 0.0475
+                          }
+                        },
+                        "gamut_type": "C"
+                      },
+                      "mode": "normal",
+                      "gradient": {
+                        "points": [],
+                        "mode": "interpolated_palette",
+                        "points_capable": 5,
+                        "mode_values": [
+                          "interpolated_palette",
+                          "interpolated_palette_mirrored",
+                          "random_pixelated"
+                        ],
+                        "pixel_count": 16
+                      },
+                      "effects_v2": {
+                        "action": {
+                          "effect_values": [
+                            "no_effect",
+                            "candle",
+                            "prism"
+                          ]
+                        },
+                        "status": {
+                          "effect": "no_effect",
+                          "effect_values": [
+                            "no_effect",
+                            "candle",
+                            "prism"
+                          ]
+                        }
+                      },
+                      "type": "light"
+                    }
+                  ]
+                }
+                """);
+
+        assertThrows(NonUniqueNameException.class, () -> api.getSceneLightStates("GROUPED_LIGHT_1", "SCENE NAME"));
     }
 
     @Test
@@ -1785,26 +3214,38 @@ class HueApiTest {
                         ]
                       },
                       "mode": "normal",
-                      "effects": {
-                        "status_values": [
-                          "no_effect",
-                          "candle",
-                          "fire",
-                          "prism",
-                          "sparkle",
-                          "opal",
-                          "glisten"
-                        ],
-                        "status": "no_effect",
-                        "effect_values": [
-                          "no_effect",
-                          "candle",
-                          "fire",
-                          "prism",
-                          "sparkle",
-                          "opal",
-                          "glisten"
-                        ]
+                      "effects_v2": {
+                        "action": {
+                          "effect_values": [
+                            "no_effect",
+                            "candle",
+                            "fire",
+                            "prism",
+                            "sparkle",
+                            "opal",
+                            "glisten",
+                            "underwater",
+                            "cosmos",
+                            "sunbeam",
+                            "enchant"
+                          ]
+                        },
+                        "status": {
+                          "effect": "no_effect",
+                          "effect_values": [
+                            "no_effect",
+                            "candle",
+                            "fire",
+                            "prism",
+                            "sparkle",
+                            "opal",
+                            "glisten",
+                            "underwater",
+                            "cosmos",
+                            "sunbeam",
+                            "enchant"
+                          ]
+                        }
                       },
                       "timed_effects": {
                         "status_values": [
@@ -1833,8 +3274,10 @@ class HueApiTest {
                                  .colorGamut(GAMUT_C)
                                  .ctMin(153)
                                  .ctMax(500)
-                                 .effects(List.of("candle", "fire", "prism", "sparkle", "opal", "glisten"))
-                                 .capabilities(EnumSet.allOf(Capability.class))
+                                 .effects(List.of("candle", "fire", "prism", "sparkle", "opal", "glisten", "underwater",
+                                         "cosmos", "sunbeam", "enchant"))
+                                 .capabilities(EnumSet.of(Capability.COLOR, Capability.COLOR_TEMPERATURE,
+                                         Capability.BRIGHTNESS, Capability.ON_OFF))
                                  .build()
         );
         assertThat(capabilities.isColorSupported()).isTrue();
@@ -1968,16 +3411,20 @@ class HueApiTest {
                         ]
                       },
                       "mode": "normal",
-                      "effects": {
-                        "status_values": [
-                          "no_effect",
-                          "candle"
-                        ],
-                        "status": "no_effect",
-                        "effect_values": [
-                          "no_effect",
-                          "candle"
-                        ]
+                      "effects_v2": {
+                        "action": {
+                          "effect_values": [
+                            "no_effect",
+                            "candle"
+                          ]
+                        },
+                        "status": {
+                          "effect": "no_effect",
+                          "effect_values": [
+                            "no_effect",
+                            "candle"
+                          ]
+                        }
                       },
                       "type": "light"
                     }
@@ -2055,20 +3502,24 @@ class HueApiTest {
                         ]
                       },
                       "mode": "normal",
-                      "effects": {
-                        "status_values": [
-                          "no_effect",
-                          "candle",
-                          "sparkle",
-                          "glisten"
-                        ],
-                        "status": "no_effect",
-                        "effect_values": [
-                          "no_effect",
-                          "candle",
-                          "sparkle",
-                          "glisten"
-                        ]
+                      "effects_v2": {
+                        "action": {
+                          "effect_values": [
+                            "no_effect",
+                            "candle",
+                            "sparkle",
+                            "glisten"
+                          ]
+                        },
+                        "status": {
+                          "effect": "no_effect",
+                          "effect_values": [
+                            "no_effect",
+                            "candle",
+                            "sparkle",
+                            "glisten"
+                          ]
+                        }
                       },
                       "timed_effects": {
                         "status_values": [
@@ -2163,7 +3614,7 @@ class HueApiTest {
     }
 
     @Test
-    void getGroupCapabilities_returnsMaxOfAllContainedLights() {
+    void getGroupCapabilities_returnsMaxOfAllContainedLights_excludesGradientCapabilities() {
         setGetResponse("/grouped_light", """
                 {
                   "errors": [],
@@ -2223,6 +3674,14 @@ class HueApiTest {
                         "rtype": "zone"
                       },
                       "type": "grouped_light"
+                    },
+                    {
+                      "id": "GroupedLight_Zone_8",
+                      "owner": {
+                        "rid": "Zone_8",
+                        "rtype": "zone"
+                      },
+                      "type": "grouped_light"
                     }
                   ]
                 }""");
@@ -2234,19 +3693,23 @@ class HueApiTest {
                       "id": "Zone_1",
                       "children": [
                         {
-                          "rid": "42",
+                          "rid": "CT_LIGHT",
                           "rtype": "light"
                         },
                         {
-                          "rid": "22",
+                          "rid": "COLOR_LIGHT_C",
                           "rtype": "light"
                         },
                         {
-                          "rid": "30",
+                          "rid": "ON_OFF_LIGHT",
                           "rtype": "light"
                         },
                         {
-                          "rid": "25",
+                          "rid": "COLOR_CT_LIGHT",
+                          "rtype": "light"
+                        },
+                        {
+                          "rid": "GRADIENT_LIGHT",
                           "rtype": "light"
                         }
                       ],
@@ -2256,7 +3719,7 @@ class HueApiTest {
                       "id": "Zone_2",
                       "children": [
                         {
-                          "rid": "22",
+                          "rid": "COLOR_LIGHT_C",
                           "rtype": "light"
                         }
                       ],
@@ -2266,7 +3729,7 @@ class HueApiTest {
                       "id": "Zone_3",
                       "children": [
                         {
-                          "rid": "42",
+                          "rid": "CT_LIGHT",
                           "rtype": "light"
                         }
                       ],
@@ -2276,7 +3739,7 @@ class HueApiTest {
                       "id": "Zone_4",
                       "children": [
                         {
-                          "rid": "30",
+                          "rid": "ON_OFF_LIGHT",
                           "rtype": "light"
                         }
                       ],
@@ -2286,7 +3749,7 @@ class HueApiTest {
                       "id": "Zone_5",
                       "children": [
                         {
-                          "rid": "23",
+                          "rid": "COLOR_LIGHT_A",
                           "rtype": "light"
                         }
                       ],
@@ -2296,11 +3759,11 @@ class HueApiTest {
                       "id": "Zone_6",
                       "children": [
                         {
-                          "rid": "22",
+                          "rid": "COLOR_LIGHT_C",
                           "rtype": "light"
                         },
                         {
-                          "rid": "23",
+                          "rid": "COLOR_LIGHT_A",
                           "rtype": "light"
                         }
                       ],
@@ -2310,7 +3773,17 @@ class HueApiTest {
                       "id": "Zone_7",
                       "children": [
                         {
-                          "rid": "24",
+                          "rid": "COLOR_LIGHT_B",
+                          "rtype": "light"
+                        }
+                      ],
+                      "type": "zone"
+                    },
+                    {
+                      "id": "Zone_8",
+                      "children": [
+                        {
+                          "rid": "GRADIENT_LIGHT",
                           "rtype": "light"
                         }
                       ],
@@ -2324,7 +3797,7 @@ class HueApiTest {
                   "errors": [],
                   "data": [
                     {
-                      "id": "42",
+                      "id": "CT_LIGHT",
                       "metadata": {
                         "name": "Color temperature light"
                       },
@@ -2343,7 +3816,7 @@ class HueApiTest {
                       "type": "light"
                     },
                     {
-                      "id": "22",
+                      "id": "COLOR_LIGHT_C",
                       "metadata": {
                         "name": "Color light"
                       },
@@ -2375,7 +3848,7 @@ class HueApiTest {
                       "type": "light"
                     },
                     {
-                      "id": "23",
+                      "id": "COLOR_LIGHT_A",
                       "metadata": {
                         "name": "Color light"
                       },
@@ -2407,7 +3880,7 @@ class HueApiTest {
                       "type": "light"
                     },
                     {
-                      "id": "24",
+                      "id": "COLOR_LIGHT_B",
                       "metadata": {
                         "name": "Color light"
                       },
@@ -2439,7 +3912,7 @@ class HueApiTest {
                       "type": "light"
                     },
                     {
-                      "id": "25",
+                      "id": "COLOR_CT_LIGHT",
                       "metadata": {
                         "name": "Extended color light"
                       },
@@ -2479,7 +3952,121 @@ class HueApiTest {
                       "type": "light"
                     },
                     {
-                      "id": "30",
+                      "id": "GRADIENT_LIGHT",
+                      "owner": {
+                        "rid": "2d019cd6-7de4-46dc-b8af-963add43a000",
+                        "rtype": "device"
+                      },
+                      "metadata": {
+                        "name": "Gradient color light"
+                      },
+                      "on": {
+                        "on": true
+                      },
+                      "dimming": {
+                        "brightness": 7.91,
+                        "min_dim_level": 0.01
+                      },
+                      "dimming_delta": {},
+                      "color_temperature": {
+                        "mirek": null,
+                        "mirek_valid": false,
+                        "mirek_schema": {
+                          "mirek_minimum": 153,
+                          "mirek_maximum": 500
+                        }
+                      },
+                      "color": {
+                        "xy": {
+                          "x": 0.1969,
+                          "y": 0.0688
+                        },
+                        "gamut": {
+                          "red": {
+                            "x": 0.6915,
+                            "y": 0.3083
+                          },
+                          "green": {
+                            "x": 0.17,
+                            "y": 0.7
+                          },
+                          "blue": {
+                            "x": 0.1532,
+                            "y": 0.0475
+                          }
+                        },
+                        "gamut_type": "C"
+                      },
+                      "gradient": {
+                        "points": [
+                          {
+                            "color": {
+                              "xy": {
+                                "x": 0.1969,
+                                "y": 0.0688
+                              }
+                            }
+                          },
+                          {
+                            "color": {
+                              "xy": {
+                                "x": 0.3352,
+                                "y": 0.1357
+                              }
+                            }
+                          },
+                          {
+                            "color": {
+                              "xy": {
+                                "x": 0.5501,
+                                "y": 0.2398
+                              }
+                            }
+                          },
+                          {
+                            "color": {
+                              "xy": {
+                                "x": 0.6079,
+                                "y": 0.3554
+                              }
+                            }
+                          },
+                          {
+                            "color": {
+                              "xy": {
+                                "x": 0.4813,
+                                "y": 0.45
+                              }
+                            }
+                          }
+                        ],
+                        "mode": "interpolated_palette",
+                        "points_capable": 5,
+                        "mode_values": [
+                          "interpolated_palette",
+                          "random_pixelated"
+                        ],
+                        "pixel_count": 24
+                      },
+                      "effects_v2": {
+                        "action": {
+                          "effect_values": [
+                            "no_effect",
+                            "candle"
+                          ]
+                        },
+                        "status": {
+                          "effect": "no_effect",
+                          "effect_values": [
+                            "no_effect",
+                            "candle"
+                          ]
+                        }
+                      },
+                      "type": "light"
+                    },
+                    {
+                      "id": "ON_OFF_LIGHT",
                       "metadata": {
                         "name": "On/off plug-in unit"
                       },
@@ -2494,7 +4081,8 @@ class HueApiTest {
                                  .colorGamut(GAMUT_C)
                                  .ctMin(100)
                                  .ctMax(500)
-                                 .capabilities(EnumSet.allOf(Capability.class))
+                                 .capabilities(EnumSet.of(Capability.COLOR, Capability.COLOR_TEMPERATURE, Capability.BRIGHTNESS,
+                                         Capability.ON_OFF))
                                  .build()
         );
         assertCapabilities(
@@ -2535,6 +4123,15 @@ class HueApiTest {
                                  .colorGamut(GAMUT_B)
                                  .capabilities(EnumSet.of(Capability.COLOR, Capability.BRIGHTNESS, Capability.ON_OFF))
                                  .build());
+        assertCapabilities(
+                getGroupCapabilities("GroupedLight_Zone_8"),
+                LightCapabilities.builder()
+                                 .colorGamut(GAMUT_C)
+                                 .ctMin(153)
+                                 .ctMax(500)
+                                 .capabilities(EnumSet.of(Capability.COLOR_TEMPERATURE, Capability.COLOR,
+                                         Capability.BRIGHTNESS, Capability.ON_OFF))
+                                 .build());
     }
 
     @Test
@@ -2551,9 +4148,10 @@ class HueApiTest {
 
     @Test
     void putState_group_usesCorrectUrl() {
-        performPutCall(PutCall.builder().id("eeb336d9-243b-4756-8455-1c69f50efd31").bri(127).groupState(true).build());
+        String groupedLightId = "eeb336d9-243b-4756-8455-1c69f50efd31";
+        performGroupPutCall(PutCall.builder().id(groupedLightId).bri(127).build());
 
-        verifyPut("/grouped_light/eeb336d9-243b-4756-8455-1c69f50efd31", """
+        verifyPut("/grouped_light/" + groupedLightId, """
                 {
                   "dimming": {
                     "brightness": 50.0
@@ -2589,15 +4187,15 @@ class HueApiTest {
     }
 
     @Test
-    void putState_hueAndSaturation_convertedToXY() {
-        performPutCall(PutCall.builder().id("ID").hue(0).sat(254).build());
+    void putState_XAndY_performsGamutCorrection() {
+        performPutCall(PutCall.builder().id("ID").x(0.8).y(0.2).build());
 
         verifyPut("/light/ID", """
                 {
                   "color": {
                     "xy": {
-                      "x": 0.64,
-                      "y": 0.33
+                      "x": 0.6915,
+                      "y": 0.3083
                     }
                   }
                 }""");
@@ -2648,39 +4246,195 @@ class HueApiTest {
 
     @Test
     void putState_effect_correctlySet() {
-        performPutCall(PutCall.builder().id("ID").effect("opal").build());
+        performPutCall(PutCall.builder().id("ID").effect(Effect.builder().effect("opal").build()).build());
 
         verifyPut("/light/ID", """
                 {
-                  "effects": {
-                    "effect": "opal"
+                  "effects_v2": {
+                    "action": {
+                      "effect": "opal"
+                    }
                   }
                 }""");
     }
 
     @Test
     void putState_effect_none_usesCorrectValue() {
-        performPutCall(PutCall.builder().id("ID").effect("none").build());
+        performPutCall(PutCall.builder().id("ID").effect(Effect.builder().effect("none").build()).build());
 
         verifyPut("/light/ID", """
                 {
-                  "effects": {
-                    "effect": "no_effect"
+                  "effects_v2": {
+                    "action": {
+                      "effect": "no_effect"
+                    }
                   }
                 }""");
     }
 
     @Test
     void putState_effect_removesOtherCTAndColorProperties_keepsDimming() {
-        performPutCall(PutCall.builder().id("ID").ct(100).x(0.854).y(0.489).bri(127).effect("prism").build());
+        performPutCall(PutCall.builder().id("ID").ct(100).x(0.854).y(0.489).bri(127)
+                              .effect(Effect.builder().effect("prism").build()).build());
 
         verifyPut("/light/ID", """
                 {
                   "dimming": {
                     "brightness": 50.0
                   },
-                  "effects": {
-                    "effect": "prism"
+                  "effects_v2": {
+                    "action": {
+                      "effect": "prism"
+                    }
+                  }
+                }""");
+    }
+
+    @Test
+    void putState_effect_withParameters_xy_speed() {
+        performPutCall(PutCall.builder().id("ID").effect(Effect.builder()
+                                                               .effect("prism")
+                                                               .x(0.123)
+                                                               .y(0.456)
+                                                               .speed(0.6)
+                                                               .build()).build());
+
+        verifyPut("/light/ID", """
+                {
+                  "effects_v2": {
+                    "action": {
+                      "effect": "prism",
+                      "parameters": {
+                        "color": {
+                          "xy": {
+                            "x": 0.123,
+                            "y": 0.456
+                          }
+                        },
+                        "speed": 0.6
+                      }
+                    }
+                  }
+                }""");
+    }
+
+    @Test
+    void putState_effect_withParameters_ct() {
+        performPutCall(PutCall.builder().id("ID").effect(Effect.builder()
+                                                               .effect("opal")
+                                                               .ct(350)
+                                                               .build()).build());
+
+        verifyPut("/light/ID", """
+                {
+                  "effects_v2": {
+                    "action": {
+                      "effect": "opal",
+                      "parameters": {
+                        "color_temperature": {
+                          "mirek": 350
+                        }
+                      }
+                    }
+                  }
+                }""");
+    }
+
+    @Test
+    void putState_effect_withParameters_speedOnly() {
+        performPutCall(PutCall.builder().id("ID").effect(Effect.builder()
+                                                               .effect("opal")
+                                                               .speed(0.7)
+                                                               .build()).build());
+
+        verifyPut("/light/ID", """
+                {
+                  "effects_v2": {
+                    "action": {
+                      "effect": "opal",
+                      "parameters": {
+                        "speed": 0.7
+                      }
+                    }
+                  }
+                }""");
+    }
+
+    @Test
+    void putState_gradient_noModeGiven() {
+        performPutCall(PutCall.builder().id("ID").gradient(Gradient.builder()
+                                                                   .points(List.of(
+                                                                           Pair.of(0.123, 0.456),
+                                                                           Pair.of(0.234, 0.567)
+                                                                   ))
+                                                                   .build()).build());
+
+        verifyPut("/light/ID", """
+                {
+                  "gradient": {
+                    "points": [
+                      {
+                        "color": {
+                          "xy": {
+                            "x": 0.123,
+                            "y": 0.456
+                          }
+                        }
+                      },
+                      {
+                        "color": {
+                          "xy": {
+                            "x": 0.234,
+                            "y": 0.567
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }""");
+    }
+
+    @Test
+    void putState_gradient_withMode() {
+        performPutCall(PutCall.builder().id("ID").gradient(Gradient.builder()
+                                                                   .points(List.of(
+                                                                           Pair.of(0.123, 0.456),
+                                                                           Pair.of(0.234, 0.567),
+                                                                           Pair.of(0.345, 0.678)
+                                                                   ))
+                                                                   .mode("random_pixelated")
+                                                                   .build()).build());
+
+        verifyPut("/light/ID", """
+                {
+                  "gradient": {
+                    "points": [
+                      {
+                        "color": {
+                          "xy": {
+                            "x": 0.123,
+                            "y": 0.456
+                          }
+                        }
+                      },
+                      {
+                        "color": {
+                          "xy": {
+                            "x": 0.234,
+                            "y": 0.567
+                          }
+                        }
+                      },
+                      {
+                        "color": {
+                          "xy": {
+                            "x": 0.345,
+                            "y": 0.678
+                          }
+                        }
+                      }
+                    ],
+                    "mode": "random_pixelated"
                   }
                 }""");
     }
@@ -3226,6 +4980,21 @@ class HueApiTest {
                           "y": 0.3553
                         }
                       },
+                      "effects_v2": {
+                        "action": {
+                          "effect_values": [
+                            "no_effect",
+                            "opal"
+                          ]
+                        },
+                        "status": {
+                          "effect": "no_effect",
+                          "effect_values": [
+                            "no_effect",
+                            "opal"
+                          ]
+                        }
+                      },
                       "type": "light"
                     },
                     {
@@ -3363,8 +5132,8 @@ class HueApiTest {
 
         // "Scene_1" already exists for Room -> update it; missing light treated as off
         createOrUpdateScene("GROUPED_LIGHT_1", "Scene_1",
-                PutCall.builder().id("LIGHT_1").hue(2000).sat(254),
-                PutCall.builder().id("LIGHT_2_1").hue(2000).sat(254)
+                PutCall.builder().id("LIGHT_1").x(0.623).y(0.3435),
+                PutCall.builder().id("LIGHT_2_1").x(0.623).y(0.3435)
         );
 
         verifyPut("/scene/SCENE_1", """
@@ -3455,7 +5224,7 @@ class HueApiTest {
 
         // special case for providing effect -> remove any color attribute
         createOrUpdateScene("GROUPED_LIGHT_2", "Scene_3",
-                PutCall.builder().id("LIGHT_1").effect("opal").x(0.123).y(0.456),
+                PutCall.builder().id("LIGHT_1").effect(Effect.builder().effect("opal").build()).x(0.123).y(0.456),
                 PutCall.builder().id("LIGHT_2_1")
         );
 
@@ -3471,8 +5240,10 @@ class HueApiTest {
                         "on": {
                           "on": true
                         },
-                        "effects": {
-                          "effect": "opal"
+                        "effects_v2": {
+                          "action": {
+                            "effect": "opal"
+                          }
                         }
                       }
                     },
@@ -3584,19 +5355,34 @@ class HueApiTest {
                         },
                         "gamut": {
                           "red": {
-                            "x": 0.6915,
-                            "y": 0.3083
+                            "x": 0.675,
+                            "y": 0.322
                           },
                           "green": {
-                            "x": 0.17,
-                            "y": 0.7
+                            "x": 0.409,
+                            "y": 0.518
                           },
                           "blue": {
-                            "x": 0.1532,
-                            "y": 0.0475
+                            "x": 0.167,
+                            "y": 0.04
                           }
                         },
-                        "gamut_type": "C"
+                        "gamut_type": "B"
+                      },
+                      "effects_v2": {
+                        "action": {
+                          "effect_values": [
+                            "no_effect",
+                            "candle"
+                          ]
+                        },
+                        "status": {
+                          "effect": "no_effect",
+                          "effect_values": [
+                            "no_effect",
+                            "candle"
+                          ]
+                        }
                       },
                       "type": "light"
                     },
@@ -3626,6 +5412,21 @@ class HueApiTest {
                           "mirek_maximum": 454
                         }
                       },
+                      "effects_v2": {
+                        "action": {
+                          "effect_values": [
+                            "no_effect",
+                            "candle"
+                          ]
+                        },
+                        "status": {
+                          "effect": "no_effect",
+                          "effect_values": [
+                            "no_effect",
+                            "candle"
+                          ]
+                        }
+                      },
                       "type": "light"
                     },
                     {
@@ -3646,6 +5447,21 @@ class HueApiTest {
                       "dimming": {
                         "brightness": 100.0,
                         "min_dim_level": 5.0
+                      },
+                      "effects_v2": {
+                        "action": {
+                          "effect_values": [
+                            "no_effect",
+                            "different_effect"
+                          ]
+                        },
+                        "status": {
+                          "effect": "no_effect",
+                          "effect_values": [
+                            "no_effect",
+                            "different_effect"
+                          ]
+                        }
                       },
                       "type": "light"
                     },
@@ -3669,15 +5485,15 @@ class HueApiTest {
                 }
                 """);
 
-        // Color and brightness (uses min mirek):
+        // Color and brightness (applies gamut correction, affecting both xy and ct):
 
         mockSceneCreationResult("SCENE_ID");
 
         createOrUpdateScene("GROUPED_LIGHT", "SCENE",
-                PutCall.builder().id("COLOR").x(0.280).y(0.280).bri(20),
-                PutCall.builder().id("CT_ONLY").x(0.280).y(0.280).bri(20),
-                PutCall.builder().id("BRI_ONLY").x(0.280).y(0.280).bri(20),
-                PutCall.builder().id("ON_OFF_ONLY").x(0.280).y(0.280).bri(20)
+                PutCall.builder().id("COLOR").x(0.8).y(0.2).bri(20), // out of gamut
+                PutCall.builder().id("CT_ONLY").x(0.8).y(0.2).bri(20),
+                PutCall.builder().id("BRI_ONLY").x(0.8).y(0.2).bri(20),
+                PutCall.builder().id("ON_OFF_ONLY").x(0.8).y(0.2).bri(20)
         );
 
         verifyPost("/scene", """
@@ -3704,8 +5520,8 @@ class HueApiTest {
                         },
                         "color": {
                           "xy": {
-                            "x": 0.28,
-                            "y": 0.28
+                            "x": 0.675,
+                            "y": 0.322
                           }
                         }
                       }
@@ -3723,7 +5539,7 @@ class HueApiTest {
                           "brightness": 7.87
                         },
                         "color_temperature": {
-                          "mirek": 153
+                          "mirek": 186
                         }
                       }
                     },
@@ -3831,13 +5647,13 @@ class HueApiTest {
                 }
                 """);
 
-        // HS only:
+        // effect and brightness:
 
         createOrUpdateScene("GROUPED_LIGHT", "SCENE",
-                PutCall.builder().id("COLOR").hue(2000).sat(254),
-                PutCall.builder().id("CT_ONLY").hue(2000).sat(254),
-                PutCall.builder().id("BRI_ONLY").hue(2000).sat(254),
-                PutCall.builder().id("ON_OFF_ONLY").hue(2000).sat(254)
+                PutCall.builder().id("COLOR").bri(254).effect(Effect.builder().effect("candle").build()),
+                PutCall.builder().id("CT_ONLY").bri(254).effect(Effect.builder().effect("candle").build()),
+                PutCall.builder().id("BRI_ONLY").bri(254).effect(Effect.builder().effect("candle").build()),
+                PutCall.builder().id("ON_OFF_ONLY").bri(254).effect(Effect.builder().effect("candle").build())
         );
 
         verifyPut("/scene/SCENE_ID", """
@@ -3852,10 +5668,12 @@ class HueApiTest {
                         "on": {
                           "on": true
                         },
-                        "color": {
-                          "xy": {
-                            "x": 0.623,
-                            "y": 0.3435
+                        "dimming": {
+                          "brightness": 100.0
+                        },
+                        "effects_v2": {
+                          "action": {
+                            "effect": "candle"
                           }
                         }
                       }
@@ -3869,8 +5687,13 @@ class HueApiTest {
                         "on": {
                           "on": true
                         },
-                        "color_temperature": {
-                          "mirek": 454
+                        "dimming": {
+                          "brightness": 100.0
+                        },
+                        "effects_v2": {
+                          "action": {
+                            "effect": "candle"
+                          }
                         }
                       }
                     },
@@ -3882,6 +5705,9 @@ class HueApiTest {
                       "action": {
                         "on": {
                           "on": true
+                        },
+                        "dimming": {
+                          "brightness": 100.0
                         }
                       }
                     },
@@ -4194,6 +6020,550 @@ class HueApiTest {
                 }""");
     }
 
+    @Test
+    void putSceneState_noExistingTempScene_createAndRecall() {
+        setGetResponse("/grouped_light", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "GL_ZONE_1",
+                      "owner": {
+                        "rid": "ZONE_1",
+                        "rtype": "zone"
+                      },
+                      "type": "grouped_light"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/zone", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "ZONE_1",
+                      "id_v1": "/groups/3",
+                      "children": [
+                        {
+                          "rid": "LIGHT_A",
+                          "rtype": "light"
+                        },
+                        {
+                          "rid": "LIGHT_B",
+                          "rtype": "light"
+                        }
+                      ],
+                      "services": [
+                        {
+                          "rid": "GL_ZONE_1",
+                          "rtype": "grouped_light"
+                        }
+                      ],
+                      "metadata": {
+                        "name": "Zone One",
+                        "archetype": "lounge"
+                      },
+                      "type": "zone"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/light", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "LIGHT_A",
+                      "metadata": {
+                        "name": "LA"
+                      },
+                      "owner": {
+                        "rid": "DEV_A",
+                        "rtype": "device"
+                      },
+                      "on": {
+                        "on": true
+                      },
+                      "dimming": {
+                        "brightness": 100.0
+                      },
+                      "color_temperature": {
+                        "mirek": 250,
+                        "mirek_valid": true,
+                        "mirek_schema": {
+                          "mirek_minimum": 153,
+                          "mirek_maximum": 500
+                        }
+                      },
+                      "color": {
+                        "xy": {
+                          "x": 0.3,
+                          "y": 0.3
+                        }
+                      },
+                      "type": "light"
+                    },
+                    {
+                      "id": "LIGHT_B",
+                      "metadata": {
+                        "name": "LB"
+                      },
+                      "owner": {
+                        "rid": "DEV_B",
+                        "rtype": "device"
+                      },
+                      "on": {
+                        "on": true
+                      },
+                      "dimming": {
+                        "brightness": 100.0
+                      },
+                      "color_temperature": {
+                        "mirek": 250,
+                        "mirek_valid": true,
+                        "mirek_schema": {
+                          "mirek_minimum": 153,
+                          "mirek_maximum": 500
+                        }
+                      },
+                      "color": {
+                        "xy": {
+                          "x": 0.3,
+                          "y": 0.3
+                        }
+                      },
+                      "type": "light"
+                    }
+                  ]
+                }
+                """);
+
+        setGetResponse("/scene", EMPTY_RESPONSE);
+        mockSceneCreationResult("SCENE_NEW");
+
+        api.putSceneState("GL_ZONE_1", List.of(
+                PutCall.builder().id("LIGHT_A").ct(300).bri(100).transitionTime(5).build(),
+                PutCall.builder().id("LIGHT_B").on(true).gradient(Gradient.builder()
+                                                                          .points(List.of(Pair.of(0.123, 0.456),
+                                                                                  Pair.of(0.234, 0.567)))
+                                                                          .mode("interpolated_palette_mirrored")
+                                                                          .build()).transitionTime(2).build()
+        ));
+
+        verifyPost("/scene", """
+                {
+                  "metadata": {
+                    "name": "HueTemp",
+                    "appdata": "hue_sch:temp"
+                  },
+                  "group": {
+                    "rid": "ZONE_1",
+                    "rtype": "zone"
+                  },
+                  "actions": [
+                    {
+                      "target": {
+                        "rid": "LIGHT_A",
+                        "rtype": "light"
+                      },
+                      "action": {
+                        "on": {
+                          "on": true
+                        },
+                        "dimming": {
+                          "brightness": 39.37
+                        },
+                        "color_temperature": {
+                          "mirek": 300
+                        }
+                      }
+                    },
+                    {
+                      "target": {
+                        "rid": "LIGHT_B",
+                        "rtype": "light"
+                      },
+                      "action": {
+                        "on": {
+                          "on": true
+                        },
+                        "gradient": {
+                          "points": [
+                            {
+                              "color": {
+                                "xy": {
+                                  "x": 0.123,
+                                  "y": 0.456
+                                }
+                              }
+                            },
+                            {
+                              "color": {
+                                "xy": {
+                                  "x": 0.234,
+                                  "y": 0.567
+                                }
+                              }
+                            }
+                          ],
+                          "mode": "interpolated_palette_mirrored"
+                        }
+                      }
+                    }
+                  ]
+                }
+                """);
+
+        verifyPut("/scene/SCENE_NEW", """
+                {
+                  "recall": {
+                    "action": "active",
+                    "duration": 500
+                  }
+                }
+                """);
+    }
+
+    @Test
+    void putSceneState_noExistingTempScene_failsToCreateScene_exception() {
+        setGetResponse("/grouped_light", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "GL_ZONE_1",
+                      "owner": {
+                        "rid": "ZONE_1",
+                        "rtype": "zone"
+                      },
+                      "type": "grouped_light"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/zone", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "ZONE_1",
+                      "id_v1": "/groups/3",
+                      "children": [
+                        {
+                          "rid": "LIGHT_A",
+                          "rtype": "light"
+                        }
+                      ],
+                      "services": [
+                        {
+                          "rid": "GL_ZONE_1",
+                          "rtype": "grouped_light"
+                        }
+                      ],
+                      "metadata": {
+                        "name": "Zone One",
+                        "archetype": "lounge"
+                      },
+                      "type": "zone"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/light", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "LIGHT_A",
+                      "metadata": {
+                        "name": "LA"
+                      },
+                      "owner": {
+                        "rid": "DEV_A",
+                        "rtype": "device"
+                      },
+                      "on": {
+                        "on": true
+                      },
+                      "dimming": {
+                        "brightness": 100.0
+                      },
+                      "color_temperature": {
+                        "mirek": 250,
+                        "mirek_valid": true,
+                        "mirek_schema": {
+                          "mirek_minimum": 153,
+                          "mirek_maximum": 500
+                        }
+                      },
+                      "color": {
+                        "xy": {
+                          "x": 0.3,
+                          "y": 0.3
+                        }
+                      },
+                      "type": "light"
+                    }
+                  ]
+                }
+                """);
+
+        setGetResponse("/scene", EMPTY_RESPONSE);
+        when(resourceProviderMock.postResource(eq(getUrl("/scene")), any()))
+                .thenReturn("""
+                        {
+                        "data": [
+                        ],
+                        "errors": []
+                        }
+                        """);
+
+
+        assertThrows(ApiFailure.class, () -> api.putSceneState("GL_ZONE_1", List.of(
+                PutCall.builder().id("LIGHT_A").ct(300).bri(100).transitionTime(5).build()
+        )));
+    }
+
+    @Test
+    void putSceneState_hasExistingTempScene_lookedUpByAppData_updatesAndRecall() {
+        setGetResponse("/grouped_light", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "GL_ZONE_1",
+                      "owner": {
+                        "rid": "ZONE_1",
+                        "rtype": "zone"
+                      },
+                      "type": "grouped_light"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/zone", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "ZONE_1",
+                      "id_v1": "/groups/3",
+                      "children": [
+                        {
+                          "rid": "LIGHT_A",
+                          "rtype": "light"
+                        }
+                      ],
+                      "services": [
+                        {
+                          "rid": "GL_ZONE_1",
+                          "rtype": "grouped_light"
+                        }
+                      ],
+                      "metadata": {
+                        "name": "Zone One",
+                        "archetype": "lounge"
+                      },
+                      "type": "zone"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/light", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "LIGHT_A",
+                      "metadata": {
+                        "name": "LA"
+                      },
+                      "owner": {
+                        "rid": "DEV_A",
+                        "rtype": "device"
+                      },
+                      "on": {
+                        "on": true
+                      },
+                      "dimming": {
+                        "brightness": 100.0
+                      },
+                      "color_temperature": {
+                        "mirek": 250,
+                        "mirek_valid": true,
+                        "mirek_schema": {
+                          "mirek_minimum": 153,
+                          "mirek_maximum": 500
+                        }
+                      },
+                      "color": {
+                        "xy": {
+                          "x": 0.3,
+                          "y": 0.3
+                        }
+                      },
+                      "type": "light"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/scene", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "SCENE_ID_3",
+                      "actions": [
+                        {
+                          "target": {
+                            "rid": "LIGHT_A",
+                            "rtype": "light"
+                          },
+                          "action": {
+                            "on": {
+                              "on": true
+                            },
+                            "dimming": {
+                              "brightness": 80.0
+                            },
+                            "color_temperature": {
+                              "mirek": 200
+                            }
+                          }
+                        }
+                      ],
+                      "metadata": {
+                        "name": "SCENE FOR ANOTHER ZONE",
+                        "appdata": "hue_sch:temp"
+                      },
+                      "group": {
+                        "rid": "ZONE_2",
+                        "rtype": "zone"
+                      },
+                      "speed": 0.6031746031746031,
+                      "auto_dynamic": false,
+                      "status": {
+                        "active": "inactive"
+                      },
+                      "type": "scene"
+                    },
+                    {
+                      "id": "SCENE_ID_2",
+                      "actions": [
+                        {
+                          "target": {
+                            "rid": "LIGHT_A",
+                            "rtype": "light"
+                          },
+                          "action": {
+                            "on": {
+                              "on": true
+                            },
+                            "dimming": {
+                              "brightness": 80.0
+                            },
+                            "color_temperature": {
+                              "mirek": 200
+                            }
+                          }
+                        }
+                      ],
+                      "metadata": {
+                        "name": "IGNORED SCENE"
+                      },
+                      "group": {
+                        "rid": "ZONE_1",
+                        "rtype": "zone"
+                      },
+                      "speed": 0.6031746031746031,
+                      "auto_dynamic": false,
+                      "status": {
+                        "active": "inactive"
+                      },
+                      "type": "scene"
+                    },
+                    {
+                      "id": "SCENE_ID_1",
+                      "actions": [
+                        {
+                          "target": {
+                            "rid": "LIGHT_A",
+                            "rtype": "light"
+                          },
+                          "action": {
+                            "on": {
+                              "on": true
+                            },
+                            "dimming": {
+                              "brightness": 100.0
+                            },
+                            "color_temperature": {
+                              "mirek": 199
+                            }
+                          }
+                        }
+                      ],
+                      "metadata": {
+                        "name": "SCENE",
+                        "appdata": "hue_sch:temp"
+                      },
+                      "group": {
+                        "rid": "ZONE_1",
+                        "rtype": "zone"
+                      },
+                      "speed": 0.6031746031746031,
+                      "auto_dynamic": false,
+                      "status": {
+                        "active": "inactive"
+                      },
+                      "type": "scene"
+                    }
+                  ]
+                }
+                """);
+
+        api.putSceneState("GL_ZONE_1", List.of(
+                PutCall.builder().id("LIGHT_A").ct(300).bri(100).build()
+        ));
+
+        verifyPut("/scene/SCENE_ID_1", """
+                {
+                  "metadata": {
+                    "name": "HueTemp",
+                    "appdata": "hue_sch:temp"
+                  },
+                  "actions": [
+                    {
+                      "target": {
+                        "rid": "LIGHT_A",
+                        "rtype": "light"
+                      },
+                      "action": {
+                        "on": {
+                          "on": true
+                        },
+                        "dimming": {
+                          "brightness": 39.37
+                        },
+                        "color_temperature": {
+                          "mirek": 300
+                        }
+                      }
+                    }
+                  ]
+                }
+                """);
+
+        verifyPut("/scene/SCENE_ID_1", """
+                {
+                  "recall": {
+                    "action": "active"
+                  }
+                }
+                """);
+    }
+
     private void mockSceneCreationResult(String sceneId) {
         when(resourceProviderMock.postResource(eq(getUrl("/scene")), any()))
                 .thenReturn("{\n" +
@@ -4252,11 +6622,15 @@ class HueApiTest {
     }
 
     private void assertLightState(LightState lightState, LightState expected) {
-        assertThat(lightState).isEqualTo(expected);
+        assertThat(lightState).usingRecursiveComparison().isEqualTo(expected);
     }
 
     private void performPutCall(PutCall putCall) {
         api.putState(putCall);
+    }
+
+    private void performGroupPutCall(PutCall putCall) {
+        api.putGroupState(putCall);
     }
 
     private List<String> getGroupLights(String groupedLightId) {
@@ -4268,7 +6642,7 @@ class HueApiTest {
     }
 
     private void assertCapabilities(LightCapabilities capabilities, LightCapabilities expected) {
-        assertThat(capabilities).isEqualTo(expected);
+        assertThat(capabilities).usingRecursiveComparison().isEqualTo(expected);
     }
 
     private void assertGroupIdentifier(String idv1, String groupedLightId, String name) {
@@ -4289,5 +6663,11 @@ class HueApiTest {
                                      PutCall.PutCallBuilder... overriddenPutCallBuilders) {
         api.createOrUpdateScene(groupedLightId, sceneSyncName,
                 Stream.of(overriddenPutCallBuilders).map(PutCall.PutCallBuilder::build).toList());
+    }
+
+    private void assertSceneLightStates(String groupId, String sceneName, ScheduledLightState.ScheduledLightStateBuilder... states) {
+        assertThat(api.getSceneLightStates(groupId, sceneName))
+                .usingRecursiveComparison()
+                .isEqualTo(Arrays.stream(states).map(ScheduledLightState.ScheduledLightStateBuilder::build).toList());
     }
 }

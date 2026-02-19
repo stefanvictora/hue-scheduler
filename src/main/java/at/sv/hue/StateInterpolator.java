@@ -2,13 +2,15 @@ package at.sv.hue;
 
 import at.sv.hue.api.PutCall;
 import at.sv.hue.color.ColorModeConverter;
+import at.sv.hue.color.XYColorGamutCorrection;
 import lombok.RequiredArgsConstructor;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.ZonedDateTime;
-import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 
@@ -18,59 +20,94 @@ public final class StateInterpolator {
     private final ScheduledStateSnapshot state;
     private final ScheduledStateSnapshot previousState;
     private final ZonedDateTime dateTime;
-    private final boolean keepPreviousPropertiesForNullTargets;
 
-    public PutCall getInterpolatedPutCall() {
+    public PutCalls getInterpolatedPutCalls() {
         if (state.isAlreadyReached(dateTime)) {
-            return null; // the state is already reached
+            return null; // no interpolation needed anymore
         }
-        PutCall interpolatedPutCall;
-        if (isDirectlyAtStartOfState()) {
-            interpolatedPutCall = previousState.getFullPicturePutCall(dateTime); // directly at start, just use previous put call
-        } else {
-            interpolatedPutCall = interpolate();
-        }
-        return modifyProperties(interpolatedPutCall);
-    }
-
-    private boolean isDirectlyAtStartOfState() {
-        return state.getStart().truncatedTo(ChronoUnit.SECONDS)
-                    .isEqual(dateTime.truncatedTo(ChronoUnit.SECONDS));
-    }
-
-    private PutCall modifyProperties(PutCall interpolatedPutCall) {
-        interpolatedPutCall.setOn(null); // do not per default reuse "on" property for interpolation
-        if (interpolatedPutCall.isNullCall()) {
-            return null; // no relevant properties set, don't perform interpolations
-        }
-        if (state.isOn()) {
-            interpolatedPutCall.setOn(true); // the current state is turning lights on, also set "on" property for interpolated state
-        }
-        return interpolatedPutCall;
+        return interpolate();
     }
 
     /**
      * P = P0 + t(P1 - P0)
      */
-    private PutCall interpolate() {
+    private PutCalls interpolate() {
         BigDecimal interpolatedTime = getInterpolatedTime();
-        PutCall previous = previousState.getFullPicturePutCall(dateTime);
-        PutCall target = state.getFullPicturePutCall(dateTime);
+        PutCalls previous = previousState.getFullPicturePutCalls(dateTime);
+        PutCalls target = state.getFullPicturePutCalls(dateTime);
 
-        return interpolate(previous, target, interpolatedTime, keepPreviousPropertiesForNullTargets);
+        return interpolate(previous, target, interpolatedTime);
     }
 
-    private static PutCall interpolate(PutCall previous, PutCall target, BigDecimal interpolatedTime,
-                                       boolean previousPropertiesForNullTargets) {
-        convertColorModeIfNeeded(previous, target);
+    private PutCalls interpolate(PutCalls previous, PutCalls target, BigDecimal interpolatedTime) {
+        List<PutCall> putCalls = new ArrayList<>();
+        if (previous.isGeneralGroup()) {
+            PutCall previousPutCall = previous.getFirst();
+            target.toList().forEach(targetPutCall -> {
+                PutCall putCall = interpolate(previousPutCall, targetPutCall, interpolatedTime);
+                putCall.setId(targetPutCall.getId());
+                putCalls.add(putCall);
+            });
+        } else if (target.isGeneralGroup()) {
+            PutCall targetPutCall = target.getFirst();
+            previous.toList().forEach(previousPutCall -> {
+                PutCall putCall = interpolate(previousPutCall, targetPutCall, interpolatedTime);
+                putCalls.add(putCall);
+            });
+        } else {
+            previous.toList().forEach(previousPutCall -> {
+                PutCall targetPutCall = target.get(previousPutCall.getId());
+                if (targetPutCall == null) {
+                    return; // skip lights that are not part of the target state
+                }
+                PutCall putCall = interpolate(previousPutCall, targetPutCall, interpolatedTime);
+                putCalls.add(putCall);
+            });
+        }
+        return new PutCalls(previous.getId(), putCalls, previous.getTransitionTime(), previous.isGroupUpdate());
+    }
 
-        previous.setBri(interpolateInteger(interpolatedTime, target.getBri(), previous.getBri(), previousPropertiesForNullTargets));
-        previous.setCt(interpolateInteger(interpolatedTime, target.getCt(), previous.getCt(), previousPropertiesForNullTargets));
-        previous.setHue(interpolateHue(interpolatedTime, target.getHue(), previous.getHue(), previousPropertiesForNullTargets));
-        previous.setSat(interpolateInteger(interpolatedTime, target.getSat(), previous.getSat(), previousPropertiesForNullTargets));
-        previous.setX(interpolateDouble(interpolatedTime, target.getX(), previous.getX(), previousPropertiesForNullTargets));
-        previous.setY(interpolateDouble(interpolatedTime, target.getY(), previous.getY(), previousPropertiesForNullTargets));
-        return previous;
+    private PutCall interpolate(PutCall previous, PutCall target, BigDecimal interpolatedTime) {
+        PutCall putCall = copy(previous);
+        convertColorModeIfNeeded(putCall, target);
+
+        putCall.setBri(interpolateInteger(interpolatedTime, getBriConsideringOff(putCall), getBriConsideringOff(target))); // todo: for target we currently can't use off since this conflicts with off light updates
+        putCall.setCt(interpolateInteger(interpolatedTime, putCall.getCt(), target.getCt()));
+        var xy = interpolateXY(interpolatedTime, putCall.getXY(), target.getXY(), target.getGamut());
+        if (xy != null) {
+            putCall.setX(xy.first());
+            putCall.setY(xy.second());
+        } else {
+            putCall.setX(null);
+            putCall.setY(null);
+        }
+        putCall.setGradient(interpolateGradient(interpolatedTime, putCall.getGradient(), target.getGradient(),
+                target.getGamut()));
+
+        putCall.setOn(null); // do not per default reuse "on" property for interpolation
+        if (target.isOn()) {
+            putCall.setOn(true); // the current state is turning lights on, also set "on" property for interpolated state
+        }
+        if (previous.isOff() && target.isOff()) {
+            putCall.setOn(false);
+            putCall.setBri(null);
+        }
+        if (putCall.getBri() != null && putCall.getBri() == 0) {
+            putCall.setBri(1); // min brightness is 1 if light is on
+        }
+
+        return putCall;
+    }
+
+    private static Integer getBriConsideringOff(PutCall putCall) {
+        if (putCall.isOff()) {
+            return 0;
+        }
+        return putCall.getBri();
+    }
+
+    private static PutCall copy(PutCall putCall) {
+        return putCall.toBuilder().build();
     }
 
     /**
@@ -78,24 +115,21 @@ public final class StateInterpolator {
      * would be possible. Here we don't care about the time differences, but just the available properties of the put calls.
      */
     public static boolean hasNoOverlappingProperties(PutCall previous, PutCall target) {
-        previous.setOn(null); // do not reuse on property
-        convertColorModeIfNeeded(previous, target);
-        removeEqualProperties(previous, target);
-        return previous.isNullCall();
+        PutCall putCall = copy(previous);
+        putCall.setBri(getBriConsideringOff(putCall));
+        putCall.setOn(null); // do not reuse on property
+        putCall.setEffect(null); // interpolation between effects not supported
+        convertColorModeIfNeeded(putCall, target);
+        removeEqualProperties(putCall, target);
+        return putCall.isNullCall();
     }
 
     private static void removeEqualProperties(PutCall putCall, PutCall target) {
-        if (isEqualOrNotAvailableAtTarget(putCall, target, PutCall::getBri)) {
+        if (isEqualOrNotAvailableAtTarget(putCall, getTargetConsideringOff(target), PutCall::getBri)) {
             putCall.setBri(null);
         }
         if (isEqualOrNotAvailableAtTarget(putCall, target, PutCall::getCt)) {
             putCall.setCt(null);
-        }
-        if (isEqualOrNotAvailableAtTarget(putCall, target, PutCall::getHue)) {
-            putCall.setHue(null);
-        }
-        if (isEqualOrNotAvailableAtTarget(putCall, target, PutCall::getSat)) {
-            putCall.setSat(null);
         }
         if (isEqualOrNotAvailableAtTarget(putCall, target, PutCall::getX)) {
             putCall.setX(null);
@@ -103,10 +137,29 @@ public final class StateInterpolator {
         if (isEqualOrNotAvailableAtTarget(putCall, target, PutCall::getY)) {
             putCall.setY(null);
         }
+        if (isEqualOrNotAvailableAtTarget(putCall, target, StateInterpolator::getGradientPoints)) { // we don't care about gradient mode here
+            putCall.setGradient(null);
+        }
+    }
+
+    private static PutCall getTargetConsideringOff(PutCall target) {
+        if (target.isOff()) {
+            PutCall modifiedTarget = copy(target);
+            modifiedTarget.setBri(0);
+            return modifiedTarget;
+        }
+        return target;
     }
 
     private static boolean isEqualOrNotAvailableAtTarget(PutCall putCall, PutCall target, Function<PutCall, Object> function) {
         return Objects.equals(function.apply(putCall), function.apply(target)) || function.apply(target) == null;
+    }
+
+    private static List<Pair<Double, Double>> getGradientPoints(PutCall putCall) {
+        if (putCall.getGradient() == null) {
+            return null;
+        }
+        return putCall.getGradient().points();
     }
 
     /**
@@ -119,18 +172,13 @@ public final class StateInterpolator {
                          .divide(BigDecimal.valueOf(totalDuration.toMillis()), 7, RoundingMode.HALF_UP);
     }
 
-
     private static void convertColorModeIfNeeded(PutCall previousPutCall, PutCall target) {
         ColorModeConverter.convertIfNeeded(previousPutCall, target.getColorMode());
     }
 
-    private static Integer interpolateInteger(BigDecimal interpolatedTime, Integer target, Integer previous,
-                                              boolean previousPropertiesForNullTargets) {
-        if (shouldReturnPrevious(target, previousPropertiesForNullTargets)) {
-            return previous;
-        }
+    private Integer interpolateInteger(BigDecimal interpolatedTime, Integer previous, Integer target) {
         if (target == null) {
-            return null;
+            return previous;
         }
         if (previous == null) {
             return null;
@@ -142,17 +190,23 @@ public final class StateInterpolator {
                          .intValue();
     }
 
-    private static Double interpolateDouble(BigDecimal interpolatedTime, Double target, Double previous,
-                                            boolean previousPropertiesForNullTargets) {
-        if (shouldReturnPrevious(target, previousPropertiesForNullTargets)) {
+    private Pair<Double, Double> interpolateXY(BigDecimal interpolatedTime, Pair<Double, Double> previous,
+                                               Pair<Double, Double> target, Double[][] gamut) {
+        if (target == null) { // todo: no mutation coverage
             return previous;
         }
-        if (target == null) {
+        if (previous == null) { // todo: no mutation coverage
             return null;
         }
-        if (previous == null) {
-            return null;
-        }
+
+        Double x = interpolateDouble(interpolatedTime, previous.first(), target.first());
+        Double y = interpolateDouble(interpolatedTime, previous.second(), target.second());
+
+        XYColorGamutCorrection correction = new XYColorGamutCorrection(x, y, gamut);
+        return Pair.of(correction.getX(), correction.getY());
+    }
+
+    private Double interpolateDouble(BigDecimal interpolatedTime, Double previous, Double target) {
         BigDecimal diff = BigDecimal.valueOf(target - previous);
         return BigDecimal.valueOf(previous)
                          .add(interpolatedTime.multiply(diff))
@@ -160,32 +214,50 @@ public final class StateInterpolator {
                          .doubleValue();
     }
 
-    /**
-     * Perform special interpolation for hue values, as they wrap around i.e. 0 and 65535 are both considered red.
-     * This means that we need to decide in which direction we want to interpolate, to get the smoothest transition.
-     */
-    private static Integer interpolateHue(BigDecimal interpolatedTime, Integer target, Integer previous,
-                                          boolean previousPropertiesForNullTargets) {
-        if (shouldReturnPrevious(target, previousPropertiesForNullTargets)) {
+    private Gradient interpolateGradient(BigDecimal interpolatedTime, Gradient previous, Gradient target,
+                                         Double[][] gamut) {
+        if (target == null) { // todo: no mutation coverage
             return previous;
         }
-        if (target == null) {
+        if (previous == null) { // todo: no mutation coverage
             return null;
         }
-        if (previous == null) {
-            return null;
+
+        final var previousPoints = previous.points();
+        final var targetPoints = target.points();
+        final int maxPoints = Math.max(previousPoints.size(), targetPoints.size());
+        List<Pair<Double, Double>> points = new ArrayList<>(maxPoints);
+        // API guarantees minimum 2 gradient points, so maxPoints >= 2 and division is safe
+        for (int i = 0; i < maxPoints; i++) {
+            double pos = (double) i / (double) (maxPoints - 1);
+
+            var p = evalAt(previousPoints, pos);
+            var t = evalAt(targetPoints, pos);
+
+            Double x = interpolateDouble(interpolatedTime, p.first(), t.first());
+            Double y = interpolateDouble(interpolatedTime, p.second(), t.second());
+
+            XYColorGamutCorrection correction = new XYColorGamutCorrection(x, y, gamut);
+            points.add(Pair.of(correction.getX(), correction.getY()));
         }
-        if (previous == 0 && target == ScheduledState.MAX_HUE_VALUE || previous == ScheduledState.MAX_HUE_VALUE && target == 0) {
-            return 0;
-        }
-        int diff = ((target - previous + ScheduledState.MIDDLE_HUE_VALUE) % (ScheduledState.MAX_HUE_VALUE + 1)) - ScheduledState.MIDDLE_HUE_VALUE;
-        return BigDecimal.valueOf(previous)
-                         .add(interpolatedTime.multiply(BigDecimal.valueOf(diff)))
-                         .setScale(0, RoundingMode.HALF_UP)
-                         .intValue();
+        return new Gradient(points, target.mode());
     }
 
-    private static boolean shouldReturnPrevious(Object target, boolean previousPropertiesForNullTargets) {
-        return target == null && previousPropertiesForNullTargets;
+    /**
+     * Evaluate within a polyline of xy points at normalized position in [0,1].
+     */
+    private static Pair<Double, Double> evalAt(List<Pair<Double, Double>> points, double position) {
+        int n = points.size();
+
+        double f = position * (n - 1);
+        int i0 = (int) Math.floor(f);
+        int i1 = Math.min(i0 + 1, n - 1);
+        double w = f - i0;
+
+        var a = points.get(i0);
+        var b = points.get(i1);
+        double x = a.first() + w * (b.first() - a.first());
+        double y = a.second() + w * (b.second() - a.second());
+        return Pair.of(x, y);
     }
 }

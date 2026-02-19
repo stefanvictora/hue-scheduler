@@ -1,5 +1,7 @@
 package at.sv.hue.api;
 
+import at.sv.hue.ScheduledLightState;
+
 import java.util.List;
 
 public interface HueApi extends ResourceModificationEventListener {
@@ -67,6 +69,16 @@ public interface HueApi extends ResourceModificationEventListener {
     void putState(PutCall putCall);
 
     /**
+     * @throws ApiFailure if the api call failed
+     */
+    void putGroupState(PutCall putCall);
+
+    /**
+     * @throws ApiFailure if the api call failed
+     */
+    void putSceneState(String groupId, List<PutCall> putCalls);
+
+    /**
      * @return the lights associated with the group of the given id. Not null.
      * @throws GroupNotFoundException if no group with given id was found
      * @throws EmptyGroupException    if the group has no lights associated
@@ -81,10 +93,10 @@ public interface HueApi extends ResourceModificationEventListener {
     String getSceneName(String sceneId);
 
     /**
-     * @return the lights and group id related to the given scene. If not found, empty list. Not null.
+     * @return the lights and group id related to the given scene and if they are already on. If not found, empty list. Not null.
      * @throws ApiFailure if the api call failed
      */
-    List<String> getAffectedIdsByScene(String sceneId);
+    List<AffectedId> getAffectedIdsByScene(String sceneId);
 
     /**
      * @return the lights and group id related to the given device. If not found, empty list. Not null.
@@ -105,7 +117,7 @@ public interface HueApi extends ResourceModificationEventListener {
      *
      * @param lightIds the light IDs to resolve areas for; must not be null
      * @return a list of GroupInfo objects representing additional areas and their contained light IDs;
-     *         each GroupInfo contains an area/group ID and the list of light IDs it contains; never null
+     * each GroupInfo contains an area/group ID and the list of light IDs it contains; never null
      */
     List<GroupInfo> getAdditionalAreas(List<String> lightIds);
 
@@ -127,6 +139,21 @@ public interface HueApi extends ResourceModificationEventListener {
      * @throws ApiFailure             if the api call failed
      */
     LightCapabilities getGroupCapabilities(String id);
+
+    /**
+     * Retrieves the scheduled light states for a specific scene within a given group.
+     * The light states represent the detailed configurations (e.g., brightness, color temperature)
+     * assigned to each light in the group for the specified scene.
+     *
+     * @param groupId   the identifier of the group for which the scene light states are needed; must not be null or empty
+     * @param sceneName the name of the scene within the group whose light states are to be retrieved; must not be null or empty
+     * @return a list of ScheduledLightState objects representing the light states associated with the specified scene;
+     * never null.
+     * @throws SceneNotFoundException if no scene with the given name exists for the specified group
+     * @throws GroupNotFoundException if no group with the given id exists
+     * @throws NonUniqueNameException if multiple scenes with the same name exist for the specified group
+     */
+    List<ScheduledLightState> getSceneLightStates(String groupId, String sceneName);
 
     /**
      * Creates or updates a existing scene with the given name for the given group id.

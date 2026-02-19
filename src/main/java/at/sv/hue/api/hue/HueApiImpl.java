@@ -1,6 +1,11 @@
 package at.sv.hue.api.hue;
 
 import at.sv.hue.ColorMode;
+import at.sv.hue.Effect;
+import at.sv.hue.Gradient;
+import at.sv.hue.Pair;
+import at.sv.hue.ScheduledLightState;
+import at.sv.hue.api.AffectedId;
 import at.sv.hue.api.ApiFailure;
 import at.sv.hue.api.Capability;
 import at.sv.hue.api.EmptyGroupException;
@@ -12,9 +17,12 @@ import at.sv.hue.api.Identifier;
 import at.sv.hue.api.LightCapabilities;
 import at.sv.hue.api.LightNotFoundException;
 import at.sv.hue.api.LightState;
+import at.sv.hue.api.NonUniqueNameException;
 import at.sv.hue.api.PutCall;
 import at.sv.hue.api.RateLimiter;
+import at.sv.hue.api.SceneNotFoundException;
 import at.sv.hue.color.ColorModeConverter;
+import at.sv.hue.color.XYColorGamutCorrection;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -63,6 +71,9 @@ public final class HueApiImpl implements HueApi {
     private final ObjectMapper mapper;
     private final String baseApi;
     private final RateLimiter rateLimiter;
+    private final String sceneControlName;
+    private final String sceneControlAppData;
+    private final int sceneUpdateSleepDelayInMs;
     private final AsyncLoadingCache<String, Map<String, Light>> availableLightsCache;
     private final AsyncLoadingCache<String, Map<String, Device>> availableDevicesCache;
     private final AsyncLoadingCache<String, Map<String, Light>> availableGroupedLightsCache;
@@ -72,15 +83,19 @@ public final class HueApiImpl implements HueApi {
     private final AsyncLoadingCache<String, Map<String, ZigbeeConnectivity>> availableZigbeeConnectivityCache;
 
     public HueApiImpl(HttpResourceProvider resourceProvider, String host, RateLimiter rateLimiter,
-                      int apiCacheInvalidationIntervalInMinutes) {
+                      int apiCacheInvalidationIntervalInMinutes, String sceneControlName, String sceneControlAppData,
+                      int sceneUpdateSleepDelayInMs) {
         this.resourceProvider = resourceProvider;
         mapper = new ObjectMapper();
         mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
-        mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+        mapper.setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL);
         mapper.setDefaultMergeable(true);
         assertNotHttpSchemeProvided(host);
         baseApi = "https://" + host + "/clip/v2/resource";
         this.rateLimiter = rateLimiter;
+        this.sceneControlName = sceneControlName;
+        this.sceneControlAppData = sceneControlAppData;
+        this.sceneUpdateSleepDelayInMs = sceneUpdateSleepDelayInMs;
         availableLightsCache = createCache(this::lookupLights, apiCacheInvalidationIntervalInMinutes);
         availableDevicesCache = createCache(this::lookupDevices, apiCacheInvalidationIntervalInMinutes);
         availableGroupedLightsCache = createCache(this::lookupGroupedLights, apiCacheInvalidationIntervalInMinutes);
@@ -101,7 +116,7 @@ public final class HueApiImpl implements HueApi {
         return Caffeine.newBuilder()
                        .refreshAfterWrite(Duration.ofMinutes(apiCacheInvalidationIntervalInMinutes))
                        .expireAfterWrite(Duration.ofMinutes(apiCacheInvalidationIntervalInMinutes * 2L))
-                       .buildAsync(key -> supplier.get());
+                       .buildAsync(_ -> supplier.get());
     }
 
     @Override
@@ -206,15 +221,60 @@ public final class HueApiImpl implements HueApi {
 
     @Override
     public void putState(PutCall putCall) {
-        URL url;
-        if (putCall.isGroupState()) {
-            rateLimiter.acquire(10);
-            url = createUrl("/grouped_light/" + putCall.getId());
-        } else {
-            rateLimiter.acquire(1);
-            url = createUrl("/light/" + putCall.getId());
-        }
+        rateLimiter.acquire(1);
+        putStateInternal("/light/", putCall);
+    }
+
+    @Override
+    public void putGroupState(PutCall putCall) {
+        rateLimiter.acquire(10);
+        putStateInternal("/grouped_light/", putCall);
+    }
+
+    private void putStateInternal(String path, PutCall putCall) {
+        URL url = createUrl(path + putCall.getId());
         resourceProvider.putResource(url, getBody(getAction(putCall)));
+    }
+
+    @Override
+    public void putSceneState(String groupedLightId, List<PutCall> putCalls) {
+        String sceneId = createOrUpdateSceneInternal(groupedLightId, sceneControlAppData, sceneControlName,
+                removeTransitionTime(putCalls));
+        sleep();
+        Integer recallDuration = getRecallDuration(putCalls);
+        recallScene(sceneId, recallDuration);
+        log.trace("Recalled temp scene for {}. Transition time: {}", groupedLightId, recallDuration);
+    }
+
+    private static List<PutCall> removeTransitionTime(List<PutCall> putCalls) {
+        return putCalls.stream()
+                       .map(putCall -> putCall.toBuilder().transitionTime(null).build())
+                       .toList();
+    }
+
+    private static Integer getRecallDuration(List<PutCall> putCalls) {
+        return putCalls.stream()
+                       .map(PutCall::getTransitionTime)
+                       .filter(Objects::nonNull)
+                       .max(Integer::compareTo)
+                       .map(tr -> tr * 100)
+                       .orElse(null);
+    }
+
+    private void sleep() {
+        try {
+            log.trace("Sleep for {} to ensure scene is properly recalled before next operation.",
+                    Duration.ofMillis(sceneUpdateSleepDelayInMs));
+            Thread.sleep(sceneUpdateSleepDelayInMs);
+        } catch (InterruptedException ignored) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private void recallScene(String sceneId, Integer duration) {
+        RecallRequest recallBody = new RecallRequest(new Recall("active", duration));
+        rateLimiter.acquire(10);
+        resourceProvider.putResource(createUrl("/scene/" + sceneId), getBody(recallBody));
     }
 
     private String getBody(Object object) {
@@ -227,8 +287,7 @@ public final class HueApiImpl implements HueApi {
 
     @Override
     public List<String> getGroupLights(String groupedLightId) {
-        Light groupedLight = getAndAssertGroupedLightExists(groupedLightId);
-        Group group = getAndAssertGroupExists(groupedLight.getOwner());
+        Group group = getAndAssertGroupExists(groupedLightId);
         List<String> lightIds = getContainedLightIds(group);
         if (lightIds.isEmpty()) {
             throw new EmptyGroupException("Group with id '" + groupedLightId + "' has no lights to control!");
@@ -246,7 +305,7 @@ public final class HueApiImpl implements HueApi {
     }
 
     @Override
-    public List<String> getAffectedIdsByScene(String sceneId) {
+    public List<AffectedId> getAffectedIdsByScene(String sceneId) {
         Scene scene = getAvailableScenes().get(sceneId);
         if (scene == null) {
             return List.of();
@@ -254,15 +313,17 @@ public final class HueApiImpl implements HueApi {
         return getAffectedIdsByScene(scene);
     }
 
-    private List<String> getAffectedIdsByScene(Scene scene) {
-        List<String> resourceIds = new ArrayList<>(scene.getActions().stream()
-                                                        .filter(HueApiImpl::isOn)
-                                                        .map(SceneAction::getTarget)
-                                                        .map(ResourceReference::getRid)
-                                                        .toList());
+    private List<AffectedId> getAffectedIdsByScene(Scene scene) {
+        List<AffectedId> affectedIds = new ArrayList<>();
+        scene.getActions().stream()
+             .filter(HueApiImpl::isOn)
+             .map(SceneAction::getTarget)
+             .map(ResourceReference::getRid)
+             .map(id -> new AffectedId(id, !isLightOff(id)))
+             .forEach(affectedIds::add);
         String groupedLightId = getAndAssertGroupExists(scene.getGroup()).getGroupedLightId();
-        resourceIds.add(groupedLightId);
-        return resourceIds;
+        affectedIds.add(new AffectedId(groupedLightId, !isGroupOff(groupedLightId)));
+        return affectedIds;
     }
 
     private static boolean isOn(SceneAction action) {
@@ -319,22 +380,40 @@ public final class HueApiImpl implements HueApi {
     }
 
     @Override
+    public List<ScheduledLightState> getSceneLightStates(String groupedLightId, String sceneName) {
+        Group group = getAndAssertGroupExists(groupedLightId);
+        return getUniqueScene(group, sceneName).getActions()
+                                               .stream()
+                                               .map(this::createScheduledLightState)
+                                               .toList();
+    }
+
+    @Override
     public synchronized void createOrUpdateScene(String groupedLightId, String sceneSyncName, List<PutCall> putCalls) {
-        Light groupedLight = getAndAssertGroupedLightExists(groupedLightId);
-        Group group = getAndAssertGroupExists(groupedLight.getOwner());
-        Scene existingScene = getScene(group, sceneSyncName);
+        createOrUpdateSceneInternal(groupedLightId, null, sceneSyncName, putCalls);
+    }
+
+    private String createOrUpdateSceneInternal(String groupedLightId, String appdata, String sceneSyncName,
+                                               List<PutCall> putCalls) {
+        Group group = getAndAssertGroupExists(groupedLightId);
+        Scene existingScene = getScene(group, appdata, sceneSyncName);
         List<SceneAction> actions = createSceneActions(group, putCalls);
+        String sceneId;
         if (existingScene == null) {
-            Scene newScene = new Scene(sceneSyncName, group.toResourceReference(), actions);
-            String sceneId = createScene(newScene);
+            Scene newScene = new Scene(sceneSyncName, appdata, group.toResourceReference(), actions);
+            sceneId = createScene(newScene);
             log.trace("Created scene id={}", sceneId);
             newScene.setId(sceneId);
             getAvailableScenes().put(sceneId, newScene); // prepopulate cache
         } else if (actionsDiffer(existingScene, actions)) {
-            Scene updatedScene = new Scene(actions);
+            Scene updatedScene = getUpdatedScene(sceneSyncName, appdata, actions);
             updateScene(existingScene, updatedScene);
             log.trace("Updated scene id={}", existingScene.getId());
+            sceneId = existingScene.getId();
+        } else {
+            sceneId = existingScene.getId();
         }
+        return sceneId;
     }
 
     private List<SceneAction> createSceneActions(Group group, List<PutCall> putCalls) {
@@ -342,12 +421,9 @@ public final class HueApiImpl implements HueApi {
                                                   .collect(Collectors.toMap(PutCall::getId, Function.identity()));
         return getContainedLights(group)
                 .stream()
-                .map(resource -> createSceneAction(putCallMap.getOrDefault(resource.getRid(), getDefaultPutCall(resource)), resource))
+                .map(resource -> createSceneAction(putCallMap.getOrDefault(resource.getRid(),
+                        PutCall.builder().on(false).build()), resource))
                 .toList();
-    }
-
-    private static PutCall getDefaultPutCall(ResourceReference resource) {
-        return PutCall.builder().id(resource.getRid()).on(false).build();
     }
 
     private SceneAction createSceneAction(PutCall putCall, ResourceReference resource) {
@@ -365,10 +441,15 @@ public final class HueApiImpl implements HueApi {
             putCallBuilder.ct(null);
         }
         if (!capabilities.isColorSupported() && !capabilities.isCtSupported()) {
-            putCallBuilder.x(null).y(null).hue(null).sat(null);
+            putCallBuilder.x(null).y(null);
         }
+        Effect effect = putCall.getEffect();
+        if (effect != null && !capabilities.isEffectSupported(effect.effect())) {
+            putCallBuilder.effect(null);
+        }
+        putCallBuilder.gamut(capabilities.getColorGamut());
         PutCall updatedPutCall = putCallBuilder.build();
-        if (!capabilities.isColorSupported() && capabilities.isCtSupported()) {
+        if (!capabilities.isColorSupported() && capabilities.isCtSupported()) { // .isCtSupported() redundant, but clearer
             ColorModeConverter.convertIfNeeded(updatedPutCall, ColorMode.CT);
         }
         if (updatedPutCall.getCt() != null) {
@@ -393,20 +474,26 @@ public final class HueApiImpl implements HueApi {
         if (on != null) {
             actionBuilder.on(new On(on));
         }
-        if (putCall.hasNonDefaultTransitionTime()) {
+        if (hasNonDefaultTransitionTime(putCall.getTransitionTime())) {
             actionBuilder.dynamics(new Action.Dynamics(putCall.getTransitionTime() * 100));
         }
         if (on == Boolean.FALSE) {
             return actionBuilder.build(); // no further properties needed
         }
-        if (putCall.getColorMode() == ColorMode.HS) {
-            ColorModeConverter.convertIfNeeded(putCall, ColorMode.XY);
-        }
         if (putCall.getColorMode() == ColorMode.CT) {
             actionBuilder.color_temperature(new ColorTemperature(putCall.getCt()));
         }
         if (putCall.getColorMode() == ColorMode.XY) {
-            actionBuilder.color(new Color(new XY(putCall.getX(), putCall.getY())));
+            XYColorGamutCorrection correction = new XYColorGamutCorrection(putCall.getX(), putCall.getY(), putCall.getGamut());
+            actionBuilder.color(new Color(new XY(correction.getX(), correction.getY())));
+        }
+        if (putCall.getColorMode() == ColorMode.GRADIENT) {
+            Gradient gradient = putCall.getGradient();
+            List<Action.GradientPoint> points = gradient.points()
+                                                        .stream()
+                                                        .map(HueApiImpl::createGradientPoint)
+                                                        .toList();
+            actionBuilder.gradient(new Action.Gradient(points, gradient.mode()));
         }
         if (putCall.getBri() != null) {
             double dimming = BigDecimal.valueOf(putCall.getBri())
@@ -415,24 +502,56 @@ public final class HueApiImpl implements HueApi {
                                        .doubleValue();
             actionBuilder.dimming(new Dimming(dimming));
         }
-        String effect = getEffectWithNoneConverted(putCall);
+        Effect effect = getEffectWithNoneConverted(putCall);
         if (effect != null) {
-            actionBuilder.effects(new Action.Effects(effect));
+            Action.Effects effects = getEffectsAction(effect);
+            actionBuilder.effects_v2(effects);
             actionBuilder.color_temperature(null);
             actionBuilder.color(null);
         }
         return actionBuilder.build();
     }
 
-    private static String getEffectWithNoneConverted(PutCall putCall) {
-        String effect = putCall.getEffect();
+    private boolean hasNonDefaultTransitionTime(Integer transitionTime) {
+        return transitionTime != null && transitionTime != 4;
+    }
+
+    private static Effect getEffectWithNoneConverted(PutCall putCall) {
+        Effect effect = putCall.getEffect();
         if (effect == null) {
             return null;
         }
-        if ("none".equals(effect)) {
-            return "no_effect";
+        if (effect.isNone()) {
+            return effect.toBuilder()
+                         .effect("no_effect")
+                         .build();
         }
         return effect;
+    }
+
+    private static Action.Effects getEffectsAction(Effect effect) {
+        Action.EffectsParameters parameters = getEffectsParameters(effect);
+        Action.EffectsAction action = new Action.EffectsAction(effect.effect(), parameters);
+        return new Action.Effects(action);
+    }
+
+    private static Action.EffectsParameters getEffectsParameters(Effect effect) {
+        if (effect.hasNoParameters()) {
+            return null;
+        }
+        Action.EffectsParameters parameters = new Action.EffectsParameters();
+        if (effect.y() != null) {
+            parameters.setColor(new Color(new XY(effect.x(), effect.y())));
+        }
+        if (effect.ct() != null) {
+            parameters.setColor_temperature(new ColorTemperature(effect.ct()));
+        }
+        parameters.setSpeed(effect.speed());
+        return parameters;
+    }
+
+    private static Action.GradientPoint createGradientPoint(Pair<Double, Double> pair) {
+        return new Action.GradientPoint(new Color(new XY(pair.first(), pair.second())));
     }
 
     private static boolean actionsDiffer(Scene scene, List<SceneAction> actions) {
@@ -472,6 +591,70 @@ public final class HueApiImpl implements HueApi {
         resourceProvider.putResource(createUrl("/scene/" + scene.getId()), getBody(updatedScene));
     }
 
+    private ScheduledLightState createScheduledLightState(SceneAction sceneAction) {
+        ScheduledLightState.ScheduledLightStateBuilder state = ScheduledLightState.builder();
+        String id = sceneAction.getTarget().getRid();
+        state.id(id);
+        state.gamut(getLightCapabilities(id).getColorGamut());
+        Action action = sceneAction.getAction();
+        if (action.getOn() != null) {
+            // don't set on=true, as lights are per default on when recalling a scene
+            if (!action.getOn().isOn()) {
+                state.on(false);
+            }
+        }
+        if (action.getDimming() != null) {
+            int bri = BigDecimal.valueOf(action.getDimming().getBrightness())
+                                .multiply(BigDecimal.valueOf(254))
+                                .divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP)
+                                .intValue();
+            state.bri(bri);
+        }
+        if (action.getColor_temperature() != null) {
+            state.ct(action.getColor_temperature().getMirek());
+        }
+        if (action.getColor() != null) {
+            XY xy = action.getColor().getXy();
+            state.x(xy.getX());
+            state.y(xy.getY());
+        }
+        if (action.getEffects_v2() != null) {
+            Action.EffectsAction effectsAction = action.getEffects_v2().getAction();
+            String effect = effectsAction.getEffect();
+            state.effect(getEffectState(effect, effectsAction.getParameters()));
+        }
+        if (action.getGradient() != null) {
+            Action.Gradient gradient = action.getGradient();
+            List<Pair<Double, Double>> points = gradient.getPoints()
+                                                        .stream()
+                                                        .map(point ->
+                                                                Pair.of(point.getColor().getXy().getX(),
+                                                                        point.getColor().getXy().getY()))
+                                                        .toList();
+            state.gradient(new Gradient(points, gradient.getMode()));
+        }
+        // todo: transition time?
+        return state.build();
+    }
+
+    private static Effect getEffectState(String effect, Action.EffectsParameters parameters) {
+        Effect.EffectBuilder effectBuilder = Effect.builder().effect(effect);
+        if (parameters != null) {
+            Color color = parameters.getColor();
+            if (color != null) {
+                XY xy = color.getXy();
+                effectBuilder.x(xy.getX());
+                effectBuilder.y(xy.getY());
+            }
+            ColorTemperature colorTemperature = parameters.getColor_temperature();
+            if (colorTemperature != null) {
+                effectBuilder.ct(colorTemperature.getMirek());
+            }
+            effectBuilder.speed(parameters.getSpeed());
+        }
+        return effectBuilder.build();
+    }
+
     private List<String> getContainedLightIds(Group group) {
         return getContainedLights(group).stream()
                                         .map(ResourceReference::getRid)
@@ -499,6 +682,11 @@ public final class HueApiImpl implements HueApi {
             throw new LightNotFoundException("Light with id '" + lightId + "' was not found!");
         }
         return light;
+    }
+
+    private Group getAndAssertGroupExists(String groupedLightId) {
+        Light groupedLight = getAndAssertGroupedLightExists(groupedLightId);
+        return getAndAssertGroupExists(groupedLight.getOwner());
     }
 
     private Light getAndAssertGroupedLightExists(String groupedLightId) {
@@ -533,12 +721,50 @@ public final class HueApiImpl implements HueApi {
         return group;
     }
 
-    private Scene getScene(Group group, String name) {
+    private Scene getScene(Group group, String appdata, String sceneSyncName) {
+        if (appdata != null) {
+            return findScenesByGroupAndAppdata(group, appdata)
+                    .stream()
+                    .findFirst()
+                    .orElse(null);
+        } else {
+            return findScenesByGroupAndName(group, sceneSyncName)
+                    .stream()
+                    .findFirst()
+                    .orElse(null);
+        }
+    }
+
+    private static Scene getUpdatedScene(String sceneSyncName, String appdata, List<SceneAction> actions) {
+        if (appdata == null) {
+            return new Scene(actions);
+        }
+        return new Scene(sceneSyncName, appdata, actions);
+    }
+
+    private Scene getUniqueScene(Group group, String name) {
+        List<Scene> scenes = findScenesByGroupAndName(group, name);
+        if (scenes.size() > 1) {
+            throw new NonUniqueNameException("Multiple scenes with name '" + name + "' found for group '" + group.getName() + "'");
+        }
+        if (scenes.isEmpty()) {
+            throw new SceneNotFoundException("No scene with name '" + name + "' found for group '" + group.getName() + "'");
+        }
+        return scenes.getFirst();
+    }
+
+    private List<Scene> findScenesByGroupAndName(Group group, String name) {
         return getAvailableScenes().values()
                                    .stream()
                                    .filter(scene -> scene.isPartOf(group) && name.equals(scene.metadata.name))
-                                   .findFirst()
-                                   .orElse(null);
+                                   .toList();
+    }
+
+    private List<Scene> findScenesByGroupAndAppdata(Group group, String appdata) {
+        return getAvailableScenes().values()
+                                   .stream()
+                                   .filter(scene -> scene.isPartOf(group) && appdata.equals(scene.metadata.appdata))
+                                   .toList();
     }
 
     private Map<String, Light> getAvailableLights() {
@@ -641,7 +867,7 @@ public final class HueApiImpl implements HueApi {
                                                                  .filter(c -> c.getColorGamut() != null)
                                                                  .collect(Collectors.toMap(LightCapabilities::getColorGamutType,
                                                                          LightCapabilities::getColorGamut,
-                                                                         (gamut1, gamut2) -> gamut1));
+                                                                         (gamut1, _) -> gamut1));
         return colorGamutMap.getOrDefault("C", colorGamutMap.getOrDefault("B", colorGamutMap.getOrDefault("A", null)));
     }
 
@@ -650,6 +876,7 @@ public final class HueApiImpl implements HueApi {
                 .stream()
                 .map(LightCapabilities::getCapabilities)
                 .flatMap(Collection::stream)
+                .filter(capability -> capability != Capability.GRADIENT)
                 .collect(Collectors.toSet()));
     }
 
@@ -734,6 +961,18 @@ public final class HueApiImpl implements HueApi {
 
     private void invalidate(AsyncLoadingCache<String, ?> availableLightsCache) {
         availableLightsCache.synchronous().invalidateAll();
+    }
+
+    public void migrateSyncedScenes(String oldSceneName, String newSceneName) {
+        List<Scene> oldScenes = getAvailableScenes().values()
+                                                    .stream()
+                                                    .filter(scene -> oldSceneName.equals(scene.metadata.name))
+                                                    .toList();
+        for (Scene oldScene : oldScenes) {
+            Scene updatedScene = new Scene(newSceneName);
+            updateScene(oldScene, updatedScene);
+            log.trace("Migrated old synced scene id={}", oldScene.getId());
+        }
     }
 
     private interface DataListContainer<T> {

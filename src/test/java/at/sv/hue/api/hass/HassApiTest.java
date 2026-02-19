@@ -1,6 +1,8 @@
 package at.sv.hue.api.hass;
 
 import at.sv.hue.ColorMode;
+import at.sv.hue.Effect;
+import at.sv.hue.api.AffectedId;
 import at.sv.hue.api.ApiFailure;
 import at.sv.hue.api.BridgeAuthenticationFailure;
 import at.sv.hue.api.BridgeConnectionFailure;
@@ -13,6 +15,7 @@ import at.sv.hue.api.Identifier;
 import at.sv.hue.api.LightCapabilities;
 import at.sv.hue.api.LightNotFoundException;
 import at.sv.hue.api.LightState;
+import at.sv.hue.api.NonUniqueNameException;
 import at.sv.hue.api.PutCall;
 import at.sv.hue.api.hass.area.HassAreaRegistry;
 import org.intellij.lang.annotations.Language;
@@ -342,7 +345,7 @@ public class HassApiTest {
                       0.6024,
                       0.3433
                     ],
-                    "effect": "None",
+                    "effect": "off",
                     "mode": "normal",
                     "dynamics": "none",
                     "friendly_name": "Schreibtisch R",
@@ -372,7 +375,7 @@ public class HassApiTest {
                                                    .on(true)
                                                    .x(0.6024)
                                                    .y(0.3433)
-                                                   .effect("none")
+                                                   .effect("none") // "off" treated as "none"
                                                    .colormode(ColorMode.XY)
                                                    .brightness(127)
                                                    .lightCapabilities(lightCapabilities)
@@ -489,7 +492,7 @@ public class HassApiTest {
                                 0.524,
                                 0.387
                             ],
-                            "effect": "None",
+                            "effect": "Candle",
                             "mode": "normal",
                             "dynamics": "none",
                             "friendly_name": "CT Only",
@@ -512,7 +515,7 @@ public class HassApiTest {
                                                    .colorTemperature(366)
                                                    .x(0.524)
                                                    .y(0.387)
-                                                   .effect("none")
+                                                   .effect("candle")
                                                    .colormode(ColorMode.CT)
                                                    .brightness(233) // converted to hue range
                                                    .lightCapabilities(LightCapabilities.builder()
@@ -1727,7 +1730,9 @@ public class HassApiTest {
                                                               .ctMin(153)
                                                               .ctMax(500)
                                                               .effects(List.of("candle", "fire"))
-                                                              .capabilities(EnumSet.allOf(Capability.class))
+                                                              .capabilities(EnumSet.of(Capability.COLOR,
+                                                                      Capability.BRIGHTNESS, Capability.ON_OFF,
+                                                                      Capability.COLOR_TEMPERATURE))
                                                               .build())
                           .build(),
                 LightState.builder()
@@ -1743,7 +1748,9 @@ public class HassApiTest {
                                                               .ctMin(153)
                                                               .ctMax(500)
                                                               .effects(List.of("candle", "fire"))
-                                                              .capabilities(EnumSet.allOf(Capability.class))
+                                                              .capabilities(EnumSet.of(Capability.COLOR,
+                                                                      Capability.BRIGHTNESS, Capability.ON_OFF,
+                                                                      Capability.COLOR_TEMPERATURE))
                                                               .build())
                           .build()
         );
@@ -2134,7 +2141,7 @@ public class HassApiTest {
         createOrUpdateScene(groupId, sceneName, List.of(putCall));
 
         verify(http).postResource(eq(sceneSyncUrl), argThat(body ->
-                body.contains("\"scene_id\":\"movie_time__living_room\"")
+                body.contains("\"scene_id\":\"movietime__living_room\"")
         ));
     }
 
@@ -2399,8 +2406,24 @@ public class HassApiTest {
                     }
                   },
                   {
-                    "entity_id": "light.3",
+                    "entity_id": "light.2",
                     "state": "on",
+                    "attributes": {
+                      "friendly_name": "Light 2",
+                      "supported_features": 40
+                    },
+                    "last_changed": "2024-06-28T07:15:30.790775+00:00",
+                    "last_reported": "2024-06-28T07:15:32.442080+00:00",
+                    "last_updated": "2024-06-28T07:15:32.442080+00:00",
+                    "context": {
+                      "id": "01J1EV61YTBP7RKF3H66D2XD7W",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  },
+                  {
+                    "entity_id": "light.3",
+                    "state": "off",
                     "attributes": {
                       "friendly_name": "Light 3",
                       "supported_features": 40
@@ -2418,8 +2441,12 @@ public class HassApiTest {
                 """);
 
         assertThat(api.getAffectedIdsByScene("scene.unknown")).isEmpty();
-        assertThat(api.getAffectedIdsByScene("scene.test_scene")).containsExactly("light.1", "light.2");
-        assertThat(api.getAffectedIdsByScene("scene.hue_scene")).containsExactly("light.wohnzimmer", "light.1", "light.3");
+        assertThat(api.getAffectedIdsByScene("scene.test_scene"))
+                .extracting(AffectedId::id, AffectedId::alreadyOn)
+                .containsExactly(tuple("light.1", true), tuple("light.2", true));
+        assertThat(api.getAffectedIdsByScene("scene.hue_scene"))
+                .extracting(AffectedId::id, AffectedId::alreadyOn)
+                .containsExactly(tuple("light.wohnzimmer", true), tuple("light.1", true), tuple("light.3", false));
         assertThat(api.getAffectedIdsByScene("scene.hue_scene_broken1")).isEmpty();
         assertThat(api.getAffectedIdsByScene("scene.hue_scene_broken2")).isEmpty();
 
@@ -2518,6 +2545,38 @@ public class HassApiTest {
     }
 
     @Test
+    void putGroupState_noDifference() {
+        api.putGroupState(PutCall.builder()
+                                 .on(true)
+                                 .id("light.id")
+                                 .bri(38)
+                                 .ct(153)
+                                 .transitionTime(5).build());
+
+        verify(http).postResource(getUrl("/services/light/turn_on"),
+                "{\"entity_id\":\"light.id\",\"brightness\":37,\"color_temp\":153,\"transition\":0.5}");
+    }
+
+    @Test
+    void putSceneState_sendsEachRequestSeparately() {
+        api.putSceneState("1",
+                List.of(PutCall.builder()
+                               .on(true)
+                               .id("light.id1")
+                               .bri(38)
+                               .build(),
+                        PutCall.builder()
+                               .id("light.id2")
+                               .bri(38)
+                               .build()));
+
+        verify(http).postResource(getUrl("/services/light/turn_on"),
+                "{\"entity_id\":\"light.id1\",\"brightness\":37}");
+        verify(http).postResource(getUrl("/services/light/turn_on"),
+                "{\"entity_id\":\"light.id2\",\"brightness\":37}");
+    }
+
+    @Test
     void putState_supportsOtherOrigin() {
         setupApi("https://123456789.ui.nabu.casa");
 
@@ -2541,6 +2600,18 @@ public class HassApiTest {
 
         verify(http).postResource(getUrl("/services/light/turn_on"),
                 "{\"entity_id\":\"light.id\",\"brightness\":255,\"xy_color\":[0.354,0.546]}");
+    }
+
+    @Test
+    void putState_turnOn_xy_performsGamutCorrection() {
+        putState(PutCall.builder()
+                        .id("light.id")
+                        .bri(254)
+                        .x(0.8)
+                        .y(0.2));
+
+        verify(http).postResource(getUrl("/services/light/turn_on"),
+                "{\"entity_id\":\"light.id\",\"brightness\":255,\"xy_color\":[0.6915,0.3083]}");
     }
 
     @Test
@@ -2570,73 +2641,21 @@ public class HassApiTest {
         putState(PutCall.builder()
                         .id("light.id")
                         .bri(1)
-                        .effect("prism"));
+                        .effect(Effect.builder().effect("prism").build()));
 
         verify(http).postResource(getUrl("/services/light/turn_on"),
                 "{\"entity_id\":\"light.id\",\"brightness\":1,\"effect\":\"prism\"}");
     }
 
     @Test
-    void putState_turnOn_hs_hueLargerThan360_color() {
-        api.putState(PutCall.builder()
-                            .id("light.id")
-                            .bri(254)
-                            .hue(10000)
-                            .sat(50)
-                            .build());
+    void putState_turnOn_effect_none_treatedAsOff() {
+        putState(PutCall.builder()
+                        .id("light.id")
+                        .bri(1)
+                        .effect(Effect.builder().effect("none").build()));
 
         verify(http).postResource(getUrl("/services/light/turn_on"),
-                "{\"entity_id\":\"light.id\",\"brightness\":255,\"hs_color\":[54,19]}");
-    }
-
-    @Test
-    void putState_turnOn_hs_maxValues_color() {
-        api.putState(PutCall.builder()
-                            .id("light.id")
-                            .bri(254)
-                            .hue(65535)
-                            .sat(254)
-                            .build());
-
-        verify(http).postResource(getUrl("/services/light/turn_on"),
-                "{\"entity_id\":\"light.id\",\"brightness\":255,\"hs_color\":[360,100]}");
-    }
-
-    @Test
-    void putState_turnOn_hs_minValues_color() {
-        api.putState(PutCall.builder()
-                            .id("light.id")
-                            .bri(254)
-                            .hue(0)
-                            .sat(0)
-                            .build());
-
-        verify(http).postResource(getUrl("/services/light/turn_on"),
-                "{\"entity_id\":\"light.id\",\"brightness\":255,\"hs_color\":[0,0]}");
-    }
-
-    @Test
-    void putState_turnOn_hs_onlyHueValue_unsupported_ignored() {
-        api.putState(PutCall.builder()
-                            .id("light.id")
-                            .bri(254)
-                            .hue(65535)
-                            .build());
-
-        verify(http).postResource(getUrl("/services/light/turn_on"),
-                "{\"entity_id\":\"light.id\",\"brightness\":255}");
-    }
-
-    @Test
-    void putState_turnOn_hs_onlySatValue_unsupported_ignored() {
-        api.putState(PutCall.builder()
-                            .id("light.id")
-                            .bri(254)
-                            .sat(254)
-                            .build());
-
-        verify(http).postResource(getUrl("/services/light/turn_on"),
-                "{\"entity_id\":\"light.id\",\"brightness\":255}");
+                "{\"entity_id\":\"light.id\",\"brightness\":1,\"effect\":\"off\"}");
     }
 
     @Test
@@ -2708,8 +2727,8 @@ public class HassApiTest {
 
     @Test
     void isLightOff_isOn_false() {
-        setGetResponse("/states/light.on_off", """
-                {
+        setGetResponse("/states", """
+                [{
                   "entity_id": "light.on_off",
                   "state": "on",
                   "attributes": {
@@ -2727,7 +2746,7 @@ public class HassApiTest {
                     "parent_id": null,
                     "user_id": null
                   }
-                }""");
+                }]""");
 
 
         assertThat(api.isLightOff("light.on_off")).isFalse();
@@ -2736,8 +2755,8 @@ public class HassApiTest {
 
     @Test
     void isLightOff_off_true() {
-        setGetResponse("/states/light.on_off", """
-                {
+        setGetResponse("/states", """
+                [{
                   "entity_id": "light.on_off",
                   "state": "off",
                   "attributes": {
@@ -2755,7 +2774,7 @@ public class HassApiTest {
                     "parent_id": null,
                     "user_id": null
                   }
-                }""");
+                }]""");
 
 
         assertThat(api.isLightOff("light.on_off")).isTrue();
@@ -2764,8 +2783,8 @@ public class HassApiTest {
 
     @Test
     void isLightOff_unavailable_true() {
-        setGetResponse("/states/light.on_off", """
-                {
+        setGetResponse("/states", """
+                [{
                   "entity_id": "light.on_off",
                   "state": "unavailable",
                   "attributes": {
@@ -2783,7 +2802,7 @@ public class HassApiTest {
                     "parent_id": null,
                     "user_id": null
                   }
-                }""");
+                }]""");
 
 
         assertThat(api.isLightOff("light.on_off")).isTrue();
