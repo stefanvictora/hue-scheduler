@@ -33,7 +33,7 @@ final class RateLimiterImpl implements RateLimiter {
     private static final Logger LOG = LoggerFactory.getLogger(RateLimiterImpl.class);
     private static final long ONE_SECOND_IN_NANOS = Duration.ofSeconds(1).toNanos();
 
-    private final double permitsPerSecond;
+    private final double maxStoredPermits;
     private final Supplier<Long> nanoTime;
     private final Consumer<Long> sleep;
     private final double stableIntervalNanos;
@@ -42,8 +42,8 @@ final class RateLimiterImpl implements RateLimiter {
     private long nextFreeTicketNanos = 0L;
     private double storedPermits;
 
-    RateLimiterImpl(double permitsPerSecond, Supplier<Long> nanoTime, Consumer<Long> sleep) {
-        this.permitsPerSecond = permitsPerSecond;
+    RateLimiterImpl(double permitsPerSecond, double maxStoredPermits, Supplier<Long> nanoTime, Consumer<Long> sleep) {
+        this.maxStoredPermits = maxStoredPermits;
         this.nanoTime = nanoTime;
         this.sleep = sleep;
         storedPermits = 0.0;
@@ -55,7 +55,7 @@ final class RateLimiterImpl implements RateLimiter {
         long nowNanos = nanoTime.get();
         if (nowNanos > nextFreeTicketNanos) {
             double newPermits = (nowNanos - nextFreeTicketNanos) / stableIntervalNanos;
-            storedPermits = min(permitsPerSecond, storedPermits + newPermits);
+            storedPermits = min(maxStoredPermits, storedPermits + newPermits);
             nextFreeTicketNanos = nowNanos;
         }
     }

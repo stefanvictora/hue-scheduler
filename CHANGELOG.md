@@ -1,3 +1,11 @@
+## [0.14.3] - 2026-02-19
+
+### Added
+- **`--max-concurrent-requests`**: New CLI option to configure the maximum number of concurrent in-flight HTTP requests (default: `2`) (#46)
+
+### Fixed
+- **Rate Limiter**: Reduced burst capacity after idle periods to prevent request spikes (e.g., when morning schedules fire) (#46)
+
 ## [0.14.2] - 2026-02-12
 
 ### Fixed

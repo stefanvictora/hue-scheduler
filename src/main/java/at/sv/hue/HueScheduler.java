@@ -60,7 +60,7 @@ import java.util.stream.Stream;
 
 import static at.sv.hue.InputConfigurationParser.parseBrightnessPercentValue;
 
-@Command(name = "HueScheduler", version = "0.14.2", mixinStandardHelpOptions = true, sortOptions = false)
+@Command(name = "HueScheduler", version = "0.14.3", mixinStandardHelpOptions = true, sortOptions = false)
 public final class HueScheduler implements Runnable {
 
     private static final Logger LOG = LoggerFactory.getLogger(HueScheduler.class);
@@ -104,6 +104,11 @@ public final class HueScheduler implements Runnable {
             description = "The maximum number of PUT API requests to perform per second. Default and recommended: " +
                           "${DEFAULT-VALUE} requests per second.")
     double requestsPerSecond;
+    @Option(names = "--max-concurrent-requests", paramLabel = "<requests>",
+            defaultValue = "${env:MAX_CONCURRENT_REQUESTS:-2}",
+            description = "The maximum number of concurrent in-flight HTTP requests. " +
+                          "Limits parallel TLS handshakes and connections to the bridge. Default: ${DEFAULT-VALUE}")
+    int maxConcurrentRequests;
     @Option(names = "--control-group-lights-individually",
             defaultValue = "${env:CONTROL_GROUP_LIGHTS_INDIVIDUALLY:-false}",
             description = "Experimental: If the lights in a group should be controlled individually instead of using broadcast messages." +
@@ -357,7 +362,7 @@ public final class HueScheduler implements Runnable {
         HassAreaRegistry areaRegistry = new HassAreaRegistryImpl(
                 new HassWebSocketClientImpl(websocketOrigin, accessToken, httpClient, 5));
         HassAvailabilityListener availabilityListener = new HassAvailabilityListener(this::clearCachesAndReSyncScenes);
-        api = new HassApiImpl(apiHost, new HttpResourceProviderImpl(httpClient), areaRegistry, availabilityListener, rateLimiter);
+        api = new HassApiImpl(apiHost, new HttpResourceProviderImpl(httpClient, maxConcurrentRequests), areaRegistry, availabilityListener, rateLimiter);
         lightEventListener = createLightEventListener();
         sceneEventListener = new SceneEventListenerImpl(api, Ticker.systemTicker(),
                 sceneActivationIgnoreWindowInSeconds,
@@ -371,7 +376,7 @@ public final class HueScheduler implements Runnable {
         supportsOffLightUpdates = true;
         OkHttpClient httpsClient = createHueHttpsClient();
         RateLimiter rateLimiter = RateLimiter.create(requestsPerSecond);
-        api = new HueApiImpl(new HttpResourceProviderImpl(httpsClient), apiHost, rateLimiter, apiCacheInvalidationIntervalInMinutes);
+        api = new HueApiImpl(new HttpResourceProviderImpl(httpsClient, maxConcurrentRequests), apiHost, rateLimiter, apiCacheInvalidationIntervalInMinutes);
         lightEventListener = createLightEventListener();
         sceneEventListener = new SceneEventListenerImpl(api, Ticker.systemTicker(),
                 sceneActivationIgnoreWindowInSeconds, sceneSyncName::equals, lightEventListener);
@@ -428,6 +433,9 @@ public final class HueScheduler implements Runnable {
     private void assertRateLimitingConfiguration() {
         if (requestsPerSecond <= 0) {
             fail("--max-requests-per-second must be > 0");
+        }
+        if (maxConcurrentRequests <= 0) {
+            fail("--max-concurrent-requests must be > 0");
         }
     }
 
@@ -850,7 +858,7 @@ public final class HueScheduler implements Runnable {
 
     private boolean justTurnedOnBySyncedScene(ScheduledStateSnapshot state) {
         return wasJustPowerTransition(state) && sceneEventListener.wasRecentlyAffectedBySyncedScene(state.getId())
-                && manualOverrideTracker.wasTurnedOnBySyncedScene(state.getId());
+               && manualOverrideTracker.wasTurnedOnBySyncedScene(state.getId());
     }
 
     private boolean justTurnedOnThroughNormalScene(ScheduledStateSnapshot state) {
