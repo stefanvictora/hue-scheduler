@@ -74,7 +74,12 @@ public class HttpResourceProviderImpl implements HttpResourceProvider {
     }
 
     private String performCall(Request request) {
-        semaphore.acquireUninterruptibly();
+        try {
+            semaphore.acquire();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new BridgeConnectionFailure("Interrupted while waiting for permit", e);
+        }
         try (Response response = callHttpClient(request)) {
             assertSuccessful(response);
             return getBody(response);
