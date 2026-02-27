@@ -3910,6 +3910,29 @@ class HueSchedulerTest extends AbstractHueSchedulerTest {
     }
 
     @Test
+    void parse_gradient_rgb_twoPoints_autoFillTrue_maxPointsTwo_keepsTwoPoints() {
+        autoFillGradient = true;
+        create();
+        mockLightCapabilities(1, LightCapabilities.builder()
+                                                  .maxGradientPoints(2)
+                                                  .capabilities(EnumSet.of(Capability.GRADIENT)));
+        addStateNow("1", "gradient:[xy(0.2 0.2),xy(0.3 0.3)]");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
+                expectedPutCall(ID).gradient(Gradient.builder()
+                                                     .points(List.of(
+                                                             Pair.of(0.2, 0.2),
+                                                             Pair.of(0.3, 0.3)
+                                                     ))
+                                                     .build())
+        );
+
+        ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
     void parse_gradient_rgbAndHex_twoPoints_canHandleSpaces() {
         addKnownLightIdsWithDefaultCapabilities(1);
         addStateNow("1", "gradient:[ #5eba7d, rgb(150 90 77) ]");

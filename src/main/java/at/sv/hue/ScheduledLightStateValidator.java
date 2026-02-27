@@ -243,11 +243,11 @@ public final class ScheduledLightStateValidator {
     }
 
     private boolean shouldNotAutoFill(Gradient gradient) {
-        return !autoFillGradient || gradient.points().size() != 2;
+        return !autoFillGradient || gradient.points().size() != 2 || capabilities.getMaxGradientPoints() < 3;
     }
 
     private List<Pair<Double, Double>> autoFillPerceptualTwoPoint(Pair<Double, Double> start, Pair<Double, Double> end) {
-        int maxGradientPoints = Math.max(3, capabilities.getMaxGradientPoints());
+        int maxGradientPoints = capabilities.getMaxGradientPoints();
         List<Pair<Double, Double>> points = new ArrayList<>(maxGradientPoints);
         points.add(start);
         for (int i = 1; i < maxGradientPoints - 1; i++) {
