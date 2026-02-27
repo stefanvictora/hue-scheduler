@@ -638,6 +638,9 @@ public final class HueApiImpl implements HueApi {
     }
 
     private static Effect getEffectState(String effect, Action.EffectsParameters parameters) {
+        if ("no_effect".equals(effect)) {
+            return Effect.builder().effect("none").build();
+        }
         Effect.EffectBuilder effectBuilder = Effect.builder().effect(effect);
         if (parameters != null) {
             Color color = parameters.getColor();

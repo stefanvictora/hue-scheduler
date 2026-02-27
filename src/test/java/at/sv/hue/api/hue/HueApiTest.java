@@ -2483,6 +2483,156 @@ class HueApiTest {
     }
 
     @Test
+    void getSceneLightStates_mapsNoEffectToNoneIgnoresParameters() {
+        setGetResponse("/grouped_light", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "GROUPED_LIGHT_1",
+                      "owner": {
+                        "rid": "ZONE_ID",
+                        "rtype": "zone"
+                      },
+                      "type": "grouped_light"
+                    }
+                  ]
+                }""");
+        setGetResponse("/zone", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "ZONE_ID",
+                      "children": [
+                        {
+                          "rid": "LIGHT_1",
+                          "rtype": "light"
+                        }
+                      ],
+                      "services": [
+                        {
+                          "rid": "GROUPED_LIGHT_1",
+                          "rtype": "grouped_light"
+                        }
+                      ],
+                      "metadata": {
+                        "name": "Couch",
+                        "archetype": "lounge"
+                      },
+                      "type": "zone"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/scene", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "SCENE_1",
+                      "actions": [
+                        {
+                          "target": {
+                            "rid": "LIGHT_1",
+                            "rtype": "light"
+                          },
+                          "action": {
+                            "effects_v2": {
+                              "action": {
+                                "effect": "no_effect",
+                                "parameters": {
+                                  "speed": 0.25
+                                }
+                              }
+                            }
+                          }
+                        }
+                      ],
+                      "metadata": {
+                        "name": "Scene_1"
+                      },
+                      "group": {
+                        "rid": "ZONE_ID",
+                        "rtype": "zone"
+                      },
+                      "status": {
+                        "active": "inactive"
+                      },
+                      "type": "scene"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/light", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "LIGHT_1",
+                      "owner": {
+                        "rid": "a5fdefc3-8471-43fd-b5ee-642a6561696f",
+                        "rtype": "device"
+                      },
+                      "metadata": {
+                        "name": "Light 1",
+                        "archetype": "hue_lightstrip",
+                        "function": "mixed"
+                      },
+                      "on": {
+                        "on": false
+                      },
+                      "dimming": {
+                        "brightness": 100.0,
+                        "min_dim_level": 0.01
+                      },
+                      "color_temperature": {
+                        "mirek": 199,
+                        "mirek_valid": true,
+                        "mirek_schema": {
+                          "mirek_minimum": 153,
+                          "mirek_maximum": 500
+                        }
+                      },
+                      "color": {
+                        "xy": {
+                          "x": 0.3448,
+                          "y": 0.3553
+                        },
+                        "gamut": {
+                          "red": {
+                            "x": 0.6915,
+                            "y": 0.3083
+                          },
+                          "green": {
+                            "x": 0.17,
+                            "y": 0.7
+                          },
+                          "blue": {
+                            "x": 0.1532,
+                            "y": 0.0475
+                          }
+                        },
+                        "gamut_type": "C"
+                      },
+                      "mode": "normal",
+                      "type": "light"
+                    }
+                  ]
+                }
+                """);
+
+        assertSceneLightStates("GROUPED_LIGHT_1", "Scene_1",
+                ScheduledLightState.builder()
+                                   .id("LIGHT_1")
+                                   .gamut(GAMUT_C)
+                                   .effect(Effect.builder()
+                                                 .effect("none")
+                                                 .build())
+        );
+    }
+
+    @Test
     void getSceneLightStates_duplicateSceneNameForGroup_exception() {
         setGetResponse("/grouped_light", """
                 {
