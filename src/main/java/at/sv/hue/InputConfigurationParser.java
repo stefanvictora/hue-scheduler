@@ -329,21 +329,28 @@ public final class InputConfigurationParser {
     }
 
     private static Integer parseInteger(String value, String parameter) {
-        return parseValueWithErrorHandling(value.trim(), parameter, "integer", Integer::valueOf);
+        return parseValueWithErrorHandling(trimIfNotNull(value), parameter, "integer", Integer::valueOf);
     }
 
     private static Double parseDouble(String value, String parameter) {
-        return parseValueWithErrorHandling(value, parameter, "double", Double::parseDouble);
+        return parseValueWithErrorHandling(trimIfNotNull(value), parameter, "double", Double::parseDouble);
     }
 
     private static Boolean parseBoolean(String value, String parameter) {
-        if ("true".equalsIgnoreCase(value)) {
+        if ("true".equalsIgnoreCase(trimIfNotNull(value))) {
             return Boolean.TRUE;
         }
-        if ("false".equalsIgnoreCase(value)) {
+        if ("false".equalsIgnoreCase(trimIfNotNull(value))) {
             return Boolean.FALSE;
         }
         throw new InvalidPropertyValue("Invalid boolean '" + value + "' for property '" + parameter + "'.");
+    }
+
+    private static String trimIfNotNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        return value.trim();
     }
 
     private static <T> T parseValueWithErrorHandling(String value, String parameter, String type, Function<String, T> function) {

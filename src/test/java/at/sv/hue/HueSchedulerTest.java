@@ -289,7 +289,6 @@ class HueSchedulerTest extends AbstractHueSchedulerTest {
     }
 
 
-
     @Test
     void parse_canParseTransitionTime_withTimeUnits() {
         addKnownLightIdsWithDefaultCapabilities(1);
@@ -4819,6 +4818,17 @@ class HueSchedulerTest extends AbstractHueSchedulerTest {
         mockLightCapabilities(1, LightCapabilities.builder().capabilities(EnumSet.of(Capability.ON_OFF)));
 
         addStateNow(1, "on:true");
+
+        startScheduler();
+
+        ensureScheduledStates(1);
+    }
+
+    @Test
+    void parse_on_withLeadingSpace_forOnOffLight() {
+        mockLightCapabilities(1, LightCapabilities.builder().capabilities(EnumSet.of(Capability.ON_OFF)));
+
+        addStateNow(1, "on: true");
 
         startScheduler();
 
