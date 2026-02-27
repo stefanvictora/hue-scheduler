@@ -223,7 +223,7 @@ public final class ScheduledLightStateValidator {
     }
 
     private void assertNoOtherColorPropertiesThanGradient() {
-        if (ct != null || x != null || effectValue != null) { // y is not checked, because x and y must be set together
+        if (ct != null || x != null || isEffectState()) { // y is not checked, because x and y must be set together
             throw new InvalidPropertyValue("When setting a gradient, no other color properties (ct, x, y, effect) are allowed.");
         }
     }

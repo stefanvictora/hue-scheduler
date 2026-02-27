@@ -3745,6 +3745,17 @@ class HueSchedulerTest extends AbstractHueSchedulerTest {
     }
 
     @Test
+    void parse_gradient_withEffectNone_allowed() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+
+        addStateNow("1", "effect:none", "gradient:[rgb(94 186 125),rgb(200 100 50)]");
+
+        startScheduler();
+
+        ensureScheduledStates(1);
+    }
+
+    @Test
     void parse_gradient_withXY_exception() {
         addKnownLightIdsWithDefaultCapabilities(1);
 
