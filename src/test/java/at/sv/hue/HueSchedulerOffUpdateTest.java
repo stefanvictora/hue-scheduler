@@ -830,4 +830,104 @@ public class HueSchedulerOffUpdateTest extends AbstractHueSchedulerTest {
 
         ensureRunnable(initialNow.plusDays(1).plusHours(1), initialNow.plusDays(2)); // next day
     }
+
+    @Test
+    void offEvent_afterSchedulerSendsOnFalse_withInterpolation_doesNotRescheduleWaitingStates() {
+        enableSupportForOffLightUpdates();
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now, "bri:100");
+        addState(1, now.plusMinutes(10), "on:false", "interpolate:true");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1)),
+                expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
+        );
+
+        advanceCurrentTime(Duration.ofMinutes(5));
+
+        runAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).bri(50), // interpolated
+                expectedPutCall(1).on(false).transitionTime(tr("5min"))
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusMinutes(6), initialNow.plusDays(1)), // first change for background interpolation
+                expectedRunnable(initialNow.plusDays(1), initialNow.plusDays(2)) // next day
+        );
+        
+        // Bridge immediately reports light as off after scheduler sent on:false.
+        // The off-event should not trigger rescheduling of the power-transition copy.
+        simulateLightOffEvent("/lights/1");
+    }
+
+    @Test
+    void offEvent_afterSchedulerSendsOnFalse_withInterpolation_powerTransitionStillFiresOnSubsequentOnEvent() {
+        enableSupportForOffLightUpdates();
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now, "bri:100");
+        addState(1, now.plusMinutes(10), "on:false", "interpolate:true");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1)),
+                expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
+        );
+
+        advanceCurrentTime(Duration.ofMinutes(5));
+
+        runAndAssertPutCalls(scheduledRunnables.getFirst(),
+                expectedPutCall(1).bri(50), // interpolated
+                expectedPutCall(1).on(false).transitionTime(tr("5min"))
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusMinutes(6), initialNow.plusDays(1)), // first change for background interpolation
+                expectedRunnable(initialNow.plusDays(1), initialNow.plusDays(2)) // next day
+        );
+
+        // Off-event suppressed because scheduler initiated the off
+        simulateLightOffEvent("/lights/1");
+
+        ensureScheduledStates();
+
+        // User turns light back on — power-transition copy should still fire
+        advanceCurrentTime(Duration.ofMinutes(1)); // now at +6min
+
+        ScheduledRunnable powerTransition = simulateLightOnEvent("/lights/1",
+                expectedPowerOnEnd(initialNow.plusMinutes(10)) // interpolation end
+        ).getFirst();
+
+        advanceTimeAndRunAndAssertPutCalls(powerTransition,
+                expectedPutCall(1).bri(40), // 6/10 progress → bri interpolated to 40
+                expectedPutCall(1).on(false).transitionTime(tr("4min"))
+        );
+    }
+
+    @Test
+    void offEvent_afterSchedulerSendsGroupOnFalse_withInterpolation_doesNotRescheduleWaitingStates() {
+        enableSupportForOffLightUpdates();
+        mockGroupLightsForId(1, 1, 2);
+        mockDefaultGroupCapabilities(1);
+        addState("g1", "00:00", "bri:100");
+        addState("g1", "00:10", "on:false", "interpolate:true");
+
+        List<ScheduledRunnable> scheduledRunnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1)),
+                expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
+        );
+
+        advanceCurrentTime(Duration.ofMinutes(5));
+
+        runAndAssertGroupPutCalls(scheduledRunnables.getFirst(),
+                expectedGroupPutCall(1).bri(50), // interpolated
+                expectedGroupPutCall(1).on(false).transitionTime(tr("5min"))
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusMinutes(6), initialNow.plusDays(1)), // background interpolation
+                expectedRunnable(initialNow.plusDays(1), initialNow.plusDays(2)) // next day
+        );
+
+        // Bridge reports group off — should be suppressed because scheduler initiated it
+        simulateLightOffEvent("/groups/1");
+    }
 }

@@ -995,6 +995,7 @@ public final class HueScheduler implements Runnable {
         if (wasJustPowerTransition(state) && isOff(state) && !state.isForced()) {
             putCalls.resetOn();
         }
+        markSchedulerInitiatedOffIfNeeded(putCalls);
         state.recordLastPutCalls(putCalls);
         // todo: are we sure that we always have at least one element here?
         if (putCalls.isGroupUpdate()) {
@@ -1015,6 +1016,12 @@ public final class HueScheduler implements Runnable {
             }
         } else {
             api.putState(putCalls.getFirst());
+        }
+    }
+
+    private void markSchedulerInitiatedOffIfNeeded(PutCalls putCalls) {
+        if (putCalls.isOff()) {
+            lightEventListener.markSchedulerInitiatedOff(putCalls.getFirst().getId());
         }
     }
 

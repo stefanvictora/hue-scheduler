@@ -77,6 +77,14 @@ public final class PutCalls {
         return groupUpdate && putCalls.size() == 1;
     }
 
+    /**
+     * @return true if the light or the whole group is turned off. False otherwise.
+     */
+    public boolean isOff() {
+        PutCall first = putCalls.getFirst();
+        return first.isOff() && (!groupUpdate || isGeneralGroup());
+    }
+
     public boolean hasSameLightStates(PutCalls other) {
         return allMatch(other, PutCall::hasSameLightState);
     }
