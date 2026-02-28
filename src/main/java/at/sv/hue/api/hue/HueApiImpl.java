@@ -316,10 +316,12 @@ public final class HueApiImpl implements HueApi {
 
     private List<AffectedId> getAffectedIdsByScene(Scene scene) {
         List<AffectedId> affectedIds = new ArrayList<>();
+        Map<String, Light> currentLights = getAvailableLights();
         scene.getActions().stream()
              .filter(HueApiImpl::isOn)
              .map(SceneAction::getTarget)
              .map(ResourceReference::getRid)
+             .filter(currentLights::containsKey)
              .map(id -> new AffectedId(id, !isLightOff(id)))
              .forEach(affectedIds::add);
         String groupedLightId = getAndAssertGroupExists(scene.getGroup()).getGroupedLightId();

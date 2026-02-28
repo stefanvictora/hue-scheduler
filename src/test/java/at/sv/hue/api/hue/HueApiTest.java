@@ -1913,6 +1913,140 @@ class HueApiTest {
     }
 
     @Test
+    void getAffectedIdsByScene_sceneReferencingMissingLight_skipsItWithoutException() {
+        setGetResponse("/grouped_light", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "GROUPED_LIGHT_ID_ROOM",
+                      "id_v1": "/groups/1",
+                      "owner": {
+                        "rid": "ROOM_ID",
+                        "rtype": "room"
+                      },
+                      "on": {
+                        "on": true
+                      },
+                      "type": "grouped_light"
+                    }
+                  ]
+                }""");
+        setGetResponse("/room", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "ROOM_ID",
+                      "id_v1": "/groups/1",
+                      "children": [
+                        {
+                          "rid": "DEVICE_ID_1",
+                          "rtype": "device"
+                        }
+                      ],
+                      "services": [
+                        {
+                          "rid": "GROUPED_LIGHT_ID_ROOM",
+                          "rtype": "grouped_light"
+                        }
+                      ],
+                      "metadata": {
+                        "name": "Wohnzimmer",
+                        "archetype": "living_room"
+                      },
+                      "type": "room"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/zone", EMPTY_RESPONSE);
+        setGetResponse("/scene", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "SCENE_WITH_MISSING_LIGHT",
+                      "actions": [
+                        {
+                          "target": {
+                            "rid": "LIGHT_ID_1",
+                            "rtype": "light"
+                          },
+                          "action": {
+                            "on": {
+                              "on": true
+                            },
+                            "dimming": {
+                              "brightness": 100.0
+                            }
+                          }
+                        },
+                        {
+                          "target": {
+                            "rid": "MISSING_LIGHT_ID",
+                            "rtype": "light"
+                          },
+                          "action": {
+                            "on": {
+                              "on": true
+                            },
+                            "dimming": {
+                              "brightness": 50.0
+                            }
+                          }
+                        }
+                      ],
+                      "metadata": {
+                        "name": "Scene_Missing"
+                      },
+                      "group": {
+                        "rid": "ROOM_ID",
+                        "rtype": "room"
+                      },
+                      "status": {
+                        "active": "inactive"
+                      },
+                      "type": "scene"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/light", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "LIGHT_ID_1",
+                      "owner": {
+                        "rid": "DEVICE_ID_1",
+                        "rtype": "device"
+                      },
+                      "metadata": {
+                        "name": "Light 1",
+                        "archetype": "hue_lightstrip",
+                        "function": "mixed"
+                      },
+                      "on": {
+                        "on": true
+                      },
+                      "dimming": {
+                        "brightness": 100.0,
+                        "min_dim_level": 0.01
+                      },
+                      "type": "light"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/device", EMPTY_RESPONSE);
+
+        assertThat(api.getAffectedIdsByScene("SCENE_WITH_MISSING_LIGHT"))
+                .extracting(AffectedId::id, AffectedId::alreadyOn)
+                .containsExactly(tuple("LIGHT_ID_1", true), tuple("GROUPED_LIGHT_ID_ROOM", true));
+    }
+
+    @Test
     void getSceneLightStates_includesGamut() {
         setGetResponse("/grouped_light", """
                 {
