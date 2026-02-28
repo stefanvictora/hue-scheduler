@@ -167,14 +167,15 @@ public final class InputConfigurationParser {
                                            .build();
                         break;
                     case "effect":
+                        value = value.trim();
                         if (value.contains("@")) {
                             String[] split = value.split("@");
                             if (split.length != 2) {
                                 throw new InvalidPropertyValue("Invalid effect value '" + value +
                                                                "'. Expected format: <effect>@<speed>");
                             }
-                            effectValue = split[0];
-                            effectSpeed = parseDouble(split[1], parameter);
+                            effectValue = split[0].trim();
+                            effectSpeed = parseDouble(split[1].trim(), parameter);
                         } else {
                             effectValue = value;
                         }
@@ -189,7 +190,7 @@ public final class InputConfigurationParser {
                         interpolate = parseBoolean(value, parameter);
                         break;
                     case "scene":
-                        scene = value;
+                        scene = value.trim();
                         break;
                     default:
                         throw new UnknownStateProperty("Unknown state property '" + parameter + "' with value '" + value + "'");

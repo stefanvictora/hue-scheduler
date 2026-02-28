@@ -4110,6 +4110,39 @@ class HueSchedulerTest extends AbstractHueSchedulerTest {
     }
 
     @Test
+    void parse_canHandleEffect_withWhitespace_trims() {
+        mockDefaultLightCapabilities(1);
+        addStateNow(1, "effect: candle ");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
+                expectedPutCall(1).effect(Effect.builder()
+                                                .effect("candle")
+                                                .build())
+        );
+
+        ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
+    void parse_canHandleEffect_withSpeed_withWhitespace_trims() {
+        mockDefaultLightCapabilities(1);
+        addStateNow(1, "effect: candle @ 0.5 ");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
+                expectedPutCall(1).effect(Effect.builder()
+                                                .effect("candle")
+                                                .speed(0.5)
+                                                .build())
+        );
+
+        ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
     void parse_canHandleEffect_withSpeed_tooBig() {
         mockDefaultLightCapabilities(1);
 

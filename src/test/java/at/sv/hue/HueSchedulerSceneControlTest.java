@@ -2213,4 +2213,33 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
         );
     }
+
+    @Test
+    void sceneControl_init_whitespace_trims() {
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        mockSceneLightStates(1, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100)
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(50)
+                                   .ct(40));
+        addState("g1", now, "scene: TestScene ");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+                expectedPutCall(4).bri(100).ct(20),
+                expectedPutCall(5).bri(50).ct(40)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
+        );
+    }
 }
