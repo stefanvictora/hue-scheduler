@@ -1167,7 +1167,7 @@ public final class HueScheduler implements Runnable {
                 boolean differs = lastSeenLightState.lightStateDiffers(lightState);
                 if (differs) {
                     LOG.trace("\t- Actual:   {}", formatLightState(lightState));
-//                    LOG.trace("\t  Expected: {}", formatLastPutCall(lastSeenLightState.getLastPutCall()));
+                    logExpectedPutCallsForLight(lightState.getId(), lastSeenLightState);
                 }
             } else {
                 boolean allGroupStatesDiffer = allSeenGroupStatesDiffer(lightState);
@@ -1178,17 +1178,28 @@ public final class HueScheduler implements Runnable {
                        .map(stateRegistry::getLastSeenState)
                        .filter(Objects::nonNull)
                        .forEach(lastSeenGroupState -> {
-//                           LOG.trace("\t  Expected: {}", formatLastPutCall(lastSeenGroupState.getLastPutCall()));
+                           logExpectedPutCallsForLight(lightState.getId(), lastSeenGroupState);
                        });
                 }
             }
         });
     }
 
+    private void logExpectedPutCallsForLight(String lightId, ScheduledState lastSeenState) {
+        PutCall putCall;
+        PutCalls lastPutCalls = lastSeenState.getLastPutCalls();
+        if (lastPutCalls.isGeneralGroup()) {
+            putCall = lastPutCalls.getFirst();
+        } else {
+            putCall = lastPutCalls.get(lightId);
+        }
+        LOG.trace("\t  Expected: {}", formatLastPutCall(putCall, true));
+    }
+
     private void logLightOverridden(ScheduledStateSnapshot state, LightState lightState, ScheduledState lastSeenState) {
         LOG.trace("Override detected for light {}.", state.getId());
         LOG.trace("\tActual:   {}", formatLightState(lightState));
-//        LOG.trace("\tExpected: {}", formatLastPutCall(lastSeenState.getLastPutCall()));
+        LOG.trace("\tExpected: {}", formatLastPutCall(lastSeenState.getLastPutCalls().getFirst(), false));
     }
 
     private String formatLightState(LightState lightState) {
@@ -1205,12 +1216,12 @@ public final class HueScheduler implements Runnable {
         return "{" + String.join(", ", properties) + "}";
     }
 
-    private String formatLastPutCall(PutCall putCall) {
+    private String formatLastPutCall(PutCall putCall, boolean includeId) {
         if (putCall == null) return "null";
 
         List<String> properties = new ArrayList<>();
 
-        properties.add("id=" + putCall.getId());
+        if (includeId) properties.add("id=" + putCall.getId());
         if (putCall.getOn() != null) properties.add("on=" + putCall.getOn());
         if (putCall.getBri() != null) properties.add("bri=" + putCall.getBri());
         if (putCall.getCt() != null) properties.add("ct=" + putCall.getCt());
