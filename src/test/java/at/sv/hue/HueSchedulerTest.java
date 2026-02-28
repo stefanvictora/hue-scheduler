@@ -4936,6 +4936,18 @@ class HueSchedulerTest extends AbstractHueSchedulerTest {
     }
 
     @Test
+    void parse_invalidPropertyValue_hex_exception() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        assertThrows(InvalidPropertyValue.class, () -> addStateNow("1", "color:#ZZZZZZ"));
+    }
+
+    @Test
+    void parse_invalidPropertyValue_oklch_exception() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        assertThrows(InvalidPropertyValue.class, () -> addStateNow("1", "color:oklch(INVALID)"));
+    }
+
+    @Test
     void run_execution_reachable_startsAgainNextDay_repeats() {
         ScheduledRunnable scheduledRunnable = startWithDefaultState();
 

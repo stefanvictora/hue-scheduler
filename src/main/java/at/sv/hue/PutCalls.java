@@ -56,7 +56,7 @@ public final class PutCalls {
     }
 
     public PutCall getFirst() {
-        return toList().getFirst();
+        return stream().findFirst().orElseThrow();
     }
 
     public PutCall get(String id) {

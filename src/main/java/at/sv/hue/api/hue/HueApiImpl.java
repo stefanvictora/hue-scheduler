@@ -66,6 +66,7 @@ public final class HueApiImpl implements HueApi {
     private static final String CACHE_KEY_ZONES = "allZones";
     private static final String CACHE_KEY_ROOMS = "allRooms";
     private static final String CACHE_KEY_ZIGBEE_CONNECTIVITY = "allZigbeeConnectivity";
+    private static final int DEFAULT_HUE_TRANSITION_TIME = 4; // 400ms in 100ms units
 
     private final HttpResourceProvider resourceProvider;
     private final ObjectMapper mapper;
@@ -513,7 +514,7 @@ public final class HueApiImpl implements HueApi {
     }
 
     private boolean hasNonDefaultTransitionTime(Integer transitionTime) {
-        return transitionTime != null && transitionTime != 4;
+        return transitionTime != null && transitionTime != DEFAULT_HUE_TRANSITION_TIME;
     }
 
     private static Effect getEffectWithNoneConverted(PutCall putCall) {

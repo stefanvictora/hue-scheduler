@@ -240,8 +240,12 @@ public final class InputConfigurationParser {
             var b = parseInteger(rgb[2], "color");
             return convertToXY(r, g, b, capabilities);
         } else if (v.startsWith("#")) {
-            Color color = Color.decode(v);
-            return convertToXY(color.getRed(), color.getGreen(), color.getBlue(), capabilities);
+            try {
+                Color color = Color.decode(v);
+                return convertToXY(color.getRed(), color.getGreen(), color.getBlue(), capabilities);
+            } catch (Exception e) {
+                throw new InvalidPropertyValue("Invalid hex color value '" + v + "': " + e.getMessage());
+            }
         } else if (v.startsWith("xy(") && v.endsWith(")")) {
             String xyString = v.substring(3, v.length() - 1).trim();
             String[] xy = xyString.split(" ");
@@ -252,7 +256,11 @@ public final class InputConfigurationParser {
             double y = parseDouble(xy[1], "color");
             return new XYColor(x, y, null);
         } else if (v.startsWith("oklch(") && v.endsWith(")")) {
-            return OkLchParser.parseOkLch(v);
+            try {
+                return OkLchParser.parseOkLch(v);
+            } catch (Exception e) {
+                throw new InvalidPropertyValue("Invalid OKLCH color value '" + v + "': " + e.getMessage());
+            }
         } else if (v.contains(",")) { // legacy support for comma-separated rgb
             String[] rgb = v.split(",");
             if (rgb.length != 3) {
