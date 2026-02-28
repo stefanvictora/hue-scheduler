@@ -248,6 +248,7 @@ public class HassApiImpl implements HueApi {
             }
         }
         return affectedIds.stream()
+                   .filter(HassApiImpl::isSupportedStateType)
                    .map(id -> new AffectedId(id, !isLightOff(id)))
                    .toList();
     }

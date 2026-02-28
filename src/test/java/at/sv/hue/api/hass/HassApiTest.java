@@ -2456,6 +2456,72 @@ public class HassApiTest {
     }
 
     @Test
+    void getAffectedIdsByScene_sceneContainsUnsupportedEntityTypes_filtersThemOut() {
+        setGetResponse("/states", """
+                [
+                  {
+                    "entity_id": "scene.mixed_scene",
+                    "state": "2024-06-22T20:26:10.406785+00:00",
+                    "attributes": {
+                      "entity_id": [
+                        "light.1",
+                        "automation.turn_off_lights",
+                        "media_player.living_room",
+                        "light.2"
+                      ],
+                      "id": "12345",
+                      "friendly_name": "Mixed Scene"
+                    },
+                    "last_changed": "2024-06-22T20:26:48.309168+00:00",
+                    "last_reported": "2024-06-22T20:26:48.309168+00:00",
+                    "last_updated": "2024-06-22T20:26:48.309168+00:00",
+                    "context": {
+                      "id": "01J10T2K3NY0G61R0PE3K95TXZ",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  },
+                  {
+                    "entity_id": "light.1",
+                    "state": "on",
+                    "attributes": {
+                      "friendly_name": "Light 1",
+                      "supported_features": 40
+                    },
+                    "last_changed": "2024-06-28T07:15:30.790775+00:00",
+                    "last_reported": "2024-06-28T07:15:32.442080+00:00",
+                    "last_updated": "2024-06-28T07:15:32.442080+00:00",
+                    "context": {
+                      "id": "01J1EV61YTBP7RKF3H66D2XD7W",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  },
+                  {
+                    "entity_id": "light.2",
+                    "state": "off",
+                    "attributes": {
+                      "friendly_name": "Light 2",
+                      "supported_features": 40
+                    },
+                    "last_changed": "2024-06-28T07:15:30.790775+00:00",
+                    "last_reported": "2024-06-28T07:15:32.442080+00:00",
+                    "last_updated": "2024-06-28T07:15:32.442080+00:00",
+                    "context": {
+                      "id": "01J1EV61YTBP7RKF3H66D2XD7W",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  }
+                ]
+                """);
+
+        assertThat(api.getAffectedIdsByScene("scene.mixed_scene"))
+                .extracting(AffectedId::id, AffectedId::alreadyOn)
+                .containsExactly(tuple("light.1", true), tuple("light.2", false));
+    }
+
+    @Test
     void onModification_updatesStates_getSceneName_initiallyNoResult_afterwardsSceneIsFound() {
         String sceneName = "Test Scene";
         String sceneId = "scene.test_scene";
