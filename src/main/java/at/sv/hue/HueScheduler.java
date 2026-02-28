@@ -504,6 +504,9 @@ public final class HueScheduler implements Runnable {
         if (sceneActivationIgnoreWindowInSeconds < 0) {
             fail("--scene-activation-ignore-window must be >= 0");
         }
+        if (sceneUpdateSleepDelayInMs < 0) {
+            fail("--scene-update-sleep-delay must be >= 0");
+        }
     }
 
     private void fail(String msg) {
