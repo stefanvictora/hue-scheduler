@@ -8,7 +8,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 import static org.mockito.Mockito.*;
-import static org.mockito.Mockito.verify;
 
 public class HueSchedulerSceneSyncTest extends AbstractHueSchedulerTest {
 

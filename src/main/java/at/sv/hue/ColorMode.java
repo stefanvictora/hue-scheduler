@@ -13,7 +13,7 @@ public enum ColorMode {
             return NONE;
         }
         for (ColorMode colorMode : ColorMode.values()) {
-            if (colorMode.name().equals(value.toUpperCase(Locale.getDefault()))) {
+            if (colorMode.name().equals(value.toUpperCase(Locale.ROOT))) {
                 return colorMode;
             }
         }
