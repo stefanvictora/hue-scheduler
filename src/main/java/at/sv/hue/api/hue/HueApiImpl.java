@@ -239,12 +239,15 @@ public final class HueApiImpl implements HueApi {
 
     @Override
     public void putSceneState(String groupedLightId, List<PutCall> putCalls) {
-        String sceneId = createOrUpdateSceneInternal(groupedLightId, sceneControlAppData, sceneControlName,
+        SceneUpdateResult result = createOrUpdateSceneInternal(groupedLightId, sceneControlAppData, sceneControlName,
                 removeTransitionTime(putCalls));
-        sleep();
+        if (result.modified) {
+            sleep();
+        }
         Integer recallDuration = getRecallDuration(putCalls);
-        recallScene(sceneId, recallDuration);
-        log.trace("Recalled temp scene for {}. Transition time: {}", groupedLightId, recallDuration);
+        recallScene(result.sceneId, recallDuration);
+        log.trace("Recalled temp scene for {}. Modified: {}. Transition time: {}", groupedLightId, result.modified,
+                recallDuration);
     }
 
     private static List<PutCall> removeTransitionTime(List<PutCall> putCalls) {
@@ -396,27 +399,34 @@ public final class HueApiImpl implements HueApi {
         createOrUpdateSceneInternal(groupedLightId, null, sceneSyncName, putCalls);
     }
 
-    private String createOrUpdateSceneInternal(String groupedLightId, String appdata, String sceneSyncName,
-                                               List<PutCall> putCalls) {
+    private record SceneUpdateResult(String sceneId, boolean modified) {
+    }
+
+    private SceneUpdateResult createOrUpdateSceneInternal(String groupedLightId, String appdata, String sceneSyncName,
+                                                         List<PutCall> putCalls) {
         Group group = getAndAssertGroupExists(groupedLightId);
         Scene existingScene = getScene(group, appdata, sceneSyncName);
         List<SceneAction> actions = createSceneActions(group, putCalls);
         String sceneId;
+        boolean modified;
         if (existingScene == null) {
             Scene newScene = new Scene(sceneSyncName, appdata, group.toResourceReference(), actions);
             sceneId = createScene(newScene);
             log.trace("Created scene id={}", sceneId);
             newScene.setId(sceneId);
             getAvailableScenes().put(sceneId, newScene); // prepopulate cache
+            modified = true;
         } else if (actionsDiffer(existingScene, actions)) {
             Scene updatedScene = getUpdatedScene(sceneSyncName, appdata, actions);
             updateScene(existingScene, updatedScene);
             log.trace("Updated scene id={}", existingScene.getId());
             sceneId = existingScene.getId();
+            modified = true;
         } else {
             sceneId = existingScene.getId();
+            modified = false;
         }
-        return sceneId;
+        return new SceneUpdateResult(sceneId, modified);
     }
 
     private List<SceneAction> createSceneActions(Group group, List<PutCall> putCalls) {
