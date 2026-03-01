@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Function;
@@ -17,6 +18,7 @@ public class LightEventListenerImpl implements LightEventListener {
     private final Function<String, List<String>> affectedIdsByDeviceLookup;
     private final Predicate<String> wasRecentlyAffectedBySyncedScene;
     private final boolean supportsOffLightUpdates;
+    private final Set<String> schedulerInitiatedOff = ConcurrentHashMap.newKeySet();
 
     public LightEventListenerImpl(ManualOverrideTracker manualOverrideTracker,
                                   Function<String, List<String>> affectedIdsByDeviceLookup,
@@ -33,9 +35,19 @@ public class LightEventListenerImpl implements LightEventListener {
         manualOverrideTracker.onLightOff(id);
         if (supportsOffLightUpdates) {
             MDC.put("context", "off-event " + id);
-            rescheduleWaitingStates(id);
+            if (schedulerInitiatedOff.remove(id)) {
+                log.trace("Scheduler initiated off: Skip rescheduling waiting states.");
+                return;
+            } else {
+                rescheduleWaitingStates(id);
+            }
             MDC.remove("context");
         }
+    }
+
+    @Override
+    public void markSchedulerInitiatedOff(String id) {
+        schedulerInitiatedOff.add(id);
     }
 
     @Override

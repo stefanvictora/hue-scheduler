@@ -60,7 +60,7 @@ public final class HueEventHandler implements BackgroundEventHandler {
                     resourceModificationEventListener.onModification(hueEvent.getType(), hueEvent.getId(),
                             getContent(containerType, resourceNode));
                 }
-                if (hueEvent.isLightOrGroup() && hueEvent.isOffEvent()) {
+                if (hueEvent.isLightOrGroup() && hueEvent.isOffEvent()) { // todo:mutation coverage
                     lightEventListener.onLightOff(hueEvent.getId());
                 } else if (hueEvent.isLightOrGroup() && hueEvent.isOnEvent()) {
                     if (hueEvent.isPhysical()) {
@@ -108,6 +108,8 @@ public final class HueEventHandler implements BackgroundEventHandler {
         private JsonNode metadata;
         private Resource owner;
         private String type;
+
+        // todo: multiple mutation coverage problems
 
         private String getStatus() {
             if (status != null && status.isTextual()) {

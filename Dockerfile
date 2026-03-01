@@ -1,5 +1,5 @@
 # -------- Build --------
-FROM --platform=$BUILDPLATFORM maven:3.9.11-eclipse-temurin-21 AS build
+FROM --platform=$BUILDPLATFORM maven:3.9.12-eclipse-temurin-25 AS build
 WORKDIR /build
 COPY pom.xml .
 RUN --mount=type=cache,target=/root/.m2,sharing=locked mvn -B -ntp dependency:go-offline
@@ -7,7 +7,7 @@ COPY src ./src
 RUN --mount=type=cache,target=/root/.m2,sharing=locked mvn -B -ntp package
 
 # -------- Runtime --------
-FROM eclipse-temurin:21-jre-alpine AS runtime
+FROM eclipse-temurin:25-jre-alpine AS runtime
 
 # Create non-root user
 RUN addgroup -S -g 10001 app && adduser -S -u 10001 -G app app

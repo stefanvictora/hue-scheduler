@@ -8,9 +8,9 @@ import org.slf4j.MDC;
 
 import java.time.Duration;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 @Slf4j
 public final class SceneEventListenerImpl implements SceneEventListener {
@@ -42,28 +42,40 @@ public final class SceneEventListenerImpl implements SceneEventListener {
         MDC.put("context", "scene-on-event " + id);
         String sceneName = hueApi.getSceneName(id);
         MDC.put("context", "scene-on-event " + sceneName);
-        Set<String> affectedIdsByScene = getAffectedIdsForScene(id);
+        Set<AffectedId> affectedIdsByScene = getAffectedIdsForScene(id);
         if (isSyncedScene(sceneName)) {
             log.info("Synced scene activated. Re-engage scheduler.");
-            affectedIdsByScene.forEach(lightOrGroupId -> recentlyAffectedSyncedIds.put(lightOrGroupId, lightOrGroupId));
-            affectedIdsByScene.forEach(lightEventListener::onLightOn);
+            affectedIdsByScene.forEach(lightOrGroupId -> {
+                recentlyAffectedSyncedIds.put(lightOrGroupId.id(), lightOrGroupId.id());
+                recentlyAffectedIds.invalidate(lightOrGroupId.id());
+            });
+            List<String> alreadyOnIds = affectedIdsByScene.stream()
+                                                          .filter(AffectedId::alreadyOn)
+                                                          .map(AffectedId::id)
+                                                          .toList();
+            alreadyOnIds.forEach(lightEventListener::onLightOn); // only re-engage scheduler for lights that are already on; others will be handled when they are turned on
             MDC.remove("context");
             return;
         }
-        affectedIdsByScene.forEach(lightOrGroupId -> recentlyAffectedIds.put(lightOrGroupId, lightOrGroupId));
+        affectedIdsByScene.forEach(lightOrGroupId -> {
+            recentlyAffectedIds.put(lightOrGroupId.id(), lightOrGroupId.id());
+            recentlyAffectedSyncedIds.invalidate(lightOrGroupId.id());
+        });
         MDC.remove("context");
     }
 
-    private Set<String> getAffectedIdsForScene(String sceneId) {
-        Set<String> affectedIds = new HashSet<>(hueApi.getAffectedIdsByScene(sceneId));
+    private Set<AffectedId> getAffectedIdsForScene(String sceneId) {
+        Set<AffectedId> affectedIds = new HashSet<>(hueApi.getAffectedIdsByScene(sceneId));
         affectedIds.addAll(fetchAdditionalGroupsForLights(affectedIds));
         return affectedIds;
     }
 
-    private Set<String> fetchAdditionalGroupsForLights(Set<String> lightIds) {
-        return lightIds.stream()
-                       .flatMap(lightId -> hueApi.getAssignedGroups(lightId).stream())
-                       .collect(Collectors.toSet());
+    private List<AffectedId> fetchAdditionalGroupsForLights(Set<AffectedId> ids) {
+        return ids.stream()
+                  .flatMap(lightId -> hueApi.getAssignedGroups(lightId.id()).stream())
+                  .distinct()
+                  .map(groupId -> new AffectedId(groupId, !hueApi.isGroupOff(groupId)))
+                  .toList();
     }
 
     private boolean isSyncedScene(String sceneName) {

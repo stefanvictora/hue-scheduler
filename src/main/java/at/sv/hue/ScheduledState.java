@@ -1,7 +1,6 @@
 package at.sv.hue;
 
 import at.sv.hue.api.Identifier;
-import at.sv.hue.api.LightCapabilities;
 import at.sv.hue.api.LightState;
 import at.sv.hue.api.PutCall;
 import at.sv.hue.time.StartTimeProvider;
@@ -23,8 +22,6 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 
 public final class ScheduledState { // todo: a better name would be StateDefinition
-    public static final int MAX_HUE_VALUE = 65535;
-    public static final int MIDDLE_HUE_VALUE = 32768;
     /**
      * Max transition time as a multiple of 100ms. Value =  1h40min
      */
@@ -32,20 +29,13 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
     public static final int MAX_TRANSITION_TIME_MS = MAX_TRANSITION_TIME * 100;
 
     private final Identifier identifier;
+    private final List<ScheduledLightState> lightStates;
     @Getter
     private final String startString;
-    private final Integer brightness;
-    private final Integer ct;
-    private final Double x;
-    private final Double y;
-    private final Integer hue;
-    private final Integer sat;
-    private Boolean on;
     @Getter
     private final Integer definedTransitionTime;
     private final String transitionTimeBeforeString;
     private final StartTimeProvider startTimeProvider;
-    private final String effect;
     private final EnumSet<DayOfWeek> daysOfWeek;
     @Getter
     private final boolean groupState;
@@ -53,8 +43,6 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
     private final Boolean interpolate;
     @Getter
     private final boolean temporary;
-    @Getter
-    private final LightCapabilities capabilities;
     private final int minTrBeforeGapInMinutes;
     private final Cache<ZonedDateTime, ScheduledStateSnapshot> snapshotCache;
     private final int brightnessOverrideThreshold;
@@ -66,20 +54,21 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
     private ZonedDateTime lastSeen;
     private ScheduledState originalState;
     @Getter
-    private PutCall lastPutCall;
+    private PutCalls lastPutCalls;
     @Setter
     private Function<ScheduledStateSnapshot, ScheduledStateSnapshot> previousStateLookup;
     @Setter
     private BiFunction<ScheduledStateSnapshot, ZonedDateTime, ScheduledStateSnapshot> nextStateLookup;
 
     @Builder
-    public ScheduledState(Identifier identifier, String startString, Integer brightness, Integer ct, Double x, Double y,
-                          Integer hue, Integer sat, String effect, Boolean on, String transitionTimeBeforeString, Integer definedTransitionTime,
-                          Set<DayOfWeek> daysOfWeek, StartTimeProvider startTimeProvider, LightCapabilities capabilities,
+    public ScheduledState(Identifier identifier, String startString, List<ScheduledLightState> lightStates,
+                          String transitionTimeBeforeString, Integer definedTransitionTime, Set<DayOfWeek> daysOfWeek,
+                          StartTimeProvider startTimeProvider,
                           int minTrBeforeGapInMinutes, int brightnessOverrideThreshold, int colorTemperatureOverrideThresholdKelvin,
                           double colorOverrideThreshold, Boolean force, Boolean interpolate, boolean groupState, boolean temporary) {
         this.identifier = identifier;
         this.startString = startString;
+        this.lightStates = lightStates;
         this.interpolate = interpolate;
         if (daysOfWeek == null || daysOfWeek.isEmpty()) {
             this.daysOfWeek = EnumSet.allOf(DayOfWeek.class);
@@ -87,16 +76,6 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
             this.daysOfWeek = EnumSet.copyOf(daysOfWeek);
         }
         this.groupState = groupState;
-        this.capabilities = capabilities;
-        this.effect = assertValidEffectValue(effect);
-        this.brightness = assertValidBrightnessValue(brightness);
-        this.ct = assertCtSupportAndValue(ct);
-        this.x = assertValidXAndY(x);
-        this.y = assertValidXAndY(y);
-        this.hue = assertValidHueValue(hue);
-        this.sat = assertValidSaturationValue(sat);
-        assertValidHueAndSat();
-        this.on = on;
         this.definedTransitionTime = assertValidTransitionTime(definedTransitionTime);
         this.transitionTimeBeforeString = transitionTimeBeforeString;
         this.startTimeProvider = startTimeProvider;
@@ -110,7 +89,6 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
         triggeredByPowerTransition = false;
         previousStateLookup = (state) -> null;
         nextStateLookup = (state, dateTime) -> null;
-        assertColorCapabilities();
         snapshotCache = Caffeine.newBuilder()
                                 .expireAfterWrite(Duration.ofDays(3))
                                 .build();
@@ -122,9 +100,8 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
 
     private static ScheduledState createTemporaryCopy(ScheduledState state, String start) {
         ScheduledState copy = new ScheduledState(state.identifier, start,
-                state.brightness, state.ct, state.x, state.y, state.hue, state.sat, state.effect, state.on,
-                state.transitionTimeBeforeString, state.definedTransitionTime, state.daysOfWeek, state.startTimeProvider,
-                state.capabilities, state.minTrBeforeGapInMinutes, state.brightnessOverrideThreshold, state.colorTemperatureOverrideThresholdKelvin,
+                copyLightStates(state.lightStates), state.transitionTimeBeforeString, state.definedTransitionTime, state.daysOfWeek, state.startTimeProvider,
+                state.minTrBeforeGapInMinutes, state.brightnessOverrideThreshold, state.colorTemperatureOverrideThresholdKelvin,
                 state.colorOverrideThreshold, state.force, state.interpolate, state.groupState, true);
         copy.lastSeen = state.lastSeen;
         copy.originalState = state.originalState;
@@ -133,94 +110,10 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
         return copy;
     }
 
-    private String assertValidEffectValue(String effect) {
-        if (effect == null) {
-            return null;
-        }
-        if (groupState) {
-            throw new InvalidPropertyValue("Effects are not supported by groups.");
-        }
-        List<String> supportedEffects = capabilities.getEffects();
-        if (supportedEffects == null) {
-            throw new InvalidPropertyValue("Light does not support any effects.");
-        }
-        if (effect.equals("none")) {
-            return effect;
-        }
-        if (!supportedEffects.contains(effect)) {
-            throw new InvalidPropertyValue("Unsupported value for effect property: '" + effect + "'." +
-                                           " Supported effects: " + supportedEffects);
-        }
-        return effect;
-    }
-
-    private Integer assertValidBrightnessValue(Integer brightness) {
-        if (brightness == null) {
-            return null;
-        }
-        assertBrightnessSupported();
-        if (brightness > 254 || brightness < 1) {
-            throw new InvalidBrightnessValue("Invalid brightness value '" + brightness + "'. Allowed integer range: 1-254");
-        }
-        return brightness;
-    }
-
-    private void assertBrightnessSupported() {
-        if (!capabilities.isBrightnessSupported()) {
-            throw new BrightnessNotSupported(getFormattedName() + "' does not support setting brightness! "
-                                             + "Capabilities: " + capabilities.getCapabilities());
-        }
-    }
-
-    private Integer assertCtSupportAndValue(Integer ct) {
-        if (ct == null) {
-            return null;
-        }
-        assertCtSupported();
-        if (capabilities.getCtMax() == null || capabilities.getCtMin() == null) {
-            return ct;
-        }
-        if (ct > capabilities.getCtMax()) {
-            return capabilities.getCtMax();
-        }
-        if (ct < capabilities.getCtMin()) {
-            return capabilities.getCtMin();
-        }
-        return ct;
-    }
-
-    private void assertCtSupported() {
-        if (!capabilities.isCtSupported()) {
-            throw new ColorTemperatureNotSupported(getFormattedName() + "' does not support setting color temperature! "
-                                                   + "Capabilities: " + capabilities.getCapabilities());
-        }
-    }
-
-    private Double assertValidXAndY(Double xOrY) {
-        if (xOrY != null && (xOrY > 1 || xOrY < 0)) {
-            throw new InvalidXAndYValue("Invalid x or y value '" + xOrY + "'. Allowed double range: 0-1");
-        }
-        return xOrY;
-    }
-
-    private Integer assertValidHueValue(Integer hue) {
-        if (hue != null && (hue > MAX_HUE_VALUE || hue < 0)) {
-            throw new InvalidHueValue("Invalid hue value '" + hue + "'. Allowed integer range: 0-65535");
-        }
-        return hue;
-    }
-
-    private Integer assertValidSaturationValue(Integer sat) {
-        if (sat != null && (sat > 254 || sat < 0)) {
-            throw new InvalidSaturationValue("Invalid saturation value '" + sat + "'. Allowed integer range: 0-254");
-        }
-        return sat;
-    }
-
-    private void assertValidHueAndSat() {
-        if (hue != null && sat == null || hue == null && sat != null) {
-            throw new InvalidPropertyValue("Hue and sat can only occur at the same time.");
-        }
+    private static List<ScheduledLightState> copyLightStates(List<ScheduledLightState> lightStates) {
+        return lightStates.stream()
+                          .map(lightState -> lightState.toBuilder().build())
+                          .toList();
     }
 
     private Integer assertValidTransitionTime(Integer transitionTime) {
@@ -228,17 +121,6 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
             throw new InvalidTransitionTime("Invalid transition time '" + transitionTime + "'. Allowed integer range: 0-" + MAX_TRANSITION_TIME);
         }
         return transitionTime;
-    }
-
-    private void assertColorCapabilities() {
-        if (isColorState() && !capabilities.isColorSupported()) {
-            throw new ColorNotSupported(getFormattedName() + "' does not support setting color! "
-                                        + "Capabilities: " + capabilities.getCapabilities());
-        }
-    }
-
-    private boolean isColorState() {
-        return x != null || y != null || hue != null || sat != null;
     }
 
     public boolean hasTransitionBefore() {
@@ -336,27 +218,29 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
     }
 
     public boolean isNullState() {
-        return on == null && hasNoOtherPropertiesThanOn();
-    }
-
-    private boolean hasNoOtherPropertiesThanOn() {
-        return brightness == null && ct == null && x == null && y == null && hue == null && sat == null && effect == null;
+        return lightStates.stream().allMatch(ScheduledLightState::isNullState);
     }
 
     public boolean hasOtherPropertiesThanOn() {
-        return !hasNoOtherPropertiesThanOn();
+        return lightStates.stream().anyMatch(ScheduledLightState::hasOtherPropertiesThanOn);
     }
 
     public boolean isOff() {
-        return on == Boolean.FALSE;
+        return lightStates.stream().allMatch(ScheduledLightState::isOff);
     }
 
     public boolean isOn() {
-        return on == Boolean.TRUE;
+        return lightStates.stream().anyMatch(ScheduledLightState::isOn);
     }
 
     public boolean lightStateDiffers(LightState currentState) {
-        return new LightStateComparator(lastPutCall, currentState, brightnessOverrideThreshold,
+        PutCall putCall;
+        if (lastPutCalls.isGeneralGroup() || !lastPutCalls.isGroupUpdate()) {
+            putCall = lastPutCalls.getFirst();
+        } else {
+            putCall = lastPutCalls.get(currentState.getId());
+        }
+        return new LightStateComparator(putCall, currentState, brightnessOverrideThreshold,
                 colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold).lightStateDiffers();
     }
 
@@ -367,10 +251,10 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
         }
     }
 
-    public void setLastPutCall(PutCall lastPutCall) {
-        this.lastPutCall = lastPutCall;
+    public void setLastPutCalls(PutCalls lastPutCalls) {
+        this.lastPutCalls = lastPutCalls;
         if (originalState != this) {
-            originalState.setLastPutCall(lastPutCall);
+            originalState.setLastPutCalls(lastPutCalls);
         }
     }
 
@@ -382,19 +266,25 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
         return force == Boolean.TRUE;
     }
 
-    public PutCall getPutCall(ZonedDateTime now, ZonedDateTime definedStart) {
-        return PutCall.builder().id(identifier.id())
-                      .bri(brightness)
-                      .ct(ct)
-                      .x(x)
-                      .y(y)
-                      .hue(hue)
-                      .sat(sat)
-                      .on(on)
-                      .effect(effect)
-                      .transitionTime(now != null && definedStart != null ? getTransitionTime(now, definedStart) : null)
-                      .groupState(groupState)
-                      .gamut(capabilities != null ? capabilities.getColorGamut() : null)
+    public PutCalls getPutCalls(ZonedDateTime now, ZonedDateTime definedStart) {
+        Integer transitionTime = now != null && definedStart != null ? getTransitionTime(now, definedStart) : null;
+        List<PutCall> putCallList = lightStates.stream()
+                                               .map(this::getPutCall)
+                                               .toList();
+        return new PutCalls(identifier.id(), putCallList, transitionTime, groupState);
+    }
+
+    private PutCall getPutCall(ScheduledLightState lightState) {
+        return PutCall.builder()
+                      .id(lightState.getId())
+                      .bri(lightState.getBri())
+                      .ct(lightState.getCt())
+                      .x(lightState.getX())
+                      .y(lightState.getY())
+                      .on(lightState.getOn())
+                      .effect(lightState.getEffect())
+                      .gradient(lightState.getGradient())
+                      .gamut(lightState.getGamut())
                       .build();
     }
 
@@ -402,11 +292,8 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
         return identifier.id();
     }
 
-    public void setTriggeredByPowerTransition(boolean triggeredByPowerTransition) {
-        this.triggeredByPowerTransition = triggeredByPowerTransition;
-        if (force != Boolean.TRUE) {
-            on = null;
-        }
+    public void setTriggeredByPowerTransition() {
+        this.triggeredByPowerTransition = true;
     }
 
     @Override
@@ -418,14 +305,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
         return "id=" + identifier.id() +
                (temporary && !triggeredByPowerTransition ? ", temporary" : "") +
                (triggeredByPowerTransition ? ", power-transition-state" : "") +
-               getFormattedPropertyIfSet("on", on) +
-               getFormattedBriIfSet() +
-               getFormattedCtIfSet() +
-               getFormattedPropertyIfSet("x", x) +
-               getFormattedPropertyIfSet("y", y) +
-               getFormattedPropertyIfSet("hue", hue) +
-               getFormattedPropertyIfSet("sat", sat) +
-               getFormattedPropertyIfSet("effect", effect) +
+               formatPropertyName("states") + lightStates.toString() +
                getFormattedDaysOfWeek() +
                getFormattedPropertyIfSet("tr-before", transitionTimeBeforeString) +
                getFormattedTransitionTimeIfSet("tr", definedTransitionTime) +
@@ -457,17 +337,6 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
 
     private String formatPropertyName(String name) {
         return ", " + name + "=";
-    }
-
-    private String getFormattedBriIfSet() {
-        if (brightness == null) return "";
-        return formatPropertyName("bri") + brightness + " (" + FormatUtil.formatBrightnessPercent(brightness) + "%)";
-    }
-
-    private String getFormattedCtIfSet() {
-        if (ct == null) return "";
-        long kelvin = Math.round(1_000_000.0 / ct);
-        return formatPropertyName("ct") + ct + " (" + kelvin + "K)";
     }
 
     private String getFormattedDaysOfWeek() {

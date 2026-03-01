@@ -45,7 +45,7 @@ public class HassWebSocketClientImpl implements HassWebSocketClient {
         this.client = client;
         this.requestTimeoutSeconds = requestTimeoutSeconds;
         this.mapper = new ObjectMapper();
-        this.mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+        this.mapper.setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL);
     }
 
     @Override
@@ -136,7 +136,7 @@ public class HassWebSocketClientImpl implements HassWebSocketClient {
                 if (authFuture != null && !authFuture.isDone()) {
                     authFuture.completeExceptionally(t);
                 }
-                pendingRequests.forEach((id, future) -> future.completeExceptionally(t));
+                pendingRequests.forEach((_, future) -> future.completeExceptionally(t));
                 pendingRequests.clear();
             }
         }

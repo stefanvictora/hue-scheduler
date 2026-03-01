@@ -6,8 +6,13 @@ import at.sv.hue.api.PutCall;
 import at.sv.hue.color.ColorComparator;
 import lombok.RequiredArgsConstructor;
 
+import java.util.List;
+import java.util.Objects;
+
 @RequiredArgsConstructor
 public class LightStateComparator {
+
+    private static final String DEFAULT_GRADIENT_MODE = "interpolated_palette";
 
     private final PutCall lastPutCall;
     private final LightState currentState;
@@ -44,29 +49,61 @@ public class LightStateComparator {
         if (colorModeNotSupportedByState(colorMode)) {
             return false;
         }
-        if (incompatibleColorMode(colorMode)) {
+        if (colorModeDiffers(colorMode)) {
             return true;
         }
         return switch (colorMode) {
             case CT -> ctDiffers();
-            case HS -> ColorComparator.colorDiffers(currentState.getX(), currentState.getY(),
-                    lastPutCall.getHue(), lastPutCall.getSat(), colorOverrideThreshold);
             case XY -> ColorComparator.colorDiffers(currentState.getX(), currentState.getY(),
                     lastPutCall.getX(), lastPutCall.getY(), currentState.getLightCapabilities().getColorGamut(),
                     colorOverrideThreshold);
+            case GRADIENT -> gradientDiffers();
             default -> false;
         };
     }
 
-    private boolean colorModeNotSupportedByState(ColorMode colorMode) {
-        return colorMode == ColorMode.CT && !currentState.isCtSupported()
-               || colorMode == ColorMode.HS && !currentState.isColorSupported()
-               || colorMode == ColorMode.XY && !currentState.isColorSupported();
+    private boolean gradientDiffers() {
+        if (gradientModeDiffers()) {
+            return true;
+        }
+        return gradientPointsDiffer();
     }
 
-    private boolean incompatibleColorMode(ColorMode colorMode) {
-        return colorMode == ColorMode.CT && currentState.getColormode() != ColorMode.CT ||
-               currentState.getColormode() == ColorMode.CT && colorMode != ColorMode.CT;
+    private boolean gradientModeDiffers() {
+        return !Objects.equals(getGradientModeOrDefault(currentState.getGradient()),
+                getGradientModeOrDefault(lastPutCall.getGradient()));
+    }
+
+    private String getGradientModeOrDefault(Gradient gradient) {
+        return Objects.requireNonNullElse(gradient.mode(), DEFAULT_GRADIENT_MODE);
+    }
+
+    private boolean gradientPointsDiffer() {
+        List<Pair<Double, Double>> currentPoints = currentState.getGradient().points();
+        List<Pair<Double, Double>> lastPoints = lastPutCall.getGradient().points();
+        if (currentPoints.size() != lastPoints.size()) {
+            return true;
+        }
+        for (int i = 0; i < lastPoints.size(); i++) {
+            Pair<Double, Double> currentPoint = currentPoints.get(i);
+            Pair<Double, Double> lastPoint = lastPoints.get(i);
+            if (ColorComparator.colorDiffers(currentPoint.first(), currentPoint.second(),
+                    lastPoint.first(), lastPoint.second(), currentState.getLightCapabilities().getColorGamut(),
+                    colorOverrideThreshold)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean colorModeNotSupportedByState(ColorMode colorMode) {
+        return colorMode == ColorMode.CT && !currentState.isCtSupported()
+               || colorMode == ColorMode.XY && !currentState.isColorSupported()
+               || colorMode == ColorMode.GRADIENT && !currentState.isGradientSupported();
+    }
+
+    private boolean colorModeDiffers(ColorMode colorMode) {
+        return !Objects.equals(colorMode, currentState.getColormode());
     }
 
     private boolean ctDiffers() {
@@ -98,11 +135,11 @@ public class LightStateComparator {
     }
 
     private boolean effectDiffers() {
-        String lastEffect = lastPutCall.getEffect();
+        Effect lastEffect = lastPutCall.getEffect();
         if (lastEffect == null) {
             return false; // if no effect scheduled, always treat as equal
         } else if (currentState.getEffect() == null) {
-            return !"none".equals(lastEffect); // if effect scheduled, but none set, only consider "none" to be equal
+            return !"none".equals(lastEffect.effect()); // if effect scheduled, but none set, only consider "none" to be equal
         } else {
             return !lastEffect.equals(currentState.getEffect()); // otherwise, effects have to be exactly the same
         }
