@@ -37,7 +37,6 @@ public class LightEventListenerImpl implements LightEventListener {
             MDC.put("context", "off-event " + id);
             if (schedulerInitiatedOff.remove(id)) {
                 log.trace("Scheduler initiated off: Skip rescheduling waiting states.");
-                return;
             } else {
                 rescheduleWaitingStates(id);
             }

@@ -411,7 +411,8 @@ public final class HueScheduler implements Runnable {
         lightEventListener = createLightEventListener();
         sceneEventListener = new SceneEventListenerImpl(api, Ticker.systemTicker(),
                 sceneActivationIgnoreWindowInSeconds, sceneSyncName::equals, lightEventListener);
-        new HueEventStreamReader(apiHost, accessToken, httpsClient, new HueEventHandler(lightEventListener, sceneEventListener, api),
+        new HueEventStreamReader(apiHost, accessToken, httpsClient,
+                new HueEventHandler(lightEventListener, sceneEventListener, api, this::onSceneResourceModified),
                 eventStreamReadTimeoutInMinutes).start();
         stateRegistry = new ScheduledStateRegistry(currentTime, api);
     }
@@ -590,11 +591,13 @@ public final class HueScheduler implements Runnable {
     }
 
     public void addState(String input) {
-        new InputConfigurationParser(startTimeProvider, api, minTrBeforeGapInMinutes,
+        createParser().parse(input).forEach(stateRegistry::addState);
+    }
+
+    private InputConfigurationParser createParser() {
+        return new InputConfigurationParser(startTimeProvider, api, minTrBeforeGapInMinutes,
                 parseBrightnessPercentValue(brightnessOverrideThresholdPercentage),
-                colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold, interpolateAll, autoFillGradient)
-                .parse(input)
-                .forEach(stateRegistry::addState);
+                colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold, interpolateAll, autoFillGradient);
     }
 
     public void start() {
@@ -1270,5 +1273,36 @@ public final class HueScheduler implements Runnable {
 
     ManualOverrideTracker getManualOverrideTracker() {
         return manualOverrideTracker;
+    }
+
+    void onSceneResourceModified(String sceneId) {
+        try {
+            reloadSceneStates(sceneId);
+        } catch (Exception e) {
+            LOG.error("Failed to handle scene modification for scene ID '{}': {}", sceneId, e.getLocalizedMessage(), e);
+        }
+    }
+
+    private void reloadSceneStates(String sceneId) {
+        List<ScheduledState> states = stateRegistry.findStatesWithSceneId(sceneId);
+        if (states.isEmpty()) {
+            return;
+        }
+        MDC.put("context", "scene-reload");
+        LOG.info("Scene '{}' modified. Reloading {} state(s).", sceneId, states.size());
+        for (ScheduledState state : states) {
+            try {
+                reloadLightStates(sceneId, state);
+                LOG.info("Reloaded scene state: {}", state);
+            } catch (Exception e) {
+                LOG.error("Failed to reload scene state for '{}': {}", state, e.getLocalizedMessage(), e);
+            }
+        }
+        MDC.remove("context");
+    }
+
+    private void reloadLightStates(String sceneId, ScheduledState state) {
+        state.updateLightStates(createParser().loadLightStates(sceneId,
+                state.getSceneBrightnessModifier(), state.getSceneOnModifier()));
     }
 }

@@ -5,6 +5,7 @@ import at.sv.hue.api.LightCapabilities;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
+import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.EnumSet;
 import java.util.List;
@@ -2241,5 +2242,301 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
         ensureScheduledStates(
                 expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
         );
+    }
+
+    @Test
+    void sceneControl_sceneModified_reloadsLightStates() {
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        mockSceneLightStates(1, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100)
+                                   .ct(200),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(50)
+                                   .ct(300));
+        addState("g1", now, "scene:TestScene");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1))
+        );
+
+        // Run with original values
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+                expectedPutCall(4).bri(100).ct(200),
+                expectedPutCall(5).bri(50).ct(300)
+        );
+
+        // Get next day runnable
+        ScheduledRunnable nextDay = ensureNextDayRunnable(now);
+
+        // Scene is modified by user
+        mockSceneLightStates(1, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(200)
+                                   .ct(400),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(150)
+                                   .ct(500));
+        simulateSceneModified(1, "TestScene");
+
+        // Next day - should use new values
+        advanceTimeAndRunAndAssertScenePutCalls(nextDay, 1,
+                expectedPutCall(4).bri(200).ct(400),
+                expectedPutCall(5).bri(150).ct(500)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
+        );
+    }
+
+    @Test
+    void sceneControl_sceneModified_withBriModifier_reAppliesScaling() {
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        mockSceneLightStates(1, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(200),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(100));
+        addState("g1", now, "scene:TestScene", "bri:127");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1))
+        );
+
+        // bri:127 scales to ~50% (127/254 ≈ 0.5). 200*0.5=100, 100*0.5=50
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+                expectedPutCall(4).bri(100),
+                expectedPutCall(5).bri(50)
+        );
+
+        ScheduledRunnable nextDay = ensureNextDayRunnable(now);
+
+        // Scene modified: new base brightness values
+        mockSceneLightStates(1, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(254),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(200));
+        simulateSceneModified(1, "TestScene");
+
+        // Scaling should be re-applied: 254*0.5=127, 200*0.5=100
+        advanceTimeAndRunAndAssertScenePutCalls(nextDay, 1,
+                expectedPutCall(4).bri(127),
+                expectedPutCall(5).bri(100)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(2))
+        );
+    }
+
+    @Test
+    void sceneControl_sceneModified_withOnModifier_reAppliesTurnOn() {
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        mockSceneLightStates(1, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100)
+                                   .ct(200),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(50)
+                                   .ct(300)
+                                   .on(false));
+        addState("g1", now, "scene:TestScene", "on:true");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1))
+        );
+
+        // on:true turns on light 4 (not off), but not light 5 (explicitly off in scene)
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+                expectedPutCall(4).bri(100).ct(200).on(true),
+                expectedPutCall(5).bri(50).ct(300).on(false)
+        );
+
+        ScheduledRunnable nextDay = ensureNextDayRunnable(now);
+
+        // Scene modified: light 5 now has on state (no on:false), new values
+        mockSceneLightStates(1, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(150)
+                                   .ct(250),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(80)
+                                   .ct(350));
+        simulateSceneModified(1, "TestScene");
+
+        // on:true should be re-applied: both lights are now on
+        advanceTimeAndRunAndAssertScenePutCalls(nextDay, 1,
+                expectedPutCall(4).bri(150).ct(250).on(true),
+                expectedPutCall(5).bri(80).ct(350).on(true)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(2))
+        );
+    }
+
+    @Test
+    void sceneControl_sceneModified_nonSceneStatesNotAffected() {
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        addKnownLightIdsWithDefaultCapabilities(2);
+        mockSceneLightStates(1, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100)
+                                   .ct(200),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(50)
+                                   .ct(300));
+        addState("g1", now, "scene:TestScene");
+        addState(2, now, "bri:150", "ct:400");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1)), // scene state
+                expectedRunnable(now, now.plusDays(1))  // regular state
+        );
+
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+                expectedPutCall(4).bri(100).ct(200),
+                expectedPutCall(5).bri(50).ct(300)
+        );
+        runAndAssertPutCalls(runnables.get(1), expectedPutCall(2).bri(150).ct(400));
+
+        List<ScheduledRunnable> nextDayRunnables = ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(2)),
+                expectedRunnable(now.plusDays(1), now.plusDays(2))
+        );
+
+        // Scene modified
+        mockSceneLightStates(1, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(200)
+                                   .ct(400),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(150)
+                                   .ct(500));
+        simulateSceneModified(1, "TestScene");
+
+        // Scene state uses new values
+        advanceTimeAndRunAndAssertScenePutCalls(nextDayRunnables.getFirst(), 1,
+                expectedPutCall(4).bri(200).ct(400),
+                expectedPutCall(5).bri(150).ct(500)
+        );
+
+        // Regular state still uses original values
+        runAndAssertPutCalls(nextDayRunnables.get(1), expectedPutCall(2).bri(150).ct(400));
+
+        ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(2)),
+                expectedRunnable(now.plusDays(1), now.plusDays(2))
+        );
+    }
+
+    @Test
+    void sceneControl_sceneModified_multipleStatesReferencingSameScene_allReloaded() {
+        ZonedDateTime midnight = now;
+        ZonedDateTime noon = now.plusHours(12);
+
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        mockSceneLightStates(1, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100)
+                                   .ct(200),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(50)
+                                   .ct(300));
+        addState("g1", midnight, "scene:TestScene");
+        addState("g1", noon, "scene:TestScene", "bri:127");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(midnight, noon),
+                expectedRunnable(noon, midnight.plusDays(1))
+        );
+
+        // Scene modified before any state runs
+        mockSceneLightStates(1, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(254)
+                                   .ct(400),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(200)
+                                   .ct(500));
+        simulateSceneModified(1, "TestScene");
+
+        // First state uses new values
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+                expectedPutCall(4).bri(254).ct(400),
+                expectedPutCall(5).bri(200).ct(500)
+        );
+
+        // Consume the reschedule for first state
+        ensureScheduledStates(
+                expectedRunnable(midnight.plusDays(1), noon.plusDays(1))
+        );
+
+        // Second state uses new values with bri modifier (127/254 ≈ 0.5): 254*0.5=127, 200*0.5=100
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.get(1), 1,
+                expectedPutCall(4).bri(127).ct(400),
+                expectedPutCall(5).bri(100).ct(500)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(noon.plusDays(1), midnight.plusDays(2))
+        );
+    }
+
+    @Test
+    void sceneControl_nonExistingSceneModification_noError() {
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        mockSceneLightStates(1, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100)
+                                   .ct(200),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(50)
+                                   .ct(300));
+        addState("g1", now, "scene:TestScene");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1))
+        );
+
+        // Modifying a scene that no state references - should be a no-op
+        simulateSceneModified(99, "OtherScene");
+
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+                expectedPutCall(4).bri(100).ct(200),
+                expectedPutCall(5).bri(50).ct(300)
+        );
+
+        ensureNextDayRunnable(now);
     }
 }

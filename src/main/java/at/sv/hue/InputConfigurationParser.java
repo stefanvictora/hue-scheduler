@@ -96,7 +96,7 @@ public final class InputConfigurationParser {
             Integer transitionTime = null;
             String effectValue = null;
             Double effectSpeed = null;
-            String scene = null;
+            String sceneName = null;
             if (interpolateAll) {
                 interpolate = Boolean.TRUE;
             }
@@ -190,7 +190,7 @@ public final class InputConfigurationParser {
                         interpolate = parseBoolean(value, parameter);
                         break;
                     case "scene":
-                        scene = value.trim();
+                        sceneName = value.trim();
                         break;
                     default:
                         throw new UnknownStateProperty("Unknown state property '" + parameter + "' with value '" + value + "'");
@@ -199,31 +199,27 @@ public final class InputConfigurationParser {
             String start = parts[1];
 
             List<ScheduledLightState> scheduledLightStates;
-            if (scene != null) {
+            String sceneId = null;
+            if (sceneName != null) {
                 if (ct != null || x != null || y != null || effectValue != null || gradient != null) {
                     throw new InvalidConfigurationLine(
                             "When 'scene' is used, only 'on', 'bri', 'tr', 'tr-before', 'days', 'force', 'interpolate' are allowed.");
                 }
-
-                scheduledLightStates = api.getSceneLightStates(identifier.id(), scene);
-                if (bri != null) {
-                    scheduledLightStates = scaleBrightness(bri, scheduledLightStates);
-                }
-                if (on == Boolean.TRUE) {
-                    scheduledLightStates = turnOnIfNotOff(scheduledLightStates);
-                }
                 if (on == Boolean.FALSE) {
                     throw new InvalidConfigurationLine("Can't combine 'on:false' with a scene: " + Arrays.toString(parts));
                 }
+
+                sceneId = api.getSceneId(identifier.id(), sceneName);
+                scheduledLightStates = loadLightStates(sceneId, bri, on);
             } else {
                 ScheduledLightStateValidator validator = new ScheduledLightStateValidator(identifier, groupState, capabilities,
                         capBrightness(bri), ct, x, y, on, effectValue, effectSpeed, gradient, autoFillGradient);
                 scheduledLightStates = List.of(validator.getScheduledLightState());
             }
-
-            states.add(new ScheduledState(identifier, start, scheduledLightStates, transitionTimeBefore,
+            states.add(new ScheduledState(identifier, start, scheduledLightStates, sceneId, bri, on, transitionTimeBefore,
                     transitionTime, dayOfWeeks, startTimeProvider, minTrBeforeGapInMinutes, brightnessOverrideThreshold,
-                    colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold, force, interpolate, groupState, false));
+                    colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold, force, interpolate, groupState, false
+            ));
         }
         return states;
     }
@@ -278,6 +274,17 @@ public final class InputConfigurationParser {
 
     private static XYColor convertToXY(int r, int g, int b, LightCapabilities capabilities) {
         return RGBToXYConverter.rgbToXY(r, g, b, capabilities.getColorGamut());
+    }
+
+    public List<ScheduledLightState> loadLightStates(String sceneId, Integer brightnessModifier, Boolean onModifier) {
+        List<ScheduledLightState> lightStates = api.getSceneLightStates(sceneId);
+        if (brightnessModifier != null) {
+            lightStates = scaleBrightness(brightnessModifier, lightStates);
+        }
+        if (onModifier == Boolean.TRUE) {
+            lightStates = turnOnIfNotOff(lightStates);
+        }
+        return lightStates;
     }
 
     private static List<ScheduledLightState> scaleBrightness(Integer targetBrightness, List<ScheduledLightState> scheduledLightStates) {

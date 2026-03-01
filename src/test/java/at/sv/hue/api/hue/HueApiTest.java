@@ -2526,7 +2526,16 @@ class HueApiTest {
                 }
                 """);
 
-        assertSceneLightStates("GROUPED_LIGHT_1", "Scene_1",
+        assertSceneId("GROUPED_LIGHT_1", "Scene_1", "SCENE_1");
+        assertSceneId("GROUPED_LIGHT_1", "Scene_2", "SCENE_2");
+        assertSceneId("GROUPED_LIGHT_1", "Scene_3", "SCENE_3");
+        assertSceneId("GROUPED_LIGHT_1", "Scene_4", "SCENE_4");
+        assertSceneId("GROUPED_LIGHT_1", "Scene_5", "SCENE_5");
+        assertThrows(SceneNotFoundException.class, () -> api.getSceneLightStates("UNKNOWN_SCENE_ID"));
+        assertThrows(SceneNotFoundException.class, () -> api.getSceneId("GROUPED_LIGHT_1", "Unknown_Scene"));
+        assertThrows(GroupNotFoundException.class, () -> api.getSceneId("UNKNOWN_GROUP", "Scene_1"));
+
+        assertSceneLightStates("SCENE_1",
                 ScheduledLightState.builder()
                                    .id("LIGHT_1")
                                    // no "on"
@@ -2542,7 +2551,7 @@ class HueApiTest {
                                    .gamut(GAMUT_A)
         );
 
-        assertSceneLightStates("GROUPED_LIGHT_1", "Scene_2",
+        assertSceneLightStates("SCENE_2",
                 ScheduledLightState.builder()
                                    .id("LIGHT_1")
                                    // no "on"
@@ -2557,7 +2566,7 @@ class HueApiTest {
                                    .gamut(GAMUT_A)
         );
 
-        assertSceneLightStates("GROUPED_LIGHT_1", "Scene_3",
+        assertSceneLightStates("SCENE_3",
                 ScheduledLightState.builder()
                                    .id("LIGHT_1")
                                    .gamut(GAMUT_C)
@@ -2578,7 +2587,7 @@ class HueApiTest {
                                                  .build())
         );
 
-        assertSceneLightStates("GROUPED_LIGHT_1", "Scene_4",
+        assertSceneLightStates("SCENE_4",
                 ScheduledLightState.builder()
                                    .id("LIGHT_1")
                                    .gamut(GAMUT_C)
@@ -2594,7 +2603,7 @@ class HueApiTest {
                                                  .build())
         );
 
-        assertSceneLightStates("GROUPED_LIGHT_1", "Scene_5",
+        assertSceneLightStates("SCENE_5",
                 ScheduledLightState.builder()
                                    .id("LIGHT_1")
                                    .gamut(GAMUT_C)
@@ -2610,10 +2619,6 @@ class HueApiTest {
                                    .id("LIGHT_2")
                                    .gamut(GAMUT_A)
         );
-
-        assertThrows(SceneNotFoundException.class, () -> api.getSceneLightStates("GROUPED_LIGHT_1", "UNKNOWN_SCENE"));
-
-        assertThrows(GroupNotFoundException.class, () -> api.getSceneLightStates("UNKNOWN_GROUP", "Scene_1"));
     }
 
     @Test
@@ -2756,7 +2761,7 @@ class HueApiTest {
                 }
                 """);
 
-        assertSceneLightStates("GROUPED_LIGHT_1", "Scene_1",
+        assertSceneLightStates("SCENE_1",
                 ScheduledLightState.builder()
                                    .id("LIGHT_1")
                                    .gamut(GAMUT_C)
@@ -2767,7 +2772,7 @@ class HueApiTest {
     }
 
     @Test
-    void getSceneLightStates_duplicateSceneNameForGroup_exception() {
+    void getSceneId_duplicateSceneNameForGroup_exception() {
         setGetResponse("/grouped_light", """
                 {
                   "errors": [],
@@ -2961,7 +2966,7 @@ class HueApiTest {
                 }
                 """);
 
-        assertThrows(NonUniqueNameException.class, () -> api.getSceneLightStates("GROUPED_LIGHT_1", "SCENE NAME"));
+        assertThrows(NonUniqueNameException.class, () -> api.getSceneId("GROUPED_LIGHT_1", "SCENE NAME"));
     }
 
     @Test
@@ -6949,8 +6954,12 @@ class HueApiTest {
                 Stream.of(overriddenPutCallBuilders).map(PutCall.PutCallBuilder::build).toList());
     }
 
-    private void assertSceneLightStates(String groupId, String sceneName, ScheduledLightState.ScheduledLightStateBuilder... states) {
-        assertThat(api.getSceneLightStates(groupId, sceneName))
+    private void assertSceneId(String groupId, String sceneName, String expected) {
+        assertThat(api.getSceneId(groupId, sceneName)).isEqualTo(expected);
+    }
+
+    private void assertSceneLightStates(String sceneId, ScheduledLightState.ScheduledLightStateBuilder... states) {
+        assertThat(api.getSceneLightStates(sceneId))
                 .usingRecursiveComparison()
                 .isEqualTo(Arrays.stream(states).map(ScheduledLightState.ScheduledLightStateBuilder::build).toList());
     }

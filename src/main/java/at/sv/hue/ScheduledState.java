@@ -29,9 +29,15 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
     public static final int MAX_TRANSITION_TIME_MS = MAX_TRANSITION_TIME * 100;
 
     private final Identifier identifier;
-    private final List<ScheduledLightState> lightStates;
+    private volatile List<ScheduledLightState> lightStates;
     @Getter
     private final String startString;
+    @Getter
+    private final String sceneId;
+    @Getter
+    private final Integer sceneBrightnessModifier;
+    @Getter
+    private final Boolean sceneOnModifier;
     @Getter
     private final Integer definedTransitionTime;
     private final String transitionTimeBeforeString;
@@ -62,13 +68,16 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
 
     @Builder
     public ScheduledState(Identifier identifier, String startString, List<ScheduledLightState> lightStates,
-                          String transitionTimeBeforeString, Integer definedTransitionTime, Set<DayOfWeek> daysOfWeek,
-                          StartTimeProvider startTimeProvider,
+                          String sceneId, Integer sceneBrightnessModifier, Boolean sceneOnModifier, String transitionTimeBeforeString,
+                          Integer definedTransitionTime, Set<DayOfWeek> daysOfWeek, StartTimeProvider startTimeProvider,
                           int minTrBeforeGapInMinutes, int brightnessOverrideThreshold, int colorTemperatureOverrideThresholdKelvin,
                           double colorOverrideThreshold, Boolean force, Boolean interpolate, boolean groupState, boolean temporary) {
         this.identifier = identifier;
         this.startString = startString;
         this.lightStates = lightStates;
+        this.sceneId = sceneId;
+        this.sceneBrightnessModifier = sceneBrightnessModifier;
+        this.sceneOnModifier = sceneOnModifier;
         this.interpolate = interpolate;
         if (daysOfWeek == null || daysOfWeek.isEmpty()) {
             this.daysOfWeek = EnumSet.allOf(DayOfWeek.class);
@@ -100,9 +109,11 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
 
     private static ScheduledState createTemporaryCopy(ScheduledState state, String start) {
         ScheduledState copy = new ScheduledState(state.identifier, start,
-                copyLightStates(state.lightStates), state.transitionTimeBeforeString, state.definedTransitionTime, state.daysOfWeek, state.startTimeProvider,
+                copyLightStates(state.lightStates), state.sceneId, state.sceneBrightnessModifier, state.sceneOnModifier,
+                state.transitionTimeBeforeString, state.definedTransitionTime, state.daysOfWeek, state.startTimeProvider,
                 state.minTrBeforeGapInMinutes, state.brightnessOverrideThreshold, state.colorTemperatureOverrideThresholdKelvin,
-                state.colorOverrideThreshold, state.force, state.interpolate, state.groupState, true);
+                state.colorOverrideThreshold, state.force, state.interpolate, state.groupState, true
+        );
         copy.lastSeen = state.lastSeen;
         copy.originalState = state.originalState;
         copy.previousStateLookup = state.previousStateLookup;
@@ -114,6 +125,16 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
         return lightStates.stream()
                           .map(lightState -> lightState.toBuilder().build())
                           .toList();
+    }
+
+    public boolean isSceneBased() {
+        return sceneId != null;
+    }
+
+    public void updateLightStates(List<ScheduledLightState> newLightStates) {
+        this.lightStates = newLightStates;
+        snapshotCache.invalidateAll(); // todo: do we really need this?
+        lastPutCalls = null;
     }
 
     private Integer assertValidTransitionTime(Integer transitionTime) {

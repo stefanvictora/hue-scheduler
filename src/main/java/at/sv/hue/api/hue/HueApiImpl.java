@@ -386,12 +386,21 @@ public final class HueApiImpl implements HueApi {
     }
 
     @Override
-    public List<ScheduledLightState> getSceneLightStates(String groupedLightId, String sceneName) {
+    public String getSceneId(String groupedLightId, String sceneName) {
         Group group = getAndAssertGroupExists(groupedLightId);
-        return getUniqueScene(group, sceneName).getActions()
-                                               .stream()
-                                               .map(this::createScheduledLightState)
-                                               .toList();
+        return getUniqueScene(group, sceneName).getId();
+    }
+
+    @Override
+    public List<ScheduledLightState> getSceneLightStates(String sceneId) {
+        Scene scene = getAvailableScenes().get(sceneId);
+        if (scene == null) {
+            throw new SceneNotFoundException("No scene with ID '" + sceneId + "' found");
+        }
+        return scene.getActions()
+                    .stream()
+                    .map(this::createScheduledLightState)
+                    .toList();
     }
 
     @Override

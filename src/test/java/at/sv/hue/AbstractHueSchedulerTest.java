@@ -553,7 +553,9 @@ public class AbstractHueSchedulerTest {
         List<ScheduledLightState> states = Arrays.stream(builder)
                                                  .map(ScheduledLightState.ScheduledLightStateBuilder::build)
                                                  .toList();
-        when(mockedHueApi.getSceneLightStates("/groups/" + groupId, sceneName)).thenReturn(states);
+        String sceneId = "scene-" + groupId + "-" + sceneName;
+        when(mockedHueApi.getSceneId("/groups/" + groupId, sceneName)).thenReturn(sceneId);
+        when(mockedHueApi.getSceneLightStates(sceneId)).thenReturn(states);
     }
 
     protected void mockIsLightOff(int id, boolean value) {
@@ -624,6 +626,10 @@ public class AbstractHueSchedulerTest {
         when(mockedHueApi.getSceneName(sceneId)).thenReturn(sceneName);
 
         scheduler.getSceneEventListener().onSceneActivated(sceneId);
+    }
+
+    protected void simulateSceneModified(int groupId, String sceneName) {
+        scheduler.onSceneResourceModified("scene-" + groupId + "-" + sceneName);
     }
 
     /* API Assertions */

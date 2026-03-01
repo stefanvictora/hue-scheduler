@@ -210,6 +210,14 @@ public class ScheduledStateRegistry {
         return lightStates.values();
     }
 
+    public List<ScheduledState> findStatesWithSceneId(String sceneId) {
+        return lightStates.values().stream()
+                          .flatMap(List::stream)
+                          .filter(ScheduledState::isSceneBased)
+                          .filter(state -> sceneId.equals(state.getSceneId()))
+                          .toList();
+    }
+
     public List<ScheduledStateSnapshot> findCurrentlyActiveStates() {
         ZonedDateTime now = currentTime.get();
         return values().stream()

@@ -325,7 +325,12 @@ public class HassApiImpl implements HueApi {
     }
 
     @Override
-    public List<ScheduledLightState> getSceneLightStates(String groupId, String sceneName) {
+    public String getSceneId(String groupId, String sceneName) {
+        throw new UnsupportedOperationException("Scene scheduling is not supported by Home Assistant");
+    }
+
+    @Override
+    public List<ScheduledLightState> getSceneLightStates(String sceneId) {
         throw new UnsupportedOperationException("Scene scheduling is not supported by Home Assistant");
     }
 
