@@ -162,8 +162,6 @@ public class HassApiTest {
                     "attributes": {
                       "min_color_temp_kelvin": 2000,
                       "max_color_temp_kelvin": 6535,
-                      "min_mireds": 153,
-                      "max_mireds": 500,
                       "effect_list": [
                         "None",
                         "candle",
@@ -191,8 +189,6 @@ public class HassApiTest {
                     "attributes": {
                       "min_color_temp_kelvin": 2202,
                       "max_color_temp_kelvin": 6535,
-                      "min_mireds": 153,
-                      "max_mireds": 454,
                       "supported_color_modes": [
                         "color_temp",
                         "xy"
@@ -310,6 +306,44 @@ public class HassApiTest {
     }
 
     @Test
+    void getLightCapabilities_whenMiredRangeMissing_usesKelvinRange() {
+        setGetResponse("/states", """
+                [
+                  {
+                    "entity_id": "light.kitchen",
+                    "state": "on",
+                    "attributes": {
+                      "min_color_temp_kelvin": 2000,
+                      "max_color_temp_kelvin": 6666,
+                      "supported_color_modes": [
+                        "color_temp",
+                        "xy"
+                      ],
+                      "friendly_name": "Kitchen",
+                      "supported_features": 44
+                    },
+                    "last_changed": "2023-09-24T07:55:01.698292+00:00",
+                    "last_updated": "2023-09-24T07:55:01.698292+00:00",
+                    "context": {
+                      "id": "123456789",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  }
+                ]
+                """);
+
+        assertThat(api.getLightCapabilities("light.kitchen")).isEqualTo(LightCapabilities.builder()
+                                                                                         .ctMin(150)
+                                                                                         .ctMax(500)
+                                                                                         .capabilities(EnumSet.of(Capability.COLOR,
+                                                                                                 Capability.COLOR_TEMPERATURE,
+                                                                                                 Capability.BRIGHTNESS,
+                                                                                                 Capability.ON_OFF))
+                                                                                         .build());
+    }
+
+    @Test
     void getLightState_colorAndCT_xyColorMode_returnsState() {
         setGetResponse("/states/light.schreibtisch_r", """
                 {
@@ -318,8 +352,6 @@ public class HassApiTest {
                   "attributes": {
                     "min_color_temp_kelvin": 2000,
                     "max_color_temp_kelvin": 6535,
-                    "min_mireds": 153,
-                    "max_mireds": 500,
                     "effect_list": [
                       "None",
                       "CANDLE",
@@ -391,8 +423,6 @@ public class HassApiTest {
                     "attributes": {
                         "min_color_temp_kelvin": 2000,
                         "max_color_temp_kelvin": 6535,
-                        "min_mireds": 153,
-                        "max_mireds": 500,
                         "effect_list": [
                             "None",
                             "candle",
@@ -406,7 +436,6 @@ public class HassApiTest {
                         "color_mode": "color_temp",
                         "brightness": 37,
                         "color_temp_kelvin": 6211,
-                        "color_temp": 161,
                         "hs_color": [
                             33.877,
                             4.876
@@ -466,8 +495,6 @@ public class HassApiTest {
                         "attributes": {
                             "min_color_temp_kelvin": 2202,
                             "max_color_temp_kelvin": 6535,
-                            "min_mireds": 153,
-                            "max_mireds": 454,
                             "effect_list": [
                                 "None",
                                 "candle"
@@ -478,7 +505,6 @@ public class HassApiTest {
                             "color_mode": "color_temp",
                             "brightness": 234,
                             "color_temp_kelvin": 2732,
-                            "color_temp": 366,
                             "hs_color": [
                                 28.327,
                                 64.71
@@ -594,8 +620,6 @@ public class HassApiTest {
                     "attributes": {
                         "min_color_temp_kelvin": 2000,
                         "max_color_temp_kelvin": 6535,
-                        "min_mireds": 153,
-                        "max_mireds": 500,
                         "effect_list": [
                             "None",
                             "candle",
@@ -644,8 +668,6 @@ public class HassApiTest {
                         "attributes": {
                             "min_color_temp_kelvin": 2202,
                             "max_color_temp_kelvin": 6535,
-                            "min_mireds": 153,
-                            "max_mireds": 454,
                             "effect_list": [
                                 "None",
                                 "candle"
@@ -1203,8 +1225,6 @@ public class HassApiTest {
                     "attributes": {
                       "min_color_temp_kelvin": 2000,
                       "max_color_temp_kelvin": 6535,
-                      "min_mireds": 153,
-                      "max_mireds": 500,
                       "effect_list": [
                         "None",
                         "candle",
@@ -1250,8 +1270,6 @@ public class HassApiTest {
                     "attributes": {
                       "min_color_temp_kelvin": 2000,
                       "max_color_temp_kelvin": 6535,
-                      "min_mireds": 153,
-                      "max_mireds": 500,
                       "effect_list": [
                         "None",
                         "candle",
@@ -1300,8 +1318,6 @@ public class HassApiTest {
                         "attributes": {
                             "min_color_temp_kelvin": 2000,
                             "max_color_temp_kelvin": 6535,
-                            "min_mireds": 153,
-                            "max_mireds": 500,
                             "supported_color_modes": [
                                 "color_temp",
                                 "xy"
@@ -1309,7 +1325,6 @@ public class HassApiTest {
                             "color_mode": null,
                             "brightness": null,
                             "color_temp_kelvin": null,
-                            "color_temp": null,
                             "hs_color": null,
                             "rgb_color": null,
                             "xy_color": null,
@@ -1440,8 +1455,6 @@ public class HassApiTest {
                     "attributes": {
                       "min_color_temp_kelvin": 2000,
                       "max_color_temp_kelvin": 6535,
-                      "min_mireds": 153,
-                      "max_mireds": 500,
                       "effect_list": [
                         "None",
                         "candle",
@@ -1548,8 +1561,6 @@ public class HassApiTest {
                     "attributes": {
                       "min_color_temp_kelvin": 2000,
                       "max_color_temp_kelvin": 6535,
-                      "min_mireds": 153,
-                      "max_mireds": 500,
                       "effect_list": [
                         "None",
                         "candle",
@@ -1563,7 +1574,6 @@ public class HassApiTest {
                       "color_mode": "color_temp",
                       "brightness": 244,
                       "color_temp_kelvin": 2971,
-                      "color_temp": 336,
                       "hs_color": [
                         27.874,
                         57.689
@@ -1602,8 +1612,6 @@ public class HassApiTest {
                     "attributes": {
                       "min_color_temp_kelvin": 2000,
                       "max_color_temp_kelvin": 6535,
-                      "min_mireds": 153,
-                      "max_mireds": 500,
                       "effect_list": [
                         "None",
                         "candle",
@@ -1617,7 +1625,6 @@ public class HassApiTest {
                       "color_mode": "color_temp",
                       "brightness": 127,
                       "color_temp_kelvin": 2994,
-                      "color_temp": 334,
                       "hs_color": [
                         27.835,
                         57.058
@@ -1651,8 +1658,6 @@ public class HassApiTest {
                     "attributes": {
                       "min_color_temp_kelvin": 2000,
                       "max_color_temp_kelvin": 6535,
-                      "min_mireds": 153,
-                      "max_mireds": 500,
                       "effect_list": [
                         "None",
                         "candle",
@@ -1666,7 +1671,6 @@ public class HassApiTest {
                       "color_mode": "color_temp",
                       "brightness": 246,
                       "color_temp_kelvin": 2976,
-                      "color_temp": 336,
                       "hs_color": [
                         27.865,
                         57.551
@@ -1815,8 +1819,6 @@ public class HassApiTest {
                     "attributes": {
                       "min_color_temp_kelvin": 2000,
                       "max_color_temp_kelvin": 6535,
-                      "min_mireds": 153,
-                      "max_mireds": 500,
                       "effect_list": [
                         "None",
                         "candle",
@@ -1923,8 +1925,6 @@ public class HassApiTest {
                     "attributes": {
                       "min_color_temp_kelvin": 2000,
                       "max_color_temp_kelvin": 6535,
-                      "min_mireds": 153,
-                      "max_mireds": 500,
                       "effect_list": [
                         "None",
                         "candle",
@@ -2100,7 +2100,7 @@ public class HassApiTest {
                     "light.kitchen_main" : {
                       "state" : "on",
                       "brightness" : 255,
-                      "color_temp" : 100
+                      "color_temp_kelvin" : 10000
                     },
                     "light.kitchen_table" : {
                       "state" : "on",
@@ -2204,8 +2204,6 @@ public class HassApiTest {
                       "attributes": {
                         "min_color_temp_kelvin": 2000,
                         "max_color_temp_kelvin": 6535,
-                        "min_mireds": 153,
-                        "max_mireds": 500,
                         "effect_list": [
                           "None",
                           "candle",
@@ -2607,7 +2605,7 @@ public class HassApiTest {
                         .transitionTime(5));
 
         verify(http).postResource(getUrl("/services/light/turn_on"),
-                "{\"entity_id\":\"light.id\",\"brightness\":37,\"color_temp\":153,\"transition\":0.5}");
+                "{\"entity_id\":\"light.id\",\"brightness\":37,\"color_temp_kelvin\":6535,\"transition\":0.5}");
     }
 
     @Test
@@ -2620,7 +2618,7 @@ public class HassApiTest {
                                  .transitionTime(5).build());
 
         verify(http).postResource(getUrl("/services/light/turn_on"),
-                "{\"entity_id\":\"light.id\",\"brightness\":37,\"color_temp\":153,\"transition\":0.5}");
+                "{\"entity_id\":\"light.id\",\"brightness\":37,\"color_temp_kelvin\":6535,\"transition\":0.5}");
     }
 
     @Test

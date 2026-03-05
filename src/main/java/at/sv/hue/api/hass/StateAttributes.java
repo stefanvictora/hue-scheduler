@@ -10,13 +10,13 @@ final class StateAttributes {
     String group_name;
     String color_mode;
     Integer brightness;
-    Integer color_temp;
+    Integer color_temp_kelvin;
     Double[] xy_color;
     String effect;
     List<String> effect_list;
     List<String> supported_color_modes;
-    Integer min_mireds;
-    Integer max_mireds;
+    Integer min_color_temp_kelvin;
+    Integer max_color_temp_kelvin;
     Boolean is_hue_group;
     List<String> lights;
     List<String> entity_id;

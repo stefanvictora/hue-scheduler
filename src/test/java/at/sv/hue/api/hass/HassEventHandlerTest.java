@@ -95,8 +95,6 @@ class HassEventHandlerTest {
                         "attributes": {
                           "min_color_temp_kelvin": 2000,
                           "max_color_temp_kelvin": 6535,
-                          "min_mireds": 153,
-                          "max_mireds": 500,
                           "effect_list": [
                             "None",
                             "candle",
@@ -167,8 +165,6 @@ class HassEventHandlerTest {
                         "attributes": {
                           "min_color_temp_kelvin": 2000,
                           "max_color_temp_kelvin": 6535,
-                          "min_mireds": 153,
-                          "max_mireds": 500,
                           "effect_list": [
                             "None",
                             "candle",
@@ -198,8 +194,6 @@ class HassEventHandlerTest {
                         "attributes": {
                           "min_color_temp_kelvin": 2000,
                           "max_color_temp_kelvin": 6535,
-                          "min_mireds": 153,
-                          "max_mireds": 500,
                           "effect_list": [
                             "None",
                             "candle",
@@ -270,8 +264,6 @@ class HassEventHandlerTest {
                         "attributes": {
                           "min_color_temp_kelvin": 2000,
                           "max_color_temp_kelvin": 6535,
-                          "min_mireds": 153,
-                          "max_mireds": 500,
                           "effect_list": [
                             "None",
                             "candle",
@@ -299,8 +291,6 @@ class HassEventHandlerTest {
                         "attributes": {
                           "min_color_temp_kelvin": 2000,
                           "max_color_temp_kelvin": 6535,
-                          "min_mireds": 153,
-                          "max_mireds": 500,
                           "effect_list": [
                             "None",
                             "candle",
@@ -371,8 +361,6 @@ class HassEventHandlerTest {
                         "attributes": {
                           "min_color_temp_kelvin": 2000,
                           "max_color_temp_kelvin": 6535,
-                          "min_mireds": 153,
-                          "max_mireds": 500,
                           "effect_list": [
                             "None",
                             "candle",
@@ -418,8 +406,6 @@ class HassEventHandlerTest {
                         "attributes": {
                           "min_color_temp_kelvin": 2000,
                           "max_color_temp_kelvin": 6535,
-                          "min_mireds": 153,
-                          "max_mireds": 500,
                           "effect_list": [
                             "None",
                             "candle",
@@ -491,8 +477,6 @@ class HassEventHandlerTest {
                         "attributes": {
                           "min_color_temp_kelvin": 2000,
                           "max_color_temp_kelvin": 6535,
-                          "min_mireds": 153,
-                          "max_mireds": 500,
                           "effect_list": [
                             "None",
                             "candle",
@@ -564,8 +548,6 @@ class HassEventHandlerTest {
                         "attributes": {
                           "min_color_temp_kelvin": 2000,
                           "max_color_temp_kelvin": 6535,
-                          "min_mireds": 153,
-                          "max_mireds": 500,
                           "effect_list": [
                             "None",
                             "candle",
@@ -611,8 +593,6 @@ class HassEventHandlerTest {
                         "attributes": {
                           "min_color_temp_kelvin": 2000,
                           "max_color_temp_kelvin": 6535,
-                          "min_mireds": 153,
-                          "max_mireds": 500,
                           "effect_list": [
                             "None",
                             "candle",
@@ -683,8 +663,6 @@ class HassEventHandlerTest {
                         "attributes": {
                           "min_color_temp_kelvin": 2000,
                           "max_color_temp_kelvin": 6535,
-                          "min_mireds": 153,
-                          "max_mireds": 500,
                           "effect_list": [
                             "None",
                             "candle",
@@ -730,8 +708,6 @@ class HassEventHandlerTest {
                         "attributes": {
                           "min_color_temp_kelvin": 2000,
                           "max_color_temp_kelvin": 6535,
-                          "min_mireds": 153,
-                          "max_mireds": 500,
                           "effect_list": [
                             "None",
                             "candle",
@@ -802,8 +778,6 @@ class HassEventHandlerTest {
                         "attributes": {
                           "min_color_temp_kelvin": 2000,
                           "max_color_temp_kelvin": 6535,
-                          "min_mireds": 153,
-                          "max_mireds": 500,
                           "effect_list": [
                             "None",
                             "candle",
@@ -849,8 +823,6 @@ class HassEventHandlerTest {
                         "attributes": {
                           "min_color_temp_kelvin": 2000,
                           "max_color_temp_kelvin": 6535,
-                          "min_mireds": 153,
-                          "max_mireds": 500,
                           "effect_list": [
                             "None",
                             "candle",
@@ -905,8 +877,6 @@ class HassEventHandlerTest {
                         "attributes": {
                           "min_color_temp_kelvin": 2000,
                           "max_color_temp_kelvin": 6535,
-                          "min_mireds": 153,
-                          "max_mireds": 500,
                           "effect_list": [
                             "None",
                             "candle",
@@ -952,8 +922,6 @@ class HassEventHandlerTest {
                         "attributes": {
                           "min_color_temp_kelvin": 2000,
                           "max_color_temp_kelvin": 6535,
-                          "min_mireds": 153,
-                          "max_mireds": 500,
                           "effect_list": [
                             "None",
                             "candle",
@@ -1006,8 +974,6 @@ class HassEventHandlerTest {
                         "attributes": {
                           "min_color_temp_kelvin": 2000,
                           "max_color_temp_kelvin": 6535,
-                          "min_mireds": 153,
-                          "max_mireds": 500,
                           "effect_list": [
                             "None",
                             "candle",
@@ -1053,8 +1019,6 @@ class HassEventHandlerTest {
                         "attributes": {
                           "min_color_temp_kelvin": 2000,
                           "max_color_temp_kelvin": 6535,
-                          "min_mireds": 153,
-                          "max_mireds": 500,
                           "effect_list": [
                             "None",
                             "candle",
