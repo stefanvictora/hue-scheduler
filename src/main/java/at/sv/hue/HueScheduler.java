@@ -60,7 +60,7 @@ import java.util.stream.Stream;
 
 import static at.sv.hue.InputConfigurationParser.parseBrightnessPercentValue;
 
-@Command(name = "HueScheduler", version = "0.14.3", mixinStandardHelpOptions = true, sortOptions = false)
+@Command(name = "HueScheduler", version = "0.14.4", mixinStandardHelpOptions = true, sortOptions = false)
 public final class HueScheduler implements Runnable {
 
     private static final Logger LOG = LoggerFactory.getLogger(HueScheduler.class);
@@ -339,6 +339,10 @@ public final class HueScheduler implements Runnable {
     @Override
     public void run() {
         MDC.put("context", "init");
+        LOG.info("Hue Scheduler v{}", spec.version()[0]);
+        LOG.info("API host: {}", apiHost);
+        LOG.info("Config file: {}", configFile);
+        logEnabledFlags();
         assertConfigurationParameters();
         if (HassApiUtils.isHassConnection(accessToken)) {
             setupHassApi();
@@ -346,6 +350,20 @@ public final class HueScheduler implements Runnable {
             setupHueApi();
         }
         createAndStart();
+    }
+
+    private void logEnabledFlags() {
+        LOG.info("Modification Tracking: {}, Scene Sync: {}, Interpolate All: {}, Require Scene Activation: {}, " +
+                 "Control Group Lights Individually: {}",
+                enabledOrDisabled(!disableUserModificationTracking),
+                enabledOrDisabled(enableSceneSync),
+                enabledOrDisabled(interpolateAll),
+                enabledOrDisabled(requireSceneActivation),
+                enabledOrDisabled(controlGroupLightsIndividually));
+    }
+
+    private static String enabledOrDisabled(boolean enabled) {
+        return enabled ? "enabled" : "disabled";
     }
 
     private void setupHassApi() {
