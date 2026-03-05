@@ -1,3 +1,11 @@
+## [0.14.4] - 2026-03-05
+
+### Added
+- Print version and enabled features at startup
+
+### Fixed
+- **HA API deprecations**: Fixed usage of removed `min_mireds`, `max_mireds` and `color_temp` properties (#50)
+
 ## [0.14.3] - 2026-02-19
 
 ### Added
