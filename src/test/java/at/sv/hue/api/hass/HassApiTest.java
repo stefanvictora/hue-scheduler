@@ -162,8 +162,6 @@ public class HassApiTest {
                     "attributes": {
                       "min_color_temp_kelvin": 2000,
                       "max_color_temp_kelvin": 6535,
-                      "min_mireds": 153,
-                      "max_mireds": 500,
                       "effect_list": [
                         "None",
                         "candle",
@@ -191,8 +189,6 @@ public class HassApiTest {
                     "attributes": {
                       "min_color_temp_kelvin": 2202,
                       "max_color_temp_kelvin": 6535,
-                      "min_mireds": 153,
-                      "max_mireds": 454,
                       "supported_color_modes": [
                         "color_temp",
                         "xy"
@@ -356,8 +352,6 @@ public class HassApiTest {
                   "attributes": {
                     "min_color_temp_kelvin": 2000,
                     "max_color_temp_kelvin": 6535,
-                    "min_mireds": 153,
-                    "max_mireds": 500,
                     "effect_list": [
                       "None",
                       "CANDLE",
@@ -429,8 +423,6 @@ public class HassApiTest {
                     "attributes": {
                         "min_color_temp_kelvin": 2000,
                         "max_color_temp_kelvin": 6535,
-                        "min_mireds": 153,
-                        "max_mireds": 500,
                         "effect_list": [
                             "None",
                             "candle",
@@ -503,8 +495,6 @@ public class HassApiTest {
                         "attributes": {
                             "min_color_temp_kelvin": 2202,
                             "max_color_temp_kelvin": 6535,
-                            "min_mireds": 153,
-                            "max_mireds": 454,
                             "effect_list": [
                                 "None",
                                 "candle"
@@ -630,8 +620,6 @@ public class HassApiTest {
                     "attributes": {
                         "min_color_temp_kelvin": 2000,
                         "max_color_temp_kelvin": 6535,
-                        "min_mireds": 153,
-                        "max_mireds": 500,
                         "effect_list": [
                             "None",
                             "candle",
@@ -680,8 +668,6 @@ public class HassApiTest {
                         "attributes": {
                             "min_color_temp_kelvin": 2202,
                             "max_color_temp_kelvin": 6535,
-                            "min_mireds": 153,
-                            "max_mireds": 454,
                             "effect_list": [
                                 "None",
                                 "candle"
@@ -1239,8 +1225,6 @@ public class HassApiTest {
                     "attributes": {
                       "min_color_temp_kelvin": 2000,
                       "max_color_temp_kelvin": 6535,
-                      "min_mireds": 153,
-                      "max_mireds": 500,
                       "effect_list": [
                         "None",
                         "candle",
@@ -1286,8 +1270,6 @@ public class HassApiTest {
                     "attributes": {
                       "min_color_temp_kelvin": 2000,
                       "max_color_temp_kelvin": 6535,
-                      "min_mireds": 153,
-                      "max_mireds": 500,
                       "effect_list": [
                         "None",
                         "candle",
@@ -1336,8 +1318,6 @@ public class HassApiTest {
                         "attributes": {
                             "min_color_temp_kelvin": 2000,
                             "max_color_temp_kelvin": 6535,
-                            "min_mireds": 153,
-                            "max_mireds": 500,
                             "supported_color_modes": [
                                 "color_temp",
                                 "xy"
@@ -1475,8 +1455,6 @@ public class HassApiTest {
                     "attributes": {
                       "min_color_temp_kelvin": 2000,
                       "max_color_temp_kelvin": 6535,
-                      "min_mireds": 153,
-                      "max_mireds": 500,
                       "effect_list": [
                         "None",
                         "candle",
@@ -1583,8 +1561,6 @@ public class HassApiTest {
                     "attributes": {
                       "min_color_temp_kelvin": 2000,
                       "max_color_temp_kelvin": 6535,
-                      "min_mireds": 153,
-                      "max_mireds": 500,
                       "effect_list": [
                         "None",
                         "candle",
@@ -1636,8 +1612,6 @@ public class HassApiTest {
                     "attributes": {
                       "min_color_temp_kelvin": 2000,
                       "max_color_temp_kelvin": 6535,
-                      "min_mireds": 153,
-                      "max_mireds": 500,
                       "effect_list": [
                         "None",
                         "candle",
@@ -1684,8 +1658,6 @@ public class HassApiTest {
                     "attributes": {
                       "min_color_temp_kelvin": 2000,
                       "max_color_temp_kelvin": 6535,
-                      "min_mireds": 153,
-                      "max_mireds": 500,
                       "effect_list": [
                         "None",
                         "candle",
@@ -1847,8 +1819,6 @@ public class HassApiTest {
                     "attributes": {
                       "min_color_temp_kelvin": 2000,
                       "max_color_temp_kelvin": 6535,
-                      "min_mireds": 153,
-                      "max_mireds": 500,
                       "effect_list": [
                         "None",
                         "candle",
@@ -1955,8 +1925,6 @@ public class HassApiTest {
                     "attributes": {
                       "min_color_temp_kelvin": 2000,
                       "max_color_temp_kelvin": 6535,
-                      "min_mireds": 153,
-                      "max_mireds": 500,
                       "effect_list": [
                         "None",
                         "candle",
@@ -2236,8 +2204,6 @@ public class HassApiTest {
                       "attributes": {
                         "min_color_temp_kelvin": 2000,
                         "max_color_temp_kelvin": 6535,
-                        "min_mireds": 153,
-                        "max_mireds": 500,
                         "effect_list": [
                           "None",
                           "candle",

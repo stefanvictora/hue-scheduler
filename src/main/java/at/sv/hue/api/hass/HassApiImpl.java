@@ -464,22 +464,10 @@ public class HassApiImpl implements HueApi {
     }
 
     private static Integer getCtMin(StateAttributes attributes) {
-        if (attributes.min_mireds != null) {
-            return attributes.min_mireds; // removed in HA 2026.1
-        }
-        if (attributes.max_color_temp_kelvin == null) {
-            return null;
-        }
         return kelvinToMireds(attributes.max_color_temp_kelvin);
     }
 
     private static Integer getCtMax(StateAttributes attributes) {
-        if (attributes.max_mireds != null) {
-            return attributes.max_mireds; // removed in HA 2026.1
-        }
-        if (attributes.min_color_temp_kelvin == null) {
-            return null;
-        }
         return kelvinToMireds(attributes.min_color_temp_kelvin);
     }
 
