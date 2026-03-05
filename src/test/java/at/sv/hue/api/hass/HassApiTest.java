@@ -441,7 +441,6 @@ public class HassApiTest {
                         "color_mode": "color_temp",
                         "brightness": 37,
                         "color_temp_kelvin": 6211,
-                        "color_temp": 161,
                         "hs_color": [
                             33.877,
                             4.876
@@ -513,7 +512,6 @@ public class HassApiTest {
                             "color_mode": "color_temp",
                             "brightness": 234,
                             "color_temp_kelvin": 2732,
-                            "color_temp": 366,
                             "hs_color": [
                                 28.327,
                                 64.71
@@ -1344,7 +1342,6 @@ public class HassApiTest {
                             "color_mode": null,
                             "brightness": null,
                             "color_temp_kelvin": null,
-                            "color_temp": null,
                             "hs_color": null,
                             "rgb_color": null,
                             "xy_color": null,
@@ -1598,7 +1595,6 @@ public class HassApiTest {
                       "color_mode": "color_temp",
                       "brightness": 244,
                       "color_temp_kelvin": 2971,
-                      "color_temp": 336,
                       "hs_color": [
                         27.874,
                         57.689
@@ -1652,7 +1648,6 @@ public class HassApiTest {
                       "color_mode": "color_temp",
                       "brightness": 127,
                       "color_temp_kelvin": 2994,
-                      "color_temp": 334,
                       "hs_color": [
                         27.835,
                         57.058
@@ -1701,7 +1696,6 @@ public class HassApiTest {
                       "color_mode": "color_temp",
                       "brightness": 246,
                       "color_temp_kelvin": 2976,
-                      "color_temp": 336,
                       "hs_color": [
                         27.865,
                         57.551
@@ -2131,7 +2125,7 @@ public class HassApiTest {
                     "light.kitchen_main" : {
                       "state" : "on",
                       "brightness" : 255,
-                      "color_temp" : 100
+                      "color_temp_kelvin" : 10000
                     },
                     "light.kitchen_table" : {
                       "state" : "on",
@@ -2552,7 +2546,7 @@ public class HassApiTest {
                         .transitionTime(5));
 
         verify(http).postResource(getUrl("/services/light/turn_on"),
-                "{\"entity_id\":\"light.id\",\"brightness\":37,\"color_temp\":153,\"transition\":0.5}");
+                "{\"entity_id\":\"light.id\",\"brightness\":37,\"color_temp_kelvin\":6535,\"transition\":0.5}");
     }
 
     @Test

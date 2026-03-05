@@ -10,7 +10,7 @@ final class StateAttributes {
     String group_name;
     String color_mode;
     Integer brightness;
-    Integer color_temp;
+    Integer color_temp_kelvin;
     Double[] xy_color;
     String effect;
     List<String> effect_list;
