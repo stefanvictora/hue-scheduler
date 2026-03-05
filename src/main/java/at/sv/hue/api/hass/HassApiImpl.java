@@ -170,7 +170,7 @@ public class HassApiImpl implements HueApi {
     private ChangeState getChangeState(PutCall putCall) {
         ChangeState changeState = new ChangeState();
         changeState.setBrightness(hueToHassBrightness(putCall.getBri()));
-        changeState.setColor_temp(putCall.getCt());
+        changeState.setColor_temp_kelvin(miredsToKelvin(putCall.getCt()));
         changeState.setEffect(getEffect(putCall));
         // transition in seconds (float ≥ 0); HA applies no global max (device integration may enforce limits)
         changeState.setTransition(convertToSeconds(putCall.getTransitionTime()));
@@ -412,8 +412,9 @@ public class HassApiImpl implements HueApi {
 
     private LightState createLightState(State state) {
         StateAttributes attributes = state.getAttributes();
-        return new LightState(state.entity_id, hassToHueBrightness(attributes.brightness), attributes.color_temp, getXY(attributes.xy_color, 0),
-                getXY(attributes.xy_color, 1),
+        return new LightState(state.entity_id, hassToHueBrightness(attributes.brightness),
+                kelvinToMireds(attributes.color_temp_kelvin),
+                getXY(attributes.xy_color, 0), getXY(attributes.xy_color, 1),
                 getEffect(attributes.effect), null, getColorMode(attributes.color_mode),
                 getOn(state.state), getUnavailable(state.state), createLightCapabilities(state));
     }
@@ -469,7 +470,7 @@ public class HassApiImpl implements HueApi {
         if (attributes.max_color_temp_kelvin == null) {
             return null;
         }
-        return 1_000_000 / attributes.max_color_temp_kelvin;
+        return kelvinToMireds(attributes.max_color_temp_kelvin);
     }
 
     private static Integer getCtMax(StateAttributes attributes) {
@@ -479,7 +480,21 @@ public class HassApiImpl implements HueApi {
         if (attributes.min_color_temp_kelvin == null) {
             return null;
         }
-        return 1_000_000 / attributes.min_color_temp_kelvin;
+        return kelvinToMireds(attributes.min_color_temp_kelvin);
+    }
+
+    private static Integer kelvinToMireds(Integer kelvin) {
+        if (kelvin == null) {
+            return null;
+        }
+        return 1_000_000 / kelvin;
+    }
+
+    private static Integer miredsToKelvin(Integer mireds) {
+        if (mireds == null) {
+            return null;
+        }
+        return 1_000_000 / mireds;
     }
 
     private static List<String> getEffects(State state) {
@@ -616,7 +631,7 @@ public class HassApiImpl implements HueApi {
         String entity_id;
         String state;
         Integer brightness;
-        Integer color_temp;
+        Integer color_temp_kelvin;
         Double[] xy_color;
         Integer[] hs_color;
         String effect;
