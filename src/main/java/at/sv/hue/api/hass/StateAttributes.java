@@ -17,8 +17,6 @@ final class StateAttributes {
     List<String> supported_color_modes;
     Integer min_color_temp_kelvin;
     Integer max_color_temp_kelvin;
-    Integer min_mireds;
-    Integer max_mireds;
     Boolean is_hue_group;
     List<String> lights;
     List<String> entity_id;
