@@ -2618,7 +2618,7 @@ public class HassApiTest {
                                  .transitionTime(5).build());
 
         verify(http).postResource(getUrl("/services/light/turn_on"),
-                "{\"entity_id\":\"light.id\",\"brightness\":37,\"color_temp\":153,\"transition\":0.5}");
+                "{\"entity_id\":\"light.id\",\"brightness\":37,\"color_temp_kelvin\":6535,\"transition\":0.5}");
     }
 
     @Test
