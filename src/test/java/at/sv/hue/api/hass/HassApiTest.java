@@ -310,6 +310,44 @@ public class HassApiTest {
     }
 
     @Test
+    void getLightCapabilities_whenMiredRangeMissing_usesKelvinRange() {
+        setGetResponse("/states", """
+                [
+                  {
+                    "entity_id": "light.kitchen",
+                    "state": "on",
+                    "attributes": {
+                      "min_color_temp_kelvin": 2000,
+                      "max_color_temp_kelvin": 6666,
+                      "supported_color_modes": [
+                        "color_temp",
+                        "xy"
+                      ],
+                      "friendly_name": "Kitchen",
+                      "supported_features": 44
+                    },
+                    "last_changed": "2023-09-24T07:55:01.698292+00:00",
+                    "last_updated": "2023-09-24T07:55:01.698292+00:00",
+                    "context": {
+                      "id": "123456789",
+                      "parent_id": null,
+                      "user_id": null
+                    }
+                  }
+                ]
+                """);
+
+        assertThat(api.getLightCapabilities("light.kitchen")).isEqualTo(LightCapabilities.builder()
+                                                                                         .ctMin(150)
+                                                                                         .ctMax(500)
+                                                                                         .capabilities(EnumSet.of(Capability.COLOR,
+                                                                                                 Capability.COLOR_TEMPERATURE,
+                                                                                                 Capability.BRIGHTNESS,
+                                                                                                 Capability.ON_OFF))
+                                                                                         .build());
+    }
+
+    @Test
     void getLightState_colorAndCT_xyColorMode_returnsState() {
         setGetResponse("/states/light.schreibtisch_r", """
                 {

@@ -457,9 +457,29 @@ public class HassApiImpl implements HueApi {
 
     private static LightCapabilities createLightCapabilities(State state) {
         StateAttributes attributes = state.attributes;
-        return new LightCapabilities(null, null, attributes.min_mireds, attributes.max_mireds,
+        return new LightCapabilities(null, null, getCtMin(attributes), getCtMax(attributes),
                 null, null,
                 getCapabilities(state), getEffects(state));
+    }
+
+    private static Integer getCtMin(StateAttributes attributes) {
+        if (attributes.min_mireds != null) {
+            return attributes.min_mireds; // removed in HA 2026.1
+        }
+        if (attributes.max_color_temp_kelvin == null) {
+            return null;
+        }
+        return 1_000_000 / attributes.max_color_temp_kelvin;
+    }
+
+    private static Integer getCtMax(StateAttributes attributes) {
+        if (attributes.max_mireds != null) {
+            return attributes.max_mireds; // removed in HA 2026.1
+        }
+        if (attributes.min_color_temp_kelvin == null) {
+            return null;
+        }
+        return 1_000_000 / attributes.min_color_temp_kelvin;
     }
 
     private static List<String> getEffects(State state) {
