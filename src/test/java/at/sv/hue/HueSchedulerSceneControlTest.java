@@ -2245,8 +2245,9 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
     }
 
     @Test
-    void sceneControl_sceneModified_reloadsLightStates() {
+    void sceneControl_sceneModified_reloadsLightStates_doesNotAffectRegularState() {
         mockDefaultGroupCapabilities(1);
+        addKnownLightIdsWithDefaultCapabilities(2);
         mockGroupLightsForId(1, 4, 5);
         mockSceneLightStates(1, "TestScene",
                 ScheduledLightState.builder()
@@ -2258,19 +2259,23 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                                    .bri(50)
                                    .ct(300));
         addState("g1", now, "scene:TestScene");
+        addState(2, now, "bri:150", "ct:400");
 
         List<ScheduledRunnable> runnables = startScheduler(
-                expectedRunnable(now, now.plusDays(1))
+                expectedRunnable(now, now.plusDays(1)), // scene state
+                expectedRunnable(now, now.plusDays(1))  // regular state
         );
 
-        // Run with original values
         advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
                 expectedPutCall(4).bri(100).ct(200),
                 expectedPutCall(5).bri(50).ct(300)
         );
+        runAndAssertPutCalls(runnables.get(1), expectedPutCall(2).bri(150).ct(400));
 
-        // Get next day runnable
-        ScheduledRunnable nextDay = ensureNextDayRunnable(now);
+        List<ScheduledRunnable> nextDayRunnables = ensureScheduledStates(
+                expectedRunnable(now.plusDays(1), now.plusDays(2)),
+                expectedRunnable(now.plusDays(1), now.plusDays(2))
+        );
 
         // Scene is modified by user
         mockSceneLightStates(1, "TestScene",
@@ -2284,14 +2289,18 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                                    .ct(500));
         simulateSceneModified(1, "TestScene");
 
-        // Next day - should use new values
-        advanceTimeAndRunAndAssertScenePutCalls(nextDay, 1,
+        // Scene state uses new values
+        advanceTimeAndRunAndAssertScenePutCalls(nextDayRunnables.getFirst(), 1,
                 expectedPutCall(4).bri(200).ct(400),
                 expectedPutCall(5).bri(150).ct(500)
         );
 
+        // Regular state still uses original values
+        runAndAssertPutCalls(nextDayRunnables.get(1), expectedPutCall(2).bri(150).ct(400));
+
         ensureScheduledStates(
-                expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
+                expectedRunnable(now.plusDays(1), now.plusDays(2)),
+                expectedRunnable(now.plusDays(1), now.plusDays(2))
         );
     }
 
@@ -2388,66 +2397,6 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
         );
 
         ensureScheduledStates(
-                expectedRunnable(now.plusDays(1), now.plusDays(2))
-        );
-    }
-
-    @Test
-    void sceneControl_sceneModified_nonSceneStatesNotAffected() {
-        mockDefaultGroupCapabilities(1);
-        mockGroupLightsForId(1, 4, 5);
-        addKnownLightIdsWithDefaultCapabilities(2);
-        mockSceneLightStates(1, "TestScene",
-                ScheduledLightState.builder()
-                                   .id("/lights/4")
-                                   .bri(100)
-                                   .ct(200),
-                ScheduledLightState.builder()
-                                   .id("/lights/5")
-                                   .bri(50)
-                                   .ct(300));
-        addState("g1", now, "scene:TestScene");
-        addState(2, now, "bri:150", "ct:400");
-
-        List<ScheduledRunnable> runnables = startScheduler(
-                expectedRunnable(now, now.plusDays(1)), // scene state
-                expectedRunnable(now, now.plusDays(1))  // regular state
-        );
-
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
-                expectedPutCall(4).bri(100).ct(200),
-                expectedPutCall(5).bri(50).ct(300)
-        );
-        runAndAssertPutCalls(runnables.get(1), expectedPutCall(2).bri(150).ct(400));
-
-        List<ScheduledRunnable> nextDayRunnables = ensureScheduledStates(
-                expectedRunnable(now.plusDays(1), now.plusDays(2)),
-                expectedRunnable(now.plusDays(1), now.plusDays(2))
-        );
-
-        // Scene modified
-        mockSceneLightStates(1, "TestScene",
-                ScheduledLightState.builder()
-                                   .id("/lights/4")
-                                   .bri(200)
-                                   .ct(400),
-                ScheduledLightState.builder()
-                                   .id("/lights/5")
-                                   .bri(150)
-                                   .ct(500));
-        simulateSceneModified(1, "TestScene");
-
-        // Scene state uses new values
-        advanceTimeAndRunAndAssertScenePutCalls(nextDayRunnables.getFirst(), 1,
-                expectedPutCall(4).bri(200).ct(400),
-                expectedPutCall(5).bri(150).ct(500)
-        );
-
-        // Regular state still uses original values
-        runAndAssertPutCalls(nextDayRunnables.get(1), expectedPutCall(2).bri(150).ct(400));
-
-        ensureScheduledStates(
-                expectedRunnable(now.plusDays(1), now.plusDays(2)),
                 expectedRunnable(now.plusDays(1), now.plusDays(2))
         );
     }
