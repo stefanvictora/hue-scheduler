@@ -252,52 +252,56 @@ public class ScheduledStateSnapshot {
             return null;
         }
         PutCalls putCalls = getPutCalls(now);
-        return putCalls.map(putCall -> {
-            if (putCall.getOn() == Boolean.FALSE) {
-                return putCall;
+        return putCalls.map(this::enrichFromPreviousStates);
+    }
+
+    /**
+     * Walks previous states to fill in missing brightness and color mode properties.
+     * Stops when both are filled, or when a null state / same state / no previous state is encountered.
+     */
+    PutCall enrichFromPreviousStates(PutCall putCall) {
+        if (putCall.getOn() == Boolean.FALSE) {
+            return putCall;
+        }
+        ScheduledStateSnapshot previousState = this;
+        while (putCall.getBri() == null || putCall.getColorMode() == ColorMode.NONE) { // stop as soon as we have brightness and color mode
+            previousState = previousState.getPreviousState();
+            if (previousState == null || isSameState(previousState) || previousState.isNullState()) {
+                break;
             }
-            ScheduledStateSnapshot previousState = this;
-            while (putCall.getBri() == null || putCall.getColorMode() == ColorMode.NONE) { // stop as soon as we have brightness and color mode
-                previousState = previousState.getPreviousState();
-                if (previousState == null || isSameState(previousState) || previousState.isNullState()) {
+            PutCalls previousPutCalls = previousState.getPutCallsIgnoringTransition();
+            PutCall previousPutCall;
+            if (previousPutCalls.isGeneralGroup()) {
+                previousPutCall = previousPutCalls.getFirst();
+            } else {
+                previousPutCall = previousPutCalls.get(putCall.getId());
+                if (previousPutCall == null) {
                     break;
                 }
-                PutCalls previousPutCalls = previousState.getPutCallsIgnoringTransition();
-                PutCall previousPutCall;
-                if (previousPutCalls.isGeneralGroup()) {
-                    previousPutCall = previousPutCalls.getFirst();
-                } else if (putCalls.isGeneralGroup()) { // optimization
-                    break; // we cannot map specific lights to a general group
-                } else {
-                    previousPutCall = previousPutCalls.get(putCall.getId());
-                    if (previousPutCall == null) {
-                        break; // no previous put call found, stop here
-                    }
-                }
-                if (putCall.getBri() == null) {
-                    putCall.setBri(previousPutCall.getBri());
-                }
-                if (shouldCopyEffect(putCall)) {
-                    putCall.setEffect(previousPutCall.getEffect());
-                }
-                if (shouldParameteriseEffect(putCall)) {
-                    Effect effect = putCall.getEffect();
-                    if (hasNoColorProperties(effect)) {
-                        Effect.EffectBuilder builder = effect.toBuilder();
-                        builder.x(previousPutCall.getX());
-                        builder.y(previousPutCall.getY());
-                        builder.ct(previousPutCall.getCt());
-                        putCall.setEffect(builder.build());
-                    }
-                } else if (putCall.getColorMode() == ColorMode.NONE) {
-                    putCall.setCt(previousPutCall.getCt());
-                    putCall.setX(previousPutCall.getX());
-                    putCall.setY(previousPutCall.getY());
-                    putCall.setGradient(previousPutCall.getGradient());
-                }
             }
-            return putCall;
-        });
+            if (putCall.getBri() == null) {
+                putCall.setBri(previousPutCall.getBri());
+            }
+            if (shouldCopyEffect(putCall)) {
+                putCall.setEffect(previousPutCall.getEffect());
+            }
+            if (shouldParameteriseEffect(putCall)) {
+                Effect effect = putCall.getEffect();
+                if (hasNoColorProperties(effect)) {
+                    Effect.EffectBuilder builder = effect.toBuilder();
+                    builder.x(previousPutCall.getX());
+                    builder.y(previousPutCall.getY());
+                    builder.ct(previousPutCall.getCt());
+                    putCall.setEffect(builder.build());
+                }
+            } else if (putCall.getColorMode() == ColorMode.NONE) {
+                putCall.setCt(previousPutCall.getCt());
+                putCall.setX(previousPutCall.getX());
+                putCall.setY(previousPutCall.getY());
+                putCall.setGradient(previousPutCall.getGradient());
+            }
+        }
+        return putCall;
     }
 
     private static boolean shouldCopyEffect(PutCall putCall) {

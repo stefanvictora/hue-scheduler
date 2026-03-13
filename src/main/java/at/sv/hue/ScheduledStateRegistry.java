@@ -144,10 +144,29 @@ public class ScheduledStateRegistry {
         return getAssignedGroupsSortedBySizeDesc(groupLights)
                 .stream()
                 .map(GroupInfo::groupId)
-                .flatMap(groupId -> findActivePutCalls(groupId, now).stream())
-                .flatMap(putCalls -> createOverriddenLightPutCalls(putCalls, groupLights))
+                .flatMap(groupId -> findActiveGroupPutCalls(groupId, groupLights, now))
                 .filter(Objects::nonNull)
                 .collect(Collectors.toMap(PutCall::getId, putCall -> putCall, (_, replacement) -> replacement, LinkedHashMap::new));
+    }
+
+    private Stream<PutCall> findActiveGroupPutCalls(String groupId, List<String> groupLights, ZonedDateTime now) {
+        List<ScheduledState> statesForId = findStatesForId(groupId);
+        if (statesForId == null) {
+            return Stream.empty();
+        }
+        Optional<ScheduledStateSnapshot> activeSnapshot = findActiveSnapshot(statesForId, now);
+        return activeSnapshot.stream()
+                             .flatMap(snapshot -> {
+                                 PutCalls putCalls = snapshot.getInterpolatedFullPicturePutCalls(now);
+                                 if (putCalls == null) {
+                                     return Stream.empty();
+                                 }
+                                 Stream<PutCall> perLightPutCalls = createOverriddenLightPutCalls(putCalls, groupLights);
+                                 if (putCalls.isGeneralGroup()) {
+                                     return perLightPutCalls.map(snapshot::enrichFromPreviousStates);
+                                 }
+                                 return perLightPutCalls;
+                             });
     }
 
     private List<PutCalls> findActivePutCalls(List<String> ids, ZonedDateTime now) {

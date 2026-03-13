@@ -60,7 +60,7 @@ import java.util.stream.Stream;
 
 import static at.sv.hue.InputConfigurationParser.parseBrightnessPercentValue;
 
-@Command(name = "HueScheduler", version = "0.15.0", mixinStandardHelpOptions = true, sortOptions = false)
+@Command(name = "HueScheduler", version = "0.15.0-SNAPSHOT", mixinStandardHelpOptions = true, sortOptions = false)
 public final class HueScheduler implements Runnable {
 
     private static final Logger LOG = LoggerFactory.getLogger(HueScheduler.class);
@@ -1304,11 +1304,21 @@ public final class HueScheduler implements Runnable {
                                          .map(ScheduledState::getId)
                                          .distinct()
                                          .toList();
+        syncScenesForActiveStates(affectedIds);
         for (String affectedId : affectedIds) {
             api.allowFastSceneUpdate(affectedId);
             lightEventListener.onLightOn(affectedId);
         }
         MDC.remove("context");
+    }
+
+    private void syncScenesForActiveStates(List<String> affectedIds) {
+        if (!enableSceneSync) {
+            return;
+        }
+        stateRegistry.findCurrentlyActiveStates().stream()
+                     .filter(snapshot -> affectedIds.contains(snapshot.getId()))
+                     .forEach(snapshot -> scheduleAsyncSceneSync(snapshot, true));
     }
 
     private void reloadLightStates(String sceneId, ScheduledState state) {

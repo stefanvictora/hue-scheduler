@@ -2557,4 +2557,139 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
 
         ensureRunnable(initialNow.plusDays(1).plusHours(1), initialNow.plusDays(2)); // next day
     }
+
+    @Test
+    void sceneControl_sceneModified_withSceneSync_syncsActiveState() {
+        enableSceneSync();
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        mockSceneLightStates(1, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100)
+                                   .ct(200),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(50)
+                                   .ct(300));
+        addState("g1", now, "scene:TestScene");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+                expectedPutCall(4).bri(100).ct(200),
+                expectedPutCall(5).bri(50).ct(300)
+        );
+
+        // Initial scene sync after state was applied
+        assertSceneUpdate("/groups/1",
+                expectedPutCall(4).bri(100).ct(200),
+                expectedPutCall(5).bri(50).ct(300)
+        );
+
+        ensureNextDayRunnable(now);
+
+        // Scene is modified by user
+        mockSceneLightStates(1, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(200)
+                                   .ct(400),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(150)
+                                   .ct(500));
+        simulateSceneModified(1, "TestScene");
+
+        ScheduledRunnable rescheduledState = ensureRunnable(now, now.plusDays(1));
+
+        // Scene sync should have been triggered with new values
+        assertSceneUpdate("/groups/1",
+                expectedPutCall(4).bri(200).ct(400),
+                expectedPutCall(5).bri(150).ct(500)
+        );
+
+        advanceTimeAndRunAndAssertScenePutCalls(rescheduledState, 1,
+                expectedPutCall(4).bri(200).ct(400),
+                expectedPutCall(5).bri(150).ct(500)
+        );
+    }
+
+    @Test
+    void sceneControl_sceneModified_withSceneSync_futureSceneState_syncsCurrentlyActiveGroupState() {
+        enableSceneSync();
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        mockSceneLightStates(1, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100)
+                                   .ct(200),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(50)
+                                   .ct(300));
+        addState("g1", now, "bri:180");
+        addState("g1", now.plusHours(2), "scene:TestScene");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusHours(2)),
+                expectedRunnable(now.plusHours(2), now.plusDays(1))
+        );
+
+        // Run the currently active group state
+        advanceTimeAndRunAndAssertGroupPutCalls(runnables.getFirst(),
+                expectedGroupPutCall(1).bri(180)
+        );
+
+        // Initial scene sync after group state was applied
+        assertSceneUpdate("/groups/1",
+                expectedPutCall(4).bri(180).ct(200),
+                expectedPutCall(5).bri(180).ct(300)
+        );
+
+        ensureRunnable(now.plusDays(1), now.plusDays(1).plusHours(2)); // next day
+
+        // Scene is modified by user — the scene state is in the future (now+2h), not currently active
+        mockSceneLightStates(1, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(254)
+                                   .ct(400),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(200)
+                                   .ct(500));
+        simulateSceneModified(1, "TestScene");
+
+        // Scene sync should still be triggered for the currently active group state,
+        // since the scene state shares the same target group
+        assertSceneUpdate("/groups/1",
+                expectedPutCall(4).bri(180).ct(400),
+                expectedPutCall(5).bri(180).ct(500)
+        );
+
+        // The group state is re-applied via power-transition (light-on event)
+        ScheduledRunnable rescheduledGroupState = ensureRunnable(now, now.plusHours(2));
+
+        advanceTimeAndRunAndAssertGroupPutCalls(rescheduledGroupState,
+                expectedGroupPutCall(1).bri(180)
+        );
+
+        // The future scene state should use the new values when it becomes active
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.get(1), 1,
+                expectedPutCall(4).bri(254).ct(400),
+                expectedPutCall(5).bri(200).ct(500)
+        );
+
+        // Scene sync with new scene values
+        assertSceneUpdate("/groups/1",
+                expectedPutCall(4).bri(254).ct(400),
+                expectedPutCall(5).bri(200).ct(500)
+        );
+
+        ensureRunnable(initialNow.plusDays(1).plusHours(2), initialNow.plusDays(2));
+    }
 }
