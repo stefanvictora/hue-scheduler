@@ -246,7 +246,8 @@ public final class HueApiImpl implements HueApi {
     public void putSceneState(String groupedLightId, List<PutCall> putCalls) {
         SceneUpdateResult result = createOrUpdateSceneInternal(groupedLightId, sceneControlAppData, sceneControlName,
                 removeTransitionTime(putCalls));
-        if (result.modified && !consumeFastSceneUpdate(groupedLightId)) {
+        boolean fastUpdate = consumeFastSceneUpdate(groupedLightId);
+        if (result.modified && !fastUpdate) {
             sleep();
         }
         Integer recallDuration = getRecallDuration(putCalls);
