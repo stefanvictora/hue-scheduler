@@ -247,8 +247,12 @@ public final class HueApiImpl implements HueApi {
         SceneUpdateResult result = createOrUpdateSceneInternal(groupedLightId, sceneControlAppData, sceneControlName,
                 removeTransitionTime(putCalls));
         boolean fastUpdate = consumeFastSceneUpdate(groupedLightId);
-        if (result.modified && !fastUpdate) {
-            sleep();
+        if (result.modified) {
+            if (fastUpdate) {
+                sleep(3000);
+            } else {
+                sleep(sceneUpdateSleepDelayInMs);
+            }
         }
         Integer recallDuration = getRecallDuration(putCalls);
         recallScene(result.sceneId, recallDuration);
@@ -280,11 +284,11 @@ public final class HueApiImpl implements HueApi {
                        .orElse(null);
     }
 
-    private void sleep() {
+    private void sleep(int delayInMs) {
         try {
             log.trace("Sleep for {} to ensure scene is properly recalled before next operation.",
-                    Duration.ofMillis(sceneUpdateSleepDelayInMs));
-            Thread.sleep(sceneUpdateSleepDelayInMs);
+                    Duration.ofMillis(delayInMs));
+            Thread.sleep(delayInMs);
         } catch (InterruptedException ignored) {
             Thread.currentThread().interrupt();
         }
