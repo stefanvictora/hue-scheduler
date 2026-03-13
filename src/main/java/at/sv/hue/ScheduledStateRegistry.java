@@ -135,8 +135,8 @@ public class ScheduledStateRegistry {
         ZonedDateTime now = currentTime.get();
         Map<String, PutCall> putCalls = getActivePutCallsFromGroups(groupLights, now);
         findActivePutCalls(groupLights, now).stream()
-                .flatMap(PutCalls::stream)
-                .forEach(putCall -> putCalls.put(putCall.getId(), putCall));
+                                            .flatMap(PutCalls::stream)
+                                            .forEach(putCall -> putCalls.put(putCall.getId(), putCall));
         return new ArrayList<>(putCalls.values());
     }
 
@@ -159,22 +159,22 @@ public class ScheduledStateRegistry {
 
     private Optional<PutCalls> findActivePutCalls(String id, ZonedDateTime now) {
         return Optional.ofNullable(findStatesForId(id))
-                       .flatMap(lightStatesForId -> findActivePutCall(lightStatesForId, now));
+                       .flatMap(scheduledStatesForId -> findActivePutCall(scheduledStatesForId, now));
     }
 
-    private Optional<PutCalls> findActivePutCall(List<ScheduledState> lightStatesForId, ZonedDateTime now) {
-        return findActiveSnapshot(lightStatesForId, now)
+    private Optional<PutCalls> findActivePutCall(List<ScheduledState> scheduledStatesForId, ZonedDateTime now) {
+        return findActiveSnapshot(scheduledStatesForId, now)
                 .map(snapshot -> snapshot.getInterpolatedFullPicturePutCalls(now));
     }
 
-    private Optional<ScheduledStateSnapshot> findActiveSnapshot(List<ScheduledState> lightStatesForId, ZonedDateTime now) {
+    private Optional<ScheduledStateSnapshot> findActiveSnapshot(List<ScheduledState> scheduledStatesForId, ZonedDateTime now) {
         ZonedDateTime theDayBefore = now.minusDays(1);
         ZonedDateTime theDayAfter = now.plusDays(1);
-        return lightStatesForId.stream()
-                               .flatMap(state -> Stream.of(state.getSnapshot(theDayBefore),
-                                       state.getSnapshot(now), state.getSnapshot(theDayAfter)))
-                               .filter(snapshot -> snapshot.isCurrentlyActive(now))
-                               .findFirst();
+        return scheduledStatesForId.stream()
+                                   .flatMap(state -> Stream.of(state.getSnapshot(theDayBefore),
+                                           state.getSnapshot(now), state.getSnapshot(theDayAfter)))
+                                   .filter(snapshot -> snapshot.isCurrentlyActive(now))
+                                   .findFirst();
     }
 
     private Stream<PutCall> createOverriddenLightPutCalls(PutCalls otherGroupPutCalls, List<String> groupLights) {
@@ -210,11 +210,19 @@ public class ScheduledStateRegistry {
         return lightStates.values();
     }
 
+    public List<ScheduledState> findStatesWithSceneId(String sceneId) {
+        return lightStates.values().stream()
+                          .flatMap(List::stream)
+                          .filter(ScheduledState::isSceneBased)
+                          .filter(state -> sceneId.equals(state.getSceneId()))
+                          .toList();
+    }
+
     public List<ScheduledStateSnapshot> findCurrentlyActiveStates() {
         ZonedDateTime now = currentTime.get();
         return values().stream()
-                .map(lightStatesForId -> findActiveSnapshot(lightStatesForId, now))
-                .flatMap(Optional::stream)
-                .toList();
+                       .map(lightStatesForId -> findActiveSnapshot(lightStatesForId, now))
+                       .flatMap(Optional::stream)
+                       .toList();
     }
 }

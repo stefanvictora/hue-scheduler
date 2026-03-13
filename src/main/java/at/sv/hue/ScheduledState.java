@@ -29,9 +29,15 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
     public static final int MAX_TRANSITION_TIME_MS = MAX_TRANSITION_TIME * 100;
 
     private final Identifier identifier;
-    private final List<ScheduledLightState> lightStates;
+    private volatile List<ScheduledLightState> lightStates;
     @Getter
     private final String startString;
+    @Getter
+    private final String sceneId;
+    @Getter
+    private final Integer sceneBrightnessModifier;
+    @Getter
+    private final Boolean sceneOnModifier;
     @Getter
     private final Integer definedTransitionTime;
     private final String transitionTimeBeforeString;
@@ -62,13 +68,16 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
 
     @Builder
     public ScheduledState(Identifier identifier, String startString, List<ScheduledLightState> lightStates,
-                          String transitionTimeBeforeString, Integer definedTransitionTime, Set<DayOfWeek> daysOfWeek,
-                          StartTimeProvider startTimeProvider,
+                          String sceneId, Integer sceneBrightnessModifier, Boolean sceneOnModifier, String transitionTimeBeforeString,
+                          Integer definedTransitionTime, Set<DayOfWeek> daysOfWeek, StartTimeProvider startTimeProvider,
                           int minTrBeforeGapInMinutes, int brightnessOverrideThreshold, int colorTemperatureOverrideThresholdKelvin,
                           double colorOverrideThreshold, Boolean force, Boolean interpolate, boolean groupState, boolean temporary) {
         this.identifier = identifier;
         this.startString = startString;
         this.lightStates = lightStates;
+        this.sceneId = sceneId;
+        this.sceneBrightnessModifier = sceneBrightnessModifier;
+        this.sceneOnModifier = sceneOnModifier;
         this.interpolate = interpolate;
         if (daysOfWeek == null || daysOfWeek.isEmpty()) {
             this.daysOfWeek = EnumSet.allOf(DayOfWeek.class);
@@ -99,10 +108,13 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
     }
 
     private static ScheduledState createTemporaryCopy(ScheduledState state, String start) {
-        ScheduledState copy = new ScheduledState(state.identifier, start,
-                copyLightStates(state.lightStates), state.transitionTimeBeforeString, state.definedTransitionTime, state.daysOfWeek, state.startTimeProvider,
+        // we pass null for light states, since we always delegate to the original state
+        ScheduledState copy = new ScheduledState(state.identifier, start, null, state.sceneId,
+                state.sceneBrightnessModifier, state.sceneOnModifier,
+                state.transitionTimeBeforeString, state.definedTransitionTime, state.daysOfWeek, state.startTimeProvider,
                 state.minTrBeforeGapInMinutes, state.brightnessOverrideThreshold, state.colorTemperatureOverrideThresholdKelvin,
-                state.colorOverrideThreshold, state.force, state.interpolate, state.groupState, true);
+                state.colorOverrideThreshold, state.force, state.interpolate, state.groupState, true
+        );
         copy.lastSeen = state.lastSeen;
         copy.originalState = state.originalState;
         copy.previousStateLookup = state.previousStateLookup;
@@ -110,10 +122,16 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
         return copy;
     }
 
-    private static List<ScheduledLightState> copyLightStates(List<ScheduledLightState> lightStates) {
-        return lightStates.stream()
-                          .map(lightState -> lightState.toBuilder().build())
-                          .toList();
+    public boolean isSceneBased() {
+        return sceneId != null;
+    }
+
+    public void updateLightStates(List<ScheduledLightState> newLightStates) {
+        this.lightStates = newLightStates;
+    }
+
+    private List<ScheduledLightState> getLightStates() {
+        return originalState.lightStates;
     }
 
     private Integer assertValidTransitionTime(Integer transitionTime) {
@@ -218,19 +236,19 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
     }
 
     public boolean isNullState() {
-        return lightStates.stream().allMatch(ScheduledLightState::isNullState);
+        return getLightStates().stream().allMatch(ScheduledLightState::isNullState);
     }
 
     public boolean hasOtherPropertiesThanOn() {
-        return lightStates.stream().anyMatch(ScheduledLightState::hasOtherPropertiesThanOn);
+        return getLightStates().stream().anyMatch(ScheduledLightState::hasOtherPropertiesThanOn);
     }
 
     public boolean isOff() {
-        return lightStates.stream().allMatch(ScheduledLightState::isOff);
+        return getLightStates().stream().allMatch(ScheduledLightState::isOff);
     }
 
     public boolean isOn() {
-        return lightStates.stream().anyMatch(ScheduledLightState::isOn);
+        return getLightStates().stream().anyMatch(ScheduledLightState::isOn);
     }
 
     public boolean lightStateDiffers(LightState currentState) {
@@ -268,9 +286,9 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
 
     public PutCalls getPutCalls(ZonedDateTime now, ZonedDateTime definedStart) {
         Integer transitionTime = now != null && definedStart != null ? getTransitionTime(now, definedStart) : null;
-        List<PutCall> putCallList = lightStates.stream()
-                                               .map(this::getPutCall)
-                                               .toList();
+        List<PutCall> putCallList = getLightStates().stream()
+                                                    .map(this::getPutCall)
+                                                    .toList();
         return new PutCalls(identifier.id(), putCallList, transitionTime, groupState);
     }
 
@@ -305,7 +323,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
         return "id=" + identifier.id() +
                (temporary && !triggeredByPowerTransition ? ", temporary" : "") +
                (triggeredByPowerTransition ? ", power-transition-state" : "") +
-               formatPropertyName("states") + lightStates.toString() +
+               formatPropertyName("states") + getLightStates().toString() +
                getFormattedDaysOfWeek() +
                getFormattedPropertyIfSet("tr-before", transitionTimeBeforeString) +
                getFormattedTransitionTimeIfSet("tr", definedTransitionTime) +

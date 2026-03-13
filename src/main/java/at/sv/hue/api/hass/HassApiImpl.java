@@ -159,6 +159,11 @@ public class HassApiImpl implements HueApi {
         putCalls.forEach(this::putState);
     }
 
+    @Override
+    public void allowFastSceneUpdate(String groupId) {
+        // no-op: Home Assistant does not use scene-based sleep delays
+    }
+
     private void putStateInternal(PutCall putCall) {
         String id = putCall.getId();
         assertSupportedStateType(id);
@@ -325,7 +330,12 @@ public class HassApiImpl implements HueApi {
     }
 
     @Override
-    public List<ScheduledLightState> getSceneLightStates(String groupId, String sceneName) {
+    public String getSceneId(String groupId, String sceneName) {
+        throw new UnsupportedOperationException("Scene scheduling is not supported by Home Assistant");
+    }
+
+    @Override
+    public List<ScheduledLightState> getSceneLightStates(String sceneId) {
         throw new UnsupportedOperationException("Scene scheduling is not supported by Home Assistant");
     }
 

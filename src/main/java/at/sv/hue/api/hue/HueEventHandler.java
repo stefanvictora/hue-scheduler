@@ -3,6 +3,7 @@ package at.sv.hue.api.hue;
 import at.sv.hue.api.LightEventListener;
 import at.sv.hue.api.ResourceModificationEventListener;
 import at.sv.hue.api.SceneEventListener;
+import at.sv.hue.api.SceneModificationListener;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -17,13 +18,16 @@ public final class HueEventHandler implements BackgroundEventHandler {
     private final LightEventListener lightEventListener;
     private final SceneEventListener sceneEventListener;
     private final ResourceModificationEventListener resourceModificationEventListener;
+    private final SceneModificationListener sceneModificationListener;
     private final ObjectMapper objectMapper;
 
     public HueEventHandler(LightEventListener lightEventListener, SceneEventListener sceneEventListener,
-                           ResourceModificationEventListener resourceModificationEventListener) {
+                           ResourceModificationEventListener resourceModificationEventListener,
+                           SceneModificationListener sceneModificationListener) {
         this.lightEventListener = lightEventListener;
         this.sceneEventListener = sceneEventListener;
         this.resourceModificationEventListener = resourceModificationEventListener;
+        this.sceneModificationListener = sceneModificationListener;
         objectMapper = new ObjectMapper();
         objectMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
     }
@@ -59,6 +63,9 @@ public final class HueEventHandler implements BackgroundEventHandler {
                 if (shouldFireModificationTrackingEvent(hueEvent, containerType)) {
                     resourceModificationEventListener.onModification(hueEvent.getType(), hueEvent.getId(),
                             getContent(containerType, resourceNode));
+                }
+                if (hueEvent.isSceneActionModification(containerType)) {
+                    sceneModificationListener.onSceneModified(hueEvent.getId());
                 }
                 if (hueEvent.isLightOrGroup() && hueEvent.isOffEvent()) { // todo:mutation coverage
                     lightEventListener.onLightOff(hueEvent.getId());
@@ -165,6 +172,10 @@ public final class HueEventHandler implements BackgroundEventHandler {
 
         public boolean notRelevantSceneModification() {
             return isScene() && actions == null && metadata == null;
+        }
+
+        public boolean isSceneActionModification(String containerType) {
+            return isScene() && actions != null && "update".equals(containerType);
         }
 
         @Data

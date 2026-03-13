@@ -30,6 +30,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.benmanes.caffeine.cache.AsyncLoadingCache;
+import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
@@ -82,6 +83,7 @@ public final class HueApiImpl implements HueApi {
     private final AsyncLoadingCache<String, Map<String, Group>> availableZonesCache;
     private final AsyncLoadingCache<String, Map<String, Group>> availableRoomsCache;
     private final AsyncLoadingCache<String, Map<String, ZigbeeConnectivity>> availableZigbeeConnectivityCache;
+    private final Cache<String, String> fastSceneUpdateIds;
 
     public HueApiImpl(HttpResourceProvider resourceProvider, String host, RateLimiter rateLimiter,
                       int apiCacheInvalidationIntervalInMinutes, String sceneControlName, String sceneControlAppData,
@@ -104,6 +106,9 @@ public final class HueApiImpl implements HueApi {
         availableZonesCache = createCache(this::lookupZones, apiCacheInvalidationIntervalInMinutes);
         availableRoomsCache = createCache(this::lookupRooms, apiCacheInvalidationIntervalInMinutes);
         availableZigbeeConnectivityCache = createCache(this::lookupZigbeeConnectivity, apiCacheInvalidationIntervalInMinutes);
+        fastSceneUpdateIds = Caffeine.newBuilder()
+                                     .expireAfterWrite(Duration.ofSeconds(30))
+                                     .build();
     }
 
     private static void assertNotHttpSchemeProvided(String host) {
@@ -241,13 +246,23 @@ public final class HueApiImpl implements HueApi {
     public void putSceneState(String groupedLightId, List<PutCall> putCalls) {
         SceneUpdateResult result = createOrUpdateSceneInternal(groupedLightId, sceneControlAppData, sceneControlName,
                 removeTransitionTime(putCalls));
-        if (result.modified) {
+        boolean fastUpdate = consumeFastSceneUpdate(groupedLightId);
+        if (result.modified && !fastUpdate) {
             sleep();
         }
         Integer recallDuration = getRecallDuration(putCalls);
         recallScene(result.sceneId, recallDuration);
         log.trace("Recalled temp scene for {}. Modified: {}. Transition time: {}", groupedLightId, result.modified,
                 recallDuration);
+    }
+
+    @Override
+    public void allowFastSceneUpdate(String groupId) {
+        fastSceneUpdateIds.put(groupId, groupId);
+    }
+
+    private boolean consumeFastSceneUpdate(String groupId) {
+        return fastSceneUpdateIds.asMap().remove(groupId) != null;
     }
 
     private static List<PutCall> removeTransitionTime(List<PutCall> putCalls) {
@@ -386,12 +401,21 @@ public final class HueApiImpl implements HueApi {
     }
 
     @Override
-    public List<ScheduledLightState> getSceneLightStates(String groupedLightId, String sceneName) {
+    public String getSceneId(String groupedLightId, String sceneName) {
         Group group = getAndAssertGroupExists(groupedLightId);
-        return getUniqueScene(group, sceneName).getActions()
-                                               .stream()
-                                               .map(this::createScheduledLightState)
-                                               .toList();
+        return getUniqueScene(group, sceneName).getId();
+    }
+
+    @Override
+    public List<ScheduledLightState> getSceneLightStates(String sceneId) {
+        Scene scene = getAvailableScenes().get(sceneId);
+        if (scene == null) {
+            throw new SceneNotFoundException("No scene with ID '" + sceneId + "' found");
+        }
+        return scene.getActions()
+                    .stream()
+                    .map(this::createScheduledLightState)
+                    .toList();
     }
 
     @Override

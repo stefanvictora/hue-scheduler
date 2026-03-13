@@ -3,6 +3,7 @@ package at.sv.hue.api.hue;
 import at.sv.hue.api.LightEventListener;
 import at.sv.hue.api.ResourceModificationEventListener;
 import at.sv.hue.api.SceneEventListener;
+import at.sv.hue.api.SceneModificationListener;
 import com.launchdarkly.eventsource.MessageEvent;
 import org.hamcrest.Matcher;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,11 +25,14 @@ class HueEventHandlerTest {
     private SceneEventListener sceneEventListener;
     @Mock
     private ResourceModificationEventListener resourceModificationEventListener;
+    @Mock
+    private SceneModificationListener sceneModificationListener;
     private HueEventHandler handler;
 
     @BeforeEach
     void setUp() {
-        handler = new HueEventHandler(lightEventListener, sceneEventListener, resourceModificationEventListener);
+        handler = new HueEventHandler(lightEventListener, sceneEventListener, resourceModificationEventListener,
+                sceneModificationListener);
     }
 
     @Test
@@ -662,6 +666,7 @@ class HueEventHandlerTest {
         verifyResourceModification("scene", "c1ad153a-b1ca-4250-a352-9dbb6f985586");
 
         verifyNoInteractions(sceneEventListener);
+        verifyNoInteractions(sceneModificationListener); // no modification, but addition of a new scene
     }
 
     @Test
@@ -718,6 +723,7 @@ class HueEventHandlerTest {
         verifyNoMoreInteractions(resourceModificationEventListener);
         verifyNoInteractions(lightEventListener);
         verifyNoInteractions(sceneEventListener);
+        verifyNoInteractions(sceneModificationListener);
     }
 
     @Test
@@ -814,6 +820,7 @@ class HueEventHandlerTest {
         
         verifyNoMoreInteractions(sceneEventListener);
         verifyNoInteractions(lightEventListener);
+        verifyNoInteractions(sceneModificationListener);
         verifyNoMoreInteractions(resourceModificationEventListener);
     }
 
@@ -984,5 +991,49 @@ class HueEventHandlerTest {
                 eq(id),
                 argThat(contentMatcher::matches)
         );
+    }
+
+    @Test
+    void onMessage_sceneActionsModified_notifiesSceneModificationListener() throws Exception {
+        handler.onMessage("", new MessageEvent("""
+                [
+                  {
+                    "creationtime": "2024-07-27T12:46:51Z",
+                    "data": [
+                      {
+                        "actions": [
+                          {
+                            "action": {
+                              "color": {
+                                "xy": {
+                                  "x": 0.5452,
+                                  "y": 0.2408
+                                }
+                              },
+                              "dimming": {
+                                "brightness": 50.0
+                              },
+                              "on": {
+                                "on": true
+                              }
+                            },
+                            "target": {
+                              "rid": "1aa6083d-3692-49e5-92f7-b926b302dd49",
+                              "rtype": "light"
+                            }
+                          }
+                        ],
+                        "id": "f6b7b1ee-31e1-4a24-b848-376a5dd6e2d4",
+                        "id_v1": "/scenes/abc123",
+                        "type": "scene"
+                      }
+                    ],
+                    "id": "e5302581-1b12-404b-a8b1-e69c25b3dd48",
+                    "type": "update"
+                  }
+                ]"""));
+
+        verify(sceneModificationListener).onSceneModified("f6b7b1ee-31e1-4a24-b848-376a5dd6e2d4");
+        verifyResourceModification("scene", "f6b7b1ee-31e1-4a24-b848-376a5dd6e2d4");
     }
 }
