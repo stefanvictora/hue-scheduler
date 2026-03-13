@@ -108,8 +108,9 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
     }
 
     private static ScheduledState createTemporaryCopy(ScheduledState state, String start) {
-        ScheduledState copy = new ScheduledState(state.identifier, start,
-                null, state.sceneId, state.sceneBrightnessModifier, state.sceneOnModifier,
+        // we pass null for light states, since we always delegate to the original state
+        ScheduledState copy = new ScheduledState(state.identifier, start, null, state.sceneId,
+                state.sceneBrightnessModifier, state.sceneOnModifier,
                 state.transitionTimeBeforeString, state.definedTransitionTime, state.daysOfWeek, state.startTimeProvider,
                 state.minTrBeforeGapInMinutes, state.brightnessOverrideThreshold, state.colorTemperatureOverrideThresholdKelvin,
                 state.colorOverrideThreshold, state.force, state.interpolate, state.groupState, true
