@@ -79,6 +79,12 @@ public interface HueApi extends ResourceModificationEventListener {
     void putSceneState(String groupId, List<PutCall> putCalls);
 
     /**
+     * Marks the given group ID as eligible for a fast scene update, skipping the usual sleep delay
+     * in {@link #putSceneState}. The flag expires automatically after a short time window.
+     */
+    void allowFastSceneUpdate(String groupId);
+
+    /**
      * @return the lights associated with the group of the given id. Not null.
      * @throws GroupNotFoundException if no group with given id was found
      * @throws EmptyGroupException    if the group has no lights associated

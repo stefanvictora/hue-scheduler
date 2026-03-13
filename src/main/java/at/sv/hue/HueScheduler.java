@@ -1305,6 +1305,7 @@ public final class HueScheduler implements Runnable {
                                          .distinct()
                                          .toList();
         for (String affectedId : affectedIds) {
+            api.allowFastSceneUpdate(affectedId);
             lightEventListener.onLightOn(affectedId);
         }
         MDC.remove("context");
