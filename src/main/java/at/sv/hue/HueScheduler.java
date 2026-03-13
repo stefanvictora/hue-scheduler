@@ -641,6 +641,7 @@ public final class HueScheduler implements Runnable {
     }
 
     private void schedule(ScheduledStateSnapshot snapshot, long delayInMs) {
+        MDC.put("context", snapshot.getContextName());
         if (snapshot.isNullState()) return;
         long overlappingDelayInMs = getPotentialOverlappingDelayInMs(snapshot);
         LOG.debug("Schedule: {} in {}", snapshot, Duration.ofMillis(delayInMs + overlappingDelayInMs).withNanos(0));
@@ -1291,12 +1292,20 @@ public final class HueScheduler implements Runnable {
         MDC.put("context", "scene-reload");
         LOG.info("Scene '{}' modified. Reloading {} state(s).", sceneId, states.size());
         for (ScheduledState state : states) {
+            MDC.put("context", "scene-reload");
             try {
                 reloadLightStates(sceneId, state);
                 LOG.info("Reloaded scene state: {}", state);
             } catch (Exception e) {
                 LOG.error("Failed to reload scene state for '{}': {}", state, e.getLocalizedMessage(), e);
             }
+        }
+        List<String> affectedIds = states.stream()
+                                         .map(ScheduledState::getId)
+                                         .distinct()
+                                         .toList();
+        for (String affectedId : affectedIds) {
+            lightEventListener.onLightOn(affectedId);
         }
         MDC.remove("context");
     }

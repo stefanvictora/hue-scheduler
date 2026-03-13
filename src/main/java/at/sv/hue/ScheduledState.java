@@ -109,7 +109,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
 
     private static ScheduledState createTemporaryCopy(ScheduledState state, String start) {
         ScheduledState copy = new ScheduledState(state.identifier, start,
-                copyLightStates(state.lightStates), state.sceneId, state.sceneBrightnessModifier, state.sceneOnModifier,
+                null, state.sceneId, state.sceneBrightnessModifier, state.sceneOnModifier,
                 state.transitionTimeBeforeString, state.definedTransitionTime, state.daysOfWeek, state.startTimeProvider,
                 state.minTrBeforeGapInMinutes, state.brightnessOverrideThreshold, state.colorTemperatureOverrideThresholdKelvin,
                 state.colorOverrideThreshold, state.force, state.interpolate, state.groupState, true
@@ -121,20 +121,16 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
         return copy;
     }
 
-    private static List<ScheduledLightState> copyLightStates(List<ScheduledLightState> lightStates) {
-        return lightStates.stream()
-                          .map(lightState -> lightState.toBuilder().build())
-                          .toList();
-    }
-
     public boolean isSceneBased() {
         return sceneId != null;
     }
 
     public void updateLightStates(List<ScheduledLightState> newLightStates) {
         this.lightStates = newLightStates;
-        snapshotCache.invalidateAll(); // todo: do we really need this?
-        lastPutCalls = null;
+    }
+
+    private List<ScheduledLightState> getLightStates() {
+        return originalState.lightStates;
     }
 
     private Integer assertValidTransitionTime(Integer transitionTime) {
@@ -239,19 +235,19 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
     }
 
     public boolean isNullState() {
-        return lightStates.stream().allMatch(ScheduledLightState::isNullState);
+        return getLightStates().stream().allMatch(ScheduledLightState::isNullState);
     }
 
     public boolean hasOtherPropertiesThanOn() {
-        return lightStates.stream().anyMatch(ScheduledLightState::hasOtherPropertiesThanOn);
+        return getLightStates().stream().anyMatch(ScheduledLightState::hasOtherPropertiesThanOn);
     }
 
     public boolean isOff() {
-        return lightStates.stream().allMatch(ScheduledLightState::isOff);
+        return getLightStates().stream().allMatch(ScheduledLightState::isOff);
     }
 
     public boolean isOn() {
-        return lightStates.stream().anyMatch(ScheduledLightState::isOn);
+        return getLightStates().stream().anyMatch(ScheduledLightState::isOn);
     }
 
     public boolean lightStateDiffers(LightState currentState) {
@@ -289,9 +285,9 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
 
     public PutCalls getPutCalls(ZonedDateTime now, ZonedDateTime definedStart) {
         Integer transitionTime = now != null && definedStart != null ? getTransitionTime(now, definedStart) : null;
-        List<PutCall> putCallList = lightStates.stream()
-                                               .map(this::getPutCall)
-                                               .toList();
+        List<PutCall> putCallList = getLightStates().stream()
+                                                    .map(this::getPutCall)
+                                                    .toList();
         return new PutCalls(identifier.id(), putCallList, transitionTime, groupState);
     }
 
@@ -326,7 +322,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
         return "id=" + identifier.id() +
                (temporary && !triggeredByPowerTransition ? ", temporary" : "") +
                (triggeredByPowerTransition ? ", power-transition-state" : "") +
-               formatPropertyName("states") + lightStates.toString() +
+               formatPropertyName("states") + getLightStates().toString() +
                getFormattedDaysOfWeek() +
                getFormattedPropertyIfSet("tr-before", transitionTimeBeforeString) +
                getFormattedTransitionTimeIfSet("tr", definedTransitionTime) +
