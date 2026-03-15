@@ -173,6 +173,11 @@ public final class HueScheduler implements Runnable {
             description = "The delay in milliseconds between scene creation/update and scene recall operations. " +
                           "This ensures the bridge has processed the scene changes. Default: ${DEFAULT-VALUE} ms.")
     int sceneUpdateSleepDelayInMs;
+    @Option(names = "--fast-scene-update-sleep-delay", paramLabel = "<delay>",
+            defaultValue = "${env:FAST_SCENE_UPDATE_SLEEP_DELAY:-3000}",
+            description = "The delay in milliseconds for fast scene update operations. " +
+                          "Used when a scene was recently recalled and needs a shorter update delay. Default: ${DEFAULT-VALUE} ms.")
+    int fastSceneUpdateSleepDelayInMs;
     int syncFailureRetryInMinutes = 3;
     @Option(names = "--event-stream-read-timeout", paramLabel = "<timeout>",
             defaultValue = "${env:EVENT_STREAM_READ_TIMEOUT:-120}",
@@ -407,7 +412,7 @@ public final class HueScheduler implements Runnable {
         RateLimiter rateLimiter = RateLimiter.create(requestsPerSecond);
         api = new HueApiImpl(new HttpResourceProviderImpl(httpsClient, maxConcurrentRequests), apiHost, rateLimiter,
                 apiCacheInvalidationIntervalInMinutes, sceneControlName, SCENE_CONTROL_APP_DATA,
-                sceneUpdateSleepDelayInMs);
+                sceneUpdateSleepDelayInMs, fastSceneUpdateSleepDelayInMs);
         lightEventListener = createLightEventListener();
         sceneEventListener = new SceneEventListenerImpl(api, Ticker.systemTicker(),
                 sceneActivationIgnoreWindowInSeconds, sceneSyncName::equals, lightEventListener);
@@ -525,6 +530,9 @@ public final class HueScheduler implements Runnable {
         }
         if (sceneUpdateSleepDelayInMs < 0) {
             fail("--scene-update-sleep-delay must be >= 0");
+        }
+        if (fastSceneUpdateSleepDelayInMs < 0) {
+            fail("--fast-scene-update-sleep-delay must be >= 0");
         }
     }
 

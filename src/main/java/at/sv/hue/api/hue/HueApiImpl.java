@@ -76,6 +76,7 @@ public final class HueApiImpl implements HueApi {
     private final String sceneControlName;
     private final String sceneControlAppData;
     private final int sceneUpdateSleepDelayInMs;
+    private final int fastSceneUpdateSleepDelayInMs;
     private final AsyncLoadingCache<String, Map<String, Light>> availableLightsCache;
     private final AsyncLoadingCache<String, Map<String, Device>> availableDevicesCache;
     private final AsyncLoadingCache<String, Map<String, Light>> availableGroupedLightsCache;
@@ -87,7 +88,7 @@ public final class HueApiImpl implements HueApi {
 
     public HueApiImpl(HttpResourceProvider resourceProvider, String host, RateLimiter rateLimiter,
                       int apiCacheInvalidationIntervalInMinutes, String sceneControlName, String sceneControlAppData,
-                      int sceneUpdateSleepDelayInMs) {
+                      int sceneUpdateSleepDelayInMs, int fastSceneUpdateSleepDelayInMs) {
         this.resourceProvider = resourceProvider;
         mapper = new ObjectMapper();
         mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
@@ -99,6 +100,7 @@ public final class HueApiImpl implements HueApi {
         this.sceneControlName = sceneControlName;
         this.sceneControlAppData = sceneControlAppData;
         this.sceneUpdateSleepDelayInMs = sceneUpdateSleepDelayInMs;
+        this.fastSceneUpdateSleepDelayInMs = fastSceneUpdateSleepDelayInMs;
         availableLightsCache = createCache(this::lookupLights, apiCacheInvalidationIntervalInMinutes);
         availableDevicesCache = createCache(this::lookupDevices, apiCacheInvalidationIntervalInMinutes);
         availableGroupedLightsCache = createCache(this::lookupGroupedLights, apiCacheInvalidationIntervalInMinutes);
@@ -249,7 +251,7 @@ public final class HueApiImpl implements HueApi {
         boolean fastUpdate = consumeFastSceneUpdate(groupedLightId);
         if (result.modified) {
             if (fastUpdate) {
-                sleep(3000);
+                sleep(fastSceneUpdateSleepDelayInMs);
             } else {
                 sleep(sceneUpdateSleepDelayInMs);
             }

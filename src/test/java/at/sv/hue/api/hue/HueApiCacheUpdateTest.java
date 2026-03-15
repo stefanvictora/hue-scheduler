@@ -52,7 +52,7 @@ class HueApiCacheUpdateTest {
     void init() {
         http = mock(HttpResourceProvider.class);
         api = new HueApiImpl(http, HOST, r -> {
-        }, 5, null, null, 2000);
+        }, 5, null, null, 2000, 0);
         mapper = new ObjectMapper();
         reset(http);
     }
