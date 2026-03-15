@@ -2312,6 +2312,58 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
     }
 
     @Test
+    void sceneControl_sceneModified_reloadsLightStates_lightIsOff_skipsReapply() {
+        mockDefaultGroupCapabilities(1);
+        addKnownLightIdsWithDefaultCapabilities(2);
+        mockGroupLightsForId(1, 4, 5);
+        mockSceneLightStates(1, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100)
+                                   .ct(200),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(50)
+                                   .ct(300));
+        addState("g1", now, "scene:TestScene");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+                expectedPutCall(4).bri(100).ct(200),
+                expectedPutCall(5).bri(50).ct(300)
+        );
+
+        ScheduledRunnable nextDayRunnable = ensureRunnable(now.plusDays(1), now.plusDays(2));
+
+        // group is off, scene is modified by user -> no reapply
+        mockIsGroupOff(1, true);
+        mockSceneLightStates(1, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(200)
+                                   .ct(400),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(150)
+                                   .ct(500));
+        simulateSceneModified(1, "TestScene");
+
+        ensureScheduledStates(0); // no reschedule
+
+        // next day, group is on again -> applies new scene values
+        mockIsGroupOff(1, false);
+        advanceTimeAndRunAndAssertScenePutCalls(nextDayRunnable, 1,
+                expectedPutCall(4).bri(200).ct(400),
+                expectedPutCall(5).bri(150).ct(500)
+        );
+
+        ensureRunnable(now.plusDays(1), now.plusDays(2)); // next day
+    }
+
+    @Test
     void sceneControl_sceneModified_withBriModifier_reAppliesScaling() {
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);

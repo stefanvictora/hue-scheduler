@@ -1308,16 +1308,24 @@ public final class HueScheduler implements Runnable {
                 LOG.error("Failed to reload scene state for '{}': {}", state, e.getLocalizedMessage(), e);
             }
         }
-        List<String> affectedIds = states.stream()
-                                         .map(ScheduledState::getId)
-                                         .distinct()
-                                         .toList();
+        List<String> affectedIds = getAffectedIds(states);
         syncScenesForActiveStates(affectedIds);
+        reapplyAffectedIdsIfOn(affectedIds);
+        MDC.remove("context");
+    }
+
+    private static List<String> getAffectedIds(List<ScheduledState> states) {
+        return states.stream().map(ScheduledState::getId).distinct().toList();
+    }
+
+    private void reapplyAffectedIdsIfOn(List<String> affectedIds) {
         for (String affectedId : affectedIds) {
+            if (api.isGroupOff(affectedId)) {
+                continue;
+            }
             api.allowFastSceneUpdate(affectedId);
             lightEventListener.onLightOn(affectedId);
         }
-        MDC.remove("context");
     }
 
     private void syncScenesForActiveStates(List<String> affectedIds) {
