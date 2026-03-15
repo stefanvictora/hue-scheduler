@@ -229,12 +229,18 @@ public final class HueApiImpl implements HueApi {
 
     @Override
     public void putState(PutCall putCall) {
+        if (putCall.isNullCall()) {
+            return;
+        }
         rateLimiter.acquire(1);
         putStateInternal("/light/", putCall);
     }
 
     @Override
     public void putGroupState(PutCall putCall) {
+        if (putCall.isNullCall()) {
+            return;
+        }
         rateLimiter.acquire(10);
         putStateInternal("/grouped_light/", putCall);
     }
