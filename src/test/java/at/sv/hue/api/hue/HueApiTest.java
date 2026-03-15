@@ -64,14 +64,14 @@ class HueApiTest {
         String host = "localhost";
         resourceProviderMock = Mockito.mock(HttpResourceProvider.class);
         api = new HueApiImpl(resourceProviderMock, host, _ -> {
-        }, 5, SCENE_CONTROL_NAME, SCENE_CONTROL_APP_DATA, 2000);
+        }, 5, SCENE_CONTROL_NAME, SCENE_CONTROL_APP_DATA, 2000, 0);
         baseUrl = "https://" + host + "/clip/v2/resource";
     }
 
     @Test
     void invalidHost_cantUseScheme_exception() {
         assertThrows(InvalidConnectionException.class, () -> new HueApiImpl(resourceProviderMock, "hTtps://localhost", permits -> {
-        }, 5, null, null, 2000));
+        }, 5, null, null, 2000, 0));
     }
 
     @Test
@@ -4436,6 +4436,13 @@ class HueApiTest {
     }
 
     @Test
+    void putState_empty_doesNotCallApi() {
+        performPutCall(PutCall.builder().id("2697622a-f39a-4f0e-b42e-651f94b4b983").build());
+        
+        verifyNoInteractions(resourceProviderMock);
+    }
+
+    @Test
     void putState_group_usesCorrectUrl() {
         String groupedLightId = "eeb336d9-243b-4756-8455-1c69f50efd31";
         performGroupPutCall(PutCall.builder().id(groupedLightId).bri(127).build());
@@ -4446,6 +4453,13 @@ class HueApiTest {
                     "brightness": 50.0
                   }
                 }""");
+    }
+
+    @Test
+    void putState_group_empty_doesNotCallApi() {
+        performGroupPutCall(PutCall.builder().id("eeb336d9-243b-4756-8455-1c69f50efd31").build());
+
+        verifyNoInteractions(resourceProviderMock);
     }
 
     @Test
@@ -4516,10 +4530,13 @@ class HueApiTest {
 
     @Test
     void putState_transitionTime_setsTimeCorrectly() {
-        performPutCall(PutCall.builder().id("ID").transitionTime(2).build());
+        performPutCall(PutCall.builder().id("ID").bri(127).transitionTime(2).build());
 
         verifyPut("/light/ID", """
                 {
+                  "dimming": {
+                    "brightness": 50.0
+                  },
                   "dynamics": {
                     "duration": 200
                   }
@@ -4528,9 +4545,14 @@ class HueApiTest {
 
     @Test
     void putState_transitionTime_defaultValueOfFour_isIgnored() {
-        performPutCall(PutCall.builder().id("ID").transitionTime(4).build());
+        performPutCall(PutCall.builder().id("ID").bri(127).transitionTime(4).build());
 
-        verifyPut("/light/ID", "{}");
+        verifyPut("/light/ID", """
+                {
+                  "dimming": {
+                    "brightness": 50.0
+                  }
+                }""");
     }
 
     @Test

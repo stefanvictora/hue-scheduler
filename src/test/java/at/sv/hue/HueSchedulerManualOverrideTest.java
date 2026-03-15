@@ -769,6 +769,7 @@ public class HueSchedulerManualOverrideTest extends AbstractHueSchedulerTest {
         // physical power on of second state -> resets overridden flag again
 
         scheduler.getHueEventListener().onPhysicalOn("/device/354");
+        verify(mockedHueApi).allowFastSceneUpdate("/lights/1");
 
         List<ScheduledRunnable> powerOnRunnables = ensureScheduledStates(
                 expectedPowerOnEnd(initialNow.plusMinutes(10)), // already ended
