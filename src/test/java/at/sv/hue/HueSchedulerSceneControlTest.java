@@ -10,6 +10,7 @@ import java.util.EnumSet;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.verify;
 
 public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
 
@@ -2288,6 +2289,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                                    .ct(500));
         simulateSceneModified(1, "TestScene");
 
+        verify(mockedHueApi).allowFastSceneUpdate("/groups/1");
         // Rescheduled current scene state -> uses new values
         ScheduledRunnable rescheduledState = ensureRunnable(now, now.plusDays(1));
 

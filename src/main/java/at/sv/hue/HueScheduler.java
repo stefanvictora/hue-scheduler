@@ -174,7 +174,7 @@ public final class HueScheduler implements Runnable {
                           "This ensures the bridge has processed the scene changes. Default: ${DEFAULT-VALUE} ms.")
     int sceneUpdateSleepDelayInMs;
     @Option(names = "--fast-scene-update-sleep-delay", paramLabel = "<delay>",
-            defaultValue = "${env:FAST_SCENE_UPDATE_SLEEP_DELAY:-3000}",
+            defaultValue = "${env:FAST_SCENE_UPDATE_SLEEP_DELAY:-2000}",
             description = "The delay in milliseconds for fast scene update operations. " +
                           "Used when a scene was recently recalled and needs a shorter update delay. Default: ${DEFAULT-VALUE} ms.")
     int fastSceneUpdateSleepDelayInMs;
@@ -331,6 +331,7 @@ public final class HueScheduler implements Runnable {
         return new LightEventListenerImpl(manualOverrideTracker,
                 deviceId -> api.getAffectedIdsByDevice(deviceId),
                 id -> sceneEventListener.wasRecentlyAffectedBySyncedScene(id),
+                api::allowFastSceneUpdate,
                 supportsOffLightUpdates);
     }
 
@@ -1323,7 +1324,6 @@ public final class HueScheduler implements Runnable {
             if (api.isGroupOff(affectedId)) {
                 continue;
             }
-            api.allowFastSceneUpdate(affectedId);
             lightEventListener.onLightOn(affectedId);
         }
     }
