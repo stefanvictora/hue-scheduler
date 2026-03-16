@@ -1325,6 +1325,7 @@ public final class HueScheduler implements Runnable {
             if (api.isGroupOff(affectedId)) {
                 continue;
             }
+            sceneEventListener.resetRecentlyAffectedId(affectedId);
             lightEventListener.onLightOn(affectedId);
         }
     }

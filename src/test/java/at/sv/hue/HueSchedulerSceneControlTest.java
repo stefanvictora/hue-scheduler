@@ -2576,6 +2576,8 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
 
         ensureRunnable(now.plusDays(1), now.plusDays(1).plusHours(1)); // next day
 
+        // User activates scene via app to modify it, which triggers a scene update with new values, but should not trigger manual override
+        simulateSceneActivated("/groups/1", "/lights/4", "/lights/5");
         mockSceneLightStates(1, "TestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")

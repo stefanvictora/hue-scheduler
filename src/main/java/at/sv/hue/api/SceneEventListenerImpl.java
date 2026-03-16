@@ -91,4 +91,10 @@ public final class SceneEventListenerImpl implements SceneEventListener {
     public boolean wasRecentlyAffectedBySyncedScene(String id) {
         return recentlyAffectedSyncedIds.getIfPresent(id) != null;
     }
+
+    @Override
+    public void resetRecentlyAffectedId(String id) {
+        recentlyAffectedIds.invalidate(id);
+        recentlyAffectedSyncedIds.invalidate(id);
+    }
 }
