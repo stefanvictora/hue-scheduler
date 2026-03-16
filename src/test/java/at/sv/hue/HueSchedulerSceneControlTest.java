@@ -1305,7 +1305,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
     }
 
     @Test
-    void sceneControl_groupThenScene_noFullPicturePossible_keepsOwnProperties_correctPutCalls() {
+    void sceneControl_groupThenScene_stillUsesFullPicture_keepsOwnProperties_correctPutCalls() {
         mockDefaultGroupCapabilities(2);
         mockGroupLightsForId(2, 4, 5);
         mockSceneLightStates(2, "TestScene",
@@ -1325,8 +1325,9 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now.plusMinutes(10), now.plusDays(1))
         );
 
-        advanceTimeAndRunAndAssertGroupPutCalls(runnables.getFirst(),
-                expectedGroupPutCall(2).ct(200)
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 2,
+                expectedPutCall(4).bri(100).ct(200),
+                expectedPutCall(5).bri(150).ct(200)
         );
 
         ensureScheduledStates(
@@ -2693,9 +2694,10 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now.plusHours(2), now.plusDays(1))
         );
 
-        // Run the currently active group state
-        advanceTimeAndRunAndAssertGroupPutCalls(runnables.getFirst(),
-                expectedGroupPutCall(1).bri(180)
+        // Run the currently active group state -> uses full picture
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+                expectedPutCall(4).bri(180).ct(200),
+                expectedPutCall(5).bri(180).ct(300)
         );
 
         // Initial scene sync after group state was applied
@@ -2728,8 +2730,9 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
         // The group state is re-applied via power-transition (light-on event)
         ScheduledRunnable rescheduledGroupState = ensureRunnable(now, now.plusHours(2));
 
-        advanceTimeAndRunAndAssertGroupPutCalls(rescheduledGroupState,
-                expectedGroupPutCall(1).bri(180)
+        advanceTimeAndRunAndAssertScenePutCalls(rescheduledGroupState, 1,
+                expectedPutCall(4).bri(180).ct(400),
+                expectedPutCall(5).bri(180).ct(500)
         );
 
         // The future scene state should use the new values when it becomes active

@@ -31,6 +31,8 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
     private final Identifier identifier;
     private volatile List<ScheduledLightState> lightStates;
     @Getter
+    private final List<String> groupLightIds;
+    @Getter
     private final String startString;
     @Getter
     private final String sceneId;
@@ -68,6 +70,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
 
     @Builder
     public ScheduledState(Identifier identifier, String startString, List<ScheduledLightState> lightStates,
+                          List<String> groupLightIds,
                           String sceneId, Integer sceneBrightnessModifier, Boolean sceneOnModifier, String transitionTimeBeforeString,
                           Integer definedTransitionTime, Set<DayOfWeek> daysOfWeek, StartTimeProvider startTimeProvider,
                           int minTrBeforeGapInMinutes, int brightnessOverrideThreshold, int colorTemperatureOverrideThresholdKelvin,
@@ -75,6 +78,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
         this.identifier = identifier;
         this.startString = startString;
         this.lightStates = lightStates;
+        this.groupLightIds = groupLightIds;
         this.sceneId = sceneId;
         this.sceneBrightnessModifier = sceneBrightnessModifier;
         this.sceneOnModifier = sceneOnModifier;
@@ -109,7 +113,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
 
     private static ScheduledState createTemporaryCopy(ScheduledState state, String start) {
         // we pass null for light states, since we always delegate to the original state
-        ScheduledState copy = new ScheduledState(state.identifier, start, null, state.sceneId,
+        ScheduledState copy = new ScheduledState(state.identifier, start, null, state.groupLightIds, state.sceneId,
                 state.sceneBrightnessModifier, state.sceneOnModifier,
                 state.transitionTimeBeforeString, state.definedTransitionTime, state.daysOfWeek, state.startTimeProvider,
                 state.minTrBeforeGapInMinutes, state.brightnessOverrideThreshold, state.colorTemperatureOverrideThresholdKelvin,

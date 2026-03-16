@@ -161,11 +161,7 @@ public class ScheduledStateRegistry {
                                  if (putCalls == null) {
                                      return Stream.empty();
                                  }
-                                 Stream<PutCall> perLightPutCalls = createOverriddenLightPutCalls(putCalls, groupLights);
-                                 if (putCalls.isGeneralGroup()) {
-                                     return perLightPutCalls.map(snapshot::enrichFromPreviousStates);
-                                 }
-                                 return perLightPutCalls;
+                                 return createOverriddenLightPutCalls(putCalls, groupLights);
                              });
     }
 

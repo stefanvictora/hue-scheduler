@@ -10,6 +10,7 @@ import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
@@ -252,14 +253,26 @@ public class ScheduledStateSnapshot {
             return null;
         }
         PutCalls putCalls = getPutCalls(now);
+        if (putCalls.isGeneralGroup()) {
+            return expandAndEnrichPerLightPutCalls(putCalls);
+        }
         return putCalls.map(this::enrichFromPreviousStates);
+    }
+
+    private PutCalls expandAndEnrichPerLightPutCalls(PutCalls generalGroupPutCalls) {
+        PutCall groupPutCall = generalGroupPutCalls.getFirst();
+        List<PutCall> expanded = scheduledState.getGroupLightIds().stream()
+                                               .map(lightId -> groupPutCall.toBuilder().id(lightId).build())
+                                               .map(this::enrichFromPreviousStates)
+                                               .toList();
+        return new PutCalls(generalGroupPutCalls.getId(), expanded, generalGroupPutCalls.getTransitionTime(), true);
     }
 
     /**
      * Walks previous states to fill in missing brightness and color mode properties.
      * Stops when both are filled, or when a null state / same state / no previous state is encountered.
      */
-    PutCall enrichFromPreviousStates(PutCall putCall) {
+    private PutCall enrichFromPreviousStates(PutCall putCall) {
         if (putCall.getOn() == Boolean.FALSE) {
             return putCall;
         }
