@@ -51,6 +51,7 @@ import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.Executors;
@@ -1332,8 +1333,9 @@ public final class HueScheduler implements Runnable {
         if (!enableSceneSync) {
             return;
         }
+        HashSet<String> affectedIdSet = new HashSet<>(affectedIds);
         stateRegistry.findCurrentlyActiveStates().stream()
-                     .filter(snapshot -> affectedIds.contains(snapshot.getId()))
+                     .filter(snapshot -> affectedIdSet.contains(snapshot.getId()))
                      .forEach(snapshot -> scheduleAsyncSceneSync(snapshot, true));
     }
 
