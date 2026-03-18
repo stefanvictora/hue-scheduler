@@ -1,3 +1,43 @@
+## [0.15.0] - 2026-03-18
+
+### Added
+- **Scene scheduling for groups** (`scene:<name>`) (#47):
+  - Load per-light states from an existing Hue scene and schedule them as a group state.
+  - Auto-reloads the light states on scene changes.
+  - Lights within the scene retain their individual brightness, color temperature, color, effect, and gradient settings.
+  - Proportional brightness scaling: when `bri` is specified alongside `scene:`, each light's brightness is scaled proportionally (e.g., `bri:50%` dims all lights to 50% of their scene brightness). Values above `100%` boost brightness proportionally — individual lights are capped at their maximum.
+  - `on:true` can be combined with `scene:` to ensure all scene lights are turned on.
+  - Scene states are applied via temporary Hue scenes (create/update + recall) for synchronized, per-light control.
+  - **`--scene-control-name`**: New CLI option to set the name of the temporary scene used for scene scheduling (default: `HueTemp`).
+  - **`--scene-update-sleep-delay`**: New CLI option to configure the delay (in ms) between scene update and recall, preventing race conditions on the bridge (default: `13000`).
+  - **`--fast-scene-update-sleep-delay`**: New CLI option to configure the delay (in ms) zsed when a scene was recently recalled and needs a shorter update delay. (default: `2000`).
+  - **Note:** Not supported with Home Assistant, as scene details cannot be retrieved via the HA API.
+- **Gradient support** for gradient-capable Hue lights:
+  - New `gradient` property: `gradient:[<color>, <color>, ...]` with 2–5 color points (depends on device capabilities).
+  - Colors inside the gradient can be any supported format: `#hex`, `rgb(r g b)`, `xy(x y)`, `oklch(L C h)`.
+  - Optional mode suffix: `gradient:[<color>, <color>]@<mode>` (validated against device capabilities). Current known modes: `interpolated_palette`, `interpolated_palette_mirrored`, `random_pixelated`, `segmented_palette`
+  - Auto-fill: when exactly 2 points are provided, intermediate points are automatically generated using perceptual OKLab interpolation up to the device's maximum gradient point count.
+  - Full interpolation support: gradients interpolate smoothly between states, including polyline sampling for different-sized point lists.
+  - **Note**: The Hue bridge currently supports gradients only for individual lights and not groups.
+- **OKLab/OKLCH color input**: New `oklch()` color format for perceptually uniform color specification.
+  - Syntax: `color:oklch(L C h)` where L is lightness (0–1 or percentage), C is chroma, and h is hue in degrees.
+  - Supports `deg`, `grad`, `rad`, `turn` angle units.
+  - Brightness is derived from the L component when `bri` is not explicitly set.
+  - Also supported inside `gradient:[oklch(...), oklch(...)]`.
+- **Effect speed parameter**: Effects now accept an optional speed value.
+  - Syntax: `effect:<name>@<speed>` where speed is `0.0–1.0` (e.g., `effect:candle@0.5`).
+- **Parameterized effects**: Effects can now be combined with `color`, `ct`, or `x`/`y` to set the effect's color parameter (e.g., `effect:candle  ct:350`). When loaded from scenes, parameterized effect states including color temperature, color, and speed are fully preserved.
+- **`on:false` interpolation**:
+
+### Changed
+- **Synced scene name default** changed from `HueScheduler` to `Hue Scheduler` (`--scene-sync-name`) for better in-app display. Existing synced scenes are automatically migrated on startup (Hue Bridge only).
+- **Color sync threshold** (`--color-sync-threshold`) default changed from `0.03` to `0.04`.
+- **Stricter configuration parsing**: Normalized values and stricter boolean handling ensure consistent behavior across environments.
+- **Updated to Java 25** which improves overall performance and reliability, especially for bigger configurations (#46, #49, #52)
+
+### Removed
+- Removed `hue`and `sat` properties from scheduled states.
+
 ## [0.14.4] - 2026-03-05
 
 ### Added

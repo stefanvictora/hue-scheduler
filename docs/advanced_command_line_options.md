@@ -4,7 +4,7 @@
 
 **Scene Sync & Activation**
 
-- [`--enable-scene-sync`](#--enable-scene-sync) · [`--require-scene-activation`](#--require-scene-activation) · [`--scene-sync-name`](#--scene-sync-name) · [`--scene-activation-ignore-window`](#--scene-activation-ignore-window)
+- [`--enable-scene-sync`](#--enable-scene-sync) · [`--require-scene-activation`](#--require-scene-activation) · [`--scene-sync-name`](#--scene-sync-name) · [`--scene-control-name`](#--scene-control-name) · [`--scene-activation-ignore-window`](#--scene-activation-ignore-window)
 
 **Interpolation & Transitions**
 
@@ -20,7 +20,7 @@
 
 **Reliability & Connectivity**
 
-- [`--bridge-failure-retry-delay`](#--bridge-failure-retry-delay) · [`--power-on-reschedule-delay`](#--power-on-reschedule-delay) · [`--event-stream-read-timeout`](#--event-stream-read-timeout)
+- [`--bridge-failure-retry-delay`](#--bridge-failure-retry-delay) · [`--power-on-reschedule-delay`](#--power-on-reschedule-delay) · [`--event-stream-read-timeout`](#--event-stream-read-timeout) · [`--scene-update-sleep-delay`](#--scene-update-sleep-delay) · [`--fast-scene-update-sleep-delay`](#--fast-scene-update-sleep-delay)
 
 **Performance & Rate Limiting**
 
@@ -63,7 +63,15 @@ Use `force:true` to override this behavior for specific states.
 
 Sets the name of the synced scene (used with `--enable-scene-sync`).
 
-**Default:** `HueScheduler`
+**Default:** `Hue Scheduler`
+
+### `--scene-control-name`
+
+*New in 0.15.0*
+
+The name of the temp scene to perform scene scheduling.
+
+**Default:** `HueTemp`
 
 ### `--scene-activation-ignore-window`
 
@@ -256,6 +264,18 @@ Delay **in milliseconds** between receiving an **on-event** and (re)applying the
 Read timeout **in minutes** for the API v2 SSE event stream. The connection is automatically restored after a timeout. The default (2 hours) may be adjusted in future releases based on further observations.
 
 **Default:** `120` minutes
+
+### `--scene-update-sleep-delay`
+
+Delay **in milliseconds** between scene creation/update and scene recall operations. This ensures the bridge has processed the scene changes before recalling them. Off lights especially take some time to process scene changes.
+
+**Default:** `13000` ms
+
+### `--fast-scene-update-sleep-delay`
+
+Delay **in milliseconds** for fast scene update operations. Used when a scene was recently recalled and needs a shorter update delay.
+
+**Default:** `2000` ms
 
 ## Security
 
