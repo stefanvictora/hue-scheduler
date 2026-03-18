@@ -79,8 +79,10 @@ public final class InputConfigurationParser {
                 }
             }
             LightCapabilities capabilities;
+            List<String> groupLightIds = null;
             if (groupState) {
                 capabilities = api.getGroupCapabilities(identifier.id());
+                groupLightIds = api.getGroupLights(identifier.id());
             } else {
                 capabilities = api.getLightCapabilities(identifier.id());
             }
@@ -216,7 +218,7 @@ public final class InputConfigurationParser {
                         capBrightness(bri), ct, x, y, on, effectValue, effectSpeed, gradient, autoFillGradient);
                 scheduledLightStates = List.of(validator.getScheduledLightState());
             }
-            states.add(new ScheduledState(identifier, start, scheduledLightStates, sceneId, bri, on, transitionTimeBefore,
+            states.add(new ScheduledState(identifier, start, scheduledLightStates, groupLightIds, sceneId, bri, on, transitionTimeBefore,
                     transitionTime, dayOfWeeks, startTimeProvider, minTrBeforeGapInMinutes, brightnessOverrideThreshold,
                     colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold, force, interpolate, groupState, false
             ));

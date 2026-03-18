@@ -6,4 +6,6 @@ public interface SceneEventListener {
     boolean wasRecentlyAffectedByNormalScene(String id);
 
     boolean wasRecentlyAffectedBySyncedScene(String id);
+
+    void resetRecentlyAffectedId(String id);
 }

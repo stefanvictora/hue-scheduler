@@ -51,6 +51,7 @@ import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.Executors;
@@ -60,7 +61,7 @@ import java.util.stream.Stream;
 
 import static at.sv.hue.InputConfigurationParser.parseBrightnessPercentValue;
 
-@Command(name = "HueScheduler", version = "0.15.0", mixinStandardHelpOptions = true, sortOptions = false)
+@Command(name = "HueScheduler", version = "0.15.0-SNAPSHOT", mixinStandardHelpOptions = true, sortOptions = false)
 public final class HueScheduler implements Runnable {
 
     private static final Logger LOG = LoggerFactory.getLogger(HueScheduler.class);
@@ -173,6 +174,11 @@ public final class HueScheduler implements Runnable {
             description = "The delay in milliseconds between scene creation/update and scene recall operations. " +
                           "This ensures the bridge has processed the scene changes. Default: ${DEFAULT-VALUE} ms.")
     int sceneUpdateSleepDelayInMs;
+    @Option(names = "--fast-scene-update-sleep-delay", paramLabel = "<delay>",
+            defaultValue = "${env:FAST_SCENE_UPDATE_SLEEP_DELAY:-2000}",
+            description = "The delay in milliseconds for fast scene update operations. " +
+                          "Used when a scene was recently recalled and needs a shorter update delay. Default: ${DEFAULT-VALUE} ms.")
+    int fastSceneUpdateSleepDelayInMs;
     int syncFailureRetryInMinutes = 3;
     @Option(names = "--event-stream-read-timeout", paramLabel = "<timeout>",
             defaultValue = "${env:EVENT_STREAM_READ_TIMEOUT:-120}",
@@ -326,6 +332,7 @@ public final class HueScheduler implements Runnable {
         return new LightEventListenerImpl(manualOverrideTracker,
                 deviceId -> api.getAffectedIdsByDevice(deviceId),
                 id -> sceneEventListener.wasRecentlyAffectedBySyncedScene(id),
+                api::allowFastSceneUpdate,
                 supportsOffLightUpdates);
     }
 
@@ -407,7 +414,7 @@ public final class HueScheduler implements Runnable {
         RateLimiter rateLimiter = RateLimiter.create(requestsPerSecond);
         api = new HueApiImpl(new HttpResourceProviderImpl(httpsClient, maxConcurrentRequests), apiHost, rateLimiter,
                 apiCacheInvalidationIntervalInMinutes, sceneControlName, SCENE_CONTROL_APP_DATA,
-                sceneUpdateSleepDelayInMs);
+                sceneUpdateSleepDelayInMs, fastSceneUpdateSleepDelayInMs);
         lightEventListener = createLightEventListener();
         sceneEventListener = new SceneEventListenerImpl(api, Ticker.systemTicker(),
                 sceneActivationIgnoreWindowInSeconds, sceneSyncName::equals, lightEventListener);
@@ -525,6 +532,9 @@ public final class HueScheduler implements Runnable {
         }
         if (sceneUpdateSleepDelayInMs < 0) {
             fail("--scene-update-sleep-delay must be >= 0");
+        }
+        if (fastSceneUpdateSleepDelayInMs < 0) {
+            fail("--fast-scene-update-sleep-delay must be >= 0");
         }
     }
 
@@ -1300,15 +1310,34 @@ public final class HueScheduler implements Runnable {
                 LOG.error("Failed to reload scene state for '{}': {}", state, e.getLocalizedMessage(), e);
             }
         }
-        List<String> affectedIds = states.stream()
-                                         .map(ScheduledState::getId)
-                                         .distinct()
-                                         .toList();
+        List<String> affectedIds = getAffectedIds(states);
+        syncScenesForActiveStates(affectedIds);
+        reapplyAffectedIdsIfOn(affectedIds);
+        MDC.remove("context");
+    }
+
+    private static List<String> getAffectedIds(List<ScheduledState> states) {
+        return states.stream().map(ScheduledState::getId).distinct().toList();
+    }
+
+    private void reapplyAffectedIdsIfOn(List<String> affectedIds) {
         for (String affectedId : affectedIds) {
-            api.allowFastSceneUpdate(affectedId);
+            if (api.isGroupOff(affectedId)) {
+                continue;
+            }
+            sceneEventListener.resetRecentlyAffectedId(affectedId);
             lightEventListener.onLightOn(affectedId);
         }
-        MDC.remove("context");
+    }
+
+    private void syncScenesForActiveStates(List<String> affectedIds) {
+        if (!enableSceneSync) {
+            return;
+        }
+        HashSet<String> affectedIdSet = new HashSet<>(affectedIds);
+        stateRegistry.findCurrentlyActiveStates().stream()
+                     .filter(snapshot -> affectedIdSet.contains(snapshot.getId()))
+                     .forEach(snapshot -> scheduleAsyncSceneSync(snapshot, true));
     }
 
     private void reloadLightStates(String sceneId, ScheduledState state) {

@@ -5112,6 +5112,7 @@ class HueSchedulerTest extends AbstractHueSchedulerTest {
 
         ScheduledRunnable powerOnRunnable = simulateLightOnEventExpectingSingleScheduledState();
 
+        verify(mockedHueApi).allowFastSceneUpdate("/lights/1");
         advanceTimeAndRunAndAssertPutCalls(powerOnRunnable,
                 defaultPutCall()
         );
