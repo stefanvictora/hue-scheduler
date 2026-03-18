@@ -69,11 +69,13 @@ Sets the name of the synced scene (used with `--enable-scene-sync`).
 
 *New in 0.15.0*
 
-The name of the temp scene to perform scene scheduling.
+Name of the temporary Hue scene created internally for scene scheduling (the `scene:` property). This scene is created/updated and then recalled to apply per-light states synchronously. You may need to change this if the default name conflicts with an existing scene.
 
 **Default:** `HueTemp`
 
 ### `--scene-activation-ignore-window`
+
+*New in 0.11.0*
 
 Relevant only when user-modification tracking is **enabled** (i.e., `--disable-user-modification-tracking` is **not** set).
 
@@ -169,7 +171,7 @@ Relevant only when user-modification tracking is **enabled**.
 
 The OKLab color distance threshold above which a light’s color counts as **significantly changed** to schedule the next scene sync or background interpolation.
 
-**Default:** `0.03`
+**Default:** `0.04`
 
 ### `--brightness-sync-threshold`
 
@@ -267,13 +269,17 @@ Read timeout **in minutes** for the API v2 SSE event stream. The connection is a
 
 ### `--scene-update-sleep-delay`
 
-Delay **in milliseconds** between scene creation/update and scene recall operations. This ensures the bridge has processed the scene changes before recalling them. Off lights especially take some time to process scene changes.
+*New in 0.15.0*
+
+Delay **in milliseconds** between scene creation/update and scene recall during scene scheduling (`scene:` property). This ensures the bridge has processed the scene changes before recalling them. Off lights especially take longer to process scene changes.
 
 **Default:** `13000` ms
 
 ### `--fast-scene-update-sleep-delay`
 
-Delay **in milliseconds** for fast scene update operations. Used when a scene was recently recalled and needs a shorter update delay.
+*New in 0.15.0*
+
+Shorter delay **in milliseconds** used for scene scheduling when the target light was recently turned on.
 
 **Default:** `2000` ms
 

@@ -137,11 +137,11 @@ Hue Scheduler supports several ways to set color:
   
   **Parameterized effects:** Effects can be combined with `color`, `ct`, or `x`/`y` to set the effect's color parameter. When an effect is active, these color properties become parameters of the effect rather than direct light state properties. For example, `effect:candle  ct:350` creates a candle effect with a warm color temperature, and `effect:opal  color:#FF5500` sets the effect's color. With `effect:none`, color properties behave as regular light state properties.
 
-- `gradient` — Multi-color gradient for compatible lights. Syntax: `gradient:[<color>, <color>, ...]` with 2–5 color points. Colors can be in any supported format: `#hex`, `rgb(r g b)`, `xy(x y)`, `oklch(L C h)`. Cannot be combined with `ct`, `x`/`y`, or `effect`.
+- `gradient` — Multi-color gradient for compatible lights. Syntax: `gradient:[<color>, <color>, ...]` with 2–5 color points. Colors can be in any supported format: `#hex`, `rgb(r g b)`, `xy(x y)`, `oklch(L C h)`. Cannot be combined with other color properties or `effect`.
   
   **Mode suffix:** Optionally append `@<mode>` (e.g., `gradient:[#FF0000, #0000FF]@interpolated_palette`). Available modes depend on the device. Current known values: `interpolated_palette`, `interpolated_palette_mirrored`, `random_pixelated`, `segmented_palette`.
   
-  **Auto-fill:** When exactly 2 color points are provided, intermediate points are automatically generated using perceptual OKLab interpolation up to the device's maximum gradient point count, creating smoother gradients.
+  **Auto-fill:** When exactly 2 color points are provided, intermediate points are automatically generated using perceptual OKLab interpolation up to the device's maximum gradient point count (typically 5), creating smoother gradients.
 
   > Note: The Hue bridge currently supports gradients only for individual lights and not groups.
 
@@ -151,7 +151,7 @@ Examples:
 ```
 Desk  10:00  color:#3CD0E2
 Desk  11:00  color:rgb(60 208 226)
-Desk  11:00  color:xy(0.1652 0.3103)
+Desk  11:30  color:xy(0.1652 0.3103)
 Desk  12:00  color:oklch(0.7 0.15 180)
 Desk  13:00  effect:candle  bri:50%
 Desk  13:30  effect:fire@0.1825  bri:40%
@@ -168,7 +168,7 @@ Desk  17:00  gradient:[oklch(0.7 0.2 30), #00FF00, oklch(0.5 0.15 270)]@random_p
 
 - `scene` — **Load per-light states** from an existing Hue scene and schedule them for a group. Each light retains its individual brightness, color temperature, color, effect, and gradient settings from the scene.
 
-  > **Note**: Hue Scheduler listens for any scene modification and automatically reloads the updated light states and re-applies and re-syncs the currently active state.
+  > **Note**: Hue Scheduler listens for scene modifications and automatically reloads the updated light states, re-applying and re-syncing the currently active state.
 
   ```
   Living room  sunset  scene:Relax
@@ -186,11 +186,9 @@ Desk  17:00  gradient:[oklch(0.7 0.2 30), #00FF00, oklch(0.5 0.15 270)]@random_p
 
   **Allowed combinations:** Only `on`, `bri`, `tr`, `tr-before`, `days`, `force`, and `interpolate` can be used alongside `scene:`. Color properties (`ct`, `color`, `x`/`y`, `effect`, `gradient`) cannot be combined with `scene:`, since they are defined by the scene itself.
 
-  **Parameterized effects:** Scenes that use Hue API v2 effects (e.g., `candle`, `fire`) fully preserve their effect parameters, including color temperature, color, and speed. These rich effect states are scheduled as-is per light.
+  **Parameterized effects:** Scenes that use Hue API v2 effects (e.g., `candle`, `fire`) fully preserve their effect parameters, including color temperature, color, and speed.
 
-  **Interpolation:** Scenes support full interpolation (via `interpolate:true` or `tr-before`), including between two different scenes or from a general group state.
-
-  > **Note:** Scene scheduling requires a Hue Bridge. Home Assistant is not supported because individual light details cannot be retrieved for scenes from the HA API.
+  **Interpolation:** Scenes support full interpolation (via `interpolate:true` or `tr-before`), including transitions between two different scenes or from a regular group state to a scene.
 
 ### Transitions & Interpolations
 
@@ -209,7 +207,7 @@ Desk  17:00  gradient:[oklch(0.7 0.2 30), #00FF00, oklch(0.5 0.15 270)]@random_p
   Office  sunrise  on:true  bri:254  tr-before:civil_dawn+5
   ```
 
-  In the first example, the transition starts 30 minutes before sunrise, while in the last example, it starts 5 minutes after ``civil_dawn`` to smoothly turn on the light to full brightness until sunrise.
+  In the first example, the transition starts 30 minutes before sunrise, while in the last example, it starts 5 minutes after `civil_dawn` to smoothly turn on the light to full brightness until sunrise.
 
   > Note: The `tr-before` reference must be **earlier** than the state's start, otherwise it's ignored. Values > 24 h are unsupported and produce undefined schedules.
 
@@ -250,6 +248,15 @@ Desk  17:00  gradient:[oklch(0.7 0.2 30), #00FF00, oklch(0.5 0.15 270)]@random_p
     In this example, Hue Scheduler also interpolates from `sunset` → next day's `sunrise`.
 
   > Tip: Enable interpolation globally with `--interpolate-all`, then override per state using `interpolate:false` or a custom `tr-before` (which takes precedence).
+
+  **`on:false` as interpolation target:** When the target state has `on:false`, interpolation treats it as brightness 0, producing a smooth fade-to-off transition. The same applies when `on:false` is the source: lights fade up from brightness 0. Additional properties like `ct` are interpolated normally alongside the brightness fade.
+
+  ```yacas
+  Office  06:00  bri:100  ct:4000
+  Office  22:00  on:false  interpolate:true
+  ```
+
+  Here, lights smoothly dim from brightness 100 to 0 between 06:00 and 22:00, turning off when the target state is reached.
 
 ### Advanced
 
