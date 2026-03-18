@@ -43,7 +43,12 @@
 
 Creates synced scenes that always reflect the scheduled state of a light, room, or zone.
 
-Note: In Home Assistant, dynamically created scenes can’t be assigned to areas, but they remain usable in automations. Hue Scheduler creates one scene **per group** and **per area** that a scheduled entity belongs to.
+**Home Assistant notes:**
+
+- Schedule the **real target entity** in `input.txt` (e.g., a Zigbee2MQTT group like `light.kitchen_lights`), not a Home Assistant helper group that only wraps another entity.
+- Hue Scheduler creates a synced scene for the entity's **area** and for each **HA light group** whose `attributes.entity_id` contains the scheduled entity. To get separate scenes per subgroup, place the concrete entity inside the desired HA light groups.
+- HA API-created scenes are temporary and disappear on HA restart. Hue Scheduler re-creates them automatically after receiving the HA started event.
+- Dynamically created scenes can't be assigned to areas, but they remain usable in automations.
 
 **Default:** `false`
 

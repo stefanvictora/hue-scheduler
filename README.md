@@ -167,6 +167,9 @@ Since **0.14.0**, you can alternatively keep your sensors/switches configured to
 
 For complex schedules where lights are intentionally turned off at certain times, **Scene Sync** remains the recommended approach. Synced scenes also make it easy to reset manual overrides by simply reapplying the scene.
 
+> [!TIP]
+> **Home Assistant Scene Sync:** In `input.txt`, schedule the real target entity (e.g., `light.kitchen_lights`), not a helper group that wraps it. Hue Scheduler discovers HA light groups automatically and creates additional synced scenes for them. See [`--enable-scene-sync`](docs/advanced_command_line_options.md#--enable-scene-sync) for details.
+
 ### Why is there a delay after physically switching lights on?
 
 It's a Hue Bridge limitation. Physically powered-on lights are typically detected after ~3–4 seconds; app/switch activations are near-instant. Also note: after turning lights **off** via a dumb wall switch, the bridge can take up to ~2 minutes to register the change. Fast off / on cycles may be missed; to clear manual overrides with dumb switches, wait ~2 minutes before turning lights back on.

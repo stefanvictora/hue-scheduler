@@ -176,8 +176,8 @@ public final class HueScheduler implements Runnable {
     int sceneUpdateSleepDelayInMs;
     @Option(names = "--fast-scene-update-sleep-delay", paramLabel = "<delay>",
             defaultValue = "${env:FAST_SCENE_UPDATE_SLEEP_DELAY:-2000}",
-            description = "The delay in milliseconds for fast scene update operations. " +
-                          "Used when a scene was recently recalled and needs a shorter update delay. Default: ${DEFAULT-VALUE} ms.")
+            description = "Shorter delay in milliseconds used for scene scheduling when the target light was recently turned on. " +
+                          "Default: ${DEFAULT-VALUE} ms.")
     int fastSceneUpdateSleepDelayInMs;
     int syncFailureRetryInMinutes = 3;
     @Option(names = "--event-stream-read-timeout", paramLabel = "<timeout>",
