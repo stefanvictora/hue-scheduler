@@ -10,9 +10,9 @@
 
 ## Introduction
 
-**New in 0.14.0** — **Update lights even if they are off** (requires Hue Bridge; enabled by default). Lights are now updated in the background, ensuring they turn on directly in the scheduled brightness, color temperature, and color. A lightweight alternative to synced scenes. For complex schedules where lights are intentionally turned off at specific times, **Scene Sync** remains the recommended approach.
+**New in 0.15.0** — **Scene scheduling** (`scene:<name>`): load per-light states from a Hue scene and schedule them as a group — edit the scene in the Hue app and the schedule updates automatically. Plus **gradient support**, **OKLCH color input**, **parameterized effects with speed control**, and smooth **fade-to-off interpolation**. *(Scene scheduling requires Hue Bridge.)*
 
-**New in 0.12.0** — **Sync schedules to scenes** (opt-in via ``--enable-scene-sync``). Creates synced scenes so lights turn on instantly in the desired state, with full **Home Assistant** support.
+**New in 0.14.0** — **Update lights even when they're off** (Hue Bridge; enabled by default). Lights are updated in the background, ensuring they turn on directly in the scheduled state. For schedules where lights are intentionally turned off at specific times, **Scene Sync** (`--enable-scene-sync`) remains the recommended approach.
 
 Hue Scheduler goes beyond tools like Adaptive Lighting by giving you precise control over brightness, color temperature, color, power state, and custom interpolations between solar and absolute times. It's designed to work with dumb wall switches: as soon as lights become available, Hue Scheduler applies the correct settings consistently, even after physical on/off toggles.
 
@@ -26,6 +26,11 @@ light.living_room  sunrise      bri:80%    ct:6000         tr:10s  force:true
 light.living_room  sunrise+60   bri:100%   ct:5000         interpolate:true
 light.living_room  sunset       bri:60%    ct:3000         tr-before:golden_hour-20
 light.living_room  23:00        bri:40%    color:#FE275D   tr-before:1h
+
+# Scene Scheduling: Apply per-light scene states to a group
+Living room  sunset       scene:Relax         tr:5s
+Living room  22:00        scene:Nightlight    interpolate:true
+Living room  00:00        scene:Nightlight    bri:50%   interpolate:true
 
 # Porch Light: Control power state
 Porch Light  civil_dusk   on:true    bri:100%   tr:1min
@@ -62,15 +67,16 @@ Use fixed times (24-hour `HH:mm[:ss]`, e.g., `06:00`, `23:30:15`) or solar times
 **Properties**
 
 - **Basic**
-    - **`bri`** — brightness `1–254` or `1%–100%`
+    - **`bri`** — brightness `1–254` or `1%–100%` (values above `100%` supported with `scene:` for proportional boosting)
     - **`ct`** — color temperature in **Kelvin** `6500–1000` or **Mired** `153–500` (cool → warm)
     - **`on`** — power state (`true|false`)
     - **`days`** — active days (e.g., `days:Mo-Fr`, `days:Tu,We`)
 - **Color**
-    - **`color`** (hex or RGB), e.g., `#3CD0E2` or `60,208,226`
-    - **`effect`** (e.g., `prism`, `fire`, `none`)
+    - **`color`** — hex (`#3CD0E2`), RGB (`rgb(60 208 226)`), XY (`xy(0.6024 0.3433)`), or OKLCH (`oklch(0.7 0.15 180)`)
+    - **`effect`** — light effect with optional speed and color parameters (e.g., `prism`, `candle@0.5`, `candle` with `ct:350`)
+    - **`gradient`** — multi-color gradient for compatible lights (e.g., `gradient:[#FF0000, #00FF00, #0000FF]`)
 - **Advanced**
-    - **`x`** / **`y`** — CIE xy (e.g., `x:0.6024  y:0.3433`)
+    - **`scene`** — load per-light states from a Hue scene (e.g., `scene:Relax`)
     - **`force:true`** — enforce state even after user changes
 - **Transitions**
     - **`tr`** — transition at start (e.g., `tr:10s`, `tr:1h5min`)
@@ -88,7 +94,7 @@ Run Hue Scheduler via Docker (recommended) or manually with Java. Configuration 
 
 - A Philips Hue Bridge (up-to-date) or a Home Assistant instance
 - A device that runs continuously on your network (e.g., Raspberry Pi)
-- Docker **or** Java 21
+- Docker **or** Java 25
 
 ### Docker
 
@@ -98,7 +104,7 @@ Run Hue Scheduler via Docker (recommended) or manually with Java. Configuration 
    services:
      hue-scheduler:
        container_name: hue-scheduler
-       image: stefanvictora/hue-scheduler:0.14
+       image: stefanvictora/hue-scheduler:0.15
        environment:
          - API_HOST=
          - ACCESS_TOKEN=
@@ -132,6 +138,8 @@ Run Hue Scheduler via Docker (recommended) or manually with Java. Configuration 
 3. **Start/stop with Docker Compose:**
 
    ```shell
+   # Update image
+   docker compose pull
    # Start:
    docker compose up -d
    
@@ -153,11 +161,14 @@ If your Raspberry Pi doesn't have Docker yet, see [docs/docker_on_raspberrypi.md
 
 ### Does Hue Scheduler work with motion sensors and smart switches?
 
-Yes. Starting with **0.12.0**, when Scene Sync is enabled (``--enable-scene-sync``), Hue Scheduler creates a synced scene (default: `HueScheduler`) that mirrors the current scheduled state of a room or zone. Select this scene in your motion sensor or smart switch so lights turn on in the desired state instantly.
+Yes. Starting with **0.12.0**, when Scene Sync is enabled (`--enable-scene-sync`), Hue Scheduler creates a synced scene (default: `Hue Scheduler`) that mirrors the current scheduled state of a room or zone. Select this scene in your motion sensor or smart switch so lights turn on in the desired state instantly.
 
-Since **0.14.0**, you can alternatively keep your sensors/switches configured to turn lights on in their **last on state**. Hue Scheduler now updates your lights **even while they’re off**, ensuring they power on directly in the scheduled brightness, color temperature, and color. *(Requires Hue Bridge.)*
+Since **0.14.0**, you can alternatively keep your sensors/switches configured to turn lights on in their **last on state**. Hue Scheduler updates your lights **even while they're off**, ensuring they power on directly in the scheduled brightness, color temperature, and color. *(Requires Hue Bridge.)*
 
 For complex schedules where lights are intentionally turned off at certain times, **Scene Sync** remains the recommended approach. Synced scenes also make it easy to reset manual overrides by simply reapplying the scene.
+
+> [!TIP]
+> **Home Assistant Scene Sync:** In `input.txt`, schedule the real target entity (e.g., `light.kitchen_lights`), not a helper group that wraps it. Hue Scheduler discovers HA light groups automatically and creates additional synced scenes for them. See [`--enable-scene-sync`](docs/advanced_command_line_options.md#--enable-scene-sync) for details.
 
 ### Why is there a delay after physically switching lights on?
 
@@ -188,11 +199,11 @@ No, unless you explicitly connect to a cloud-hosted Home Assistant instance. You
 - [x] **Home Assistant API support** — control lights via HA
 - [x] **Hue API v2 effects** — support additional effects
 - [x] **Scene Sync** — scenes that mirror the scheduled state of a room/zone
-- [ ] **Define schedules via scenes** — update schedules without restarting
+- [x] **Gradients** — support gradient-capable lights
+- [x] **Scene scheduling** — schedule scenes for groups
+- [ ] **Define schedules via scenes** — author and edit complete schedules directly from the Hue app
 - [ ] **Conditional states** — apply only if conditions are met
 - [ ] **Date-based scheduling** — restrict by date ranges
-- [ ] **Gradients** — support gradient-capable lights
-- [ ] **Scene scheduling** — schedule scenes for groups
 - [ ] **Sunrise/sunset min/max** — bound dynamic times to a window
 - [ ] **Web GUI** — configure/update schedules in a browser
 - [ ] **Home Assistant Add-on** — package as an easy install

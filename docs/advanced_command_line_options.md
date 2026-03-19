@@ -4,7 +4,7 @@
 
 **Scene Sync & Activation**
 
-- [`--enable-scene-sync`](#--enable-scene-sync) · [`--require-scene-activation`](#--require-scene-activation) · [`--scene-sync-name`](#--scene-sync-name) · [`--scene-activation-ignore-window`](#--scene-activation-ignore-window)
+- [`--enable-scene-sync`](#--enable-scene-sync) · [`--require-scene-activation`](#--require-scene-activation) · [`--scene-sync-name`](#--scene-sync-name) · [`--scene-control-name`](#--scene-control-name) · [`--scene-activation-ignore-window`](#--scene-activation-ignore-window)
 
 **Interpolation & Transitions**
 
@@ -20,7 +20,7 @@
 
 **Reliability & Connectivity**
 
-- [`--bridge-failure-retry-delay`](#--bridge-failure-retry-delay) · [`--power-on-reschedule-delay`](#--power-on-reschedule-delay) · [`--event-stream-read-timeout`](#--event-stream-read-timeout)
+- [`--bridge-failure-retry-delay`](#--bridge-failure-retry-delay) · [`--power-on-reschedule-delay`](#--power-on-reschedule-delay) · [`--event-stream-read-timeout`](#--event-stream-read-timeout) · [`--scene-update-sleep-delay`](#--scene-update-sleep-delay) · [`--fast-scene-update-sleep-delay`](#--fast-scene-update-sleep-delay)
 
 **Performance & Rate Limiting**
 
@@ -43,7 +43,12 @@
 
 Creates synced scenes that always reflect the scheduled state of a light, room, or zone.
 
-Note: In Home Assistant, dynamically created scenes can’t be assigned to areas, but they remain usable in automations. Hue Scheduler creates one scene **per group** and **per area** that a scheduled entity belongs to.
+**Home Assistant notes:**
+
+- Schedule the **real target entity** in `input.txt` (e.g., a Zigbee2MQTT group like `light.kitchen_lights`), not a Home Assistant helper group that only wraps another entity.
+- Hue Scheduler creates a synced scene for the entity's **area** and for each **HA light group** whose `attributes.entity_id` contains the scheduled entity. To get separate scenes per subgroup, place the concrete entity inside the desired HA light groups.
+- HA API-created scenes are temporary and disappear on HA restart. Hue Scheduler re-creates them automatically after receiving the HA started event.
+- Dynamically created scenes can't be assigned to areas, but they remain usable in automations.
 
 **Default:** `false`
 
@@ -63,9 +68,19 @@ Use `force:true` to override this behavior for specific states.
 
 Sets the name of the synced scene (used with `--enable-scene-sync`).
 
-**Default:** `HueScheduler`
+**Default:** `Hue Scheduler`
+
+### `--scene-control-name`
+
+*New in 0.15.0*
+
+Name of the temporary Hue scene created internally for scene scheduling (the `scene:` property). This scene is created/updated and then recalled to apply per-light states synchronously. You may need to change this if the default name conflicts with an existing scene.
+
+**Default:** `HueTemp`
 
 ### `--scene-activation-ignore-window`
+
+*New in 0.11.0*
 
 Relevant only when user-modification tracking is **enabled** (i.e., `--disable-user-modification-tracking` is **not** set).
 
@@ -161,7 +176,7 @@ Relevant only when user-modification tracking is **enabled**.
 
 The OKLab color distance threshold above which a light’s color counts as **significantly changed** to schedule the next scene sync or background interpolation.
 
-**Default:** `0.03`
+**Default:** `0.04`
 
 ### `--brightness-sync-threshold`
 
@@ -256,6 +271,22 @@ Delay **in milliseconds** between receiving an **on-event** and (re)applying the
 Read timeout **in minutes** for the API v2 SSE event stream. The connection is automatically restored after a timeout. The default (2 hours) may be adjusted in future releases based on further observations.
 
 **Default:** `120` minutes
+
+### `--scene-update-sleep-delay`
+
+*New in 0.15.0*
+
+Delay **in milliseconds** between scene creation/update and scene recall during scene scheduling (`scene:` property). This ensures the bridge has processed the scene changes before recalling them. Off lights especially take longer to process scene changes.
+
+**Default:** `13000` ms
+
+### `--fast-scene-update-sleep-delay`
+
+*New in 0.15.0*
+
+Shorter delay **in milliseconds** used for scene scheduling when the target light was recently turned on.
+
+**Default:** `2000` ms
 
 ## Security
 

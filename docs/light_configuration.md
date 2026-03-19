@@ -101,7 +101,7 @@ Properties define the state applied during the interval.
 
 ### Basic
 
-- `bri` — **brightness** (`1–254` or `1%–100%`), from dim to bright.
+- `bri` — **brightness** (`1–254` or `1%–100%`), from dim to bright. When used with `scene:`, values above `100%` proportionally boost brightness (individual lights capped at `254`).
 - `ct` — **color temperature** in **[Kelvin](https://en.wikipedia.org/wiki/Color_temperature)** (`6500–1000`) or **[Mired](https://en.wikipedia.org/wiki/Mired)** (`153–500`), cool → warm. Ranges can vary by bulb model. At startup, Hue Scheduler validates and clamps unsupported values. Note: Only color-capable lights support Kelvin values below 2000 K.
 
 - `on` — **power state** (`true|false`). Hue Scheduler does not change power unless `on:` is specified. If a light is off or unreachable, it waits until the light becomes reachable.
@@ -127,18 +127,68 @@ Properties define the state applied during the interval.
 
 Hue Scheduler supports several ways to set color:
 
-- `color` — **hex** (e.g., `#3CD0E2`) or **RGB** (e.g., `60,208,226`). Cannot be combined with other color properties. If `bri` is omitted, Hue Scheduler derives a suitable brightness for the color.
-- `effect` — Activates a light/group effect. Cannot be combined with other color properties or `ct`. The effect persists until the light is turned off or `effect:none`. Brightness can still be adjusted. Supported effects vary by model. Examples (Hue color lights): `candle`, `fire`, `prism`, `sparkle`, `opal`, `glisten`.
-- `x` / `y` — **[CIE xy](https://en.wikipedia.org/wiki/CIE_1931_color_space)** coordinates (`0.0–1.0`). Useful for exact colors read from the Hue API. Cannot be combined with other color properties.
+- `color` — **hex** (e.g., `#3CD0E2`), **RGB** (e.g., `rgb(60 208 226)`), **XY** (e.g., `xy(0.6024 0.3433)`), or **OKLCH** (e.g., `oklch(0.7 0.15 180)`). Cannot be combined with other color properties. If `bri` is omitted, Hue Scheduler derives a suitable brightness for the color.
+
+  **OKLCH syntax:** `oklch(L C h)` where **L** is lightness (`0.0–1.0` or percentage, e.g., `50%`), **C** is chroma (≥ 0), and **h** is hue in degrees. Angle units `deg`, `grad`, `rad`, `turn` are supported. Brightness is derived from the L component when `bri` is not explicitly set.
+
+- `effect` — Activates a light effect. The effect persists until the light is turned off or `effect:none`. Brightness can still be adjusted. Supported effects vary by model. Examples (Hue color lights): `candle`, `fire`, `prism`, `sparkle`, `opal`, `glisten`.
+  
+  **Speed parameter:** Append `@<speed>` to control effect speed, where speed is `0.0–1.0` (e.g., `effect:candle@0.5`, `effect:fire@1.0`).
+  
+  **Parameterized effects:** Effects can be combined with `color`, `ct`, or `x`/`y` to set the effect's color parameter. When an effect is active, these color properties become parameters of the effect rather than direct light state properties. For example, `effect:candle  ct:350` creates a candle effect with a warm color temperature, and `effect:opal  color:#FF5500` sets the effect's color. With `effect:none`, color properties behave as regular light state properties.
+
+- `gradient` — Multi-color gradient for compatible lights. Syntax: `gradient:[<color>, <color>, ...]` with 2–5 color points. Colors can be in any supported format: `#hex`, `rgb(r g b)`, `xy(x y)`, `oklch(L C h)`. Cannot be combined with other color properties or `effect`.
+  
+  **Mode suffix:** Optionally append `@<mode>` (e.g., `gradient:[#FF0000, #0000FF]@interpolated_palette`). Available modes depend on the device. Current known values: `interpolated_palette`, `interpolated_palette_mirrored`, `random_pixelated`, `segmented_palette`.
+  
+  **Auto-fill:** When exactly 2 color points are provided, intermediate points are automatically generated using perceptual OKLab interpolation up to the device's maximum gradient point count (typically 5), creating smoother gradients.
+
+  > Note: The Hue bridge currently supports gradients only for individual lights and not groups.
+
+- `x` / `y` — **[CIE xy](https://en.wikipedia.org/wiki/CIE_1931_color_space)** coordinates (`0.0–1.0`). Useful for exact colors read from the Hue API. Cannot be combined with other color properties. Deprecated, use `color:xy(x y)` instead.
 
 Examples:
-```yacas
-Desk  10:00  color:#3CD0E2
-Desk  11:00  color:60, 208, 226
-Desk  13:00  effect:candle  bri:50%
-Desk  14:00  effect:none
-Desk  15:00  x:0.1652  y:0.3103
 ```
+Desk  10:00  color:#3CD0E2
+Desk  11:00  color:rgb(60 208 226)
+Desk  11:30  color:xy(0.1652 0.3103)
+Desk  12:00  color:oklch(0.7 0.15 180)
+Desk  13:00  effect:candle  bri:50%
+Desk  13:30  effect:fire@0.1825  bri:40%
+Desk  13:45  effect:candle  ct:350            # candle with warm color temperature
+Desk  14:00  effect:opal  color:#FF5500       # opal with custom color
+Desk  15:00  effect:none
+Desk  16:00  gradient:[#FF0000, #0000FF]
+Desk  17:00  gradient:[oklch(0.7 0.2 30), #00FF00, oklch(0.5 0.15 270)]@random_pixelated
+```
+
+### Scene Scheduling
+
+*New in 0.15.0. Hue bridge only.*
+
+- `scene` — **Load per-light states** from an existing Hue scene and schedule them for a group. Each light retains its individual brightness, color temperature, color, effect, and gradient settings from the scene.
+
+  > **Note**: Hue Scheduler listens for scene modifications and automatically reloads the updated light states, re-applying and re-syncing the currently active state.
+
+  ```
+  Living room  sunset  scene:Relax
+  Living room  22:00   scene:Nightlight   bri:50%   interpolate:true
+  ```
+
+  **Proportional brightness scaling:** When `bri` is specified alongside `scene:`, each light's brightness is scaled proportionally. For example, `bri:50%` dims all lights to half their scene-defined brightness. Values above `100%` proportionally boost brightness — useful for making a scene brighter than its original definition. Individual lights are capped at their maximum.
+
+  ```
+  Living room  sunset   scene:Relax  bri:50%   # dim to half
+  Living room  22:00    scene:Relax  bri:200%  # boost to double (capped per light)
+  ```
+
+  **Power control:** Use `on:true` with `scene:` to ensure all scene lights are turned on. `on:false` cannot be combined with `scene:`.
+
+  **Allowed combinations:** Only `on`, `bri`, `tr`, `tr-before`, `days`, `force`, and `interpolate` can be used alongside `scene:`. Color properties (`ct`, `color`, `x`/`y`, `effect`, `gradient`) cannot be combined with `scene:`, since they are defined by the scene itself.
+
+  **Parameterized effects:** Scenes that use Hue API v2 effects (e.g., `candle`, `fire`) fully preserve their effect parameters, including color temperature, color, and speed.
+
+  **Interpolation:** Scenes support full interpolation (via `interpolate:true` or `tr-before`), including transitions between two different scenes or from a regular group state to a scene.
 
 ### Transitions & Interpolations
 
@@ -157,7 +207,7 @@ Desk  15:00  x:0.1652  y:0.3103
   Office  sunrise  on:true  bri:254  tr-before:civil_dawn+5
   ```
 
-  In the first example, the transition starts 30 minutes before sunrise, while in the last example, it starts 5 minutes after ``civil_dawn`` to smoothly turn on the light to full brightness until sunrise.
+  In the first example, the transition starts 30 minutes before sunrise, while in the last example, it starts 5 minutes after `civil_dawn` to smoothly turn on the light to full brightness until sunrise.
 
   > Note: The `tr-before` reference must be **earlier** than the state's start, otherwise it's ignored. Values > 24 h are unsupported and produce undefined schedules.
 
@@ -198,6 +248,15 @@ Desk  15:00  x:0.1652  y:0.3103
     In this example, Hue Scheduler also interpolates from `sunset` → next day's `sunrise`.
 
   > Tip: Enable interpolation globally with `--interpolate-all`, then override per state using `interpolate:false` or a custom `tr-before` (which takes precedence).
+
+  **`on:false` as interpolation target:** When the target state has `on:false`, interpolation treats it as brightness 0, producing a smooth fade-to-off transition. The same applies when `on:false` is the source: lights fade up from brightness 0. Additional properties like `ct` are interpolated normally alongside the brightness fade.
+
+  ```yacas
+  Office  06:00  bri:100  ct:4000
+  Office  22:00  on:false  interpolate:true
+  ```
+
+  Here, lights smoothly dim from brightness 100 to 0 between 06:00 and 22:00, turning off when the target state is reached.
 
 ### Advanced
 

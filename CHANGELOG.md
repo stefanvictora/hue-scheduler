@@ -1,3 +1,30 @@
+## [0.15.0] - 2026-03-18
+
+### Added
+- **Scene scheduling for groups** (`scene:<name>`) (#47):
+  - Load per-light states from an existing Hue scene and schedule them as a group state. Each light retains its individual brightness, color temperature, color, effect, and gradient settings.
+  - Auto-reloads the light states on scene changes.
+  - Proportional brightness scaling with `bri` (e.g., `bri:50%` dims all lights to half; values above `100%` boost proportionally, capped per light).
+  - Supports `on:true`, transitions (`tr`, `tr-before`), `interpolate`, `days`, and `force` alongside `scene:`.
+  - New CLI options for tuning: `--scene-control-name`, `--scene-update-sleep-delay`, `--fast-scene-update-sleep-delay`.
+  - **Note:** Requires Hue Bridge. Not supported with Home Assistant.
+- **Gradient support** for gradient-capable Hue lights:
+  - New `gradient` property with 2–5 color points in any supported format, optional mode suffix (`@<mode>`), and auto-fill from 2 points via OKLab interpolation.
+  - Full interpolation support between gradient states, even with different point counts.
+  - **Note**: Currently supported for individual lights only, not groups.
+- **OKLCH color input**: New `oklch(L C h)` color format for perceptually uniform color specification. Also supported inside gradients. Brightness is derived from the L component when `bri` is not set.
+- **Parameterized effects**: Effects now accept an optional speed parameter (`effect:candle@0.5`) and can be combined with `color`, `ct`, or `x`/`y` to set the effect's color.
+- **`on:false` interpolation**: States with `on:false` can now be used as interpolation targets (and sources), enabling smooth fade-to-off transitions.
+
+### Changed
+- **Updated to Java 25**, which improves overall performance and reliability, especially for larger configurations (#46, #49, #52)
+- **Synced scene name default** changed from `HueScheduler` to `Hue Scheduler` (`--scene-sync-name`). Existing synced scenes are automatically migrated on startup (Hue Bridge only).
+- **Color sync threshold** (`--color-sync-threshold`) default changed from `0.03` to `0.04`.
+- **Stricter configuration parsing**: Normalized values and stricter boolean handling ensure consistent behavior across environments.
+
+### Removed
+- Removed `hue` and `sat` as color input.
+
 ## [0.14.4] - 2026-03-05
 
 ### Added
@@ -34,7 +61,7 @@
     - New thresholds (advanced):
       - `--brightness-sync-threshold` — brightness delta in percentage points (**default:** `5`)
       - `--ct-sync-threshold` — color temperature delta in Kelvin (**default:** `150`)
-      - `--color-sync-threshold` — color delta ΔE (CIE76) (**default:** `3.0`)
+      - `--color-sync-threshold` — OKLab color distance (**default:** `0.03`)
 
 - **Incremental, SSE-driven Hue API cache** (#39): Greatly reduces API traffic and improves responsiveness.
 
@@ -78,7 +105,7 @@
     Make detection of user changes more robust and configurable. New thresholds:
     - `--brightness-override-threshold` — brightness difference (percentage points), **default:** `10`
     - `--ct-override-threshold` — color temperature difference (Kelvin), **default:** `350`
-    - `--color-override-threshold` — color difference (ΔE CIE76), **default:** `6.0`
+    - `--color-override-threshold` — OKLab color distance, **default:** `0.06`
         
     These settings are active only when user-modification tracking is enabled (default).
 
