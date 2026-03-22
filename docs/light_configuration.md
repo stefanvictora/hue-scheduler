@@ -68,6 +68,48 @@ You can also **offset** solar times:
 
 Examples: `sunset-30` (30 minutes before sunset), `sunrise+60` (one hour after sunrise). Offsets update daily with the sun.
 
+### Constraint Functions
+
+You can wrap any start time expression in a **constraint function** to bound dynamic solar times to fixed limits. This is useful when sunrise or sunset varies too much across seasons.
+
+Available functions:
+
+| Function | Args | Returns |
+|---|---|---|
+| `notBefore(expr, limit)` | 2 | The **later** of `expr` and `limit` (ensures start is not before `limit`) |
+| `notAfter(expr, limit)` | 2 | The **earlier** of `expr` and `limit` (ensures start is not after `limit`) |
+| `clamp(expr, min, max)` | 3 | `expr` bounded to `[min, max]` — equivalent to `notAfter(notBefore(expr, min), max)` |
+| `max(a, b)` | 2 | Alias for `notBefore` — returns the later of two times |
+| `min(a, b)` | 2 | Alias for `notAfter` — returns the earlier of two times |
+
+Each argument can be a fixed time (`HH:mm`), a solar keyword, a solar keyword with offset, or another nested function call.
+
+Function names are **case-insensitive** (`notBefore`, `NotBefore`, `NOTBEFORE` all work). Whitespace inside arguments is trimmed.
+
+**Examples:**
+
+```yacas
+# Ensure lights don't turn on before 06:30 even in summer when sunrise is early
+Kitchen  notBefore(sunrise, 06:30)  bri:254  ct:6500
+
+# Cap sunset-based scheduling to no later than 21:00
+Porch  notAfter(sunset+30, 21:00)  bri:200
+
+# Keep sunrise between 06:30 and 08:00 year-round
+Office  clamp(sunrise, 06:30, 08:00)  bri:254  ct:6000
+
+# Equivalent using min/max aliases
+Office  min(max(sunrise, 06:30), 08:00)  bri:254  ct:6000
+
+# Nested functions
+Hallway  notAfter(notBefore(sunrise, 06:30), 08:00)  bri:254
+
+# Combine with offsets
+Bedroom  clamp(sunrise-15, 06:30, 08:00)  bri:200  ct:3000
+```
+
+> Note: `min`/`max` accept exactly 2 arguments. For more bounds, nest calls: `max(max(a, b), c)`.
+
 > Note: Background on twilight terms: [Twilight - Wikipedia](https://en.wikipedia.org/wiki/Twilight) and [Twilight - commons-suncalc](https://shredzone.org/maven/commons-suncalc/usage.html#twilight).
 
 ### FAQ: How is the end of a state determined?

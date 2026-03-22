@@ -2,6 +2,8 @@ package at.sv.hue.time;
 
 import java.time.LocalTime;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -21,13 +23,88 @@ public final class StartTimeProviderImpl implements StartTimeProvider {
         LocalTime time = tryParseTimeString(input);
         if (time != null) return dateTime.with(time);
         try {
+            if (isFunctionExpression(input)) {
+                return parseFunctionExpression(input, dateTime);
+            }
             if (isOffsetExpression(input)) {
                 return parseOffsetExpression(input, dateTime);
             }
             return parseSunKeywords(input, dateTime);
+        } catch (InvalidStartTimeExpression e) {
+            throw e;
         } catch (Exception e) {
             throw new InvalidStartTimeExpression("Failed to parse start time expression '" + input + "': " + e.getMessage());
         }
+    }
+
+    private boolean isFunctionExpression(String input) {
+        String lower = input.toLowerCase(Locale.ENGLISH);
+        return lower.startsWith("notbefore(") || lower.startsWith("notafter(")
+                || lower.startsWith("clamp(") || lower.startsWith("min(") || lower.startsWith("max(");
+    }
+
+    private ZonedDateTime parseFunctionExpression(String input, ZonedDateTime dateTime) {
+        int openParen = input.indexOf('(');
+        int closeParen = input.lastIndexOf(')');
+        if (openParen == -1 || closeParen == -1 || closeParen <= openParen) {
+            throw new InvalidStartTimeExpression("Invalid function syntax: '" + input + "'");
+        }
+        if (closeParen != input.length() - 1) {
+            throw new InvalidStartTimeExpression("Unexpected text after closing parenthesis: '" + input + "'");
+        }
+        String functionName = input.substring(0, openParen).trim().toLowerCase(Locale.ENGLISH);
+        String argString = input.substring(openParen + 1, closeParen);
+        List<String> args = splitFunctionArguments(argString);
+
+        switch (functionName) {
+            case "notbefore", "max" -> {
+                requireArgCount(functionName, args, 2);
+                ZonedDateTime a = getStart(args.get(0).trim(), dateTime);
+                ZonedDateTime b = getStart(args.get(1).trim(), dateTime);
+                return a.isAfter(b) ? a : b;
+            }
+            case "notafter", "min" -> {
+                requireArgCount(functionName, args, 2);
+                ZonedDateTime a = getStart(args.get(0).trim(), dateTime);
+                ZonedDateTime b = getStart(args.get(1).trim(), dateTime);
+                return a.isBefore(b) ? a : b;
+            }
+            case "clamp" -> {
+                requireArgCount(functionName, args, 3);
+                ZonedDateTime expr = getStart(args.get(0).trim(), dateTime);
+                ZonedDateTime minT = getStart(args.get(1).trim(), dateTime);
+                ZonedDateTime maxT = getStart(args.get(2).trim(), dateTime);
+                if (expr.isBefore(minT)) return minT;
+                if (expr.isAfter(maxT)) return maxT;
+                return expr;
+            }
+            default -> throw new InvalidStartTimeExpression("Unknown function: '" + functionName + "'");
+        }
+    }
+
+    private void requireArgCount(String functionName, List<String> args, int expected) {
+        if (args.size() != expected) {
+            throw new InvalidStartTimeExpression(functionName + " requires exactly " + expected + " arguments, got " + args.size());
+        }
+    }
+
+    private List<String> splitFunctionArguments(String argString) {
+        List<String> args = new ArrayList<>();
+        int depth = 0;
+        int start = 0;
+        for (int i = 0; i < argString.length(); i++) {
+            char c = argString.charAt(i);
+            if (c == '(') {
+                depth++;
+            } else if (c == ')') {
+                depth--;
+            } else if (c == ',' && depth == 0) {
+                args.add(argString.substring(start, i));
+                start = i + 1;
+            }
+        }
+        args.add(argString.substring(start));
+        return args;
     }
 
     private LocalTime tryParseTimeString(String input) {

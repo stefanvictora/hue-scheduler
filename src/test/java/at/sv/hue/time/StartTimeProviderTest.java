@@ -188,4 +188,259 @@ class StartTimeProviderTest {
     void parse_invalidKeyword_exception() {
         assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("INVALID_KEYWORD", now));
     }
+
+    // --- notBefore / max tests ---
+
+    @Test
+    void notBefore_returnsLater_whenExprIsAlreadyLater() {
+        // sunrise = 07:00, constraint = 06:30 → sunrise is later → 07:00
+        assertStart("notBefore(sunrise, 06:30)", sunrise);
+    }
+
+    @Test
+    void notBefore_returnsConstraint_whenExprIsEarlier() {
+        // sunrise = 07:00, constraint = 08:00 → constraint is later → 08:00
+        assertStart("notBefore(sunrise, 08:00)", now.with(LocalTime.of(8, 0)));
+    }
+
+    @Test
+    void notBefore_withBothFixedTimes() {
+        assertStart("notBefore(06:30, 07:00)", now.with(LocalTime.of(7, 0)));
+        assertStart("notBefore(08:00, 07:00)", now.with(LocalTime.of(8, 0)));
+    }
+
+    // --- notAfter / min tests ---
+
+    @Test
+    void notAfter_returnsEarlier_whenExprIsAlreadyEarlier() {
+        // sunset = 16:00, constraint = 17:00 → sunset is earlier → 16:00
+        assertStart("notAfter(sunset, 17:00)", sunset);
+    }
+
+    @Test
+    void notAfter_returnsConstraint_whenExprIsLater() {
+        // sunset = 16:00, constraint = 15:00 → constraint is earlier → 15:00
+        assertStart("notAfter(sunset, 15:00)", now.with(LocalTime.of(15, 0)));
+    }
+
+    // --- clamp tests ---
+
+    @Test
+    void clamp_returnsExpr_whenWithinBounds() {
+        // sunrise = 07:00, min = 06:00, max = 08:00 → within bounds → 07:00
+        assertStart("clamp(sunrise, 06:00, 08:00)", sunrise);
+    }
+
+    @Test
+    void clamp_returnsMin_whenExprIsBelowMin() {
+        // sunrise = 07:00, min = 07:30, max = 08:00 → below min → 07:30
+        assertStart("clamp(sunrise, 07:30, 08:00)", now.with(LocalTime.of(7, 30)));
+    }
+
+    @Test
+    void clamp_returnsMax_whenExprIsAboveMax() {
+        // sunrise = 07:00, min = 06:00, max = 06:30 → above max → 06:30
+        assertStart("clamp(sunrise, 06:00, 06:30)", now.with(LocalTime.of(6, 30)));
+    }
+
+    // --- Alias tests ---
+
+    @Test
+    void max_isSameAsNotBefore() {
+        assertStart("max(06:30, sunrise)", sunrise);
+        assertStart("max(sunrise, 08:00)", now.with(LocalTime.of(8, 0)));
+    }
+
+    @Test
+    void min_isSameAsNotAfter() {
+        assertStart("min(sunset, 17:00)", sunset);
+        assertStart("min(sunset, 15:00)", now.with(LocalTime.of(15, 0)));
+    }
+
+    // --- Offset + constraint tests ---
+
+    @Test
+    void notBefore_withOffset_returnsLater() {
+        // sunrise+30 = 07:30, constraint = 07:00 → 07:30
+        assertStart("notBefore(sunrise+30, 07:00)", sunrise.plusMinutes(30));
+    }
+
+    @Test
+    void notBefore_withOffset_returnsConstraint() {
+        // sunrise+30 = 07:30, constraint = 08:00 → 08:00
+        assertStart("notBefore(sunrise+30, 08:00)", now.with(LocalTime.of(8, 0)));
+    }
+
+    @Test
+    void clamp_withOffset() {
+        // sunrise-15 = 06:45, within [06:30, 08:00] → 06:45
+        assertStart("clamp(sunrise-15, 06:30, 08:00)", sunrise.minusMinutes(15));
+    }
+
+    // --- Nesting tests ---
+
+    @Test
+    void nesting_notAfter_notBefore_equalsClamp() {
+        // notBefore(sunrise, 06:30) = max(07:00, 06:30) = 07:00
+        // notAfter(07:00, 08:00) = min(07:00, 08:00) = 07:00
+        assertStart("notAfter(notBefore(sunrise, 06:30), 08:00)", sunrise);
+    }
+
+    @Test
+    void nesting_notAfter_notBefore_clampsToMin() {
+        // notBefore(sunrise, 08:00) = max(07:00, 08:00) = 08:00
+        // notAfter(08:00, 09:00) = min(08:00, 09:00) = 08:00
+        assertStart("notAfter(notBefore(sunrise, 08:00), 09:00)", now.with(LocalTime.of(8, 0)));
+    }
+
+    @Test
+    void nesting_notAfter_notBefore_clampsToMax() {
+        // notBefore(sunrise, 06:00) = max(07:00, 06:00) = 07:00
+        // notAfter(07:00, 06:30) = min(07:00, 06:30) = 06:30
+        assertStart("notAfter(notBefore(sunrise, 06:00), 06:30)", now.with(LocalTime.of(6, 30)));
+    }
+
+    // --- Case-insensitivity tests ---
+
+    @Test
+    void caseInsensitive_notBefore() {
+        assertStart("NotBefore(sunrise, 08:00)", now.with(LocalTime.of(8, 0)));
+        assertStart("NOTBEFORE(sunrise, 08:00)", now.with(LocalTime.of(8, 0)));
+    }
+
+    @Test
+    void caseInsensitive_clamp() {
+        assertStart("CLAMP(sunrise, 06:00, 08:00)", sunrise);
+        assertStart("Clamp(sunrise, 07:30, 08:00)", now.with(LocalTime.of(7, 30)));
+    }
+
+    @Test
+    void caseInsensitive_minMax() {
+        assertStart("MAX(06:30, sunrise)", sunrise);
+        assertStart("MIN(sunset, 15:00)", now.with(LocalTime.of(15, 0)));
+    }
+
+    // --- Whitespace handling ---
+
+    @Test
+    void whitespace_insideArguments_isTrimmed() {
+        assertStart("notBefore( sunrise , 08:00 )", now.with(LocalTime.of(8, 0)));
+        assertStart("clamp( sunrise , 06:00 , 08:00 )", sunrise);
+    }
+
+    // --- Error cases: wrong argument count ---
+
+    @Test
+    void notBefore_wrongArgCount_tooFew() {
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("notBefore(sunrise)", now));
+    }
+
+    @Test
+    void notBefore_wrongArgCount_tooMany() {
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("notBefore(sunrise, 06:30, 08:00)", now));
+    }
+
+    @Test
+    void notAfter_wrongArgCount_tooFew() {
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("notAfter(sunrise)", now));
+    }
+
+    @Test
+    void notAfter_wrongArgCount_tooMany() {
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("notAfter(sunrise, 06:30, 08:00)", now));
+    }
+
+    @Test
+    void min_wrongArgCount_tooFew() {
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("min(sunrise)", now));
+    }
+
+    @Test
+    void min_wrongArgCount_tooMany() {
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("min(sunrise, 06:30, 08:00)", now));
+    }
+
+    @Test
+    void max_wrongArgCount_tooFew() {
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("max(sunrise)", now));
+    }
+
+    @Test
+    void max_wrongArgCount_tooMany() {
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("max(sunrise, 06:30, 08:00)", now));
+    }
+
+    @Test
+    void clamp_wrongArgCount_tooFew() {
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("clamp(sunrise, 06:30)", now));
+    }
+
+    @Test
+    void clamp_wrongArgCount_tooMany() {
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("clamp(sunrise, 06:00, 08:00, 10:00)", now));
+    }
+
+    // --- Error cases: invalid syntax ---
+
+    @Test
+    void unknownFunction_throwsException() {
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("unknownFunc(sunrise, 06:30)", now));
+    }
+
+    @Test
+    void missingClosingParenthesis_throwsException() {
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("notBefore(sunrise, 06:30", now));
+    }
+
+    @Test
+    void trailingTextAfterClosingParen_throwsException() {
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("notBefore(sunrise, 06:30)extra", now));
+    }
+
+    @Test
+    void emptyArguments_throwsException() {
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("notBefore()", now));
+    }
+
+    @Test
+    void emptyFirstArgument_throwsException() {
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("notBefore(, 06:30)", now));
+    }
+
+    @Test
+    void emptySecondArgument_throwsException() {
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("notBefore(sunrise,)", now));
+    }
+
+    // --- Error cases: invalid sub-expressions ---
+
+    @Test
+    void invalidSubExpression_inNotBefore_throwsException() {
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("notBefore(INVALID, 06:30)", now));
+    }
+
+    @Test
+    void invalidSubExpression_inNotAfter_throwsException() {
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("notAfter(INVALID, 06:30)", now));
+    }
+
+    @Test
+    void invalidSubExpression_inClamp_throwsException() {
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("clamp(INVALID, 06:00, 08:00)", now));
+    }
+
+    @Test
+    void nestedInvalidSubExpression_throwsException() {
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("notAfter(notBefore(INVALID, 06:30), 08:00)", now));
+    }
+
+    // --- Date propagation ---
+
+    @Test
+    void notBefore_usesCorrectDate() {
+        // nextDay: sunrise resolves to nextDaySunrise (07:10) instead of regular sunrise (07:00)
+        // notAfter(sunrise, noon) = min(07:10, 12:58) = 07:10 = nextDaySunrise
+        // Confirms dateTime is correctly passed through to sub-expressions
+        assertStart("notAfter(sunrise, noon)", nextDay, nextDaySunrise);
+    }
 }
