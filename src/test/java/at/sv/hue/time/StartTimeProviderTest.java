@@ -430,6 +430,11 @@ class StartTimeProviderTest {
     }
 
     @Test
+    void clamp_withInvertedBounds_returnsUnclampedExpression() {
+        assertStart("clamp(sunrise, 08:00, 06:00)", sunrise);
+    }
+
+    @Test
     void nestedInvalidSubExpression_throwsException() {
         assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("notAfter(notBefore(INVALID, 06:30), 08:00)", now));
     }

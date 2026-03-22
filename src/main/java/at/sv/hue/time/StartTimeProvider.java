@@ -4,11 +4,18 @@ import java.time.ZonedDateTime;
 
 public interface StartTimeProvider {
     /**
-     * @param input    a ISO_LOCAL_TIME formatted string, or a sun keyword with optional offset
+     * @param input    one of the following start time expressions:
+     *                 <ul>
+     *                   <li>a {@link java.time.format.DateTimeFormatter#ISO_LOCAL_TIME ISO_LOCAL_TIME} formatted string</li>
+     *                   <li>a supported sun keyword (optionally with minute offset using + or -)</li>
+     *                   <li>a function expression with syntax {@code functionName(arg1,arg2,...)} where arguments may be
+     *                       fixed times, sun keywords, keyword offsets, or nested function expressions</li>
+     *                 </ul>
+     *                 Supported function names are {@code notBefore}, {@code notAfter}, {@code clamp}, {@code min}, and {@code max}.
      * @param dateTime the date to use a reference for resolving solar times
      * @return the start time corresponding to the input and dateTime
      * @throws InvalidStartTimeExpression if the input is neither a valid {@link java.time.format.DateTimeFormatter#ISO_LOCAL_TIME}
-     *                                    or a supported sun keyword with optional offset.
+     *                                    nor a supported sun keyword expression, nor a supported function expression.
      */
     ZonedDateTime getStart(String input, ZonedDateTime dateTime);
 

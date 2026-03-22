@@ -74,13 +74,13 @@ You can wrap any start time expression in a **constraint function** to bound dyn
 
 Available functions:
 
-| Function | Args | Returns |
-|---|---|---|
-| `notBefore(expr, limit)` | 2 | The **later** of `expr` and `limit` (ensures start is not before `limit`) |
-| `notAfter(expr, limit)` | 2 | The **earlier** of `expr` and `limit` (ensures start is not after `limit`) |
-| `clamp(expr, min, max)` | 3 | `expr` bounded to `[min, max]` — equivalent to `notAfter(notBefore(expr, min), max)` |
-| `max(a, b)` | 2 | Alias for `notBefore` — returns the later of two times |
-| `min(a, b)` | 2 | Alias for `notAfter` — returns the earlier of two times |
+| Function                 | Args | Returns                                                                              |
+|--------------------------|------|--------------------------------------------------------------------------------------|
+| `notBefore(expr, limit)` | 2    | The **later** of `expr` and `limit` (ensures start is not before `limit`)            |
+| `notAfter(expr, limit)`  | 2    | The **earlier** of `expr` and `limit` (ensures start is not after `limit`)           |
+| `clamp(expr, min, max)`  | 3    | `expr` bounded to `[min, max]` — equivalent to `notAfter(notBefore(expr, min), max)` |
+| `max(a, b)`              | 2    | Alias for `notBefore` — returns the later of two times                               |
+| `min(a, b)`              | 2    | Alias for `notAfter` — returns the earlier of two times                              |
 
 Each argument can be a fixed time (`HH:mm`), a solar keyword, a solar keyword with offset, or another nested function call.
 
@@ -109,6 +109,7 @@ Bedroom  clamp(sunrise-15, 06:30, 08:00)  bri:200  ct:3000
 ```
 
 > Note: `min`/`max` accept exactly 2 arguments. For more bounds, nest calls: `max(max(a, b), c)`.
+
 
 > Note: Background on twilight terms: [Twilight - Wikipedia](https://en.wikipedia.org/wiki/Twilight) and [Twilight - commons-suncalc](https://shredzone.org/maven/commons-suncalc/usage.html#twilight).
 

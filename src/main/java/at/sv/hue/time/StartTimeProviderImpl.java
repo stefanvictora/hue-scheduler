@@ -1,5 +1,7 @@
 package at.sv.hue.time;
 
+import lombok.extern.slf4j.Slf4j;
+
 import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -8,6 +10,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+@Slf4j
 public final class StartTimeProviderImpl implements StartTimeProvider {
 
     private final SunTimesProvider sunTimesProvider;
@@ -74,6 +77,11 @@ public final class StartTimeProviderImpl implements StartTimeProvider {
                 ZonedDateTime expr = getStart(args.get(0).trim(), dateTime);
                 ZonedDateTime minT = getStart(args.get(1).trim(), dateTime);
                 ZonedDateTime maxT = getStart(args.get(2).trim(), dateTime);
+                if (minT.isAfter(maxT)) {
+                    log.warn("{} received inverted bounds at {}: min={}, max={}. Returning unclamped expression.",
+                        functionName, dateTime, minT, maxT);
+                    return expr;
+                }
                 if (expr.isBefore(minT)) return minT;
                 if (expr.isAfter(maxT)) return maxT;
                 return expr;
