@@ -442,7 +442,7 @@ class StartTimeProviderTest {
     // --- Date propagation ---
 
     @Test
-    void notBefore_usesCorrectDate() {
+    void notAfter_usesCorrectDate() {
         // nextDay: sunrise resolves to nextDaySunrise (07:10) instead of regular sunrise (07:00)
         // notAfter(sunrise, noon) = min(07:10, 12:58) = 07:10 = nextDaySunrise
         // Confirms dateTime is correctly passed through to sub-expressions

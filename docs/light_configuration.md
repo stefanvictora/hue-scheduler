@@ -60,6 +60,8 @@ Each state has a start time, specified either as a fixed time (24-hour `HH:mm[:s
 
 These times vary by location and date. To see your current values, start Hue Scheduler with an empty input file.
 
+> Note: Background on twilight terms: [Twilight - Wikipedia](https://en.wikipedia.org/wiki/Twilight) and [Twilight - commons-suncalc](https://shredzone.org/maven/commons-suncalc/usage.html#twilight).
+
 You can also **offset** solar times:
 
 ```yacas
@@ -109,9 +111,6 @@ Bedroom  clamp(sunrise-15, 06:30, 08:00)  bri:200  ct:3000
 ```
 
 > Note: `min`/`max` accept exactly 2 arguments. For more bounds, nest calls: `max(max(a, b), c)`.
-
-
-> Note: Background on twilight terms: [Twilight - Wikipedia](https://en.wikipedia.org/wiki/Twilight) and [Twilight - commons-suncalc](https://shredzone.org/maven/commons-suncalc/usage.html#twilight).
 
 ### FAQ: How is the end of a state determined?
 
