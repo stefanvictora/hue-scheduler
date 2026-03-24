@@ -43,7 +43,8 @@ public final class StartTimeProviderImpl implements StartTimeProvider {
     private boolean isFunctionExpression(String input) {
         String lower = input.toLowerCase(Locale.ENGLISH);
         return lower.startsWith("notbefore(") || lower.startsWith("notafter(")
-                || lower.startsWith("clamp(") || lower.startsWith("min(") || lower.startsWith("max(");
+                || lower.startsWith("clamp(") || lower.startsWith("min(")
+                || lower.startsWith("max(") || lower.startsWith("mix(");
     }
 
     private ZonedDateTime parseFunctionExpression(String input, ZonedDateTime dateTime) {
@@ -79,14 +80,37 @@ public final class StartTimeProviderImpl implements StartTimeProvider {
                 ZonedDateTime maxT = getStart(args.get(2).trim(), dateTime);
                 if (minT.isAfter(maxT)) {
                     log.warn("{} received inverted bounds at {}: min={}, max={}. Returning unclamped expression.",
-                        functionName, dateTime, minT, maxT);
+                            functionName, dateTime, minT, maxT);
                     return expr;
                 }
                 if (expr.isBefore(minT)) return minT;
                 if (expr.isAfter(maxT)) return maxT;
                 return expr;
             }
+            case "mix" -> {
+                requireArgCount(functionName, args, 3);
+                ZonedDateTime a = getStart(args.get(0).trim(), dateTime);
+                ZonedDateTime b = getStart(args.get(1).trim(), dateTime);
+                double weight = parseMixWeight(args.get(2).trim());
+                long mixedEpochSeconds = Math.round(a.toEpochSecond() * weight + b.toEpochSecond() * (1.0 - weight));
+                return ZonedDateTime.ofInstant(java.time.Instant.ofEpochSecond(mixedEpochSeconds), a.getZone());
+            }
             default -> throw new InvalidStartTimeExpression("Unknown function: '" + functionName + "'");
+        }
+    }
+
+    private double parseMixWeight(String weightArg) {
+        try {
+            boolean isPercentage = weightArg.endsWith("%");
+            String numericPart = isPercentage ? weightArg.substring(0, weightArg.length() - 1).trim() : weightArg;
+            double parsed = Double.parseDouble(numericPart);
+            double normalized = isPercentage ? parsed / 100.0 : parsed;
+            if (normalized < 0.0 || normalized > 1.0) {
+                throw new InvalidStartTimeExpression("mix weight must be between 0 and 1 (or 0% and 100%), got " + weightArg);
+            }
+            return normalized;
+        } catch (NumberFormatException e) {
+            throw new InvalidStartTimeExpression("mix weight must be a number in [0..1] or percentage in [0%..100%], got '" + weightArg + "'");
         }
     }
 

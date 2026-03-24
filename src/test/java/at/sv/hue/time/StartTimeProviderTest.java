@@ -448,4 +448,56 @@ class StartTimeProviderTest {
         // Confirms dateTime is correctly passed through to sub-expressions
         assertStart("notAfter(sunrise, noon)", nextDay, nextDaySunrise);
     }
+
+    // --- mix tests ---
+
+    @Test
+    void mix_withDecimalWeight_interpolatesTimes() {
+        // mix(sunrise=07:00, 08:00, 0.25) = 07:45
+        assertStart("mix(sunrise, 08:00, 0.25)", now.with(LocalTime.of(7, 45)));
+    }
+
+    @Test
+    void mix_withTwoSolarTimes_works() {
+        // mix(golden_hour=15:00, sunset=16:00, 0.5) = 15:30
+        assertStart("mix(golden_hour, sunset, 0.5)", now.with(LocalTime.of(15, 30)));
+    }
+
+    @Test
+    void mix_withPercentageWeight_interpolatesTimes() {
+        // mix(sunrise=07:00, 08:00, 25%) = 07:45
+        assertStart("mix(sunrise, 08:00, 25%)", now.with(LocalTime.of(7, 45)));
+    }
+
+    @Test
+    void mix_withWeightOne_returnsFirstArgument() {
+        assertStart("mix(sunrise, 08:00, 1)", sunrise);
+    }
+
+    @Test
+    void mix_withWeightZero_returnsSecondArgument() {
+        assertStart("mix(sunrise, 08:00, 0)", now.with(LocalTime.of(8, 0)));
+    }
+
+    @Test
+    void mix_canBeComposedWithClamp() {
+        assertStart("clamp(mix(sunrise, 08:00, 0.35), 06:30, 08:00)", now.with(LocalTime.of(7, 39)));
+    }
+
+    @Test
+    void mix_rejectsWeightOutsideRange() {
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("mix(sunrise, 08:00, 1.1)", now));
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("mix(sunrise, 08:00, 110%)", now));
+    }
+
+    @Test
+    void mix_rejectsInvalidWeightFormat() {
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("mix(sunrise, 08:00, sunrise)", now));
+    }
+
+    @Test
+    void mix_wrongArgCount() {
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("mix(sunrise, 08:00)", now));
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("mix(sunrise, 08:00, 0.5, 0.1)", now));
+    }
 }

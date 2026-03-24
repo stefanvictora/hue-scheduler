@@ -11,7 +11,9 @@ public interface StartTimeProvider {
      *                   <li>a function expression with syntax {@code functionName(arg1,arg2,...)} where arguments may be
      *                       fixed times, sun keywords, keyword offsets, or nested function expressions</li>
      *                 </ul>
-     *                 Supported function names are {@code notBefore}, {@code notAfter}, {@code clamp}, {@code min}, and {@code max}.
+     *                 Supported function names are {@code notBefore}, {@code notAfter}, {@code clamp}, {@code min}, {@code max},
+     *                 and {@code mix}. The {@code mix(a,b,w)} function interpolates between {@code a} and {@code b}
+     *                 with weight {@code w} where {@code w} can be in {@code [0..1]} or as percentage ({@code 0%..100%}).
      * @param dateTime the date to use a reference for resolving solar times
      * @return the start time corresponding to the input and dateTime
      * @throws InvalidStartTimeExpression if the input is neither a valid {@link java.time.format.DateTimeFormatter#ISO_LOCAL_TIME}
