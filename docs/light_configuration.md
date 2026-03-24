@@ -105,9 +105,10 @@ clamp(mix(sunrise, 07:30, 0.35), 06:30, 08:00)
 
 This keeps the schedule smooth around spring/autumn while still enforcing hard boundaries.
 
-**Examples:**
+<details>
+<summary>Examples</summary>
 
-```yacas
+~~~
 # Ensure lights don't turn on before 06:30 even in summer when sunrise is early
 Kitchen  notBefore(sunrise, 06:30)  bri:254  ct:6500
 
@@ -140,9 +141,9 @@ Bedroom  clamp(mix(sunrise, 07:30, 0.35), 06:30, 08:00)  bri:30%  ct:3200
 
 # Real-world evening routine: follow sunset, but dampened and bounded
 Living room  clamp(mix(sunset+30, 22:30, 0.5), 19:00, 23:00)  bri:45%  ct:2600
-```
+~~~
 
-> Note: `min`/`max` accept exactly 2 arguments. For more bounds, nest calls: `max(max(a, b), c)`.
+</details>
 
 ### FAQ: How is the end of a state determined?
 
