@@ -7,8 +7,7 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.core.Is.is;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class StartTimeProviderTest {
@@ -35,7 +34,7 @@ class StartTimeProviderTest {
     }
 
     private void assertStart(String input, ZonedDateTime dateTime, ZonedDateTime time) {
-        assertThat("Start differs", provider.getStart(input, dateTime), is(time));
+        assertThat(provider.getStart(input, dateTime)).isEqualTo(time);
     }
 
     @BeforeEach
@@ -493,6 +492,27 @@ class StartTimeProviderTest {
     @Test
     void mix_rejectsInvalidWeightFormat() {
         assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("mix(sunrise, 08:00, sunrise)", now));
+    }
+
+    @Test
+    void mix_rejectsNaNWeight() {
+        InvalidStartTimeExpression exception = assertThrows(InvalidStartTimeExpression.class,
+                () -> provider.getStart("mix(sunrise, 08:00, NaN)", now));
+        assertThat(exception.getMessage()).contains("'NaN'");
+    }
+
+    @Test
+    void mix_rejectsInfinityWeight() {
+        InvalidStartTimeExpression exception = assertThrows(InvalidStartTimeExpression.class,
+                () -> provider.getStart("mix(sunrise, 08:00, Infinity)", now));
+        assertThat(exception.getMessage()).contains("'Infinity'");
+    }
+
+    @Test
+    void mix_rejectsInfinityPercentageWeight() {
+        InvalidStartTimeExpression exception = assertThrows(InvalidStartTimeExpression.class,
+                () -> provider.getStart("mix(sunrise, 08:00, Infinity%)", now));
+        assertThat(exception.getMessage()).contains("'Infinity%'");
     }
 
     @Test

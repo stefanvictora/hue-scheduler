@@ -104,7 +104,13 @@ public final class StartTimeProviderImpl implements StartTimeProvider {
             boolean isPercentage = weightArg.endsWith("%");
             String numericPart = isPercentage ? weightArg.substring(0, weightArg.length() - 1).trim() : weightArg;
             double parsed = Double.parseDouble(numericPart);
+            if (!Double.isFinite(parsed)) {
+                throw new InvalidStartTimeExpression("mix weight must be a finite number in [0..1] or percentage in [0%..100%], got '" + weightArg + "'");
+            }
             double normalized = isPercentage ? parsed / 100.0 : parsed;
+            if (!Double.isFinite(normalized)) {
+                throw new InvalidStartTimeExpression("mix weight must be a finite number in [0..1] or percentage in [0%..100%], got '" + weightArg + "'");
+            }
             if (normalized < 0.0 || normalized > 1.0) {
                 throw new InvalidStartTimeExpression("mix weight must be between 0 and 1 (or 0% and 100%), got " + weightArg);
             }
