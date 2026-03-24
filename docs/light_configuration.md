@@ -76,14 +76,14 @@ You can wrap any start time expression in a **constraint function** to bound dyn
 
 Available functions:
 
-| Function                 | Args | Returns                                                                               |
-|--------------------------|------|---------------------------------------------------------------------------------------|
-| `notBefore(expr, limit)` | 2    | The **later** of `expr` and `limit` (ensures start is not before `limit`)             |
-| `notAfter(expr, limit)`  | 2    | The **earlier** of `expr` and `limit` (ensures start is not after `limit`)            |
-| `clamp(expr, min, max)`  | 3    | `expr` bounded to `[min, max]` — equivalent to `notAfter(notBefore(expr, min), max)`  |
-| `max(a, b)`              | 2    | Alias for `notBefore` — returns the later of two times                                |
-| `min(a, b)`              | 2    | Alias for `notAfter` — returns the earlier of two times                               |
-| `mix(a, b, w)`           | 3    | **Experimental**: weighted blend. `mix(a,b,w)=a*w+b*(1-w)`, with `w` in `0..1` or `%` |
+| Function                 | Args | Returns                                                                                     |
+|--------------------------|------|---------------------------------------------------------------------------------------------|
+| `notBefore(expr, limit)` | 2    | The **later** of `expr` and `limit` (ensures start is not before `limit`)                   |
+| `notAfter(expr, limit)`  | 2    | The **earlier** of `expr` and `limit` (ensures start is not after `limit`)                  |
+| `clamp(expr, min, max)`  | 3    | `expr` bounded to `[min, max]`; if `min > max`, logs a warning and returns `expr` unchanged |
+| `max(a, b)`              | 2    | Alias for `notBefore` — returns the later of two times                                      |
+| `min(a, b)`              | 2    | Alias for `notAfter` — returns the earlier of two times                                     |
+| `mix(a, b, w)`           | 3    | **Experimental**: weighted blend. `mix(a,b,w)=a*w+b*(1-w)`, with `w` in `0..1` or `%`       |
 
 Each argument can be a fixed time (`HH:mm[:ss]`), a solar keyword, a solar keyword with offset, or another nested function call.
 
@@ -91,10 +91,10 @@ Function names are **case-insensitive** (`notBefore`, `NotBefore`, `NOTBEFORE` a
 
 #### Experimental: `mix(...)` for smoother seasonal changes
 
-`mix(...)` helps reduce day-to-day schedule swings by blending a solar time with a fixed anchor.
+`mix(...)` helps reduce day-to-day schedule swings by blending two time expressions. Both `a` and `b` can be fixed times, solar times, solar times with offsets, or nested function expressions.
 
 - `w = 1` → fully `a` (e.g. pure `sunrise`)
-- `w = 0` → fully `b` (e.g. pure fixed time)
+- `w = 0` → fully `b` (e.g. a fixed time, or another solar time such as `sunset`)
 - lower `w` means less seasonal movement
 
 In practice, many setups feel best with **mix first, clamp second**:
@@ -127,16 +127,19 @@ Hallway  notAfter(notBefore(sunrise, 06:30), 08:00)  bri:254
 Bedroom  clamp(sunrise-15, 06:30, 08:00)  bri:200  ct:3000
 
 # Experimental: blend sunrise with a fixed anchor to reduce seasonal swings
-Kitchen  mix(sunrise, 07:30, 0.35)  on:true  bri:40%
+Kitchen  mix(sunrise, 07:30, 0.35)  bri:40%
 
 # Same as above, but with percent weight
-Kitchen  mix(sunrise, 07:30, 35%)  on:true  bri:40%
+Kitchen  mix(sunrise, 07:30, 35%)  bri:40%
+
+# Blend two solar times directly
+Living room  mix(golden_hour, sunset, 0.5)  bri:45%
 
 # Real-world morning routine: smooth + bounded
-Bedroom  clamp(mix(sunrise, 07:30, 0.35), 06:30, 08:00)  on:true  bri:30%  ct:3200
+Bedroom  clamp(mix(sunrise, 07:30, 0.35), 06:30, 08:00)  bri:30%  ct:3200
 
 # Real-world evening routine: follow sunset, but dampened and bounded
-Living room  clamp(mix(sunset+30, 22:30, 0.5), 19:00, 23:00)  on:true  bri:45%  ct:2600
+Living room  clamp(mix(sunset+30, 22:30, 0.5), 19:00, 23:00)  bri:45%  ct:2600
 ```
 
 > Note: `min`/`max` accept exactly 2 arguments. For more bounds, nest calls: `max(max(a, b), c)`.

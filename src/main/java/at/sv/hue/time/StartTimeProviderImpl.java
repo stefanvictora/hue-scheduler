@@ -120,6 +120,16 @@ public final class StartTimeProviderImpl implements StartTimeProvider {
         if (args.size() != expected) {
             throw new InvalidStartTimeExpression(functionName + " requires exactly " + expected + " arguments, got " + args.size());
         }
+        assertNonEmptyArguments(functionName, args);
+    }
+
+    private static void assertNonEmptyArguments(String functionName, List<String> args) {
+        for (int i = 0; i < args.size(); i++) {
+            String arg = args.get(i);
+            if (arg == null || arg.trim().isEmpty()) {
+                throw new InvalidStartTimeExpression(functionName + " received an empty argument at position " + (i + 1));
+            }
+        }
     }
 
     private List<String> splitFunctionArguments(String argString) {
