@@ -23,9 +23,9 @@ public final class StartTimeProviderImpl implements StartTimeProvider {
 
     @Override
     public ZonedDateTime getStart(String input, ZonedDateTime dateTime) {
-        LocalTime time = tryParseTimeString(input);
-        if (time != null) return dateTime.with(time);
         try {
+            LocalTime time = tryParseTimeString(input);
+            if (time != null) return dateTime.with(time);
             if (isFunctionExpression(input)) {
                 return parseFunctionExpression(input, dateTime);
             }
@@ -41,23 +41,22 @@ public final class StartTimeProviderImpl implements StartTimeProvider {
     }
 
     private boolean isFunctionExpression(String input) {
-        String lower = input.toLowerCase(Locale.ENGLISH);
-        return lower.startsWith("notbefore(") || lower.startsWith("notafter(")
-                || lower.startsWith("clamp(") || lower.startsWith("min(")
-                || lower.startsWith("max(") || lower.startsWith("mix(");
+        String trimmed = input.trim();
+        int openParen = trimmed.indexOf('(');
+        int closeParen = trimmed.lastIndexOf(')');
+        if (openParen <= 0 || closeParen != trimmed.length() - 1) {
+            return false;
+        }
+        String functionName = trimmed.substring(0, openParen).trim();
+        return functionName.matches("[A-Za-z][A-Za-z0-9_]*");
     }
 
     private ZonedDateTime parseFunctionExpression(String input, ZonedDateTime dateTime) {
-        int openParen = input.indexOf('(');
-        int closeParen = input.lastIndexOf(')');
-        if (openParen == -1 || closeParen == -1 || closeParen <= openParen) {
-            throw new InvalidStartTimeExpression("Invalid function syntax: '" + input + "'");
-        }
-        if (closeParen != input.length() - 1) {
-            throw new InvalidStartTimeExpression("Unexpected text after closing parenthesis: '" + input + "'");
-        }
-        String functionName = input.substring(0, openParen).trim().toLowerCase(Locale.ENGLISH);
-        String argString = input.substring(openParen + 1, closeParen);
+        String normalizedInput = input.trim();
+        int openParen = normalizedInput.indexOf('(');
+        int closeParen = normalizedInput.lastIndexOf(')');
+        String functionName = normalizedInput.substring(0, openParen).trim().toLowerCase(Locale.ENGLISH);
+        String argString = normalizedInput.substring(openParen + 1, closeParen);
         List<String> args = splitFunctionArguments(argString);
 
         switch (functionName) {
@@ -108,9 +107,6 @@ public final class StartTimeProviderImpl implements StartTimeProvider {
                 throw new InvalidStartTimeExpression("mix weight must be a finite number in [0..1] or percentage in [0%..100%], got '" + weightArg + "'");
             }
             double normalized = isPercentage ? parsed / 100.0 : parsed;
-            if (!Double.isFinite(normalized)) {
-                throw new InvalidStartTimeExpression("mix weight must be a finite number in [0..1] or percentage in [0%..100%], got '" + weightArg + "'");
-            }
             if (normalized < 0.0 || normalized > 1.0) {
                 throw new InvalidStartTimeExpression("mix weight must be between 0 and 1 (or 0% and 100%), got " + weightArg);
             }

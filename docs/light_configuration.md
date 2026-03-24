@@ -85,7 +85,7 @@ Available functions:
 | `min(a, b)`              | 2    | Alias for `notAfter` — returns the earlier of two times                               |
 | `mix(a, b, w)`           | 3    | **Experimental**: weighted blend. `mix(a,b,w)=a*w+b*(1-w)`, with `w` in `0..1` or `%` |
 
-Each argument can be a fixed time (`HH:mm`), a solar keyword, a solar keyword with offset, or another nested function call.
+Each argument can be a fixed time (`HH:mm[:ss]`), a solar keyword, a solar keyword with offset, or another nested function call.
 
 Function names are **case-insensitive** (`notBefore`, `NotBefore`, `NOTBEFORE` all work). Whitespace inside arguments is trimmed.
 
