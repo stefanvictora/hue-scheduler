@@ -463,6 +463,16 @@ class StartTimeProviderTest {
     }
 
     @Test
+    void mix_resolvesToNoon() {
+        assertStart("mix(00:30, 23:30, 0.5)", now.with(LocalTime.NOON));
+    }
+
+    @Test
+    void mix_invertedParameters_invalidUsage_usesUnmixedInput() {
+        assertStart("mix(23:30, 00:30, 0.5)", now.with(LocalTime.of(23, 30)));
+    }
+
+    @Test
     void mix_withPercentageWeight_interpolatesTimes() {
         // mix(sunrise=07:00, 08:00, 25%) = 07:45
         assertStart("mix(sunrise, 08:00, 25%)", now.with(LocalTime.of(7, 45)));

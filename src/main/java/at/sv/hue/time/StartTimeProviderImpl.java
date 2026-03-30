@@ -78,8 +78,8 @@ public final class StartTimeProviderImpl implements StartTimeProvider {
                 ZonedDateTime minT = getStart(args.get(1).trim(), dateTime);
                 ZonedDateTime maxT = getStart(args.get(2).trim(), dateTime);
                 if (minT.isAfter(maxT)) {
-                    log.warn("{} received inverted bounds at {}: min={}, max={}. Returning unclamped expression.",
-                            functionName, dateTime, minT, maxT);
+                    log.warn("clamp() received inverted bounds at {}: min={}, max={}. Returning unclamped expression.",
+                            dateTime, minT, maxT);
                     return expr;
                 }
                 if (expr.isBefore(minT)) return minT;
@@ -90,6 +90,11 @@ public final class StartTimeProviderImpl implements StartTimeProvider {
                 requireArgCount(functionName, args, 3);
                 ZonedDateTime a = getStart(args.get(0).trim(), dateTime);
                 ZonedDateTime b = getStart(args.get(1).trim(), dateTime);
+                if (b.isBefore(a)) {
+                    log.warn("mix() received inverted arguments at {}: a={}, b={}. Returning unmixed expression.",
+                            dateTime, a, b);
+                    return a;
+                }
                 double weight = parseMixWeight(args.get(2).trim());
                 long mixedEpochSeconds = Math.round(a.toEpochSecond() * weight + b.toEpochSecond() * (1.0 - weight));
                 return ZonedDateTime.ofInstant(java.time.Instant.ofEpochSecond(mixedEpochSeconds), a.getZone());
