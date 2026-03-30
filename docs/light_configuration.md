@@ -89,7 +89,8 @@ Each argument can be a fixed time (`HH:mm[:ss]`), a solar keyword, a solar keywo
 
 Function names are **case-insensitive** (`notBefore`, `NotBefore`, `NOTBEFORE` all work). Whitespace inside arguments is trimmed.
 
-#### Experimental: `mix(...)` for smoother seasonal changes
+<details>
+<summary>Experimental: `mix(...)` for smoother seasonal changes</summary>
 
 `mix(...)` helps reduce day-to-day schedule swings by blending two time expressions. Both `a` and `b` can be fixed times, solar times, solar times with offsets, or nested function expressions.
 
@@ -97,13 +98,14 @@ Function names are **case-insensitive** (`notBefore`, `NotBefore`, `NOTBEFORE` a
 - `w = 0` → fully `b` (e.g. a fixed time, or another solar time such as `sunset`)
 - lower `w` means less seasonal movement
 
-In practice, many setups feel best with **mix first, clamp second**:
+In practice, **mix first, clamp second**:
 
 ```yacas
 clamp(mix(sunrise, 07:30, 0.35), 06:30, 08:00)
 ```
 
 This keeps the schedule smooth around spring/autumn while still enforcing hard boundaries.
+</details>
 
 <details>
 <summary>Examples</summary>
