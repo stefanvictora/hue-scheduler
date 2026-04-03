@@ -28,6 +28,10 @@ class StartTimeProviderTest {
     private ZonedDateTime now;
     private ZonedDateTime nextDay;
     private ZonedDateTime nextDaySunrise;
+    private ZonedDateTime previousDay;
+    private ZonedDateTime twoDaysAgo;
+    private ZonedDateTime previousDaySunrise;
+    private ZonedDateTime twoDaysAgoSunrise;
 
     private void assertStart(String input, ZonedDateTime time) {
         assertStart(input, now, time);
@@ -41,12 +45,16 @@ class StartTimeProviderTest {
     void setUp() {
         now = ZonedDateTime.of(2021, 1, 1, 0, 0, 0, 0, ZoneId.of("Europe/Vienna"));
         nextDay = now.plusDays(1);
+        previousDay = now.minusDays(1);
+        twoDaysAgo = now.minusDays(2);
         astronomicalStart = now.with(LocalTime.of(5, 0));
         nauticalStart = now.with(LocalTime.of(6, 13));
         civilStart = now.with(LocalTime.of(6, 50));
         sunrise = now.with(LocalTime.of(7, 0));
         noon = now.with(LocalTime.of(12, 58));
         nextDaySunrise = now.with(LocalTime.of(7, 10));
+        previousDaySunrise = now.with(LocalTime.of(6, 0));
+        twoDaysAgoSunrise = now.with(LocalTime.of(8, 0));
         goldenHour = now.with(LocalTime.of(15, 0));
         sunset = now.with(LocalTime.of(16, 0));
         blueHour = now.with(LocalTime.of(16, 15));
@@ -59,6 +67,10 @@ class StartTimeProviderTest {
             public ZonedDateTime getSunrise(ZonedDateTime dateTime) {
                 if (dateTime.equals(nextDay)) {
                     return nextDaySunrise;
+                } else if (dateTime.equals(previousDay)) {
+                    return previousDaySunrise;
+                } else if (dateTime.equals(twoDaysAgo)) {
+                    return twoDaysAgoSunrise;
                 } else {
                     return sunrise;
                 }
@@ -529,5 +541,37 @@ class StartTimeProviderTest {
     void mix_wrongArgCount() {
         assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("mix(sunrise, 08:00)", now));
         assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("mix(sunrise, 08:00, 0.5, 0.1)", now));
+    }
+
+    // --- smooth tests ---
+
+    @Test
+    void smooth_withHalfLifeOneDay_reducesFastSeasonalSwing() {
+        // now=07:00, day-1=06:00, day-2=08:00 and then 07:00 afterwards
+        // smooth(sunrise, 1d) dampens the day-to-day swings to around 06:52
+        assertStart("smooth(sunrise, 1d)", now.with(LocalTime.of(6, 52, 29)));
+    }
+
+    @Test
+    void smooth_canBeComposedWithClamp() {
+        assertStart("clamp(smooth(sunrise, 1d), 06:30, 07:30)", now.with(LocalTime.of(6, 52, 29)));
+    }
+
+    @Test
+    void smooth_rejectsNonPositiveHalfLife() {
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("smooth(sunrise, 0d)", now));
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("smooth(sunrise, -2)", now));
+    }
+
+    @Test
+    void smooth_rejectsInvalidHalfLifeFormat() {
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("smooth(sunrise, sunrise)", now));
+    }
+
+    @Test
+    void smooth_fixedTime_doesNotDriftIntoPastDays() {
+        // Regression test: smoothing must operate on time-of-day only.
+        // Averaging epoch-seconds over past days would incorrectly shift the result date into the past.
+        assertStart("smooth(07:00, 14d)", now.with(LocalTime.of(7, 0)));
     }
 }

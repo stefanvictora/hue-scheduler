@@ -13,6 +13,9 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 public final class StartTimeProviderImpl implements StartTimeProvider {
 
+    private static final int SECONDS_IN_A_DAY = 86_400;
+    private static final int SECONDS_IN_HALF_A_DAY = SECONDS_IN_A_DAY / 2;
+
     private final SunTimesProvider sunTimesProvider;
     private final Map<String, LocalTime> timeCache;
 
@@ -99,8 +102,64 @@ public final class StartTimeProviderImpl implements StartTimeProvider {
                 long mixedEpochSeconds = Math.round(a.toEpochSecond() * weight + b.toEpochSecond() * (1.0 - weight));
                 return ZonedDateTime.ofInstant(java.time.Instant.ofEpochSecond(mixedEpochSeconds), a.getZone());
             }
+            case "smooth" -> {
+                requireArgCount(functionName, args, 2);
+                String expression = args.get(0).trim();
+                double halfLifeDays = parseHalfLifeDays(args.get(1).trim());
+                double dailyDecay = Math.pow(0.5, 1.0 / halfLifeDays);
+                int lookBackDays = Math.max(1, (int) Math.ceil(halfLifeDays * 8.0));
+                ZonedDateTime start = getStart(expression, dateTime);
+                double weight = 1.0;
+                double weightSum = 0.0;
+                double weightedSecondDelta = 0.0;
+                for (int daysAgo = 0; daysAgo <= lookBackDays; daysAgo++) {
+                    ZonedDateTime previous = getStart(expression, dateTime.minusDays(daysAgo));
+                    weightedSecondDelta += getDelta(previous, start) * weight;
+                    weightSum += weight;
+                    weight *= dailyDecay;
+                }
+                long smoothedSecondOfDay = Math.round(start.toLocalTime().toSecondOfDay() + (weightedSecondDelta / weightSum));
+                int normalizedSecondOfDay = Math.floorMod(smoothedSecondOfDay, SECONDS_IN_A_DAY);
+                return dateTime.with(LocalTime.ofSecondOfDay(normalizedSecondOfDay));
+            }
             default -> throw new InvalidStartTimeExpression("Unknown function: '" + functionName + "'");
         }
+    }
+
+    private double parseHalfLifeDays(String halfLifeArg) {
+        try {
+            double value = Double.parseDouble(getNumberPart(halfLifeArg));
+            if (!Double.isFinite(value) || value <= 0.0) {
+                throw new InvalidStartTimeExpression("smooth() halfLife must be a finite positive number of days, got '" + halfLifeArg + "'");
+            }
+            return value;
+        } catch (NumberFormatException e) {
+            throw new InvalidStartTimeExpression("smooth() halfLife must be a number of days (e.g. 14d), got '" + halfLifeArg + "'");
+        }
+    }
+
+    private static String getNumberPart(String halfLifeArg) {
+        String normalized = halfLifeArg.trim().toLowerCase(Locale.ENGLISH).replaceAll("\\s+", "");
+        if (normalized.endsWith("d")) {
+            return normalized.substring(0, normalized.length() - 1);
+        } else {
+            return normalized;
+        }
+    }
+
+    private static int getDelta(ZonedDateTime previous, ZonedDateTime start) {
+        int delta = previous.toLocalTime().toSecondOfDay() - start.toLocalTime().toSecondOfDay();
+        // Compensate DST jumps (typically +-1h)
+        int offsetDeltaSeconds = start.getOffset().getTotalSeconds() - previous.getOffset().getTotalSeconds();
+        if (offsetDeltaSeconds != 0 && Math.abs(delta) >= 2_700) {
+            delta += offsetDeltaSeconds;
+        }
+        if (delta > SECONDS_IN_HALF_A_DAY) {
+            delta -= SECONDS_IN_A_DAY;
+        } else if (delta < -SECONDS_IN_HALF_A_DAY) {
+            delta += SECONDS_IN_A_DAY;
+        }
+        return delta;
     }
 
     private double parseMixWeight(String weightArg) {

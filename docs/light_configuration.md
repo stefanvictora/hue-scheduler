@@ -84,6 +84,7 @@ Available functions:
 | `max(a, b)`              | 2    | Alias for `notBefore` — returns the later of two times                                      |
 | `min(a, b)`              | 2    | Alias for `notAfter` — returns the earlier of two times                                     |
 | `mix(a, b, w)`           | 3    | **Experimental**: weighted blend. `mix(a,b,w)=a*w+b*(1-w)`, with `w` in `0..1` or `%`       |
+| `smooth(expr, halfLife)` | 2    | **Experimental**: pure-solar exponential smoothing over past days using half-life in days   |
 
 Each argument can be a fixed time (`HH:mm[:ss]`), a solar keyword, a solar keyword with offset, or another nested function call.
 
@@ -105,6 +106,23 @@ clamp(mix(sunrise, 07:30, 0.35), 06:30, 08:00)
 ```
 
 This keeps the schedule smooth around spring/autumn while still enforcing hard boundaries.
+</details>
+
+<details>
+<summary>Experimental: `smooth(...)` to keep it solar but damp seasonal swings</summary>
+
+`smooth(expr, halfLife)` keeps scheduling fully based on `expr`, but applies exponential smoothing over prior days.
+
+- `expr` can be fixed, solar, offset, or nested expression
+- `halfLife` is in days (e.g. `14d`, `14 day`, `14`)
+- larger `halfLife` means slower movement
+
+Examples:
+
+```yacas
+smooth(sunrise, 14d)
+clamp(smooth(sunrise, 14d), 06:30, 08:00)
+```
 </details>
 
 <details>
@@ -143,6 +161,9 @@ Bedroom  clamp(mix(sunrise, 07:30, 0.35), 06:30, 08:00)  bri:30%  ct:3200
 
 # Real-world evening routine: follow sunset, but dampened and bounded
 Living room  clamp(mix(sunset+30, 22:30, 0.5), 19:00, 23:00)  bri:45%  ct:2600
+
+# Pure-solar smoothing (no fixed anchor), then practical bounds
+Bedroom  clamp(smooth(sunrise, 14d), 06:30, 08:00)  bri:30%  ct:3200
 ~~~
 
 </details>
