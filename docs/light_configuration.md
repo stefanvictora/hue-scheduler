@@ -60,6 +60,8 @@ Each state has a start time, specified either as a fixed time (24-hour `HH:mm[:s
 
 These times vary by location and date. To see your current values, start Hue Scheduler with an empty input file.
 
+> Note: Background on twilight terms: [Twilight - Wikipedia](https://en.wikipedia.org/wiki/Twilight) and [Twilight - commons-suncalc](https://shredzone.org/maven/commons-suncalc/usage.html#twilight).
+
 You can also **offset** solar times:
 
 ```yacas
@@ -68,7 +70,91 @@ You can also **offset** solar times:
 
 Examples: `sunset-30` (30 minutes before sunset), `sunrise+60` (one hour after sunrise). Offsets update daily with the sun.
 
-> Note: Background on twilight terms: [Twilight - Wikipedia](https://en.wikipedia.org/wiki/Twilight) and [Twilight - commons-suncalc](https://shredzone.org/maven/commons-suncalc/usage.html#twilight).
+### Constraint Functions
+
+You can wrap any start time expression in a **constraint function** to bound dynamic solar times to fixed limits. This is useful when sunrise or sunset varies too much across seasons.
+
+Available functions:
+
+| Function                 | Args | Returns                                                                                                                          |
+|--------------------------|------|----------------------------------------------------------------------------------------------------------------------------------|
+| `notBefore(expr, limit)` | 2    | The **later** of `expr` and `limit` (ensures start is not before `limit`). E.g. `notBefore(sunrise, 06:30)`                      |
+| `notAfter(expr, limit)`  | 2    | The **earlier** of `expr` and `limit` (ensures start is not after `limit`). E.g. `notAfter(sunset+30, 21:00)`                    |
+| `clamp(expr, min, max)`  | 3    | `expr` bounded to `[min, max]`; if `min > max`, logs a warning and returns `expr` unchanged. E.g. `clamp(sunrise, 06:30, 08:00)` |
+| `max(a, b)`              | 2    | Alias for `notBefore` — returns the later of two times                                                                           |
+| `min(a, b)`              | 2    | Alias for `notAfter` — returns the earlier of two times                                                                          |
+| `mix(a, b, w)`           | 3    | **Experimental**: Places the time between `a` and `b` using weight `w` (`0..1` or `%`). E.g. `mix(sunrise, 07:30, 35%)`          |
+| `smooth(expr, halfLife)` | 2    | **Experimental**: Smooths `expr` by averaging it over past days. E.g. `smooth(sunrise, 14d)`                                     |
+
+Each argument can be a fixed time (`HH:mm[:ss]`), a solar keyword with optional offset, or another nested function call.
+
+Function names are **case-insensitive**. Whitespace inside arguments is trimmed.
+
+Further examples:
+
+```
+# Ensure lights don't turn on before 06:30 even in summer when sunrise is early
+Kitchen  notBefore(sunrise, 06:30)  bri:100%
+
+# Cap sunset-based scheduling to no later than 21:00
+Porch  notAfter(sunset+30, 21:00)  bri:80%
+
+# Keep sunrise between 06:30 and 08:00 year-round
+Office  clamp(sunrise, 06:30, 08:00)  bri:100%
+
+# Equivalent using min/max aliases
+Office  min(max(sunrise, 06:30), 08:00)  bri:100%
+
+# Nested functions
+Hallway  notAfter(notBefore(sunrise, 06:30), 08:00)  bri:100%
+
+# Experimental: blend sunrise with a fixed anchor to reduce seasonal swings
+Kitchen  mix(sunrise, 07:30, 0.35)  bri:40%
+
+# Blend two solar times directly
+Living room  mix(golden_hour, sunset, 0.5)  bri:45%
+
+# Morning routine: smooth + bounded
+Bedroom  clamp(mix(sunrise, 07:30, 0.35), 06:30, 08:00)  bri:30%
+
+# Evening routine: follow sunset, but dampened and bounded
+Living room  clamp(mix(sunset+30, 22:30, 0.5), 19:00, 23:00)  bri:45%
+
+# Pure-solar smoothing (no fixed anchor), then practical bounds
+Bedroom  clamp(smooth(sunrise, 14d), 06:30, 08:00)  bri:30%
+```
+
+#### Experimental: `mix(...)` — blend two time expressions
+
+`mix(a, b, w)` places the trigger time between two time expressions `a` and `b`. The weight `w` controls how close the result is to `a`:
+
+- `w = 1` → exactly `a`
+- `w = 0` → exactly `b`
+- `w = 0.5` → midpoint between `a` and `b`
+
+A common use is blending a solar time with a fixed clock time: `mix(sunrise, 07:30, 0.35)` takes sunrise but pulls it 65% toward `07:30` — so the schedule still moves with the seasons, but much more gently. You can also blend two solar times directly: `mix(golden_hour, sunset, 0.5)`. The order of `a` and `b` does not matter — the result is always between the two.
+
+**Why use it:** If you like solar-based schedules but want them to behave more like a stable routine (e.g., "around 07:30, but still season-aware"), `mix` **narrows the seasonal range**. However, since both values are recalculated fresh each day, day-to-day jumps are not smoothed out.
+
+#### Experimental: `smooth(...)` — keep it fully solar, but slow down seasonal swings
+
+`smooth(expr, halfLife)` keeps the schedule 100% solar-based, but smooths out rapid seasonal changes by averaging the solar time over past days — more recent days count more, older days fade out.
+
+- `halfLife` is in days (e.g., `14d`, `14`) and controls how "inert" the time is. With `halfLife = 14d`, the value from ~14 days ago still contributes about half as much as today's; older days fade out quickly
+- Larger half-life → smoother, slower movement; smaller → more responsive
+
+**Why use it:** If sunrise/sunset schedules feel like they shift too quickly in spring and autumn, `smooth` addresses that directly — without introducing a fixed routine time. The schedule still tracks the seasons, just more gradually. Over time, it will still reach the full seasonal extreme. To add hard limits, wrap in `clamp`: `clamp(smooth(sunrise, 14d), 06:30, 08:00)`.
+
+#### Choosing between `mix` and `smooth`
+
+|                                   | `mix(a, b, w)`                           | `smooth(expr, halfLife)`                 |
+|-----------------------------------|------------------------------------------|------------------------------------------|
+| **How it works**                  | Blends two expressions evaluated *today* | Averages one expression over past days   |
+| **Requires a second expression?** | Yes (`b`)                                | No                                       |
+| **Reduces seasonal range?**       | Yes — pulls toward `b`                   | No — eventually reaches the true extreme |
+| **Reduces day-to-day jumps?**     | No — recalculated fresh each day         | Yes — changes gradually                  |
+
+**Rule of thumb:** Use `mix` to narrow the seasonal range; use `smooth` to slow day-to-day changes. Combine them — or add `clamp` — for maximum control.
 
 ### FAQ: How is the end of a state determined?
 
@@ -274,4 +360,3 @@ Desk  17:00  gradient:[oklch(0.7 0.2 30), #00FF00, oklch(0.5 0.15 270)]@random_p
     From 0.14.0, setting `force:true` with `on:true` also forces the light to be **always on**.
 
     With `--require-scene-activation`, `force:true` still applies the state even if a synced scene wasn't activated.
-

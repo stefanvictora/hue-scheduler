@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.EnumSet;
@@ -4471,6 +4472,36 @@ class HueSchedulerTest extends AbstractHueSchedulerTest {
         );
 
         ensureRunnable(nextDaySunset, initialNow.plusDays(2));
+    }
+
+    @Test
+    void parse_sunset_withSmooth_inWinter() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now, "bri:100%");
+        addState(1, "smooth(sunset,14d)", "bri:50%");
+        // normal sunset: 16:14:29
+        ZonedDateTime smoothedSunset = now.with(LocalTime.of(16, 11, 34));
+
+        startScheduler(
+                expectedRunnable(now, smoothedSunset),
+                expectedRunnable(smoothedSunset, now.plusDays(1))
+        );
+    }
+
+    @Test
+    void parse_sunset_withSmooth_inSpring_handlesDST() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        setCurrentAndInitialTimeTo(ZonedDateTime.of(2021, 4, 1, 0, 0, 0, 0,
+                ZoneId.of("Europe/Vienna")));
+        addState(1, now, "bri:100%");
+        addState(1, "smooth(sunset,14d)", "bri:50%");
+        // normal sunset: 19:27:36
+        ZonedDateTime smoothedSunset = now.with(LocalTime.of(18, 58, 50));
+
+        startScheduler(
+                expectedRunnable(now, smoothedSunset),
+                expectedRunnable(smoothedSunset, now.plusDays(1))
+        );
     }
 
     @Test

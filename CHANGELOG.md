@@ -1,7 +1,19 @@
+## [0.16.0] - 2026-04-06
+
+### Added
+- **Start time function expressions** (#48): New composable functions for constraining and blending solar and fixed times in start time expressions. All arguments may be fixed times, sun keywords (with optional offset), or nested function calls.
+  - `notBefore(expr, min)` — ensures the result is not earlier than `min`; returns the latter of the two. Alias: `max(a, b)`.
+  - `notAfter(expr, max)` — ensures the result is not later than `max`; returns the earlier of the two. Alias: `min(a, b)`.
+  - `clamp(expr, min, max)` — constrains the result to the `[min, max]` range.
+  - `mix(a, b, weight)` — linearly interpolates between two times with the given `weight` in `[0..1]` or as a percentage (`0%..100%`). A weight of `1` returns `a`, `0` returns `b`. Example: `mix(sunrise, 08:00, 0.35)` blends toward a fixed anchor, softening seasonal drift.
+  - `smooth(expr, halfLife)` — exponentially smooths a time expression over past days to reduce day-to-day variation. `halfLife` specifies how many days it takes for the smoothing influence to halve (e.g. `14d`). Useful for softening sharp seasonal sunrise/sunset swings. Example: `smooth(sunrise, 14d)`.
+  - Functions are case-insensitive and fully composable, e.g. `clamp(smooth(sunrise, 14d), 07:00, 09:00)`.
+  - Full documentation is available in the [Light Configuration docs](/docs/light_configuration.md#constraint-functions). 
+
 ## [0.15.0] - 2026-03-18
 
 ### Added
-- **Scene scheduling for groups** (`scene:<name>`) (#47):
+- **Scene scheduling for groups** (`scene:<name>`) (#29):
   - Load per-light states from an existing Hue scene and schedule them as a group state. Each light retains its individual brightness, color temperature, color, effect, and gradient settings.
   - Auto-reloads the light states on scene changes.
   - Proportional brightness scaling with `bri` (e.g., `bri:50%` dims all lights to half; values above `100%` boost proportionally, capped per light).
