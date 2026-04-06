@@ -480,8 +480,16 @@ class StartTimeProviderTest {
     }
 
     @Test
-    void mix_invertedParameters_invalidUsage_usesUnmixedInput() {
-        assertStart("mix(23:30, 00:30, 0.5)", now.with(LocalTime.of(23, 30)));
+    void mix_invertedParameters_stillBlends() {
+        // mix(23:30, 00:30, 0.5): both resolve to same day, midpoint of epoch seconds = 12:00
+        assertStart("mix(23:30, 00:30, 0.5)", now.with(LocalTime.NOON));
+    }
+
+    @Test
+    void mix_aLaterThanB_blendsPullingTowardB() {
+        // Simulates winter: sunrise=07:00, anchor=06:30 (sunrise passed the anchor)
+        // mix(07:00, 06:30, 0.35) = 07:00*0.35 + 06:30*0.65 = 06:40:30
+        assertStart("mix(sunrise, 06:30, 0.35)", now.with(LocalTime.of(6, 40, 30)));
     }
 
     @Test

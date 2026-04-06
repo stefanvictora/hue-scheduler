@@ -76,97 +76,85 @@ You can wrap any start time expression in a **constraint function** to bound dyn
 
 Available functions:
 
-| Function                 | Args | Returns                                                                                     |
-|--------------------------|------|---------------------------------------------------------------------------------------------|
-| `notBefore(expr, limit)` | 2    | The **later** of `expr` and `limit` (ensures start is not before `limit`)                   |
-| `notAfter(expr, limit)`  | 2    | The **earlier** of `expr` and `limit` (ensures start is not after `limit`)                  |
-| `clamp(expr, min, max)`  | 3    | `expr` bounded to `[min, max]`; if `min > max`, logs a warning and returns `expr` unchanged |
-| `max(a, b)`              | 2    | Alias for `notBefore` — returns the later of two times                                      |
-| `min(a, b)`              | 2    | Alias for `notAfter` — returns the earlier of two times                                     |
-| `mix(a, b, w)`           | 3    | **Experimental**: weighted blend. `mix(a,b,w)=a*w+b*(1-w)`, with `w` in `0..1` or `%`       |
-| `smooth(expr, halfLife)` | 2    | **Experimental**: pure-solar exponential smoothing over past days using half-life in days   |
+| Function                 | Args | Returns                                                                                                                          |
+|--------------------------|------|----------------------------------------------------------------------------------------------------------------------------------|
+| `notBefore(expr, limit)` | 2    | The **later** of `expr` and `limit` (ensures start is not before `limit`). E.g. `notBefore(sunrise, 06:30)`                      |
+| `notAfter(expr, limit)`  | 2    | The **earlier** of `expr` and `limit` (ensures start is not after `limit`). E.g. `notAfter(sunset+30, 21:00)`                    |
+| `clamp(expr, min, max)`  | 3    | `expr` bounded to `[min, max]`; if `min > max`, logs a warning and returns `expr` unchanged. E.g. `clamp(sunrise, 06:30, 08:00)` |
+| `max(a, b)`              | 2    | Alias for `notBefore` — returns the later of two times                                                                           |
+| `min(a, b)`              | 2    | Alias for `notAfter` — returns the earlier of two times                                                                          |
+| `mix(a, b, w)`           | 3    | **Experimental**: Places the time between `a` and `b` using weight `w` (`0..1` or `%`). E.g. `mix(sunrise, 07:30, 35%)`          |
+| `smooth(expr, halfLife)` | 2    | **Experimental**: Smooths `expr` by averaging it over past days. E.g. `smooth(sunrise, 14d)`                                     |
 
-Each argument can be a fixed time (`HH:mm[:ss]`), a solar keyword, a solar keyword with offset, or another nested function call.
+Each argument can be a fixed time (`HH:mm[:ss]`), a solar keyword with optional offset, or another nested function call.
 
-Function names are **case-insensitive** (`notBefore`, `NotBefore`, `NOTBEFORE` all work). Whitespace inside arguments is trimmed.
+Function names are **case-insensitive**. Whitespace inside arguments is trimmed.
 
-<details>
-<summary>Experimental: `mix(...)` for smoother seasonal changes</summary>
+Further examples:
 
-`mix(...)` helps reduce day-to-day schedule swings by blending two time expressions. Both `a` and `b` can be fixed times, solar times, solar times with offsets, or nested function expressions.
-
-- `w = 1` → fully `a` (e.g. pure `sunrise`)
-- `w = 0` → fully `b` (e.g. a fixed time, or another solar time such as `sunset`)
-- lower `w` means less seasonal movement
-
-In practice, **mix first, clamp second**:
-
-```yacas
-clamp(mix(sunrise, 07:30, 0.35), 06:30, 08:00)
 ```
-
-This keeps the schedule smooth around spring/autumn while still enforcing hard boundaries.
-</details>
-
-<details>
-<summary>Experimental: `smooth(...)` to keep it solar but damp seasonal swings</summary>
-
-`smooth(expr, halfLife)` keeps scheduling fully based on `expr`, but applies exponential smoothing over prior days.
-
-- `expr` can be fixed, solar, offset, or nested expression
-- `halfLife` is in days (e.g. `14d`, `14 day`, `14`)
-- larger `halfLife` means slower movement
-
-Examples:
-
-```yacas
-smooth(sunrise, 14d)
-clamp(smooth(sunrise, 14d), 06:30, 08:00)
-```
-</details>
-
-<details>
-<summary>Examples</summary>
-
-~~~
 # Ensure lights don't turn on before 06:30 even in summer when sunrise is early
-Kitchen  notBefore(sunrise, 06:30)  bri:254  ct:6500
+Kitchen  notBefore(sunrise, 06:30)  bri:100%
 
 # Cap sunset-based scheduling to no later than 21:00
-Porch  notAfter(sunset+30, 21:00)  bri:200
+Porch  notAfter(sunset+30, 21:00)  bri:80%
 
 # Keep sunrise between 06:30 and 08:00 year-round
-Office  clamp(sunrise, 06:30, 08:00)  bri:254  ct:6000
+Office  clamp(sunrise, 06:30, 08:00)  bri:100%
 
 # Equivalent using min/max aliases
-Office  min(max(sunrise, 06:30), 08:00)  bri:254  ct:6000
+Office  min(max(sunrise, 06:30), 08:00)  bri:100%
 
 # Nested functions
-Hallway  notAfter(notBefore(sunrise, 06:30), 08:00)  bri:254
-
-# Combine with offsets
-Bedroom  clamp(sunrise-15, 06:30, 08:00)  bri:200  ct:3000
+Hallway  notAfter(notBefore(sunrise, 06:30), 08:00)  bri:100%
 
 # Experimental: blend sunrise with a fixed anchor to reduce seasonal swings
 Kitchen  mix(sunrise, 07:30, 0.35)  bri:40%
 
-# Same as above, but with percent weight
-Kitchen  mix(sunrise, 07:30, 35%)  bri:40%
-
 # Blend two solar times directly
 Living room  mix(golden_hour, sunset, 0.5)  bri:45%
 
-# Real-world morning routine: smooth + bounded
-Bedroom  clamp(mix(sunrise, 07:30, 0.35), 06:30, 08:00)  bri:30%  ct:3200
+# Morning routine: smooth + bounded
+Bedroom  clamp(mix(sunrise, 07:30, 0.35), 06:30, 08:00)  bri:30%
 
-# Real-world evening routine: follow sunset, but dampened and bounded
-Living room  clamp(mix(sunset+30, 22:30, 0.5), 19:00, 23:00)  bri:45%  ct:2600
+# Evening routine: follow sunset, but dampened and bounded
+Living room  clamp(mix(sunset+30, 22:30, 0.5), 19:00, 23:00)  bri:45%
 
 # Pure-solar smoothing (no fixed anchor), then practical bounds
-Bedroom  clamp(smooth(sunrise, 14d), 06:30, 08:00)  bri:30%  ct:3200
-~~~
+Bedroom  clamp(smooth(sunrise, 14d), 06:30, 08:00)  bri:30%
+```
 
-</details>
+#### Experimental: `mix(...)` — blend two time expressions
+
+`mix(a, b, w)` places the trigger time between two time expressions `a` and `b`. The weight `w` controls how close the result is to `a`:
+
+- `w = 1` → exactly `a`
+- `w = 0` → exactly `b`
+- `w = 0.5` → midpoint between `a` and `b`
+
+A common use is blending a solar time with a fixed clock time: `mix(sunrise, 07:30, 0.35)` takes sunrise but pulls it 65% toward `07:30` — so the schedule still moves with the seasons, but much more gently. You can also blend two solar times directly: `mix(golden_hour, sunset, 0.5)`. The order of `a` and `b` does not matter — the result is always between the two.
+
+**Why use it:** If you like solar-based schedules but want them to behave more like a stable routine (e.g., "around 07:30, but still season-aware"), `mix` **narrows the seasonal range**. However, since both values are recalculated fresh each day, day-to-day jumps are not smoothed out.
+
+#### Experimental: `smooth(...)` — keep it fully solar, but slow down seasonal swings
+
+`smooth(expr, halfLife)` keeps the schedule 100% solar-based, but smooths out rapid seasonal changes by averaging the solar time over past days — more recent days count more, older days fade out.
+
+- `halfLife` is in days (e.g., `14d`, `14`) and controls how "inert" the time is. With `halfLife = 14d`, the value from ~14 days ago still contributes about half as much as today's; older days fade out quickly
+- Larger half-life → smoother, slower movement; smaller → more responsive
+
+**Why use it:** If sunrise/sunset schedules feel like they shift too quickly in spring and autumn, `smooth` addresses that directly — without introducing a fixed routine time. The schedule still tracks the seasons, just more gradually. Over time, it will still reach the full seasonal extreme. To add hard limits, wrap in `clamp`: `clamp(smooth(sunrise, 14d), 06:30, 08:00)`.
+
+#### Choosing between `mix` and `smooth`
+
+|                                   | `mix(a, b, w)`                           | `smooth(expr, halfLife)`                 |
+|-----------------------------------|------------------------------------------|------------------------------------------|
+| **How it works**                  | Blends two expressions evaluated *today* | Averages one expression over past days   |
+| **Requires a second expression?** | Yes (`b`)                                | No                                       |
+| **Reduces seasonal range?**       | Yes — pulls toward `b`                   | No — eventually reaches the true extreme |
+| **Reduces day-to-day jumps?**     | No — recalculated fresh each day         | Yes — changes gradually                  |
+
+**Rule of thumb:** Use `mix` to narrow the seasonal range; use `smooth` to slow day-to-day changes. Combine them — or add `clamp` — for maximum control.
 
 ### FAQ: How is the end of a state determined?
 
