@@ -8,7 +8,7 @@ Below is a complete `docker-compose.yml` for a setup in **Vienna, Austria**, con
 services:
   hue-scheduler:
     container_name: hue-scheduler
-    image: stefanvictora/hue-scheduler:0.15
+    image: stefanvictora/hue-scheduler:0.16
     environment:
       - API_HOST=192.168.0.157
       - ACCESS_TOKEN=<TOKEN>
@@ -34,7 +34,7 @@ On Windows, adapt the source path, e.g. `C:\Users\user_name\.config\hue-schedule
 ```yaml
 services:
   hue-scheduler:
-    image: stefanvictora/hue-scheduler:0.15
+    image: stefanvictora/hue-scheduler:0.16
     user: "${UID}:${GID}"
 ...
 ```
@@ -57,7 +57,7 @@ docker run -d --name hue-scheduler \
   -e log.level=DEBUG \
   -e TZ=Europe/Vienna \
   --restart unless-stopped \
-  stefanvictora/hue-scheduler:0.15 \
+  stefanvictora/hue-scheduler:0.16 \
   <API_HOST> <ACCESS_TOKEN> \
   --lat <LATITUDE> --long <LONGITUDE> --elevation <ELEVATION> \
   --enable-scene-sync \

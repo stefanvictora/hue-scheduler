@@ -104,7 +104,7 @@ Run Hue Scheduler via Docker (recommended) or manually with Java. Configuration 
    services:
      hue-scheduler:
        container_name: hue-scheduler
-       image: stefanvictora/hue-scheduler:0.15
+       image: stefanvictora/hue-scheduler:0.16
        environment:
          - API_HOST=
          - ACCESS_TOKEN=
