@@ -99,6 +99,17 @@ public interface HueApi extends ResourceModificationEventListener {
     String getSceneName(String sceneId);
 
     /**
+     * @return a list of sceneId and name pairs for all scenes in the bridge. Not null.
+     */
+    List<Identifier> getAllScenes();
+
+    /**
+     * @param sceneId the id of the scene
+     * @return the grouped light id of the group the scene is assigned to.
+     */
+    String getGroupIdForScene(String sceneId);
+
+    /**
      * @return the lights and group id related to the given scene and if they are already on. If not found, empty list. Not null.
      * @throws ApiFailure if the api call failed
      */

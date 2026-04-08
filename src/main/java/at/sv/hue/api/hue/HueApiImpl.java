@@ -336,6 +336,23 @@ public final class HueApiImpl implements HueApi {
     }
 
     @Override
+    public List<Identifier> getAllScenes() {
+        return getAvailableScenes().values()
+                .stream()
+                .map(scene -> new Identifier(scene.getId(), scene.getName()))
+                .toList();
+    }
+
+    @Override
+    public String getGroupIdForScene(String sceneId) {
+        Scene scene = getAvailableScenes().get(sceneId);
+        if (scene == null) {
+            return null;
+        }
+        return getAndAssertGroupExists(scene.getGroup()).getGroupedLightId();
+    }
+
+    @Override
     public List<AffectedId> getAffectedIdsByScene(String sceneId) {
         Scene scene = getAvailableScenes().get(sceneId);
         if (scene == null) {
