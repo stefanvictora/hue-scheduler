@@ -3,7 +3,7 @@ package at.sv.hue.api.hue;
 import at.sv.hue.api.LightEventListener;
 import at.sv.hue.api.ResourceModificationEventListener;
 import at.sv.hue.api.SceneEventListener;
-import at.sv.hue.api.SceneModificationListener;
+import at.sv.hue.api.SceneActionsModificationListener;
 import com.launchdarkly.eventsource.MessageEvent;
 import org.hamcrest.Matcher;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,13 +26,13 @@ class HueEventHandlerTest {
     @Mock
     private ResourceModificationEventListener resourceModificationEventListener;
     @Mock
-    private SceneModificationListener sceneModificationListener;
+    private SceneActionsModificationListener sceneActionsModificationListener;
     private HueEventHandler handler;
 
     @BeforeEach
     void setUp() {
         handler = new HueEventHandler(lightEventListener, sceneEventListener, resourceModificationEventListener,
-                sceneModificationListener);
+                sceneActionsModificationListener);
     }
 
     @Test
@@ -666,7 +666,7 @@ class HueEventHandlerTest {
         verifyResourceModification("scene", "c1ad153a-b1ca-4250-a352-9dbb6f985586");
 
         verifyNoInteractions(sceneEventListener);
-        verifyNoInteractions(sceneModificationListener); // no modification, but addition of a new scene
+        verifyNoInteractions(sceneActionsModificationListener); // no modification, but addition of a new scene
     }
 
     @Test
@@ -723,7 +723,7 @@ class HueEventHandlerTest {
         verifyNoMoreInteractions(resourceModificationEventListener);
         verifyNoInteractions(lightEventListener);
         verifyNoInteractions(sceneEventListener);
-        verifyNoInteractions(sceneModificationListener);
+        verifyNoInteractions(sceneActionsModificationListener);
     }
 
     @Test
@@ -820,7 +820,7 @@ class HueEventHandlerTest {
         
         verifyNoMoreInteractions(sceneEventListener);
         verifyNoInteractions(lightEventListener);
-        verifyNoInteractions(sceneModificationListener);
+        verifyNoInteractions(sceneActionsModificationListener);
         verifyNoMoreInteractions(resourceModificationEventListener);
     }
 
@@ -1033,7 +1033,7 @@ class HueEventHandlerTest {
                   }
                 ]"""));
 
-        verify(sceneModificationListener).onSceneModified("f6b7b1ee-31e1-4a24-b848-376a5dd6e2d4");
+        verify(sceneActionsModificationListener).onSceneActionsModified("f6b7b1ee-31e1-4a24-b848-376a5dd6e2d4");
         verifyResourceModification("scene", "f6b7b1ee-31e1-4a24-b848-376a5dd6e2d4");
     }
 }
