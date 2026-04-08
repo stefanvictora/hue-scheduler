@@ -239,7 +239,7 @@ public class HassApiImpl implements HueApi {
     }
 
     @Override
-    public String getGroupIdForScene(String sceneId) {
+    public Identifier getGroupIdForScene(String sceneId) {
         throw new UnsupportedOperationException("Scene scheduling is not supported by Home Assistant");
     }
 

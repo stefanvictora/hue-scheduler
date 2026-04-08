@@ -344,12 +344,13 @@ public final class HueApiImpl implements HueApi {
     }
 
     @Override
-    public String getGroupIdForScene(String sceneId) {
+    public Identifier getGroupIdForScene(String sceneId) {
         Scene scene = getAvailableScenes().get(sceneId);
         if (scene == null) {
             return null;
         }
-        return getAndAssertGroupExists(scene.getGroup()).getGroupedLightId();
+        Group group = getAndAssertGroupExists(scene.getGroup());
+        return new Identifier(group.getGroupedLightId(), group.getName());
     }
 
     @Override

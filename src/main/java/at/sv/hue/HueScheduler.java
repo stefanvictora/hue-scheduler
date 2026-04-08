@@ -133,6 +133,11 @@ public final class HueScheduler implements Runnable {
             description = "Enable the creating of Hue scenes that always match the state of a scheduled room or zone." +
                           " Default: ${DEFAULT-VALUE}")
     boolean enableSceneSync;
+    @Option(names = "--enable-auto-scene-states",
+            defaultValue = "${env:ENABLE_AUTO_SCENE_STATES:-false}",
+            description = "Automatically create and reload states based on scenes matching the naming scheme." +
+                    " Default: ${DEFAULT-VALUE}")
+    boolean enableAutoSceneStates;
     @Option(names = "--scene-sync-name",
             defaultValue = "${env:SCENE_SYNC_NAME:-Hue Scheduler}",
             description = "The name of the synced scene. Related to '--enable-scene-sync'." +
@@ -269,6 +274,7 @@ public final class HueScheduler implements Runnable {
     private StartTimeProvider startTimeProvider;
     private SceneEventListenerImpl sceneEventListener;
     private ScheduledStateRegistry stateRegistry;
+    private SceneStateDiscoveryService sceneStateDiscoveryService;
     private int sceneSyncDelayInSeconds = 5;
     private boolean autoFillGradient = true;
     private boolean supportsOffLightUpdates = false;
@@ -289,7 +295,7 @@ public final class HueScheduler implements Runnable {
                         double brightnessSyncThresholdPercentage, int colorTemperatureSyncThresholdKelvin,
                         double colorSyncThreshold,
                         int sceneActivationIgnoreWindowInSeconds, boolean interpolateAll, boolean enableSceneSync,
-                        String sceneSyncName, int syncFailureRetryInMinutes, int sceneSyncDelayInSeconds,
+                        String sceneSyncName, boolean enableAutoSceneStates, int syncFailureRetryInMinutes, int sceneSyncDelayInSeconds,
                         boolean autoFillGradient, boolean supportsOffLightUpdates) {
         this();
         this.api = api;
@@ -317,6 +323,7 @@ public final class HueScheduler implements Runnable {
         this.interpolateAll = interpolateAll;
         this.enableSceneSync = enableSceneSync;
         this.sceneSyncName = sceneSyncName;
+        this.enableAutoSceneStates = enableAutoSceneStates;
         this.syncFailureRetryInMinutes = syncFailureRetryInMinutes;
         this.sceneSyncDelayInSeconds = sceneSyncDelayInSeconds;
         this.autoFillGradient = autoFillGradient;
@@ -326,6 +333,9 @@ public final class HueScheduler implements Runnable {
         lightEventListener = createLightEventListener();
         this.sceneEventListener = new SceneEventListenerImpl(api, fakeTicker, sceneActivationIgnoreWindowInSeconds,
                 sceneSyncName::equals, lightEventListener);
+        sceneStateDiscoveryService = new SceneStateDiscoveryService(api, startTimeProvider, stateRegistry,
+                minTrBeforeGapInMinutes, parseBrightnessPercentValue(brightnessOverrideThresholdPercentage),
+                colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold);
     }
 
     private LightEventListenerImpl createLightEventListener() {
@@ -558,6 +568,7 @@ public final class HueScheduler implements Runnable {
         } else {
             parseInput();
             performSyncedSceneMigration();
+            discoverSceneStates();
             start();
         }
     }
@@ -608,6 +619,13 @@ public final class HueScheduler implements Runnable {
         return new InputConfigurationParser(startTimeProvider, api, minTrBeforeGapInMinutes,
                 parseBrightnessPercentValue(brightnessOverrideThresholdPercentage),
                 colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold, interpolateAll, autoFillGradient);
+    }
+
+    void discoverSceneStates() {
+        if (!enableAutoSceneStates) {
+            return;
+        }
+        sceneStateDiscoveryService.discoverSceneStates();
     }
 
     public void start() {

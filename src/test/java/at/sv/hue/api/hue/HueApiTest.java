@@ -1915,9 +1915,11 @@ class HueApiTest {
                 .extracting(Identifier::id, Identifier::name)
                 .containsExactlyInAnyOrder(tuple("SCENE_ID_1", "Scene_1"), tuple("SCENE_ID_2", "Scene_2"));
 
-        assertThat(api.getGroupIdForScene("SCENE_ID_1")).isEqualTo("GROUPED_LIGHT_ID_ROOM");
-        assertThat(api.getGroupIdForScene("SCENE_ID_2")).isEqualTo("GROUPED_LIGHT_ID_ZONE");
-        assertThat(api.getGroupIdForScene("UKNOWN_SCENE")).isNull();
+        assertThat(api.getGroupIdForScene("SCENE_ID_1"))
+                .isEqualTo(new Identifier("GROUPED_LIGHT_ID_ROOM", "Wohnzimmer"));
+        assertThat(api.getGroupIdForScene("SCENE_ID_2"))
+                .isEqualTo(new Identifier("GROUPED_LIGHT_ID_ZONE", "Couch"));
+        assertThat(api.getGroupIdForScene("UNKNOWN_SCENE")).isNull();
     }
 
     @Test
