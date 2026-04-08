@@ -419,7 +419,7 @@ public final class HueScheduler implements Runnable {
         sceneEventListener = new SceneEventListenerImpl(api, Ticker.systemTicker(),
                 sceneActivationIgnoreWindowInSeconds, sceneSyncName::equals, lightEventListener);
         new HueEventStreamReader(apiHost, accessToken, httpsClient,
-                new HueEventHandler(lightEventListener, sceneEventListener, api, this::onSceneResourceModified),
+                new HueEventHandler(lightEventListener, sceneEventListener, api, this::onSceneResourceModified, null),
                 eventStreamReadTimeoutInMinutes).start();
         stateRegistry = new ScheduledStateRegistry(currentTime, api);
     }
