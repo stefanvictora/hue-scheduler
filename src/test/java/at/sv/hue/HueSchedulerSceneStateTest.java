@@ -520,6 +520,112 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
         advanceTimeAndRunAndAssertScenePutCalls(followUpStates.get(2), 1); // was canceled
     }
 
+    @Test
+    void autoSceneStates_interpolate_sceneSync_stopsBackgroundSceneSync_reSyncsOnReschedule() {
+        enableAutoSceneStates();
+        enableSceneSync();
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        Identifier scene1 = mockSceneLightStates(1, 1, "00:00",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100)
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(50)
+                                   .ct(40));
+        Identifier scene2 = mockSceneLightStates(1, 2, "12:00[i]",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(200)
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(100)
+                                   .ct(40));
+        mockGetAllScenes(scene1, scene2);
+
+        List<ScheduledRunnable> states = startScheduler(
+                expectedRunnable(now, now.plusDays(1)),
+                expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
+        );
+
+        setCurrentTimeToAndRun(states.getFirst());
+
+        assertScenePutCalls(1,
+                expectedPutCall(4).bri(100).ct(20),
+                expectedPutCall(5).bri(50).ct(40)
+        );
+
+        assertScenePutCalls(1,
+                expectedPutCall(4).bri(114).ct(20).transitionTime(tr("1h40min")),
+                expectedPutCall(5).bri(57).ct(40).transitionTime(tr("1h40min"))
+        );
+
+        assertAllScenePutCallsAsserted();
+
+        assertSceneUpdate("/groups/1",
+                expectedPutCall(4).bri(100).ct(20),
+                expectedPutCall(5).bri(50).ct(40)
+        );
+
+        List<ScheduledRunnable> followUpStates = ensureScheduledStates(
+                expectedRunnable(initialNow.plusMinutes(54), initialNow.plusDays(1)), // next scene sync
+                expectedRunnable(initialNow.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)), // next split call
+                expectedRunnable(initialNow.plusDays(1), initialNow.plusDays(2)) // next day
+        );
+
+        Identifier updatedScene2 = mockSceneLightStates(1, 2, "12:00[i,tr:5s]",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(200)
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(100)
+                                   .ct(40));
+        simulateSceneCreatedOrUpdated(updatedScene2.id());
+
+        List<ScheduledRunnable> reschedulesStates = ensureScheduledStates(
+                expectedRunnable(now, now.plusDays(1)),
+                expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
+        );
+
+        setCurrentTimeToAndRun(reschedulesStates.getFirst());
+
+        assertScenePutCalls(1,
+                expectedPutCall(4).bri(100).ct(20),
+                expectedPutCall(5).bri(50).ct(40)
+        );
+
+        assertScenePutCalls(1,
+                expectedPutCall(4).bri(114).ct(20).transitionTime(tr("1h40min")),
+                expectedPutCall(5).bri(57).ct(40).transitionTime(tr("1h40min"))
+        );
+
+        assertAllScenePutCallsAsserted();
+
+        assertSceneUpdate("/groups/1",
+                expectedPutCall(4).bri(100).ct(20),
+                expectedPutCall(5).bri(50).ct(40)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusMinutes(54), initialNow.plusDays(1)), // next scene sync
+                expectedRunnable(initialNow.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)), // next split call
+                expectedRunnable(initialNow.plusDays(1), initialNow.plusDays(2)) // next day
+        );
+
+        // Ensure that old background scene sync was stopped
+
+        setCurrentTimeToAndRun(followUpStates.getFirst()); // background scene sync was canceled
+        advanceTimeAndRunAndAssertScenePutCalls(followUpStates.get(1), 1); // was canceled
+        advanceTimeAndRunAndAssertScenePutCalls(followUpStates.get(2), 1); // was canceled
+
+        assertAllSceneUpdatesAsserted();
+    }
+
     private void mockGetAllScenes(Identifier... scenes) {
         when(mockedHueApi.getAllScenes()).thenReturn(Arrays.asList(scenes));
     }

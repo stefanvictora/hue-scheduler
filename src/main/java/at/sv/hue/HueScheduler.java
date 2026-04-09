@@ -802,6 +802,9 @@ public final class HueScheduler implements Runnable {
     }
 
     private void syncScene(ScheduledStateSnapshot state, boolean justOnce) {
+        if (state.isCancelled()) {
+            return;
+        }
         MDC.put("context", state.getContextName() + " (scene sync)");
         try {
             stateRegistry.getAssignedGroups(state)
