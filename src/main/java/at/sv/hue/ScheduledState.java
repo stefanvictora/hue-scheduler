@@ -325,6 +325,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
     public void invalidate() {
         generation += 1;
         snapshotCache.invalidateAll();
+        lastSeen = null;
     }
 
     public int getGeneration() {

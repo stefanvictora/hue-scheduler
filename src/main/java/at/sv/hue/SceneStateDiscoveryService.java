@@ -11,6 +11,7 @@ import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Set;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -22,6 +23,7 @@ public class SceneStateDiscoveryService implements SceneDiscoveryListener {
     private final ScheduledStateRegistry stateRegistry;
     private final Supplier<ZonedDateTime> currentTime;
     private final BiConsumer<List<ScheduledState>, ZonedDateTime> initialSchedule;
+    private final Consumer<String> manualOverrideReset;
     private final int minTrBeforeGapInMinutes;
     private final int brightnessOverrideThreshold;
     private final int colorTemperatureOverrideThresholdKelvin;
@@ -31,6 +33,7 @@ public class SceneStateDiscoveryService implements SceneDiscoveryListener {
     public SceneStateDiscoveryService(HueApi api, StartTimeProvider startTimeProvider,
                                       ScheduledStateRegistry stateRegistry, Supplier<ZonedDateTime> currentTime,
                                       BiConsumer<List<ScheduledState>, ZonedDateTime> initialSchedule,
+                                      Consumer<String> manualOverrideReset,
                                       int minTrBeforeGapInMinutes, int brightnessOverrideThreshold,
                                       int colorTemperatureOverrideThresholdKelvin, double colorOverrideThreshold,
                                       boolean enabled) {
@@ -39,6 +42,7 @@ public class SceneStateDiscoveryService implements SceneDiscoveryListener {
         this.stateRegistry = stateRegistry;
         this.currentTime = currentTime;
         this.initialSchedule = initialSchedule;
+        this.manualOverrideReset = manualOverrideReset;
         this.minTrBeforeGapInMinutes = minTrBeforeGapInMinutes;
         this.brightnessOverrideThreshold = brightnessOverrideThreshold;
         this.colorTemperatureOverrideThresholdKelvin = colorTemperatureOverrideThresholdKelvin;
@@ -130,6 +134,7 @@ public class SceneStateDiscoveryService implements SceneDiscoveryListener {
     private void rescheduleGroupStates(String affectedGroup) {
         List<ScheduledState> states = stateRegistry.findStatesForId(affectedGroup);
         states.forEach(ScheduledState::invalidate);
+        states.forEach(state -> manualOverrideReset.accept(state.getId()));
         initialSchedule.accept(states, currentTime.get());
     }
 }

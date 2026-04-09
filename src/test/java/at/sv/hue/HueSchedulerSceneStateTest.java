@@ -626,6 +626,66 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
         assertAllSceneUpdatesAsserted();
     }
 
+    @Test
+    void autoSceneStates_modificationTracking_resetsManualOverrideOnReschedule() {
+        enableAutoSceneStates();
+        enableUserModificationTracking();
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        Identifier scene1 = mockSceneLightStates(1, "00:00",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(50));
+        Identifier scene2 = mockSceneLightStates(1, "12:00",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(200),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(100));
+        mockGetAllScenes(scene1, scene2);
+
+        List<ScheduledRunnable> states = startScheduler(
+                expectedRunnable(now, now.plusHours(12)),
+                expectedRunnable(now.plusHours(12), now.plusDays(1))
+        );
+
+        // State 1 -> runs normally
+
+        advanceTimeAndRunAndAssertScenePutCalls(states.getFirst(), 1,
+                expectedPutCall(4).bri(100),
+                expectedPutCall(5).bri(50)
+        );
+
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusHours(12)); // next day
+
+        // State 2 -> manual override
+
+        setGroupStateResponses(1,
+                expectedState().id("/lights/4").brightness(200), // overridden
+                expectedState().id("/lights/5").brightness(50)
+        );
+        advanceTimeAndRunAndAssertScenePutCalls(states.get(1), 1); // detects override
+
+        ensureRunnable(initialNow.plusDays(1).plusHours(12), initialNow.plusDays(2)); // next day
+
+        // Delete scene2
+        simulateSceneDeletion(scene2.id());
+
+        // Reschedules scene1 state -> resets manual override
+        ScheduledRunnable adjustedScene1Runnable = ensureRunnable(now, initialNow.plusDays(1));
+
+        advanceTimeAndRunAndAssertScenePutCalls(adjustedScene1Runnable, 1,
+                expectedPutCall(4).bri(100),
+                expectedPutCall(5).bri(50)
+        );
+
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(2));
+    }
+
     private void mockGetAllScenes(Identifier... scenes) {
         when(mockedHueApi.getAllScenes()).thenReturn(Arrays.asList(scenes));
     }

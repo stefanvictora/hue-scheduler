@@ -335,7 +335,7 @@ public final class HueScheduler implements Runnable {
         this.sceneEventListener = new SceneEventListenerImpl(api, fakeTicker, sceneActivationIgnoreWindowInSeconds,
                 sceneSyncName::equals, lightEventListener);
         sceneStateDiscoveryService = new SceneStateDiscoveryService(api, startTimeProvider, stateRegistry,
-                currentTime, this::initialSchedule,
+                currentTime, this::initialSchedule, this::resetManualOverride,
                 minTrBeforeGapInMinutes, parseBrightnessPercentValue(brightnessOverrideThresholdPercentage),
                 colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold, enableAutoSceneStates);
     }
@@ -434,7 +434,7 @@ public final class HueScheduler implements Runnable {
         stateRegistry = new ScheduledStateRegistry(currentTime, api);
         startTimeProvider = createStartTimeProvider(latitude, longitude, elevation);
         sceneStateDiscoveryService = new SceneStateDiscoveryService(api, startTimeProvider, stateRegistry,
-                currentTime, this::initialSchedule,
+                currentTime, this::initialSchedule, this::resetManualOverride,
                 minTrBeforeGapInMinutes, parseBrightnessPercentValue(brightnessOverrideThresholdPercentage),
                 colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold, enableAutoSceneStates);
         new HueEventStreamReader(apiHost, accessToken, httpsClient,
@@ -1233,6 +1233,10 @@ public final class HueScheduler implements Runnable {
             stateRegistry.findCurrentlyActiveStates()
                          .forEach(state -> scheduleAsyncSceneSync(state, true));
         }
+    }
+
+    private void resetManualOverride(String id) {
+        manualOverrideTracker.reset(id);
     }
 
     private void logGroupOverridden(ScheduledStateSnapshot state, List<LightState> groupStates) {
