@@ -12,6 +12,7 @@ import at.sv.hue.api.ManualOverrideTracker;
 import at.sv.hue.api.ManualOverrideTrackerImpl;
 import at.sv.hue.api.PutCall;
 import at.sv.hue.api.RateLimiter;
+import at.sv.hue.api.SceneDiscoveryListener;
 import at.sv.hue.api.SceneEventListener;
 import at.sv.hue.api.SceneEventListenerImpl;
 import at.sv.hue.api.hass.HassApiImpl;
@@ -334,6 +335,7 @@ public final class HueScheduler implements Runnable {
         this.sceneEventListener = new SceneEventListenerImpl(api, fakeTicker, sceneActivationIgnoreWindowInSeconds,
                 sceneSyncName::equals, lightEventListener);
         sceneStateDiscoveryService = new SceneStateDiscoveryService(api, startTimeProvider, stateRegistry,
+                currentTime, this::initialSchedule,
                 minTrBeforeGapInMinutes, parseBrightnessPercentValue(brightnessOverrideThresholdPercentage),
                 colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold);
     }
@@ -631,25 +633,24 @@ public final class HueScheduler implements Runnable {
     public void start() {
         ZonedDateTime now = currentTime.get();
         scheduleSolarDataInfoLog();
-        stateRegistry.values().stream()
-                     .flatMap(states -> setupInitialStartup(states, now).stream())
-                     .sorted(Comparator.comparing(ScheduledStateSnapshot::getId)
-                                       .thenComparing(ScheduledStateSnapshot::getDefinedStart))
-                     .forEach(snapshot -> initialSchedule(snapshot, now));
+        stateRegistry.values().forEach(statesForId -> initialSchedule(statesForId, now));
         scheduleApiCacheClear();
+    }
+
+    private void initialSchedule(List<ScheduledState> statesForId, ZonedDateTime now) {
+        MDC.put("context", "init");
+        getInitialSnapshots(statesForId, now).stream()
+                                             .sorted(Comparator.comparing(ScheduledStateSnapshot::getId)
+                                                               .thenComparing(ScheduledStateSnapshot::getDefinedStart))
+                                             .forEach(snapshot -> initialSchedule(snapshot, now));
     }
 
     /**
      * Prepare the given states. To correctly schedule cross-over states, i.e., states that already started yesterday,
      * we initially calculate all end times using yesterday, and reschedule them if needed afterward.
      */
-    private List<ScheduledStateSnapshot> setupInitialStartup(List<ScheduledState> states, ZonedDateTime now) {
-        MDC.put("context", "init");
+    private List<ScheduledStateSnapshot> getInitialSnapshots(List<ScheduledState> states, ZonedDateTime now) {
         ZonedDateTime yesterday = now.minusDays(1);
-        states.forEach(state -> {
-            state.setPreviousStateLookup(stateRegistry::getPreviousState);
-            state.setNextStateLookup(stateRegistry::getNextStateAfter);
-        });
         return states.stream().map(state -> state.getSnapshot(yesterday)).toList();
     }
 
@@ -675,6 +676,10 @@ public final class HueScheduler implements Runnable {
         LOG.debug("Schedule: {} in {}", snapshot, Duration.ofMillis(delayInMs + overlappingDelayInMs).withNanos(0));
         stateScheduler.schedule(() -> {
             MDC.put("context", snapshot.getContextName());
+            if (snapshot.isCancelled()) {
+                LOG.trace("Already cancelled: {}", snapshot);
+                return;
+            }
             ZonedDateTime now = currentTime.get();
             if (snapshot.endsBefore(now)) {
                 LOG.debug("Already ended: {}", snapshot);
@@ -1302,6 +1307,10 @@ public final class HueScheduler implements Runnable {
 
     ManualOverrideTracker getManualOverrideTracker() {
         return manualOverrideTracker;
+    }
+
+    SceneDiscoveryListener getSceneDiscoveryListener() {
+        return sceneStateDiscoveryService;
     }
 
     void onSceneResourceModified(String sceneId) {

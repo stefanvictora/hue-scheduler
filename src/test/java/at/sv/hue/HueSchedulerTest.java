@@ -164,7 +164,7 @@ class HueSchedulerTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now, now.plusDays(1))
         );
 
-        runAndAssertNextDay(scheduledRunnables.get(1));
+        runAndAssertNextDay(scheduledRunnables.getFirst());
     }
 
     @Test

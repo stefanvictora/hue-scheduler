@@ -67,6 +67,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
     private Function<ScheduledStateSnapshot, ScheduledStateSnapshot> previousStateLookup;
     @Setter
     private BiFunction<ScheduledStateSnapshot, ZonedDateTime, ScheduledStateSnapshot> nextStateLookup;
+    private volatile int generation;
 
     @Builder
     public ScheduledState(Identifier identifier, String startString, List<ScheduledLightState> lightStates,
@@ -105,6 +106,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
         snapshotCache = Caffeine.newBuilder()
                                 .expireAfterWrite(Duration.ofDays(3))
                                 .build();
+        generation = 0;
     }
 
     public static ScheduledState createTemporaryCopy(ScheduledState state) {
@@ -123,6 +125,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
         copy.originalState = state.originalState;
         copy.previousStateLookup = state.previousStateLookup;
         copy.nextStateLookup = state.nextStateLookup;
+        copy.generation = state.generation;
         return copy;
     }
 
@@ -175,7 +178,8 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
      */
     public ScheduledStateSnapshot getSnapshot(ZonedDateTime dateTime) {
         return snapshotCache.get(getDefinedStart(dateTime),
-                definedStart -> new ScheduledStateSnapshot(this, definedStart, previousStateLookup, nextStateLookup));
+                definedStart -> new ScheduledStateSnapshot(this, definedStart, generation,
+                        previousStateLookup, nextStateLookup));
     }
 
     /**
@@ -316,6 +320,15 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
 
     public void setTriggeredByPowerTransition() {
         this.triggeredByPowerTransition = true;
+    }
+
+    public void invalidate() {
+        generation += 1;
+        snapshotCache.invalidateAll();
+    }
+
+    public int getGeneration() {
+        return originalState.generation;
     }
 
     @Override

@@ -32,7 +32,17 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyList;
+import static org.mockito.Mockito.calls;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @Slf4j
 public class AbstractHueSchedulerTest {
@@ -641,7 +651,11 @@ public class AbstractHueSchedulerTest {
     }
 
     protected void simulateSceneModified(int groupId, String sceneName) {
-        scheduler.onSceneResourceModified("scene-" + groupId + "-" + sceneName);
+        scheduler.onSceneResourceModified(getSceneId(groupId, sceneName));
+    }
+
+    private static String getSceneId(int groupId, String sceneName) {
+        return "scene-" + groupId + "-" + sceneName;
     }
 
     /* API Assertions */

@@ -23,6 +23,7 @@ public class ScheduledStateSnapshot {
     private final ScheduledState scheduledState;
     @Getter
     private final ZonedDateTime definedStart;
+    private final int generation;
     private final Function<ScheduledStateSnapshot, ScheduledStateSnapshot> previousStateLookup;
     private final BiFunction<ScheduledStateSnapshot, ZonedDateTime, ScheduledStateSnapshot> nextStateLookup;
 
@@ -440,6 +441,10 @@ public class ScheduledStateSnapshot {
 
     public boolean isScheduledOn(DayOfWeek... day) {
         return scheduledState.isScheduledOn(day);
+    }
+
+    public boolean isCancelled() {
+        return scheduledState.getGeneration() != generation;
     }
 
     @Override

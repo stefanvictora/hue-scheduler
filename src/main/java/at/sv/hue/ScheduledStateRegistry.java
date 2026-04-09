@@ -32,6 +32,12 @@ public class ScheduledStateRegistry {
 
     public void addState(ScheduledState state) {
         lightStates.computeIfAbsent(state.getId(), _ -> new ArrayList<>()).add(state);
+        state.setPreviousStateLookup(this::getPreviousState);
+        state.setNextStateLookup(this::getNextStateAfter);
+    }
+
+    public void remove(ScheduledState state) {
+        lightStates.get(state.getId()).remove(state);
     }
 
     public ScheduledStateSnapshot getPreviousState(ScheduledStateSnapshot currentStateSnapshot) {
@@ -217,7 +223,7 @@ public class ScheduledStateRegistry {
         return findStatesForId(snapshot.getId());
     }
 
-    private List<ScheduledState> findStatesForId(String id) {
+    public List<ScheduledState> findStatesForId(String id) {
         return lightStates.get(id);
     }
 
