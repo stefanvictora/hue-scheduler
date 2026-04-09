@@ -660,7 +660,7 @@ public class AbstractHueSchedulerTest {
     }
 
     private static String getSceneId(int groupId, String sceneName) {
-        return "scene-" + groupId + "-" + sceneName;
+        return "/scenes/" + groupId + "/" + sceneName.hashCode();
     }
 
     /* API Assertions */
