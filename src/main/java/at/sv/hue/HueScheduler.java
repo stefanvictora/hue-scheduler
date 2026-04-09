@@ -418,6 +418,7 @@ public final class HueScheduler implements Runnable {
         new HassEventStreamReader(websocketOrigin, accessToken, httpClient,
                 new HassEventHandler(lightEventListener, sceneEventListener, availabilityListener, api)).start();
         stateRegistry = new ScheduledStateRegistry(currentTime, api);
+        startTimeProvider = createStartTimeProvider(latitude, longitude, elevation);
     }
 
     private void setupHueApi() {
@@ -430,14 +431,18 @@ public final class HueScheduler implements Runnable {
         lightEventListener = createLightEventListener();
         sceneEventListener = new SceneEventListenerImpl(api, Ticker.systemTicker(),
                 sceneActivationIgnoreWindowInSeconds, sceneSyncName::equals, lightEventListener);
-        new HueEventStreamReader(apiHost, accessToken, httpsClient,
-                new HueEventHandler(lightEventListener, sceneEventListener, api, this::onSceneResourceModified, null),
-                eventStreamReadTimeoutInMinutes).start();
         stateRegistry = new ScheduledStateRegistry(currentTime, api);
+        startTimeProvider = createStartTimeProvider(latitude, longitude, elevation);
+        sceneStateDiscoveryService = new SceneStateDiscoveryService(api, startTimeProvider, stateRegistry,
+                currentTime, this::initialSchedule,
+                minTrBeforeGapInMinutes, parseBrightnessPercentValue(brightnessOverrideThresholdPercentage),
+                colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold);
+        new HueEventStreamReader(apiHost, accessToken, httpsClient,
+                new HueEventHandler(lightEventListener, sceneEventListener, api, this::onSceneResourceModified,
+                        sceneStateDiscoveryService), eventStreamReadTimeoutInMinutes).start();
     }
 
     private void createAndStart() {
-        startTimeProvider = createStartTimeProvider(latitude, longitude, elevation);
         stateScheduler = createStateScheduler();
         defaultInterpolationTransitionTime = parseInterpolationTransitionTime(defaultInterpolationTransitionTimeString);
         assertInputIsReadable();
