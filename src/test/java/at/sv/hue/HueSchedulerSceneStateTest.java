@@ -305,7 +305,7 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
                                    .id("/lights/5")
                                    .bri(50)
                                    .ct(40));
-        Identifier normaleScene = mockSceneLightStates(1, 2, "Just a normal scene",
+        Identifier normalScene = mockSceneLightStates(1, 2, "Just a normal scene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(100)
@@ -314,7 +314,7 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
                                    .id("/lights/5")
                                    .bri(52)
                                    .ct(42));
-        mockGetAllScenes(scene, normaleScene);
+        mockGetAllScenes(scene, normalScene);
 
         List<ScheduledRunnable> states = startScheduler(
                 expectedRunnable(now, now.plusDays(1))

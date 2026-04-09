@@ -3,7 +3,7 @@ package at.sv.hue.api;
 public interface SceneDiscoveryListener {
 
     /**
-     * Called when a scene is created, or it's name was changed.
+     * Called when a scene is created, or its name was changed.
      *
      * @param sceneId the v2 resource ID of the modified scene
      */

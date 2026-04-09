@@ -105,13 +105,13 @@ public interface HueApi extends ResourceModificationEventListener {
 
     /**
      * @param sceneId the id of the scene
-     * @return the identifier of the scene, containing id and name
+     * @return the identifier of the scene, containing id and name; null if scene not found.
      */
     Identifier getScene(String sceneId);
 
     /**
      * @param sceneId the id of the scene
-     * @return the identifier of the group the scene is assigned to.
+     * @return the identifier of the group the scene is assigned to; null if scene not found.
      */
     Identifier getGroupIdForScene(String sceneId);
 

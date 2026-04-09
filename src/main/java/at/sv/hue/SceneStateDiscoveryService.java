@@ -115,6 +115,7 @@ public class SceneStateDiscoveryService implements SceneDiscoveryListener {
             log.debug("Rescheduling remaining states for group '{}'.", affectedGroup);
             rescheduleGroupStates(affectedGroup);
         }
+        MDC.remove("context");
     }
 
     private Set<String> removeAffectedStates(String sceneId) {
