@@ -3,6 +3,7 @@ package at.sv.hue;
 import at.sv.hue.api.Identifier;
 import org.junit.jupiter.api.Test;
 
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.List;
 
@@ -158,7 +159,7 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
     }
 
     @Test
-    void autoSceneStates_onSceneDeleted_multiplesStates_adjustsOtherState() {
+    void autoSceneStates_onSceneDeleted_firstState_multiplesStates_adjustsOtherState() {
         enableAutoSceneStates();
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
@@ -202,6 +203,50 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
         ensureRunnable(initialNow.plusHours(12), initialNow.plusDays(1).plusHours(12));
 
         advanceTimeAndRunAndAssertScenePutCalls(states.get(1), 1); // was canceled
+    }
+
+    @Test
+    void autoSceneStates_onSceneDeleted_secondState_multiplesStates_adjustsOtherState() {
+        enableAutoSceneStates();
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        Identifier scene1 = mockSceneLightStates(1, "00:00",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100)
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(50)
+                                   .ct(40));
+        Identifier scene2 = mockSceneLightStates(1, "12:00",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(200)
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(100)
+                                   .ct(40));
+        mockGetAllScenes(scene1, scene2);
+
+        startScheduler(
+                expectedRunnable(now, now.plusHours(12)),
+                expectedRunnable(now.plusHours(12), now.plusDays(1))
+        );
+
+        // Delete scene2
+        simulateSceneDeletion(scene2.id());
+
+        // reschedules scene1 state, now with adjusted end at 00:00
+        ScheduledRunnable adjustedScene1Runnable = ensureRunnable(now, now.plusDays(1));
+
+        advanceTimeAndRunAndAssertScenePutCalls(adjustedScene1Runnable, 1,
+                expectedPutCall(4).bri(100).ct(20),
+                expectedPutCall(5).bri(50).ct(40)
+        );
+
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(2));
     }
 
     @Test
@@ -409,6 +454,70 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
         advanceTimeAndRunAndAssertScenePutCalls(states.get(1), 1); // was canceled
         advanceTimeAndRunAndAssertScenePutCalls(states.get(2), 1); // was canceled
         advanceTimeAndRunAndAssertScenePutCalls(nextDayRunnable, 1); // was canceled
+    }
+
+    @Test
+    void autoSceneStates_interpolate_withBackgroundInterpolation_cancelsOnDeletion() {
+        enableAutoSceneStates();
+        enableSupportForOffLightUpdates(); // enables background interpolation
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        Identifier scene1 = mockSceneLightStates(1, "00:00",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100)
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(50)
+                                   .ct(40));
+        Identifier scene2 = mockSceneLightStates(1, "12:00[i]",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(200)
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(100)
+                                   .ct(40));
+        mockGetAllScenes(scene1, scene2);
+
+        List<ScheduledRunnable> states = startScheduler(
+                expectedRunnable(now, now.plusDays(1)),
+                expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
+        );
+
+        setCurrentTimeToAndRun(states.getFirst());
+
+        assertScenePutCalls(1,
+                expectedPutCall(4).bri(100).ct(20),
+                expectedPutCall(5).bri(50).ct(40)
+        );
+
+        assertScenePutCalls(1,
+                expectedPutCall(4).bri(114).ct(20).transitionTime(tr("1h40min")),
+                expectedPutCall(5).bri(57).ct(40).transitionTime(tr("1h40min"))
+        );
+
+        assertAllScenePutCallsAsserted();
+
+        List<ScheduledRunnable> followUpStates = ensureScheduledStates(
+                expectedRunnable(initialNow.plusMinutes(54), initialNow.plusDays(1)), // next background interpolation
+                expectedRunnable(initialNow.plus(MAX_TRANSITION_TIME_MS, ChronoUnit.MILLIS), initialNow.plusDays(1)), // next split call
+                expectedRunnable(initialNow.plusDays(1), initialNow.plusDays(2)) // next day
+        );
+
+        // Delete scene2
+        simulateSceneDeletion(scene2.id());
+
+        mockIsGroupOff(1, true);
+
+        // Reschedules scene1 state
+        ensureRunnable(now, now.plusDays(1));
+
+        advanceTimeAndRunAndAssertScenePutCalls(followUpStates.getFirst(), 1); // was canceled
+        advanceTimeAndRunAndAssertScenePutCalls(followUpStates.get(1), 1); // was canceled
+        advanceTimeAndRunAndAssertScenePutCalls(followUpStates.get(2), 1); // was canceled
     }
 
     private void mockGetAllScenes(Identifier... scenes) {

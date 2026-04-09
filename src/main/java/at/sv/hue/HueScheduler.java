@@ -857,6 +857,9 @@ public final class HueScheduler implements Runnable {
     }
 
     private void performBackgroundInterpolation(ScheduledStateSnapshot state) {
+        if (state.isCancelled()) {
+            return;
+        }
         MDC.put("context", state.getContextName() + " (interpolation)");
         ZonedDateTime now = currentTime.get();
         try {
