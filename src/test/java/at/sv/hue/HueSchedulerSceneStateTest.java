@@ -11,7 +11,7 @@ import static org.mockito.Mockito.when;
 public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
 
     @Test
-    void autoSceneStates_notEnabled_ignoresScene() {
+    void autoSceneStates_notEnabled_ignoresSceneOnStartup() {
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
         Identifier scene1 = mockSceneLightStates(1, "00:00",
@@ -26,6 +26,29 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
         mockGetAllScenes(scene1);
 
         startScheduler(0);
+    }
+
+    @Test
+    void autoSceneStates_notEnabled_ignoresSceneCreationEvents() {
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+
+        startScheduler(0);
+
+        // New scene created that matches pattern
+        Identifier scene = mockSceneLightStates(1, "00:00",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100)
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(50)
+                                   .ct(40));
+        simulateSceneCreatedOrUpdated(scene.id());
+
+        // ignored
+        ensureScheduledStates(0);
     }
 
     @Test

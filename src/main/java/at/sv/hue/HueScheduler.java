@@ -337,7 +337,7 @@ public final class HueScheduler implements Runnable {
         sceneStateDiscoveryService = new SceneStateDiscoveryService(api, startTimeProvider, stateRegistry,
                 currentTime, this::initialSchedule,
                 minTrBeforeGapInMinutes, parseBrightnessPercentValue(brightnessOverrideThresholdPercentage),
-                colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold);
+                colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold, enableAutoSceneStates);
     }
 
     private LightEventListenerImpl createLightEventListener() {
@@ -436,7 +436,7 @@ public final class HueScheduler implements Runnable {
         sceneStateDiscoveryService = new SceneStateDiscoveryService(api, startTimeProvider, stateRegistry,
                 currentTime, this::initialSchedule,
                 minTrBeforeGapInMinutes, parseBrightnessPercentValue(brightnessOverrideThresholdPercentage),
-                colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold);
+                colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold, enableAutoSceneStates);
         new HueEventStreamReader(apiHost, accessToken, httpsClient,
                 new HueEventHandler(lightEventListener, sceneEventListener, api, this::onSceneResourceModified,
                         sceneStateDiscoveryService), eventStreamReadTimeoutInMinutes).start();

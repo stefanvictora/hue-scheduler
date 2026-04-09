@@ -26,12 +26,14 @@ public class SceneStateDiscoveryService implements SceneDiscoveryListener {
     private final int brightnessOverrideThreshold;
     private final int colorTemperatureOverrideThresholdKelvin;
     private final double colorOverrideThreshold;
+    private final boolean enabled;
 
     public SceneStateDiscoveryService(HueApi api, StartTimeProvider startTimeProvider,
                                       ScheduledStateRegistry stateRegistry, Supplier<ZonedDateTime> currentTime,
                                       BiConsumer<List<ScheduledState>, ZonedDateTime> initialSchedule,
                                       int minTrBeforeGapInMinutes, int brightnessOverrideThreshold,
-                                      int colorTemperatureOverrideThresholdKelvin, double colorOverrideThreshold) {
+                                      int colorTemperatureOverrideThresholdKelvin, double colorOverrideThreshold,
+                                      boolean enabled) {
         this.api = api;
         this.startTimeProvider = startTimeProvider;
         this.stateRegistry = stateRegistry;
@@ -41,6 +43,7 @@ public class SceneStateDiscoveryService implements SceneDiscoveryListener {
         this.brightnessOverrideThreshold = brightnessOverrideThreshold;
         this.colorTemperatureOverrideThresholdKelvin = colorTemperatureOverrideThresholdKelvin;
         this.colorOverrideThreshold = colorOverrideThreshold;
+        this.enabled = enabled;
     }
 
     public void discoverSceneStates() {
@@ -75,6 +78,9 @@ public class SceneStateDiscoveryService implements SceneDiscoveryListener {
 
     @Override
     public void onSceneCreatedOrRenamed(String sceneId) {
+        if (!enabled) {
+            return;
+        }
         MDC.put("context", "scene-discovery");
         Identifier scene = api.getScene(sceneId);
         if (scene == null) {
@@ -99,6 +105,9 @@ public class SceneStateDiscoveryService implements SceneDiscoveryListener {
 
     @Override
     public void onSceneDeleted(String sceneId) {
+        if (!enabled) {
+            return;
+        }
         MDC.put("context", "scene-discovery");
         log.info("Scene '{}' deleted. Removing affected states.", sceneId);
         Set<String> affectedGroups = removeAffectedStates(sceneId);
