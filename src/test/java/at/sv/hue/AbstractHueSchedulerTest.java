@@ -570,14 +570,19 @@ public class AbstractHueSchedulerTest {
     }
 
     protected Identifier mockSceneLightStates(int groupId, String sceneName, ScheduledLightState.ScheduledLightStateBuilder... builder) {
+        return mockSceneLightStates(groupId, sceneName.hashCode(), sceneName, builder);
+    }
+
+    protected Identifier mockSceneLightStates(int groupId, int sceneId, String sceneName, ScheduledLightState.ScheduledLightStateBuilder... builder) {
         List<ScheduledLightState> states = Arrays.stream(builder)
                                                  .map(ScheduledLightState.ScheduledLightStateBuilder::build)
                                                  .toList();
-        String sceneId = "scene-" + groupId + "-" + sceneName;
-        when(mockedHueApi.getSceneId("/groups/" + groupId, sceneName)).thenReturn(sceneId);
-        when(mockedHueApi.getSceneLightStates(sceneId)).thenReturn(states);
-        when(mockedHueApi.getGroupIdForScene(sceneId)).thenReturn(new Identifier("/groups/" + groupId, "Group Name"));
-        return new Identifier(sceneId, sceneName);
+        String sceneIdStr = "/scenes/" + groupId + "/" + sceneId;
+        when(mockedHueApi.getSceneId("/groups/" + groupId, sceneName)).thenReturn(sceneIdStr);
+        when(mockedHueApi.getSceneLightStates(sceneIdStr)).thenReturn(states);
+        when(mockedHueApi.getGroupIdForScene(sceneIdStr)).thenReturn(new Identifier("/groups/" + groupId, "Group Name"));
+        when(mockedHueApi.getScene(sceneIdStr)).thenReturn(new Identifier(sceneIdStr, sceneName));
+        return new Identifier(sceneIdStr, sceneName);
     }
 
     protected void mockIsLightOff(int id, boolean value) {

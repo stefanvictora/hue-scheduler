@@ -181,11 +181,162 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
         advanceTimeAndRunAndAssertScenePutCalls(states.get(1), 1); // was canceled
     }
 
+    @Test
+    void autoSceneStates_onSceneCreated_noOtherState_automaticallyCreatesState() {
+        enableAutoSceneStates();
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+
+        startScheduler(0);
+
+        // New scene created that matches pattern
+        Identifier scene = mockSceneLightStates(1, "00:00",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100)
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(50)
+                                   .ct(40));
+        simulateSceneCreatedOrUpdated(scene.id());
+
+        List<ScheduledRunnable> states = ensureScheduledStates(
+                expectedRunnable(now, now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertScenePutCalls(states.getFirst(), 1,
+                expectedPutCall(4).bri(100).ct(20),
+                expectedPutCall(5).bri(50).ct(40)
+        );
+
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(2)); // next day
+    }
+
+    @Test
+    void autoSceneStates_onExistingSceneStateRenamed_automaticallyRecreatesState() {
+        enableAutoSceneStates();
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        Identifier scene = mockSceneLightStates(1, 1, "00:00",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100)
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(50)
+                                   .ct(40));
+        mockGetAllScenes(scene);
+
+        List<ScheduledRunnable> states = startScheduler(
+                expectedRunnable(now, now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertScenePutCalls(states.getFirst(), 1,
+                expectedPutCall(4).bri(100).ct(20),
+                expectedPutCall(5).bri(50).ct(40)
+        );
+
+        ScheduledRunnable nextDayRunnable = ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(2));// next day
+
+        // Existing scene renamed
+        Identifier updatedScene = mockSceneLightStates(1, 1, "12:00",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100)
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(50)
+                                   .ct(40));
+        simulateSceneCreatedOrUpdated(updatedScene.id());
+
+        // Reschedules updated state with new start/end time
+        List<ScheduledRunnable> rescheduledStates = ensureScheduledStates(
+                expectedRunnable(now, now.plusHours(12))
+        );
+
+        advanceTimeAndRunAndAssertScenePutCalls(rescheduledStates.getFirst(), 1,
+                expectedPutCall(4).bri(100).ct(20),
+                expectedPutCall(5).bri(50).ct(40)
+        );
+
+        ensureRunnable(initialNow.plusHours(12), initialNow.plusDays(1).plusHours(12));
+
+        // Old next day state was canceled
+        advanceTimeAndRunAndAssertScenePutCalls(nextDayRunnable, 1); // was canceled
+    }
+
+    @Test
+    void autoSceneStates_onExistingSceneStateRenamed_newNameNotValidAnymore_removed() {
+        enableAutoSceneStates();
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        Identifier scene1 = mockSceneLightStates(1, 1, "00:00",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(110),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(51));
+        Identifier scene2 = mockSceneLightStates(1, 2, "07:00",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(120),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(52));
+        Identifier scene3 = mockSceneLightStates(1, 3, "12:00[i]",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(130),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(53));
+        mockGetAllScenes(scene1, scene2, scene3);
+
+        List<ScheduledRunnable> states = startScheduler(
+                expectedRunnable(now, now.plusHours(7)),
+                expectedRunnable(now.plusHours(7), now.plusHours(7)), // zero length
+                expectedRunnable(now.plusHours(7), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertScenePutCalls(states.getFirst(), 1,
+                expectedPutCall(4).bri(110),
+                expectedPutCall(5).bri(51)
+        );
+
+        ScheduledRunnable nextDayRunnable = ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusHours(7)); // next day
+
+        Identifier updatedScene2 = mockSceneLightStates(1, 2, "INVALID_NAME",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(120),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(52));
+        simulateSceneCreatedOrUpdated(updatedScene2.id());
+
+        List<ScheduledRunnable> rescheduledStates = ensureScheduledStates(
+                expectedRunnable(now, now.plusDays(1)),
+                expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
+        );
+
+        advanceTimeAndRunAndAssertScenePutCalls(states.get(1), 1); // was canceled
+        advanceTimeAndRunAndAssertScenePutCalls(states.get(2), 1); // was canceled
+        advanceTimeAndRunAndAssertScenePutCalls(nextDayRunnable, 1); // was canceled
+    }
+
     private void mockGetAllScenes(Identifier... scenes) {
         when(mockedHueApi.getAllScenes()).thenReturn(Arrays.asList(scenes));
     }
 
     private void simulateSceneDeletion(String sceneId) {
         scheduler.getSceneDiscoveryListener().onSceneDeleted(sceneId);
+    }
+
+    private void simulateSceneCreatedOrUpdated(String sceneId) {
+        scheduler.getSceneDiscoveryListener().onSceneCreatedOrUpdated(sceneId);
     }
 }

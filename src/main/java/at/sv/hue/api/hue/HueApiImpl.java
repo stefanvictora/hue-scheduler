@@ -344,6 +344,15 @@ public final class HueApiImpl implements HueApi {
     }
 
     @Override
+    public Identifier getScene(String sceneId) {
+        Scene scene = getAvailableScenes().get(sceneId);
+        if (scene == null) {
+            return null;
+        }
+        return new Identifier(scene.getId(), scene.getName());
+    }
+
+    @Override
     public Identifier getGroupIdForScene(String sceneId) {
         Scene scene = getAvailableScenes().get(sceneId);
         if (scene == null) {

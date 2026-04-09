@@ -4,6 +4,8 @@ import at.sv.hue.api.HueApi;
 import at.sv.hue.api.Identifier;
 import at.sv.hue.api.SceneDiscoveryListener;
 import at.sv.hue.time.StartTimeProvider;
+import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 
 import java.time.ZonedDateTime;
 import java.util.List;
@@ -12,6 +14,7 @@ import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
+@Slf4j
 public class SceneStateDiscoveryService implements SceneDiscoveryListener {
 
     private final HueApi api;
@@ -72,14 +75,33 @@ public class SceneStateDiscoveryService implements SceneDiscoveryListener {
 
     @Override
     public void onSceneCreatedOrUpdated(String sceneId) {
-
+        MDC.put("context", "scene-discovery");
+        Identifier scene = api.getScene(sceneId);
+        if (scene == null) {
+            return;
+        }
+        log.info("Scene '{}' ({}) created or updated. Remove any old affected states.", scene.name(), sceneId);
+        removeAffectedStates(sceneId);
+        SceneNameParser.ParseResult result = SceneNameParser.parse(scene.name());
+        if (result != null) {
+            log.info("Creating new state for scene '{}'.", scene.name());
+            ScheduledState state = createScheduledState(scene, result);
+            stateRegistry.addState(state);
+        }
+        // todo: we should only reschedule if we removed or added states?
+        Identifier group = api.getGroupIdForScene(sceneId);
+        log.info("Rescheduling states for group '{}'.", group.id());
+        rescheduleGroupStates(group.id());
     }
 
     @Override
     public void onSceneDeleted(String sceneId) {
+        MDC.put("context", "scene-discovery");
+        log.info("Scene '{}' deleted. Removing affected states.", sceneId);
         Set<String> affectedGroups = removeAffectedStates(sceneId);
         for (String affectedGroup : affectedGroups) {
-            rescheduleRemainingGroupStates(affectedGroup);
+            log.info("Rescheduling remaining states for group '{}'.", affectedGroup);
+            rescheduleGroupStates(affectedGroup);
         }
     }
 
@@ -87,12 +109,13 @@ public class SceneStateDiscoveryService implements SceneDiscoveryListener {
         List<ScheduledState> statesWithSceneId = stateRegistry.findStatesWithSceneId(sceneId);
         statesWithSceneId.forEach(stateRegistry::remove);
         statesWithSceneId.forEach(ScheduledState::invalidate);
+        log.info("Removed {} affected states.", statesWithSceneId.size());
         return statesWithSceneId.stream()
                                 .map(ScheduledState::getId)
                                 .collect(Collectors.toSet());
     }
 
-    private void rescheduleRemainingGroupStates(String affectedGroup) {
+    private void rescheduleGroupStates(String affectedGroup) {
         List<ScheduledState> states = stateRegistry.findStatesForId(affectedGroup);
         states.forEach(ScheduledState::invalidate);
         initialSchedule.accept(states, currentTime.get());
