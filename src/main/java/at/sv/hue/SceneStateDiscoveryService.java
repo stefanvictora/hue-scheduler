@@ -74,23 +74,26 @@ public class SceneStateDiscoveryService implements SceneDiscoveryListener {
     }
 
     @Override
-    public void onSceneCreatedOrUpdated(String sceneId) {
+    public void onSceneCreatedOrRenamed(String sceneId) {
         MDC.put("context", "scene-discovery");
         Identifier scene = api.getScene(sceneId);
         if (scene == null) {
             return;
         }
-        log.info("Scene '{}' ({}) created or updated. Remove any old affected states.", scene.name(), sceneId);
-        removeAffectedStates(sceneId);
+        log.debug("Scene '{}' created or renamed.", scene.name());
+        Set<String> affectedGroups = removeAffectedStates(sceneId);
         SceneNameParser.ParseResult result = SceneNameParser.parse(scene.name());
         if (result != null) {
             log.info("Creating new state for scene '{}'.", scene.name());
             ScheduledState state = createScheduledState(scene, result);
             stateRegistry.addState(state);
+            affectedGroups.add(state.getId());
         }
-        // todo: we should only reschedule if we removed or added states?
+        if (affectedGroups.isEmpty()) {
+            return;
+        }
         Identifier group = api.getGroupIdForScene(sceneId);
-        log.info("Rescheduling states for group '{}'.", group.id());
+        log.debug("Rescheduling states for group '{}'.", group.id());
         rescheduleGroupStates(group.id());
     }
 
@@ -100,7 +103,7 @@ public class SceneStateDiscoveryService implements SceneDiscoveryListener {
         log.info("Scene '{}' deleted. Removing affected states.", sceneId);
         Set<String> affectedGroups = removeAffectedStates(sceneId);
         for (String affectedGroup : affectedGroups) {
-            log.info("Rescheduling remaining states for group '{}'.", affectedGroup);
+            log.debug("Rescheduling remaining states for group '{}'.", affectedGroup);
             rescheduleGroupStates(affectedGroup);
         }
     }
@@ -109,7 +112,6 @@ public class SceneStateDiscoveryService implements SceneDiscoveryListener {
         List<ScheduledState> statesWithSceneId = stateRegistry.findStatesWithSceneId(sceneId);
         statesWithSceneId.forEach(stateRegistry::remove);
         statesWithSceneId.forEach(ScheduledState::invalidate);
-        log.info("Removed {} affected states.", statesWithSceneId.size());
         return statesWithSceneId.stream()
                                 .map(ScheduledState::getId)
                                 .collect(Collectors.toSet());

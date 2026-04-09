@@ -69,7 +69,7 @@ public final class HueEventHandler implements BackgroundEventHandler {
                             getContent(containerType, resourceNode));
                 }
                 if (hueEvent.isSceneCreation(containerType) || hueEvent.isSceneRenamed(containerType)) {
-                    sceneDiscoveryListener.onSceneCreatedOrUpdated(hueEvent.getId());
+                    sceneDiscoveryListener.onSceneCreatedOrRenamed(hueEvent.getId());
                 } else if (hueEvent.isSceneDeletion(containerType)) {
                     sceneDiscoveryListener.onSceneDeleted(hueEvent.getId());
                 }

@@ -1101,6 +1101,6 @@ class HueEventHandlerTest {
     }
 
     private void verifySceneCreatedOrUpdated(String sceneId) {
-        verify(sceneDiscoveryListener).onSceneCreatedOrUpdated(sceneId);
+        verify(sceneDiscoveryListener).onSceneCreatedOrRenamed(sceneId);
     }
 }

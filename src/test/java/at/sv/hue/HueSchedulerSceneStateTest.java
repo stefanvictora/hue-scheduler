@@ -238,7 +238,7 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
                 expectedPutCall(5).bri(50).ct(40)
         );
 
-        ScheduledRunnable nextDayRunnable = ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(2));// next day
+        ScheduledRunnable nextDayRunnable = ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(2)); // next day
 
         // Existing scene renamed
         Identifier updatedScene = mockSceneLightStates(1, 1, "12:00",
@@ -266,6 +266,66 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
 
         // Old next day state was canceled
         advanceTimeAndRunAndAssertScenePutCalls(nextDayRunnable, 1); // was canceled
+    }
+
+    @Test
+    void autoSceneStates_onUnrelatedSceneRenamed_ignored() {
+        enableAutoSceneStates();
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        Identifier scene = mockSceneLightStates(1, 1, "00:00",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100)
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(50)
+                                   .ct(40));
+        Identifier normaleScene = mockSceneLightStates(1, 2, "Just a normal scene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100)
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(52)
+                                   .ct(42));
+        mockGetAllScenes(scene, normaleScene);
+
+        List<ScheduledRunnable> states = startScheduler(
+                expectedRunnable(now, now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertScenePutCalls(states.getFirst(), 1,
+                expectedPutCall(4).bri(100).ct(20),
+                expectedPutCall(5).bri(50).ct(40)
+        );
+
+        ScheduledRunnable nextDayRunnable = ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(2)); // next day
+
+        // Unrelated scene renamed
+        Identifier updatedScene = mockSceneLightStates(1, 2, "Still a normal scene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100)
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(50)
+                                   .ct(40));
+        simulateSceneCreatedOrUpdated(updatedScene.id());
+
+        // Nothing rescheduled
+        ensureScheduledStates(0);
+
+        // Next day state was not canceled
+        advanceTimeAndRunAndAssertScenePutCalls(nextDayRunnable, 1,
+                expectedPutCall(4).bri(100).ct(20),
+                expectedPutCall(5).bri(50).ct(40)
+        );
+
+        ensureRunnable(initialNow.plusDays(2), initialNow.plusDays(3)); // next day
     }
 
     @Test
@@ -318,7 +378,7 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
                                    .bri(52));
         simulateSceneCreatedOrUpdated(updatedScene2.id());
 
-        List<ScheduledRunnable> rescheduledStates = ensureScheduledStates(
+        ensureScheduledStates(
                 expectedRunnable(now, now.plusDays(1)),
                 expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
         );
@@ -337,6 +397,6 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
     }
 
     private void simulateSceneCreatedOrUpdated(String sceneId) {
-        scheduler.getSceneDiscoveryListener().onSceneCreatedOrUpdated(sceneId);
+        scheduler.getSceneDiscoveryListener().onSceneCreatedOrRenamed(sceneId);
     }
 }

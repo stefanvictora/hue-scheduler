@@ -7,7 +7,7 @@ public interface SceneDiscoveryListener {
      *
      * @param sceneId the v2 resource ID of the modified scene
      */
-    void onSceneCreatedOrUpdated(String sceneId);
+    void onSceneCreatedOrRenamed(String sceneId);
 
     /**
      * Called when a scene is deleted.
