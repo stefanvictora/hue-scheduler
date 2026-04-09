@@ -383,10 +383,11 @@ public final class HueScheduler implements Runnable {
     }
 
     private void logEnabledFlags() {
-        LOG.info("Modification Tracking: {}, Scene Sync: {}, Interpolate All: {}, Require Scene Activation: {}, " +
+        LOG.info("Modification Tracking: {}, Scene Sync: {}, Auto Scene States: {}, Interpolate All: {}, Require Scene Activation: {}, " +
                  "Control Group Lights Individually: {}",
                 enabledOrDisabled(!disableUserModificationTracking),
                 enabledOrDisabled(enableSceneSync),
+                enabledOrDisabled(enableAutoSceneStates),
                 enabledOrDisabled(interpolateAll),
                 enabledOrDisabled(requireSceneActivation),
                 enabledOrDisabled(controlGroupLightsIndividually));
