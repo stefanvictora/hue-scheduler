@@ -136,6 +136,7 @@ class SceneNameParserTest {
     void parse_trBeforeFlag_setsTransitionTimeBefore() {
         assertFlags("07:00[tr-b:19:00]", "07:00", null, "19:00", null);
         assertFlags("sunrise[tr-b:30min]", "sunrise", null, "30min", null);
+        assertFlags("sunset[tr-b:golden_hour]", "sunset", null, "golden_hour", null);
     }
 
     @Test
@@ -154,6 +155,82 @@ class SceneNameParserTest {
     @Test
     void parse_unclosedBracket_isInvalid() {
         assertInvalid("07:00[i");
+    }
+
+    // ---- German locale aliases ----
+
+    @Test
+    void parse_german() {
+        assertTimeExpression("Sonnenaufgang", "sunrise");
+        assertTimeExpression("sonnenaufgang", "sunrise");
+        assertTimeExpression("SONNENAUFGANG", "sunrise");
+        assertTimeExpression("Sonnenuntergang", "sunset");
+        assertTimeExpression("Mittag", "noon");
+        assertTimeExpression("Goldene Stunde", "golden_hour");
+        assertTimeExpression("GoldeneStunde", "golden_hour");
+        assertTimeExpression("Blaue Stunde", "blue_hour");
+        assertTimeExpression("Bürgerliche Morgendämmerung", "civil_dawn");
+        assertTimeExpression("Nautische Morgendämmerung", "nautical_dawn");
+        assertTimeExpression("Astronomische Morgendämmerung", "astronomical_dawn");
+        assertTimeExpression("Bürgerliche Abenddämmerung", "civil_dusk");
+        assertTimeExpression("Nautische Abenddämmerung", "nautical_dusk");
+        assertTimeExpression("Astronomische Abenddämmerung", "astronomical_dusk");
+    }
+
+    @Test
+    void parse_german_abbreviated() {
+        assertTimeExpression("Bürg. Morgendämm.", "civil_dawn");
+        assertTimeExpression("Bürg Morgendämm", "civil_dawn");
+        assertTimeExpression("Naut. Morgendämm.", "nautical_dawn");
+        assertTimeExpression("Astr. Morgendämm.", "astronomical_dawn");
+        assertTimeExpression("Bürg. Abenddämm.", "civil_dusk");
+        assertTimeExpression("Burg Abenddämm.", "civil_dusk");
+        assertTimeExpression("Naut. Abenddämm.", "nautical_dusk");
+        assertTimeExpression("Astr. Abenddämm.", "astronomical_dusk");
+    }
+
+    @Test
+    void parse_german_withOffset_mapsAndPreservesOffset() {
+        assertTimeExpression("Sonnenaufgang+30", "sunrise+30");
+        assertTimeExpression("Sonnenuntergang-15", "sunset-15");
+        assertTimeExpression("Astr. Morgendämm.+60", "astronomical_dawn+60");
+    }
+
+    @Test
+    void parse_german_withFlags_mapsCorrectly() {
+        assertFlags("Sonnenuntergang[i]", "sunset", null, null, true);
+        assertFlags("Sonnenaufgang+30[tr:1h]", "sunrise+30", "1h", null, null);
+        assertFlags("Bürg. Morgendämm.[tr-b:30min]", "civil_dawn", null, "30min", null);
+        assertFlags("Sonnenuntergang [tr-b:golden_hour]", "sunset", null, "golden_hour", null);
+    }
+
+    // ---- English friendly aliases ----
+
+    @Test
+    void parse_english_variants() {
+        assertTimeExpression("Civil Dawn", "civil_dawn");
+        assertTimeExpression("civil dawn", "civil_dawn");
+        assertTimeExpression("CIVIL DAWN", "civil_dawn");
+        assertTimeExpression("Nautical Dawn", "nautical_dawn");
+        assertTimeExpression("Astronomical Dawn", "astronomical_dawn");
+        assertTimeExpression("Golden Hour", "golden_hour");
+        assertTimeExpression("Blue Hour", "blue_hour");
+        assertTimeExpression("Night Hour", "night_hour");
+        assertTimeExpression("Civil Dusk", "civil_dusk");
+        assertTimeExpression("Nautical Dusk", "nautical_dusk");
+        assertTimeExpression("Astronomical Dusk", "astronomical_dusk");
+    }
+
+    @Test
+    void parse_english_withOffset_mapsAndPreservesOffset() {
+        assertTimeExpression("Civil Dawn+30", "civil_dawn+30");
+        assertTimeExpression("Golden Hour-10", "golden_hour-10");
+    }
+
+    @Test
+    void parse_english_withFlags_mapsCorrectly() {
+        assertFlags("Civil Dawn[i]", "civil_dawn", null, null, true);
+        assertFlags("Golden Hour[tr:5min]", "golden_hour", "5min", null, null);
     }
 
     private static void assertInvalid(String sceneName) {

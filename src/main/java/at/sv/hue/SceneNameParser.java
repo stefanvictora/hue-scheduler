@@ -3,8 +3,11 @@ package at.sv.hue;
 import lombok.Builder;
 
 import java.time.LocalTime;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 public final class SceneNameParser {
 
@@ -22,6 +25,35 @@ public final class SceneNameParser {
             "nautical_end", "nautical_dusk",
             "astronomical_end", "astronomical_dusk"
     );
+
+    private static final List<Map.Entry<Pattern, String>> ALIASES = List.of(
+            // English friendly forms (space-separated; single-word forms already work via SUN_KEYWORDS)
+            pattern("^astronomical\\s+dawn$", "astronomical_dawn"),
+            pattern("^nautical\\s+dawn$", "nautical_dawn"),
+            pattern("^civil\\s+dawn$", "civil_dawn"),
+            pattern("^golden\\s+hour$", "golden_hour"),
+            pattern("^blue\\s+hour$", "blue_hour"),
+            pattern("^civil\\s+dusk$", "civil_dusk"),
+            pattern("^night\\s+hour$", "night_hour"),
+            pattern("^nautical\\s+dusk$", "nautical_dusk"),
+            pattern("^astronomical\\s+dusk$", "astronomical_dusk"),
+            // German forms – abbreviated (e.g. "Astr. Morgendämm.") and full (e.g. "Astronomische Morgendämmerung")
+            pattern("^astr(onomische)?\\.?\\s*morgend[äa]mm(erung)?\\.?$", "astronomical_dawn"),
+            pattern("^naut(ische)?\\.?\\s*morgend[äa]mm(erung)?\\.?$", "nautical_dawn"),
+            pattern("^b[üu]rg(erliche)?\\.?\\s*morgend[äa]mm(erung)?\\.?$", "civil_dawn"),
+            pattern("^sonnenaufgang$", "sunrise"),
+            pattern("^mittag$", "noon"),
+            pattern("^goldene\\s*stunde$", "golden_hour"),
+            pattern("^blaue\\s*stunde$", "blue_hour"),
+            pattern("^sonnenuntergang$", "sunset"),
+            pattern("^b[üu]rg(erliche)?\\.?\\s*abendd[äa]mm(erung)?\\.?$", "civil_dusk"),
+            pattern("^naut(ische)?\\.?\\s*abendd[äa]mm(erung)?\\.?$", "nautical_dusk"),
+            pattern("^astr(onomische)?\\.?\\s*abendd[äa]mm(erung)?\\.?$", "astronomical_dusk")
+    );
+
+    private static Map.Entry<Pattern, String> pattern(String regex, String astronomical_dawn) {
+        return Map.entry(Pattern.compile(regex, Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE), astronomical_dawn);
+    }
 
     @Builder
     public record ParseResult(String timeExpression, Boolean interpolate,
@@ -47,11 +79,12 @@ public final class SceneNameParser {
         if (parts == null) {
             return null;
         }
-        if (isInvalidTimeExpression(parts.timeExpr())) {
+        String timeExpr = normalizeTimeExpression(parts.timeExpr());
+        if (isInvalidTimeExpression(timeExpr)) {
             return null;
         }
         ParseResult.ParseResultBuilder builder = ParseResult.builder();
-        builder.timeExpression(parts.timeExpr());
+        builder.timeExpression(timeExpr);
         parseFlags(parts.flags(), builder);
         return builder.build();
     }
@@ -67,6 +100,28 @@ public final class SceneNameParser {
             return new SceneParts(timeExpr, flagsPart);
         }
         return new SceneParts(sceneName.trim(), null);
+    }
+
+    private static String normalizeTimeExpression(String expr) {
+        if (expr.isEmpty() || Character.isDigit(expr.charAt(0))) {
+            return expr;
+        }
+        int operatorIndex = getOperatorIndex(expr);
+        String keywordPart = operatorIndex > 0 ? expr.substring(0, operatorIndex).trim() : expr;
+        String mapped = mapAlias(keywordPart);
+        if (mapped != null) {
+            return operatorIndex > 0 ? mapped + expr.substring(operatorIndex) : mapped;
+        }
+        return expr;
+    }
+
+    private static String mapAlias(String keyword) {
+        for (Map.Entry<Pattern, String> alias : ALIASES) {
+            if (alias.getKey().matcher(keyword).matches()) {
+                return alias.getValue();
+            }
+        }
+        return null;
     }
 
     private static boolean isInvalidTimeExpression(String expr) {
