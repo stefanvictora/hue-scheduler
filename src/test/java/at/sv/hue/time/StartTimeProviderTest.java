@@ -464,8 +464,8 @@ class StartTimeProviderTest {
 
     @Test
     void mix_withDecimalWeight_interpolatesTimes() {
-        // mix(sunrise=07:00, 08:00, 0.25) = 07:45
-        assertStart("mix(sunrise, 08:00, 0.25)", now.with(LocalTime.of(7, 45)));
+        // mix(sunrise=07:00, 08:00, 0.25) = 07:15
+        assertStart("mix(sunrise, 08:00, 0.25)", now.with(LocalTime.of(7, 15)));
     }
 
     @Test
@@ -486,31 +486,31 @@ class StartTimeProviderTest {
     }
 
     @Test
-    void mix_aLaterThanB_blendsPullingTowardB() {
+    void mix_aLaterThanB_blendsPullingTowardA() {
         // Simulates winter: sunrise=07:00, anchor=06:30 (sunrise passed the anchor)
-        // mix(07:00, 06:30, 0.35) = 07:00*0.35 + 06:30*0.65 = 06:40:30
-        assertStart("mix(sunrise, 06:30, 0.35)", now.with(LocalTime.of(6, 40, 30)));
+        // mix(07:00, 06:30, 0.35) = 07:00*0.65 + 06:30*0.35 = 06:49:30
+        assertStart("mix(sunrise, 06:30, 0.35)", now.with(LocalTime.of(6, 49, 30)));
     }
 
     @Test
     void mix_withPercentageWeight_interpolatesTimes() {
-        // mix(sunrise=07:00, 08:00, 25%) = 07:45
-        assertStart("mix(sunrise, 08:00, 25%)", now.with(LocalTime.of(7, 45)));
+        // mix(sunrise=07:00, 08:00, 25%) = 07:15
+        assertStart("mix(sunrise, 08:00, 25%)", now.with(LocalTime.of(7, 15)));
     }
 
     @Test
-    void mix_withWeightOne_returnsFirstArgument() {
-        assertStart("mix(sunrise, 08:00, 1)", sunrise);
+    void mix_withWeightOne_returnsSecondArgument() {
+        assertStart("mix(sunrise, 08:00, 1)", now.with(LocalTime.of(8, 0)));
     }
 
     @Test
-    void mix_withWeightZero_returnsSecondArgument() {
-        assertStart("mix(sunrise, 08:00, 0)", now.with(LocalTime.of(8, 0)));
+    void mix_withWeightZero_returnsFirstArgument() {
+        assertStart("mix(sunrise, 08:00, 0)", sunrise);
     }
 
     @Test
     void mix_canBeComposedWithClamp() {
-        assertStart("clamp(mix(sunrise, 08:00, 0.35), 06:30, 08:00)", now.with(LocalTime.of(7, 39)));
+        assertStart("clamp(mix(sunrise, 08:00, 0.35), 06:30, 08:00)", now.with(LocalTime.of(7, 21)));
     }
 
     @Test

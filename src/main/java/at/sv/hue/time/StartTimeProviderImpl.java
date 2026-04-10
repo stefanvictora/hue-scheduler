@@ -94,7 +94,7 @@ public final class StartTimeProviderImpl implements StartTimeProvider {
                 ZonedDateTime a = getStart(args.get(0).trim(), dateTime);
                 ZonedDateTime b = getStart(args.get(1).trim(), dateTime);
                 double weight = parseMixWeight(args.get(2).trim());
-                long mixedEpochSeconds = Math.round(a.toEpochSecond() * weight + b.toEpochSecond() * (1.0 - weight));
+                long mixedEpochSeconds = Math.round(a.toEpochSecond() * (1.0 - weight) + b.toEpochSecond() * weight);
                 return ZonedDateTime.ofInstant(java.time.Instant.ofEpochSecond(mixedEpochSeconds), a.getZone());
             }
             case "smooth" -> {

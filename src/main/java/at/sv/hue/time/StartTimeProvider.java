@@ -13,7 +13,8 @@ public interface StartTimeProvider {
      *                 </ul>
      *                 Supported function names are {@code notBefore}, {@code notAfter}, {@code clamp}, {@code min}, {@code max},
      *                 {@code mix}, and {@code smooth}. The {@code mix(a,b,w)} function interpolates between {@code a} and {@code b}
-     *                 with weight {@code w} where {@code w} can be in {@code [0..1]} or as percentage ({@code 0%..100%}).
+     *                 with weight {@code w} (in {@code [0..1]} or as percentage {@code 0%..100%}), where {@code w=0} returns {@code a}
+     *                 and {@code w=1} returns {@code b}.
      *                 The {@code smooth(expr,halfLife)} function exponentially smooths a time expression across past days,
      *                 where {@code halfLife} is specified in days (e.g. {@code 14d}).
      * @param dateTime the date to use a reference for resolving solar times
