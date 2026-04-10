@@ -38,6 +38,61 @@ class SceneNameParserTest {
         assertInvalid("07:60");
     }
 
+    // ---- Alternative absolute time formats ----
+
+    @Test
+    void parse_singleDigitHour_normalizedTo24h() {
+        assertTimeExpression("7:30", "07:30");
+        assertTimeExpression("7:00", "07:00");
+        assertTimeExpression("0:00", "00:00");
+    }
+
+    @Test
+    void parse_pmSuffix_normalizedTo24h() {
+        assertTimeExpression("7pm", "19:00");
+        assertTimeExpression("7PM", "19:00");
+        assertTimeExpression("7 pm", "19:00");
+        assertTimeExpression("7 PM", "19:00");
+        assertTimeExpression("7:30pm", "19:30");
+        assertTimeExpression("7:30 pm", "19:30");
+        assertTimeExpression("7:30 PM", "19:30");
+        assertTimeExpression("12pm", "12:00");
+    }
+
+    @Test
+    void parse_amSuffix_normalizedTo24h() {
+        assertTimeExpression("12am", "00:00");
+        assertTimeExpression("12:15am", "00:15");
+        assertTimeExpression("7am", "07:00");
+        assertTimeExpression("7:30am", "07:30");
+        assertTimeExpression("7:30 am", "07:30");
+    }
+
+    @Test
+    void parse_uhrSuffix_normalizedTo24h() {
+        assertTimeExpression("7 Uhr", "07:00");
+        assertTimeExpression("7Uhr", "07:00");
+        assertTimeExpression("19 Uhr", "19:00");
+        assertTimeExpression("0 Uhr", "00:00");
+        assertTimeExpression("7 uhr", "07:00");
+    }
+
+    @Test
+    void parse_alternativeTimeWithFlags() {
+        assertFlags("7:30[i]", "07:30", null, null, true);
+        assertFlags("7pm[tr:5min]", "19:00", "5min", null, null);
+        assertFlags("7 Uhr[i]", "07:00", null, null, true);
+        assertFlags("7:30 pm[tr-b:30min]", "19:30", null, "30min", null);
+    }
+
+    @Test
+    void parse_invalidAlternativeTimes_areInvalid() {
+        assertInvalid("13pm");
+        assertInvalid("0pm");
+        assertInvalid("24 Uhr");
+        assertInvalid("7");
+    }
+
     // ---- Sun keyword expressions ----
 
     @Test

@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public final class SceneNameParser {
@@ -25,6 +26,12 @@ public final class SceneNameParser {
             "nautical_end", "nautical_dusk",
             "astronomical_end", "astronomical_dusk"
     );
+
+    // Alternative absolute-time format patterns (all digit-starting, normalised to HH:mm)
+    private static final Pattern TIME_H_MM = Pattern.compile("^(\\d{1,2}):(\\d{2})$");
+    private static final Pattern TIME_H_MM_AMPM = Pattern.compile("^(\\d{1,2}):(\\d{2})\\s*(am|pm)$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TIME_H_AMPM = Pattern.compile("^(\\d{1,2})\\s*(am|pm)$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TIME_H_UHR = Pattern.compile("^(\\d{1,2})\\s*uhr$", Pattern.CASE_INSENSITIVE);
 
     private static final List<Map.Entry<Pattern, String>> ALIASES = List.of(
             // English friendly forms (space-separated; single-word forms already work via SUN_KEYWORDS)
@@ -51,8 +58,8 @@ public final class SceneNameParser {
             pattern("^astr(onomische)?\\.?\\s*abendd[äa]mm(erung)?\\.?$", "astronomical_dusk")
     );
 
-    private static Map.Entry<Pattern, String> pattern(String regex, String astronomical_dawn) {
-        return Map.entry(Pattern.compile(regex, Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE), astronomical_dawn);
+    private static Map.Entry<Pattern, String> pattern(String regex, String keyword) {
+        return Map.entry(Pattern.compile(regex, Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE), keyword);
     }
 
     @Builder
@@ -80,7 +87,7 @@ public final class SceneNameParser {
             return null;
         }
         String timeExpr = normalizeTimeExpression(parts.timeExpr());
-        if (isInvalidTimeExpression(timeExpr)) {
+        if (timeExpr == null) {
             return null;
         }
         ParseResult.ParseResultBuilder builder = ParseResult.builder();
@@ -102,58 +109,112 @@ public final class SceneNameParser {
         return new SceneParts(sceneName.trim(), null);
     }
 
+    /**
+     * Normalizes the time expression to a canonical form, or returns {@code null} if invalid.
+     * Handles absolute times (various formats), sun keyword aliases, and offset expressions.
+     */
     private static String normalizeTimeExpression(String expr) {
-        if (expr.isEmpty() || Character.isDigit(expr.charAt(0))) {
-            return expr;
+        if (expr.isEmpty()) {
+            return null;
         }
-        int operatorIndex = getOperatorIndex(expr);
-        String keywordPart = operatorIndex > 0 ? expr.substring(0, operatorIndex).trim() : expr;
-        String mapped = mapAlias(keywordPart);
-        if (mapped != null) {
-            return operatorIndex > 0 ? mapped + expr.substring(operatorIndex) : mapped;
+        if (Character.isDigit(expr.charAt(0))) {
+            return normalizeAbsoluteTime(expr);
         }
-        return expr;
+        return normalizeSunExpression(expr);
     }
 
-    private static String mapAlias(String keyword) {
-        for (Map.Entry<Pattern, String> alias : ALIASES) {
-            if (alias.getKey().matcher(keyword).matches()) {
-                return alias.getValue();
+    /**
+     * Normalizes a digit-starting time to {@code HH:mm}; returns {@code null} if unparseable.
+     */
+    private static String normalizeAbsoluteTime(String expr) {
+        try {
+            LocalTime.parse(expr);
+            return expr;
+        } catch (Exception ignored) {
+        }
+        LocalTime t = parseAlternativeTime(expr);
+        if (t == null) {
+            return null;
+        }
+        return String.format("%02d:%02d", t.getHour(), t.getMinute());
+    }
+
+    private static LocalTime parseAlternativeTime(String expr) {
+        Matcher m;
+
+        m = TIME_H_MM.matcher(expr);
+        if (m.matches()) {
+            int hour = Integer.parseInt(m.group(1));
+            int minute = Integer.parseInt(m.group(2));
+            if (hour <= 23 && minute <= 59) {
+                return LocalTime.of(hour, minute);
             }
         }
+
+        m = TIME_H_MM_AMPM.matcher(expr);
+        if (m.matches()) {
+            return convertAmPm(Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2)), m.group(3));
+        }
+
+        m = TIME_H_AMPM.matcher(expr);
+        if (m.matches()) {
+            return convertAmPm(Integer.parseInt(m.group(1)), 0, m.group(2));
+        }
+
+        m = TIME_H_UHR.matcher(expr);
+        if (m.matches()) {
+            int hour = Integer.parseInt(m.group(1));
+            if (hour <= 23) {
+                return LocalTime.of(hour, 0);
+            }
+        }
+
         return null;
     }
 
-    private static boolean isInvalidTimeExpression(String expr) {
-        if (expr.isEmpty()) {
-            return true;
+    /**
+     * Converts a 12-hour value + AM/PM marker to {@link LocalTime}; returns {@code null} for out-of-range inputs.
+     */
+    private static LocalTime convertAmPm(int hour, int minute, String amPm) {
+        if (hour < 1 || hour > 12 || minute < 0 || minute > 59) {
+            return null;
         }
-        // Digit-first → attempt to parse as LocalTime (HH:mm or HH:mm:ss)
-        if (Character.isDigit(expr.charAt(0))) {
-            try {
-                LocalTime.parse(expr);
-                return false;
-            } catch (Exception e) {
-                return true;
-            }
+        int h24;
+        if ("am".equalsIgnoreCase(amPm)) {
+            h24 = hour % 12;
+        } else {
+            h24 = (hour % 12) + 12;
         }
-        // Offset expression: <sunKeyword>[+-]<integer>
+        return LocalTime.of(h24, minute);
+    }
+
+    /**
+     * Normalizes and validates a sun keyword expression (optionally with {@code +/-} offset).
+     * Resolves friendly aliases (English/German) to their technical keyword.
+     * Returns {@code null} if the keyword is unknown or the offset is not a valid integer.
+     */
+    private static String normalizeSunExpression(String expr) {
         int operatorIndex = getOperatorIndex(expr);
+        String keywordPart;
         if (operatorIndex > 0) {
-            String keyword = expr.substring(0, operatorIndex).trim().toLowerCase(Locale.ENGLISH);
-            if (!SUN_KEYWORDS.contains(keyword)) {
-                return true;
-            }
-            String offsetStr = expr.substring(operatorIndex + 1).trim();
-            try {
-                Integer.parseInt(offsetStr);
-                return false;
-            } catch (NumberFormatException e) {
-                return true;
-            }
+            keywordPart = expr.substring(0, operatorIndex).trim();
+        } else {
+            keywordPart = expr;
         }
-        // Just sun keyword
-        return !SUN_KEYWORDS.contains(expr.toLowerCase(Locale.ENGLISH));
+        String resolved = mapAlias(keywordPart);
+        if (resolved == null) {
+            if (!SUN_KEYWORDS.contains(keywordPart.toLowerCase(Locale.ENGLISH))) {
+                return null;
+            }
+            resolved = keywordPart;
+        }
+        if (operatorIndex > 0) {
+            if (!isValidOffset(expr.substring(operatorIndex + 1).trim())) {
+                return null;
+            }
+            return resolved + expr.substring(operatorIndex);
+        }
+        return resolved;
     }
 
     private static int getOperatorIndex(String expr) {
@@ -165,6 +226,24 @@ public final class SceneNameParser {
             return minusIndex;
         }
         return -1;
+    }
+
+    private static String mapAlias(String keyword) {
+        for (Map.Entry<Pattern, String> alias : ALIASES) {
+            if (alias.getKey().matcher(keyword).matches()) {
+                return alias.getValue();
+            }
+        }
+        return null;
+    }
+
+    private static boolean isValidOffset(String offsetStr) {
+        try {
+            Integer.parseInt(offsetStr);
+            return true;
+        } catch (NumberFormatException e) {
+            return false;
+        }
     }
 
     private static void parseFlags(String flags, ParseResult.ParseResultBuilder builder) {
