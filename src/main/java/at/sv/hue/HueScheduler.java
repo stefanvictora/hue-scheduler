@@ -503,6 +503,9 @@ public final class HueScheduler implements Runnable {
         if (enableSceneSync && (sceneSyncName == null || sceneSyncName.isBlank())) {
             fail("--scene-sync-name must be non-empty when --enable-scene-sync is set");
         }
+        if (enableAutoSceneStates && HassApiUtils.isHassConnection(accessToken)) {
+            fail("--enable-auto-scene-states is not supported when using Home Assistant");
+        }
     }
 
     private void assertManualOverrideThresholds() {
