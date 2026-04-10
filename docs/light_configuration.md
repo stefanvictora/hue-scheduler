@@ -126,13 +126,13 @@ Bedroom  clamp(smooth(sunrise, 14d), 06:30, 08:00)  bri:30%
 
 #### Experimental: `mix(...)` — blend two time expressions
 
-`mix(a, b, w)` places the trigger time between two time expressions `a` and `b`. The weight `w` controls how close the result is to `a`:
+`mix(a, b, w)` places the trigger time between two time expressions `a` and `b`. The weight `w` controls how close the result is to `b`:
 
-- `w = 1` → exactly `a`
-- `w = 0` → exactly `b`
+- `w = 0` → exactly `a`
+- `w = 1` → exactly `b`
 - `w = 0.5` → midpoint between `a` and `b`
 
-A common use is blending a solar time with a fixed clock time: `mix(sunrise, 07:30, 0.35)` takes sunrise but pulls it 65% toward `07:30` — so the schedule still moves with the seasons, but much more gently. You can also blend two solar times directly: `mix(golden_hour, sunset, 0.5)`. The order of `a` and `b` does not matter — the result is always between the two.
+A common use is blending a solar time with a fixed clock time: `mix(sunrise, 07:30, 0.35)` takes sunrise but pulls it 35% toward `07:30` — so the schedule still moves with the seasons, but much more gently. The result is always between the two endpoints. You can also blend two solar times directly: `mix(golden_hour, sunset, 0.5)`.
 
 **Why use it:** If you like solar-based schedules but want them to behave more like a stable routine (e.g., "around 07:30, but still season-aware"), `mix` **narrows the seasonal range**. However, since both values are recalculated fresh each day, day-to-day jumps are not smoothed out.
 
