@@ -13,7 +13,6 @@ import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 @Slf4j
 public class SceneStateDiscoveryService implements SceneDiscoveryListener {
@@ -91,20 +90,19 @@ public class SceneStateDiscoveryService implements SceneDiscoveryListener {
             return;
         }
         log.debug("Scene '{}' created or renamed.", scene.name());
-        Set<String> affectedGroups = removeAffectedStates(sceneId);
+        String affectedGroup = removeAffectedStates(sceneId);
         SceneNameParser.ParseResult result = SceneNameParser.parse(scene.name());
         if (result != null) {
             log.info("Creating new state for scene '{}'.", scene.name());
             ScheduledState state = createScheduledState(scene, result);
             stateRegistry.addState(state);
-            affectedGroups.add(state.getId());
+            affectedGroup = state.getId();
         }
-        if (affectedGroups.isEmpty()) {
+        if (affectedGroup == null) {
             return;
         }
-        Identifier group = api.getGroupIdForScene(sceneId);
-        log.debug("Rescheduling states for group '{}'.", group.id());
-        rescheduleGroupStates(group.id());
+        log.debug("Rescheduling states for group '{}'.", affectedGroup);
+        rescheduleGroupStates(affectedGroup);
     }
 
     @Override
@@ -114,21 +112,22 @@ public class SceneStateDiscoveryService implements SceneDiscoveryListener {
         }
         MDC.put("context", "scene-discovery");
         log.info("Scene '{}' deleted. Removing affected states.", sceneId);
-        Set<String> affectedGroups = removeAffectedStates(sceneId);
-        for (String affectedGroup : affectedGroups) {
+        String affectedGroup = removeAffectedStates(sceneId);
+        if (affectedGroup != null) {
             log.debug("Rescheduling remaining states for group '{}'.", affectedGroup);
             rescheduleGroupStates(affectedGroup);
         }
         MDC.remove("context");
     }
 
-    private Set<String> removeAffectedStates(String sceneId) {
+    private String removeAffectedStates(String sceneId) {
         List<ScheduledState> statesWithSceneId = stateRegistry.findStatesWithSceneId(sceneId);
         statesWithSceneId.forEach(stateRegistry::remove);
         statesWithSceneId.forEach(ScheduledState::invalidate);
         return statesWithSceneId.stream()
                                 .map(ScheduledState::getId)
-                                .collect(Collectors.toSet());
+                                .findFirst()
+                                .orElse(null);
     }
 
     private void rescheduleGroupStates(String affectedGroup) {

@@ -322,7 +322,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
         this.triggeredByPowerTransition = true;
     }
 
-    public void invalidate() {
+    public synchronized void invalidate() {
         generation += 1;
         snapshotCache.invalidateAll();
         lastSeen = null;
