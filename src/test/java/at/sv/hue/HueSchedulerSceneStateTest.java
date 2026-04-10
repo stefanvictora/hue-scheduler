@@ -487,6 +487,8 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
         );
 
+        // Run first state -> creates background interpolation and follow-up split call
+
         setCurrentTimeToAndRun(states.getFirst());
 
         assertScenePutCalls(1,
@@ -507,16 +509,31 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
                 expectedRunnable(initialNow.plusDays(1), initialNow.plusDays(2)) // next day
         );
 
+        // Run next background interpolation -> no-op since group is on
+        setCurrentTimeToAndRun(followUpStates.getFirst());
+
+        // Run next split call
+
+        advanceTimeAndRunAndAssertScenePutCalls(followUpStates.get(1), 1,
+                expectedPutCall(4).bri(128).ct(20).transitionTime(tr("1h40min")),
+                expectedPutCall(5).bri(64).ct(40).transitionTime(tr("1h40min"))
+        );
+
+        List<ScheduledRunnable> followUpStates2 = ensureScheduledStates(
+                expectedRunnable(initialNow.plusMinutes(112), initialNow.plusDays(1)), // next background interpolation
+                expectedRunnable(initialNow.plus(MAX_TRANSITION_TIME_MS * 2, ChronoUnit.MILLIS), initialNow.plusDays(1)) // next split call
+        );
+
         // Delete scene2
         simulateSceneDeletion(scene2.id());
 
         mockIsGroupOff(1, true);
 
         // Reschedules scene1 state
-        ensureRunnable(now, now.plusDays(1));
+        ensureRunnable(now, initialNow.plusDays(1));
 
-        advanceTimeAndRunAndAssertScenePutCalls(followUpStates.getFirst(), 1); // was canceled
-        advanceTimeAndRunAndAssertScenePutCalls(followUpStates.get(1), 1); // was canceled
+        advanceTimeAndRunAndAssertScenePutCalls(followUpStates2.getFirst(), 1); // was canceled
+        advanceTimeAndRunAndAssertScenePutCalls(followUpStates2.get(1), 1); // was canceled
         advanceTimeAndRunAndAssertScenePutCalls(followUpStates.get(2), 1); // was canceled
     }
 
