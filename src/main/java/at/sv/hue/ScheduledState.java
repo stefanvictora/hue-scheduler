@@ -125,7 +125,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
         copy.originalState = state.originalState;
         copy.previousStateLookup = state.previousStateLookup;
         copy.nextStateLookup = state.nextStateLookup;
-        copy.generation = state.generation;
+        copy.generation = state.getGeneration();
         return copy;
     }
 
@@ -178,7 +178,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
      */
     public ScheduledStateSnapshot getSnapshot(ZonedDateTime dateTime) {
         return snapshotCache.get(getDefinedStart(dateTime),
-                definedStart -> new ScheduledStateSnapshot(this, definedStart, generation,
+                definedStart -> new ScheduledStateSnapshot(this, definedStart, getGeneration(),
                         previousStateLookup, nextStateLookup));
     }
 
