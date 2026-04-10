@@ -201,10 +201,10 @@ No, unless you explicitly connect to a cloud-hosted Home Assistant instance. You
 - [x] **Scene Sync** — scenes that mirror the scheduled state of a room/zone
 - [x] **Gradients** — support gradient-capable lights
 - [x] **Scene scheduling** — schedule scenes for groups
-- [ ] **Define schedules via scenes** — author and edit complete schedules directly from the Hue app
+- [x] **Sunrise/sunset min/max** — bound dynamic times to a window
+- [x] **Define schedules via scenes** — author and edit complete schedules directly from the Hue app
 - [ ] **Conditional states** — apply only if conditions are met
 - [ ] **Date-based scheduling** — restrict by date ranges
-- [ ] **Sunrise/sunset min/max** — bound dynamic times to a window
 - [ ] **Web GUI** — configure/update schedules in a browser
 - [ ] **Home Assistant Add-on** — package as an easy install
 

@@ -29,9 +29,14 @@ public final class SceneNameParser {
 
     // Alternative absolute-time format patterns (all digit-starting, normalised to HH:mm)
     private static final Pattern TIME_H_MM = Pattern.compile("^(\\d{1,2}):(\\d{2})$");
+    private static final Pattern TIME_H_DOT_MM = Pattern.compile("^(\\d{1,2})\\.(\\d{2})$");
     private static final Pattern TIME_H_MM_AMPM = Pattern.compile("^(\\d{1,2}):(\\d{2})\\s*(am|pm)$", Pattern.CASE_INSENSITIVE);
     private static final Pattern TIME_H_AMPM = Pattern.compile("^(\\d{1,2})\\s*(am|pm)$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TIME_H_H = Pattern.compile("^(\\d{1,2})\\s*h$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TIME_H_H_MM = Pattern.compile("^(\\d{1,2})\\s*h\\s*(\\d{2})$", Pattern.CASE_INSENSITIVE);
     private static final Pattern TIME_H_UHR = Pattern.compile("^(\\d{1,2})\\s*uhr$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TIME_H_MM_UHR = Pattern.compile("^(\\d{1,2}):(\\d{2})\\s*uhr$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TIME_H_DOT_MM_UHR = Pattern.compile("^(\\d{1,2})\\.(\\d{2})\\s*uhr$", Pattern.CASE_INSENSITIVE);
 
     private static final List<Map.Entry<Pattern, String>> ALIASES = List.of(
             // English friendly forms (space-separated; single-word forms already work via SUN_KEYWORDS)
@@ -142,39 +147,58 @@ public final class SceneNameParser {
     private static LocalTime parseAlternativeTime(String expr) {
         Matcher m;
 
+        // H:mm and H.mm (24-hour)
         m = TIME_H_MM.matcher(expr);
-        if (m.matches()) {
-            int hour = Integer.parseInt(m.group(1));
-            int minute = Integer.parseInt(m.group(2));
-            if (hour <= 23 && minute <= 59) {
-                return LocalTime.of(hour, minute);
-            }
-        }
+        if (m.matches()) return timeAt(m.group(1), m.group(2));
 
+        m = TIME_H_DOT_MM.matcher(expr);
+        if (m.matches()) return timeAt(m.group(1), m.group(2));
+
+        // H:mm Uhr and H.mm Uhr
+        m = TIME_H_MM_UHR.matcher(expr);
+        if (m.matches()) return timeAt(m.group(1), m.group(2));
+
+        m = TIME_H_DOT_MM_UHR.matcher(expr);
+        if (m.matches()) return timeAt(m.group(1), m.group(2));
+
+        // h:mm am/pm and h am/pm (12-hour)
         m = TIME_H_MM_AMPM.matcher(expr);
-        if (m.matches()) {
-            return convertAmPm(Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2)), m.group(3));
-        }
+        if (m.matches()) return convertAmPm(Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2)), m.group(3));
 
         m = TIME_H_AMPM.matcher(expr);
-        if (m.matches()) {
-            return convertAmPm(Integer.parseInt(m.group(1)), 0, m.group(2));
-        }
+        if (m.matches()) return convertAmPm(Integer.parseInt(m.group(1)), 0, m.group(2));
 
+        // H Uhr, Hh, H h (whole-hour forms)
         m = TIME_H_UHR.matcher(expr);
-        if (m.matches()) {
-            int hour = Integer.parseInt(m.group(1));
-            if (hour <= 23) {
-                return LocalTime.of(hour, 0);
-            }
-        }
+        if (m.matches()) return wholeHour(m.group(1));
+
+        m = TIME_H_H.matcher(expr);
+        if (m.matches()) return wholeHour(m.group(1));
+
+        // H h mm, Hhmm (hour + minutes with 'h' separator)
+        m = TIME_H_H_MM.matcher(expr);
+        if (m.matches()) return timeAt(m.group(1), m.group(2));
 
         return null;
     }
 
-    /**
-     * Converts a 12-hour value + AM/PM marker to {@link LocalTime}; returns {@code null} for out-of-range inputs.
-     */
+    private static LocalTime timeAt(String hourStr, String minuteStr) {
+        int hour = Integer.parseInt(hourStr);
+        int minute = Integer.parseInt(minuteStr);
+        if (hour > 23 || minute > 59) {
+            return null;
+        }
+        return LocalTime.of(hour, minute);
+    }
+
+    private static LocalTime wholeHour(String hourStr) {
+        int hour = Integer.parseInt(hourStr);
+        if (hour > 23) {
+            return null;
+        }
+        return LocalTime.of(hour, 0);
+    }
+
     private static LocalTime convertAmPm(int hour, int minute, String amPm) {
         if (hour < 1 || hour > 12 || minute < 0 || minute > 59) {
             return null;

@@ -75,6 +75,41 @@ class SceneNameParserTest {
         assertTimeExpression("19 Uhr", "19:00");
         assertTimeExpression("0 Uhr", "00:00");
         assertTimeExpression("7 uhr", "07:00");
+        assertTimeExpression("07:30 Uhr", "07:30");
+        assertTimeExpression("9:31 Uhr", "09:31");
+    }
+
+    @Test
+    void parse_dotSeparator_normalizedTo24h() {
+        assertTimeExpression("7.30", "07:30");
+        assertTimeExpression("19.05", "19:05");
+        assertTimeExpression("00.00", "00:00");
+        assertTimeExpression("23.59", "23:59");
+    }
+
+    @Test
+    void parse_dotSeparatorUhr_normalizedTo24h() {
+        assertTimeExpression("7.30 Uhr", "07:30");
+        assertTimeExpression("15.00 Uhr", "15:00");
+        assertTimeExpression("9.20 Uhr", "09:20");
+        assertTimeExpression("09.31 uhr", "09:31");
+    }
+
+    @Test
+    void parse_hSuffix_normalizedTo24h() {
+        assertTimeExpression("7h", "07:00");
+        assertTimeExpression("7 h", "07:00");
+        assertTimeExpression("7H", "07:00");
+        assertTimeExpression("19h", "19:00");
+        assertTimeExpression("0h", "00:00");
+    }
+
+    @Test
+    void parse_hSuffixWithMinutes_normalizedTo24h() {
+        assertTimeExpression("7h30", "07:30");
+        assertTimeExpression("7 h 30", "07:30");
+        assertTimeExpression("7 h30", "07:30");
+        assertTimeExpression("19h00", "19:00");
     }
 
     @Test
@@ -83,14 +118,20 @@ class SceneNameParserTest {
         assertFlags("7pm[tr:5min]", "19:00", "5min", null, null);
         assertFlags("7 Uhr[i]", "07:00", null, null, true);
         assertFlags("7:30 pm[tr-b:30min]", "19:30", null, "30min", null);
+        assertFlags("7.30[i]", "07:30", null, null, true);
+        assertFlags("7h30[tr:5min]", "07:30", "5min", null, null);
     }
 
     @Test
     void parse_invalidAlternativeTimes_areInvalid() {
         assertInvalid("13pm");
+        assertInvalid("12:60pm");
         assertInvalid("0pm");
         assertInvalid("24 Uhr");
         assertInvalid("7");
+        assertInvalid("24h");
+        assertInvalid("7.60");
+        assertInvalid("24.00");
     }
 
     // ---- Sun keyword expressions ----
