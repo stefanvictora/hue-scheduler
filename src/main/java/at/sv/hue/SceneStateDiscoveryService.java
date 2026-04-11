@@ -9,7 +9,6 @@ import org.slf4j.MDC;
 
 import java.time.ZonedDateTime;
 import java.util.List;
-import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -56,8 +55,18 @@ public class SceneStateDiscoveryService implements SceneDiscoveryListener {
             if (result == null) {
                 continue;
             }
+            tryCreateAndAddScheduledState(scene, result);
+        }
+    }
+
+    private String tryCreateAndAddScheduledState(Identifier scene, SceneNameParser.ParseResult result) {
+        try {
             ScheduledState state = createScheduledState(scene, result);
             stateRegistry.addState(state);
+            return state.getId();
+        } catch (Exception e) {
+            log.error("Failed to create scheduled state for scene '{}': {}", scene.name(), e.getLocalizedMessage(), e);
+            return null;
         }
     }
 
@@ -94,9 +103,7 @@ public class SceneStateDiscoveryService implements SceneDiscoveryListener {
         SceneNameParser.ParseResult result = SceneNameParser.parse(scene.name());
         if (result != null) {
             log.info("Creating new state for scene '{}'.", scene.name());
-            ScheduledState state = createScheduledState(scene, result);
-            stateRegistry.addState(state);
-            affectedGroup = state.getId();
+            affectedGroup = tryCreateAndAddScheduledState(scene, result);
         }
         if (affectedGroup == null) {
             return;

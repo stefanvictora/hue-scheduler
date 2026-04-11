@@ -53,6 +53,62 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
     }
 
     @Test
+    void autoSceneStates_apiFailureDuringInitialDiscovery_ignoresAffectedScene_continuesWithNextScene() {
+        enableAutoSceneStates();
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        Identifier scene1 = mockSceneLightStates(1, "00:00",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100)
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(50)
+                                   .ct(40));
+        Identifier scene2 = mockSceneLightStates(1, "07:00",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(200)
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(254)
+                                   .ct(40));
+        mockGetAllScenes(scene1, scene2);
+        when(mockedHueApi.getSceneLightStates(scene1.id())).thenThrow(new RuntimeException("API failure"));
+
+        startScheduler(
+                expectedRunnable(now, now.plusHours(7))
+        );
+    }
+
+    @Test
+    void autoSceneStates_apiFailureDuringAddition_ignoresScene() {
+        enableAutoSceneStates();
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+
+        startScheduler(0);
+
+        // New scene created that matches pattern
+        Identifier scene = mockSceneLightStates(1, "00:00",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100)
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(50)
+                                   .ct(40));
+        when(mockedHueApi.getSceneLightStates(scene.id())).thenThrow(new RuntimeException("API failure"));
+        simulateSceneCreatedOrUpdated(scene.id());
+
+        // ignored
+        ensureScheduledStates(0);
+    }
+
+    @Test
     void autoSceneStates_matchingFormat_addedAsStates_canBeCombinedWithManualStates() {
         enableAutoSceneStates();
         mockDefaultGroupCapabilities(1);
