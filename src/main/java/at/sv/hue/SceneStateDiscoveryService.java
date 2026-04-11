@@ -139,6 +139,9 @@ public class SceneStateDiscoveryService implements SceneDiscoveryListener {
 
     private void rescheduleGroupStates(String affectedGroup) {
         List<ScheduledState> states = stateRegistry.findStatesForId(affectedGroup);
+        if (states == null) {
+            return;
+        }
         states.forEach(ScheduledState::invalidate);
         states.forEach(state -> manualOverrideReset.accept(state.getId()));
         initialSchedule.accept(states, currentTime.get());

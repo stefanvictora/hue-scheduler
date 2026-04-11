@@ -38,7 +38,11 @@ public class ScheduledStateRegistry {
     }
 
     public synchronized void remove(ScheduledState state) {
-        lightStates.get(state.getId()).remove(state);
+        List<ScheduledState> states = lightStates.get(state.getId());
+        states.remove(state);
+        if (states.isEmpty()) {
+            lightStates.remove(state.getId());
+        }
     }
 
     public synchronized ScheduledStateSnapshot getPreviousState(ScheduledStateSnapshot currentStateSnapshot) {

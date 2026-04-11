@@ -830,6 +830,72 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
         );
     }
 
+    @Test
+    void autoSceneStates_overlappingGroups_onDelete_removesAdditionalDelayOnReschedule() {
+        enableAutoSceneStates();
+        mockDefaultGroupCapabilities(1);
+        mockDefaultGroupCapabilities(2);
+        mockGroupLightsForId(1, 5, 6, 7);
+        mockGroupLightsForId(2, 5, 6);
+        mockAssignedGroups(5, 1, 2);
+        mockAssignedGroups(6, 1, 2);
+        mockAssignedGroups(7, 1);
+        Identifier scene1 = mockSceneLightStates(1, 1, "TestScene1",
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(100),
+                ScheduledLightState.builder()
+                                   .id("/lights/6")
+                                   .bri(50),
+                ScheduledLightState.builder()
+                                   .id("/lights/7")
+                                   .bri(20));
+        mockSceneLightStates(2, 2, "TestScene2",
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(100),
+                ScheduledLightState.builder()
+                                   .id("/lights/6")
+                                   .bri(50));
+        addState("g1", now, "scene:TestScene1");
+        addState("g2", now, "scene:TestScene2");
+        addState("g1", now.plusMinutes(10), "scene:TestScene1", "bri:50%");
+        addState("g2", now.plusMinutes(10), "scene:TestScene2", "bri:50%");
+
+        List<ScheduledRunnable> states = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)), // g1
+                expectedRunnable(now.plusSeconds(1), now.plusMinutes(10)), // g2
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1)),
+                expectedRunnable(now.plusMinutes(10).plusSeconds(1), now.plusDays(1))
+        );
+
+        simulateSceneDeletion(scene1.id());
+
+        ensureScheduledStates(0);
+
+        advanceTimeAndRunAndAssertScenePutCalls(states.get(0), 1); // g1.1 was canceled
+
+        // g2.1 unaffected
+        advanceTimeAndRunAndAssertScenePutCalls(states.get(1), 2,
+                expectedPutCall(5).bri(100),
+                expectedPutCall(6).bri(50)
+        );
+
+        // Next day does not have any offset anymore
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(10));
+
+        advanceTimeAndRunAndAssertScenePutCalls(states.get(2), 1); // g1.2 was canceled
+
+        // g2.2 unaffected
+        advanceTimeAndRunAndAssertScenePutCalls(states.get(3), 2,
+                expectedPutCall(5).bri(50),
+                expectedPutCall(6).bri(25)
+        );
+
+        // Next day does not have any offset anymore
+        ensureRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2));
+    }
+
     private void mockGetAllScenes(Identifier... scenes) {
         when(mockedHueApi.getAllScenes()).thenReturn(Arrays.asList(scenes));
     }
