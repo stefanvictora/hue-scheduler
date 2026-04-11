@@ -186,10 +186,12 @@ public class HassApiImpl implements HueApi {
             if (!isGroupState(state)) {
                 String friendlyName = state.getAttributes().getFriendly_name();
                 
-                if (friendlyName != null) {
-                    publishZ2mMqttUpdate(putCall, friendlyName);
-                    return; // Return immediately. We ONLY wanted a silent update.
+                if (friendlyName == null || friendlyName.isBlank()) {
+                    throw new ApiFailure("Cannot publish silent Z2M update for '" + id + "' because friendly_name is missing");
                 }
+                
+                publishZ2mMqttUpdate(putCall, friendlyName);
+                return; // Return immediately. We ONLY wanted a silent update.
             }
         }
 
