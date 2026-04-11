@@ -392,6 +392,7 @@ public final class HueScheduler implements Runnable {
     }
 
     private void setupHassApi() {
+        supportsOffLightUpdates = z2mBaseTopic != null && !z2mBaseTopic.isBlank();
         OkHttpClient httpClient = new OkHttpClient.Builder()
                 .addInterceptor(chain -> {
                     Request request = chain.request().newBuilder()

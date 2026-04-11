@@ -204,7 +204,7 @@ public class HassApiImpl implements HueApi {
             payloadParts.add("\"brightness\":" + hueToHassBrightness(putCall.getBri()));
         }
         if (putCall.getCt() != null) {
-            payloadParts.add("\"color_temp\":" + miredsToKelvin(putCall.getCt()));
+            payloadParts.add("\"color_temp\":" + putCall.getCt());
         }
         if (putCall.getX() != null && putCall.getY() != null) {
             Double[] xy = getXyColor(putCall);

@@ -2804,17 +2804,17 @@ public class HassApiTest {
         // 4. Trigger the putState call
         api.putState(silentUpdate);
 
-        // 5. Verify the correct MQTT publish payload was sent (uses getUrl() to match the URL object)
+        // 5. Verify the correct MQTT publish payload was sent
         org.mockito.ArgumentCaptor<String> bodyCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
         verify(http).postResource(eq(getUrl("/services/mqtt/publish")), bodyCaptor.capture());
 
-        // 6. Assert the JSON payload matches the required Z2M structure
+        // 6. Verify that the standard light.turn_on service was NEVER called
+        verify(http, org.mockito.Mockito.never()).postResource(eq(getUrl("/services/light/turn_on")), any());
+
+        // 7. Assert the exact JSON payload matches perfectly
         String payload = bodyCaptor.getValue();
-        assertThat(payload).contains("\"topic\":\"zigbee2mqtt/My Bulb/set\"");
-        
-        // Add extra slashes to account for the escaped nested JSON string
-        assertThat(payload).contains("\\\"state\\\":null");
-        assertThat(payload).contains("\\\"brightness\\\":");
+        String expectedPayload = "{\"topic\":\"zigbee2mqtt/My Bulb/set\",\"payload\":\"{\\\"state\\\":null,\\\"brightness\\\":150,\\\"color_temp\\\":300}\"}";
+        assertThat(payload).isEqualTo(expectedPayload);
     }
 
     @Test
