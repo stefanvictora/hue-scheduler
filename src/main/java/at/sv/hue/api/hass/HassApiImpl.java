@@ -70,7 +70,12 @@ public class HassApiImpl implements HueApi {
         this.hassAreaRegistry = hassAreaRegistry;
         this.availabilityListener = availabilityListener;
         this.rateLimiter = rateLimiter;
-        this.z2mBaseTopic = z2mBaseTopic;
+        if (z2mBaseTopic == null) {
+            this.z2mBaseTopic = null;
+        } else {
+            String normalizedBaseTopic = z2mBaseTopic.replaceAll("/+$", "").trim();
+            this.z2mBaseTopic = normalizedBaseTopic.isEmpty() ? null : normalizedBaseTopic;
+        }
         mapper = new ObjectMapper();
         mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         mapper.setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL);
@@ -170,22 +175,21 @@ public class HassApiImpl implements HueApi {
         String id = putCall.getId();
         assertSupportedStateType(id);
 
-        // Determine if this is a silent attribute update (light is off, and we aren't explicitly turning it on)
-        boolean isOffUpdate = (putCall.getOn() == null && isLightOff(id)) || Boolean.FALSE.equals(putCall.getOn());
+        // ONLY intercept if on is explicitly null (a silent background update)
+        boolean isSilentOffUpdate = putCall.getOn() == null && isLightOff(id);
         boolean hasAttributesToUpdate = putCall.getBri() != null || putCall.getCt() != null || (putCall.getX() != null && putCall.getY() != null);
 
-        if (isOffUpdate && hasAttributesToUpdate && this.z2mBaseTopic != null) {
+        if (isSilentOffUpdate && hasAttributesToUpdate && this.z2mBaseTopic != null) {
             State state = getAndAssertLightExists(id);
-            String friendlyName = state.getAttributes().getFriendly_name();
             
-            if (friendlyName != null) {
-                publishZ2mMqttUpdate(putCall, friendlyName);
+            // Exclude groups to ensure this only runs for individual bulbs
+            if (!isGroupState(state)) {
+                String friendlyName = state.getAttributes().getFriendly_name();
                 
-                // If on is null, we only wanted a silent update. We can safely return.
-                if (putCall.getOn() == null) {
-                    return; 
+                if (friendlyName != null) {
+                    publishZ2mMqttUpdate(putCall, friendlyName);
+                    return; // Return immediately. We ONLY wanted a silent update.
                 }
-                // If putCall.getOn() == false, we fall through to let HA run the actual turn_off service
             }
         }
 
