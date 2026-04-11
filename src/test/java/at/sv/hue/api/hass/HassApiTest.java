@@ -21,6 +21,7 @@ import at.sv.hue.api.hass.area.HassAreaRegistry;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 import java.net.MalformedURLException;
@@ -31,7 +32,9 @@ import java.util.EnumSet;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -55,7 +58,7 @@ public class HassApiTest {
         HassAvailabilityListener availabilityListener = new HassAvailabilityListener(() -> {
         });
         api = new HassApiImpl(origin, http, areaRegistry, availabilityListener, permits -> {
-        });
+        }, null);
         baseUrl = origin + "/api";
     }
 
@@ -2768,6 +2771,50 @@ public class HassApiTest {
 
         verify(http).postResource(getUrl("/services/fan/turn_on"),
                 "{\"entity_id\":\"fan.test_fan\"}");
+    }
+
+    @Test
+    void testZ2mMqttPublish_whenLightIsOff_andAttributesChanged() {
+        // 1. Re-initialize the API for this specific test to include the "zigbee2mqtt" topic.
+        // We reuse 'http' and 'areaRegistry' mocks that are automatically created in @BeforeEach.
+        HassAvailabilityListener availabilityListener = new HassAvailabilityListener(() -> {});
+        api = new HassApiImpl("http://localhost:8123", http, areaRegistry, availabilityListener, permits -> {}, "zigbee2mqtt");
+        
+        // 2. Use the existing test helper method to mock the state of the light as "off"
+        setGetResponse("/states", """
+            [
+              {
+                "entity_id": "light.my_z2m_bulb",
+                "state": "off",
+                "attributes": {
+                  "friendly_name": "My Bulb",
+                  "supported_features": 44
+                }
+              }
+            ]
+            """);
+
+        // 3. Create a PutCall that updates brightness/color but DOES NOT turn the light on (on=null)
+        PutCall silentUpdate = PutCall.builder()
+                .id("light.my_z2m_bulb")
+                .bri(150)
+                .ct(300)
+                .build();
+
+        // 4. Trigger the putState call
+        api.putState(silentUpdate);
+
+        // 5. Verify the correct MQTT publish payload was sent (uses getUrl() to match the URL object)
+        org.mockito.ArgumentCaptor<String> bodyCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(http).postResource(eq(getUrl("/services/mqtt/publish")), bodyCaptor.capture());
+
+        // 6. Assert the JSON payload matches the required Z2M structure
+        String payload = bodyCaptor.getValue();
+        assertThat(payload).contains("\"topic\":\"zigbee2mqtt/My Bulb/set\"");
+        
+        // Add extra slashes to account for the escaped nested JSON string
+        assertThat(payload).contains("\\\"state\\\":null");
+        assertThat(payload).contains("\\\"brightness\\\":");
     }
 
     @Test

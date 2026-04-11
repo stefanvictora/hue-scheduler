@@ -55,6 +55,7 @@ public class HassApiImpl implements HueApi {
     private final HassAvailabilityListener availabilityListener;
     private final ObjectMapper mapper;
     private final String baseUrl;
+    private final String z2mBaseTopic;
 
     private final Object lightMapLock = new Object();
     private Map<String, State> availableStates;
@@ -63,12 +64,13 @@ public class HassApiImpl implements HueApi {
     private boolean nameToStatesMapInvalidated;
 
     public HassApiImpl(String origin, HttpResourceProvider httpResourceProvider, HassAreaRegistry hassAreaRegistry,
-                       HassAvailabilityListener availabilityListener, RateLimiter rateLimiter) {
+                       HassAvailabilityListener availabilityListener, RateLimiter rateLimiter, String z2mBaseTopic) {
         baseUrl = origin + "/api";
         this.httpResourceProvider = httpResourceProvider;
         this.hassAreaRegistry = hassAreaRegistry;
         this.availabilityListener = availabilityListener;
         this.rateLimiter = rateLimiter;
+        this.z2mBaseTopic = z2mBaseTopic;
         mapper = new ObjectMapper();
         mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         mapper.setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL);
@@ -167,9 +169,59 @@ public class HassApiImpl implements HueApi {
     private void putStateInternal(PutCall putCall) {
         String id = putCall.getId();
         assertSupportedStateType(id);
+
+        // Determine if this is a silent attribute update (light is off, and we aren't explicitly turning it on)
+        boolean isOffUpdate = (putCall.getOn() == null && isLightOff(id)) || Boolean.FALSE.equals(putCall.getOn());
+        boolean hasAttributesToUpdate = putCall.getBri() != null || putCall.getCt() != null || (putCall.getX() != null && putCall.getY() != null);
+
+        if (isOffUpdate && hasAttributesToUpdate && this.z2mBaseTopic != null) {
+            State state = getAndAssertLightExists(id);
+            String friendlyName = state.getAttributes().getFriendly_name();
+            
+            if (friendlyName != null) {
+                publishZ2mMqttUpdate(putCall, friendlyName);
+                
+                // If on is null, we only wanted a silent update. We can safely return.
+                if (putCall.getOn() == null) {
+                    return; 
+                }
+                // If putCall.getOn() == false, we fall through to let HA run the actual turn_off service
+            }
+        }
+
         ChangeState changeState = getChangeState(putCall);
         changeState.setEntity_id(id);
         httpResourceProvider.postResource(getUpdateUrl(putCall), getBody(changeState));
+    }
+
+    private void publishZ2mMqttUpdate(PutCall putCall, String friendlyName) {
+        List<String> payloadParts = new ArrayList<>();
+        
+        // Hardcode the null state to bypass JSON serializer dropping it
+        payloadParts.add("\"state\":null");
+        
+        if (putCall.getBri() != null) {
+            payloadParts.add("\"brightness\":" + hueToHassBrightness(putCall.getBri()));
+        }
+        if (putCall.getCt() != null) {
+            payloadParts.add("\"color_temp\":" + miredsToKelvin(putCall.getCt()));
+        }
+        if (putCall.getX() != null && putCall.getY() != null) {
+            Double[] xy = getXyColor(putCall);
+            payloadParts.add("\"color\":{\"x\":" + xy[0] + ",\"y\":" + xy[1] + "}");
+        }
+        if (putCall.getTransitionTime() != null) {
+            payloadParts.add("\"transition\":" + convertToSeconds(putCall.getTransitionTime()));
+        }
+
+        // Combine the parts into a raw JSON string
+        String rawZ2mPayload = "{" + String.join(",", payloadParts) + "}";
+
+        MqttPublish publish = new MqttPublish();
+        publish.setTopic(this.z2mBaseTopic + "/" + friendlyName + "/set");
+        publish.setPayload(rawZ2mPayload);
+
+        httpResourceProvider.postResource(createUrl("/services/mqtt/publish"), getBody(publish));
     }
 
     private ChangeState getChangeState(PutCall putCall) {
@@ -640,5 +692,11 @@ public class HassApiImpl implements HueApi {
     private static final class CreateScene {
         String scene_id;
         Map<String, ChangeState> entities;
+    }
+
+    @Data
+    private static final class MqttPublish {
+        String topic;
+        String payload;
     }
 }

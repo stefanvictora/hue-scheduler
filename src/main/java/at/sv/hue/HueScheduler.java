@@ -261,6 +261,13 @@ public final class HueScheduler implements Runnable {
             description = "Disables certificate validation for older bridges using self-signed certificates." +
                           " Default: ${DEFAULT-VALUE}")
     private boolean insecure;
+
+    @Option(names = "--z2m-base-topic", paramLabel = "<topic>",
+            defaultValue = "${env:Z2M_BASE_TOPIC}",
+            description = "The base topic for Zigbee2MQTT to enable silent updates for off lights. " +
+                          "If provided, Home Assistant will route off-state updates via MQTT. Example: zigbee2mqtt")
+    String z2mBaseTopic;
+
     private HueApi api;
     private StateScheduler stateScheduler;
     private final ManualOverrideTracker manualOverrideTracker;
@@ -398,7 +405,7 @@ public final class HueScheduler implements Runnable {
         HassAreaRegistry areaRegistry = new HassAreaRegistryImpl(
                 new HassWebSocketClientImpl(websocketOrigin, accessToken, httpClient, 5));
         HassAvailabilityListener availabilityListener = new HassAvailabilityListener(this::clearCachesAndReSyncScenes);
-        api = new HassApiImpl(apiHost, new HttpResourceProviderImpl(httpClient, maxConcurrentRequests), areaRegistry, availabilityListener, rateLimiter);
+        api = new HassApiImpl(apiHost, new HttpResourceProviderImpl(httpClient, maxConcurrentRequests), areaRegistry, availabilityListener, rateLimiter, this.z2mBaseTopic);
         lightEventListener = createLightEventListener();
         sceneEventListener = new SceneEventListenerImpl(api, Ticker.systemTicker(),
                 sceneActivationIgnoreWindowInSeconds,
