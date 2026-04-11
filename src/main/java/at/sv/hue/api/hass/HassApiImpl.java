@@ -194,6 +194,14 @@ public class HassApiImpl implements HueApi {
         httpResourceProvider.postResource(getUpdateUrl(putCall), getBody(changeState));
     }
 
+    /**
+     * Publishes a silent MQTT update to Zigbee2MQTT to change light attributes without turning the light on.
+     * This bypasses the standard Map serialization to ensure the literal "state": null is preserved in the payload,
+     * utilizing Z2M's execute_if_off functionality.
+     *
+     * @param putCall      The scheduled state call containing the new attributes (brightness, color_temp, etc.).
+     * @param friendlyName The specific friendly_name attribute of the target Zigbee2MQTT device.
+     */
     private void publishZ2mMqttUpdate(PutCall putCall, String friendlyName) {
         List<String> payloadParts = new ArrayList<>();
         
@@ -694,6 +702,9 @@ public class HassApiImpl implements HueApi {
         Map<String, ChangeState> entities;
     }
 
+    /**
+     * Data Transfer Object for publishing a message via Home Assistant's native MQTT publish service.
+     */
     @Data
     private static final class MqttPublish {
         String topic;
