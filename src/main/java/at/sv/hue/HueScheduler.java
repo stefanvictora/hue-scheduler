@@ -642,7 +642,7 @@ public final class HueScheduler implements Runnable {
     public void start() {
         ZonedDateTime now = currentTime.get();
         scheduleSolarDataInfoLog();
-        stateRegistry.values().forEach(statesForId -> initialSchedule(statesForId, now));
+        stateRegistry.forEach(statesForId -> initialSchedule(statesForId, now));
         scheduleApiCacheClear();
     }
 
