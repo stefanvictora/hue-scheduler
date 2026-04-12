@@ -7,7 +7,9 @@ import at.sv.hue.time.StartTimeProvider;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 
+import java.time.DayOfWeek;
 import java.time.ZonedDateTime;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -79,9 +81,13 @@ public class SceneStateDiscoveryService implements SceneDiscoveryListener {
         } else if (result.on() == Boolean.FALSE) {
             sceneLightStates = turnOff(sceneLightStates);
         }
+        EnumSet<DayOfWeek> dayOfWeeks = EnumSet.noneOf(DayOfWeek.class);
+        if (result.daysOfWeek() != null) {
+            DayOfWeeksParser.parseDayOfWeeks(result.daysOfWeek(), dayOfWeeks);
+        }
         return new ScheduledState(identifier, result.timeExpression(), sceneLightStates, groupLights, scene.id(),
                 null, result.on(), result.transitionTimeBefore(), parseTransitionTime(result),
-                null, startTimeProvider, minTrBeforeGapInMinutes, brightnessOverrideThreshold,
+                dayOfWeeks, startTimeProvider, minTrBeforeGapInMinutes, brightnessOverrideThreshold,
                 colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold, result.forced(), result.interpolate(),
                 true, false);
     }

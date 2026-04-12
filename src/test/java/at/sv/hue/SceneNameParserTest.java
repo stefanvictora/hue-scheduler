@@ -253,6 +253,14 @@ class SceneNameParserTest {
     }
 
     @Test
+    void parse_additionalFlags_daysOfWeek_parsed() {
+        SceneNameParser.ParseResult result = parse("07:00 [days:Mo;Di;Mi-Fr]");
+
+        assertThat(result).isNotNull();
+        assertThat(result.daysOfWeek()).isEqualTo("Mo,Di,Mi-Fr");
+    }
+
+    @Test
     void parse_combinedFlags() {
         assertFlags("sunrise+30[tr:1h, tr-b:19:00]", "sunrise+30", "1h", "19:00", null);
         assertFlags("07:00[i,tr:5min,tr-b:19:00]", "07:00", "5min", "19:00", true);

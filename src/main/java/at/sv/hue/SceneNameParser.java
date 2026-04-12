@@ -70,6 +70,7 @@ public final class SceneNameParser {
     @Builder
     public record ParseResult(String timeExpression, Boolean interpolate,
                               String transitionTime, String transitionTimeBefore,
+                              String daysOfWeek,
                               Boolean forced, Boolean on) {
     }
 
@@ -283,6 +284,8 @@ public final class SceneNameParser {
                 builder.transitionTimeBefore(flag.substring("tr-b:".length()));
             } else if (flag.startsWith("tr:")) {
                 builder.transitionTime(flag.substring("tr:".length()));
+            } else if (flag.startsWith("days:")) {
+                builder.daysOfWeek(flag.substring("days:".length()).replace(";", ","));
             } else if (flag.equals("f")) {
                 builder.forced(Boolean.TRUE);
             } else if (flag.equals("off")) {

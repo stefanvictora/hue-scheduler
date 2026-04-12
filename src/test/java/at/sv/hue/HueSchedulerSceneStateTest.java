@@ -3,6 +3,7 @@ package at.sv.hue;
 import at.sv.hue.api.Identifier;
 import org.junit.jupiter.api.Test;
 
+import java.time.DayOfWeek;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.List;
@@ -149,7 +150,8 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
     }
 
     @Test
-    void autoSceneStates_matchingFormat_withOnOrOffFlags_correctlyInterpreted() {
+    void autoSceneStates_withOnOrOffFlags_andDaysOfWeeks_correctlyInterpreted() {
+        setupTimeWithDayOfWeek(DayOfWeek.MONDAY);
         enableAutoSceneStates();
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
@@ -171,11 +173,21 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
                                    .id("/lights/5")
                                    .bri(254)
                                    .ct(40));
-        mockGetAllScenes(scene1, scene2);
+        Identifier scene3 = mockSceneLightStates(1, "12:00 [days:Di;Mi]",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(200)
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(254)
+                                   .ct(40));
+        mockGetAllScenes(scene1, scene2, scene3);
 
         List<ScheduledRunnable> states = startScheduler(
                 expectedRunnable(now, now.plusHours(7)),
-                expectedRunnable(now.plusHours(7), now.plusDays(1))
+                expectedRunnable(now.plusHours(7), now.plusDays(1)),
+                expectedRunnable(now.plusDays(1).plusHours(12), now.plusDays(2))
         );
 
         // Sets "on:false" and removes other properties
@@ -193,7 +205,7 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
                 expectedPutCall(5).bri(254).ct(40).on(true)
         );
 
-        ensureRunnable(initialNow.plusDays(1).plusHours(7), initialNow.plusDays(2)); // next day
+        ensureRunnable(initialNow.plusDays(1).plusHours(7), initialNow.plusDays(1).plusHours(12)); // next day
 
         // Keeps on also on scene reload
 
