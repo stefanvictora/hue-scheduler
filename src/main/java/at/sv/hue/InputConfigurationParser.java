@@ -23,7 +23,7 @@ import java.util.regex.Pattern;
 
 public final class InputConfigurationParser {
 
-    private static final Pattern TR_PATTERN = Pattern.compile("(?:(\\d+)h)?(?:(\\d+)min)?(?:(\\d+)s)?(\\d*)?",
+    private static final Pattern TR_PATTERN = Pattern.compile("(?:(\\d+)h)?(?:(\\d+)m(?:in)?)?(?:(\\d+)s)?(\\d*)?",
             Pattern.CASE_INSENSITIVE);
     private static final Pattern GRADIENT_VALUE = Pattern.compile("^\\[(?<list>.+?)](?:@(?<mode>[A-Za-z_]+))?$",
             Pattern.CASE_INSENSITIVE);

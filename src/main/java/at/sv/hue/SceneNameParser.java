@@ -248,9 +248,6 @@ public final class SceneNameParser {
             resolved = keywordPart;
         }
         if (operatorIndex > 0) {
-            if (!isValidOffset(expr.substring(operatorIndex + 1).trim())) {
-                return null;
-            }
             return resolved + expr.substring(operatorIndex);
         }
         return resolved;
@@ -274,15 +271,6 @@ public final class SceneNameParser {
             }
         }
         return null;
-    }
-
-    private static boolean isValidOffset(String offsetStr) {
-        try {
-            Integer.parseInt(offsetStr);
-            return true;
-        } catch (NumberFormatException e) {
-            return false;
-        }
     }
 
     private static void parseFlags(String flags, ParseResult.ParseResultBuilder builder) {

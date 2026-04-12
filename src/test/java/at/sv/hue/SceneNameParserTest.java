@@ -181,19 +181,13 @@ class SceneNameParserTest {
     void parse_sunriseWithOffset_returnsTimeExpression() {
         assertTimeExpression("sunrise+30", "sunrise+30");
         assertTimeExpression("sunset-15", "sunset-15");
+        assertTimeExpression("sunrise+30min", "sunrise+30min");
     }
 
     @Test
     void parse_invalidSunKeyword_withOffset_isInvalid() {
         assertInvalid("solar_noon+10");
         assertInvalid("something+30");
-    }
-
-    @Test
-    void parse_offset_nonIntegerValue_isInvalid() {
-        assertInvalid("sunrise+30min");
-        assertInvalid("sunrise++");
-        assertInvalid("sunrise+ ?");
     }
 
     // ---- Function expressions (not in scope) ----

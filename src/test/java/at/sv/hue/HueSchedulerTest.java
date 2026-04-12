@@ -347,6 +347,20 @@ class HueSchedulerTest extends AbstractHueSchedulerTest {
     }
 
     @Test
+    void parse_canParseTransitionTime_withTimeUnits_minutesShortFormAccepted() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addStateNow("1", "bri:" + DEFAULT_BRIGHTNESS, "tr:20m");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
+                expectedPutCall(ID).bri(DEFAULT_BRIGHTNESS).transitionTime(12000)
+        );
+
+        ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
     void parse_canParseTransitionTimeBefore_withSunTime() {
         addKnownLightIdsWithDefaultCapabilities(1);
         addState("1", "00:00", "bri:10");
