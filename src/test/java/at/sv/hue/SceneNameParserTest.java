@@ -199,10 +199,15 @@ class SceneNameParserTest {
     // ---- Function expressions (not in scope) ----
 
     @Test
-    void parse_functionExpression_isInvalid() {
-        assertInvalid("mix(sunrise,sunset,0.5)");
-        assertInvalid("notBefore(07:00,sunrise)");
-        assertInvalid("clamp(sunrise,06:00,08:00)");
+    void parse_functionExpression_accepted_caseInsensitive() {
+        assertTimeExpression("max(sunrise,7:00)", "max(sunrise,7:00)");
+        assertTimeExpression("Max(sunrise,7:00)", "Max(sunrise,7:00)");
+        assertTimeExpression("min(sunset,19:00)", "min(sunset,19:00)");
+        assertTimeExpression("mix(sunrise,sunset,0.5)", "mix(sunrise,sunset,0.5)");
+        assertTimeExpression("notBefore(sunrise,07:00)", "notBefore(sunrise,07:00)");
+        assertTimeExpression("notAfter(sunset,19:00)", "notAfter(sunset,19:00)");
+        assertTimeExpression("clamp(sunrise,06:00,08:00)", "clamp(sunrise,06:00,08:00)");
+        assertTimeExpression("clamp(NOT_FURTHER_VALIDATED)", "clamp(NOT_FURTHER_VALIDATED)");
     }
 
     // ---- Flags ----

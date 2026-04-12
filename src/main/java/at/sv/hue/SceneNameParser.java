@@ -27,6 +27,10 @@ public final class SceneNameParser {
             "astronomical_end", "astronomical_dusk"
     );
 
+    private static final Set<String> FUNCTION_KEYWORDS = Set.of(
+            "max(", "min(", "mix(", "notBefore(", "notAfter(", "clamp("
+    );
+
     // Alternative absolute-time format patterns (all digit-starting, normalised to HH:mm)
     private static final Pattern TIME_H_MM = Pattern.compile("^(\\d{1,2}):(\\d{2})$");
     private static final Pattern TIME_H_DOT_MM = Pattern.compile("^(\\d{1,2})\\.(\\d{2})$");
@@ -118,16 +122,25 @@ public final class SceneNameParser {
 
     /**
      * Normalizes the time expression to a canonical form, or returns {@code null} if invalid.
-     * Handles absolute times (various formats), sun keyword aliases, and offset expressions.
+     * Handles absolute times (various formats), functions, sun keyword aliases, and offset expressions.
      */
     private static String normalizeTimeExpression(String expr) {
         if (expr.isEmpty()) {
             return null;
         }
+        if (isFunctionExpression(expr)) {
+            return expr;
+        }
         if (Character.isDigit(expr.charAt(0))) {
             return normalizeAbsoluteTime(expr);
         }
         return normalizeSunExpression(expr);
+    }
+
+    private static boolean isFunctionExpression(String expr) {
+        return FUNCTION_KEYWORDS.stream()
+                                .map(String::toLowerCase)
+                                .anyMatch(keyword -> expr.toLowerCase(Locale.ROOT).startsWith(keyword));
     }
 
     /**
