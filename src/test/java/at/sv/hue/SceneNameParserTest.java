@@ -236,6 +236,23 @@ class SceneNameParserTest {
     }
 
     @Test
+    void parse_additionalFlags_forced_off_parsed() {
+        SceneNameParser.ParseResult result = parse("07:00 [off, f]");
+
+        assertThat(result).isNotNull();
+        assertThat(result.forced()).isTrue();
+        assertThat(result.on()).isFalse();
+    }
+
+    @Test
+    void parse_additionalFlags_on_parsed() {
+        SceneNameParser.ParseResult result = parse("07:00 [on]");
+
+        assertThat(result).isNotNull();
+        assertThat(result.on()).isTrue();
+    }
+
+    @Test
     void parse_combinedFlags() {
         assertFlags("sunrise+30[tr:1h, tr-b:19:00]", "sunrise+30", "1h", "19:00", null);
         assertFlags("07:00[i,tr:5min,tr-b:19:00]", "07:00", "5min", "19:00", true);
@@ -345,6 +362,8 @@ class SceneNameParserTest {
         assertThat(result.transitionTime()).isEqualTo(tr);
         assertThat(result.transitionTimeBefore()).isEqualTo(trBefore);
         assertThat(result.interpolate()).isEqualTo(interpolate);
+        assertThat(result.forced()).isNull();
+        assertThat(result.on()).isNull();
     }
 
     private static SceneNameParser.ParseResult parse(String sceneName) {

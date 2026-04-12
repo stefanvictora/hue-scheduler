@@ -149,6 +149,65 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
     }
 
     @Test
+    void autoSceneStates_matchingFormat_withOnOrOffFlags_correctlyInterpreted() {
+        enableAutoSceneStates();
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        Identifier scene1 = mockSceneLightStates(1, "00:00 [off,tr:2s]",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100)
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(50)
+                                   .ct(40));
+        Identifier scene2 = mockSceneLightStates(1, "07:00 [on]",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(200)
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(254)
+                                   .ct(40));
+        mockGetAllScenes(scene1, scene2);
+
+        List<ScheduledRunnable> states = startScheduler(
+                expectedRunnable(now, now.plusHours(7)),
+                expectedRunnable(now.plusHours(7), now.plusDays(1))
+        );
+
+        // Sets "on:false" and removes other properties
+
+        advanceTimeAndRunAndAssertGroupPutCalls(states.getFirst(),
+                expectedGroupPutCall(1).on(false).transitionTime(tr("2s"))
+        );
+
+        ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusHours(7)); // next day
+
+        // Sets "on:true"
+
+        advanceTimeAndRunAndAssertScenePutCalls(states.get(1), 1, scene2.id(),
+                expectedPutCall(4).bri(200).ct(20).on(true),
+                expectedPutCall(5).bri(254).ct(40).on(true)
+        );
+
+        ensureRunnable(initialNow.plusDays(1).plusHours(7), initialNow.plusDays(2)); // next day
+
+        // Keeps on also on scene reload
+
+        simulateSceneModified(1, "07:00 [on]");
+
+        ScheduledRunnable rescheduledSecondState = ensureRunnable(now, initialNow.plusDays(1));
+
+        advanceTimeAndRunAndAssertScenePutCalls(rescheduledSecondState, 1, scene2.id(),
+                expectedPutCall(4).bri(200).ct(20).on(true),
+                expectedPutCall(5).bri(254).ct(40).on(true)
+        );
+    }
+
+    @Test
     void autoSceneStates_onSceneDeleted_singleState_cancelsState() {
         enableAutoSceneStates();
         mockDefaultGroupCapabilities(1);

@@ -311,7 +311,7 @@ public final class InputConfigurationParser {
         return Math.max(1, Math.min(254, targetBrightness));
     }
 
-    private static List<ScheduledLightState> turnOnIfNotOff(List<ScheduledLightState> scheduledLightStates) {
+    public static List<ScheduledLightState> turnOnIfNotOff(List<ScheduledLightState> scheduledLightStates) {
         return scheduledLightStates.stream().map(InputConfigurationParser::turnOnIfNotOff).toList();
     }
 

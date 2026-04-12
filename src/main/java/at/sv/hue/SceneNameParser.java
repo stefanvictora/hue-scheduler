@@ -69,7 +69,8 @@ public final class SceneNameParser {
 
     @Builder
     public record ParseResult(String timeExpression, Boolean interpolate,
-                              String transitionTime, String transitionTimeBefore) {
+                              String transitionTime, String transitionTimeBefore,
+                              Boolean forced, Boolean on) {
     }
 
     private record SceneParts(String timeExpr, String flags) {
@@ -282,6 +283,12 @@ public final class SceneNameParser {
                 builder.transitionTimeBefore(flag.substring("tr-b:".length()));
             } else if (flag.startsWith("tr:")) {
                 builder.transitionTime(flag.substring("tr:".length()));
+            } else if (flag.equals("f")) {
+                builder.forced(Boolean.TRUE);
+            } else if (flag.equals("off")) {
+                builder.on(Boolean.FALSE);
+            } else if (flag.equals("on")) {
+                builder.on(Boolean.TRUE);
             }
         }
     }
