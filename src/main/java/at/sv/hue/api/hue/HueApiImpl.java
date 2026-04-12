@@ -251,7 +251,12 @@ public final class HueApiImpl implements HueApi {
     }
 
     @Override
-    public void putSceneState(String groupedLightId, List<PutCall> putCalls) {
+    public void putSceneState(String groupedLightId, String sceneId, List<PutCall> putCalls) {
+        if (isSceneWithSameActions(sceneId, groupedLightId, putCalls)) {
+            Integer recallDuration = getRecallDuration(putCalls);
+            recallScene(sceneId, recallDuration);
+            return;
+        }
         SceneUpdateResult result = createOrUpdateSceneInternal(groupedLightId, sceneControlAppData, sceneControlName,
                 removeTransitionTime(putCalls));
         boolean fastUpdate = consumeFastSceneUpdate(groupedLightId);
@@ -266,6 +271,19 @@ public final class HueApiImpl implements HueApi {
         recallScene(result.sceneId, recallDuration);
         log.trace("Recalled temp scene for {}. Modified: {}. Transition time: {}", groupedLightId, result.modified,
                 recallDuration);
+    }
+
+    private boolean isSceneWithSameActions(String sceneId, String groupedLightId, List<PutCall> putCalls) {
+        if (sceneId == null) {
+            return false;
+        }
+        Scene existingScene = getAvailableScenes().get(sceneId);
+        if (existingScene == null) {
+            return false;
+        }
+        Group group = getAndAssertGroupExists(groupedLightId);
+        List<SceneAction> actions = createSceneActions(group, removeTransitionTime(putCalls));
+        return !actionsDiffer(existingScene, actions);
     }
 
     @Override

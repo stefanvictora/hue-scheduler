@@ -76,7 +76,7 @@ public interface HueApi extends ResourceModificationEventListener {
     /**
      * @throws ApiFailure if the api call failed
      */
-    void putSceneState(String groupId, List<PutCall> putCalls);
+    void putSceneState(String groupId, String sceneId, List<PutCall> putCalls);
 
     /**
      * Marks the given group ID as eligible for a fast scene update, skipping the usual sleep delay

@@ -670,7 +670,7 @@ public class AbstractHueSchedulerTest {
     }
 
     protected void assertAllScenePutCallsAsserted() {
-        verify(mockedHueApi, times(expectedScenePutCalls)).putSceneState(any(), anyList());
+        verify(mockedHueApi, times(expectedScenePutCalls)).putSceneState(any(), any(), anyList());
     }
 
     private void assertAllGroupPutCallsAsserted() {
@@ -690,17 +690,17 @@ public class AbstractHueSchedulerTest {
     }
 
     protected void advanceTimeAndRunAndAssertScenePutCalls(ScheduledRunnable runnable, int groupId,
-                                                           PutCall.PutCallBuilder... putCallBuilders) {
+                                                           String sceneId, PutCall.PutCallBuilder... putCallBuilders) {
         setCurrentTimeTo(runnable);
 
         runnable.run();
 
-        assertScenePutCalls(groupId, putCallBuilders);
+        assertScenePutCalls(groupId, sceneId, putCallBuilders);
 
         assertAllScenePutCallsAsserted();
     }
 
-    protected void assertScenePutCalls(int groupId, PutCall.PutCallBuilder... putCallBuilders) {
+    protected void assertScenePutCalls(int groupId, String sceneId, PutCall.PutCallBuilder... putCallBuilders) {
         if (putCallBuilders.length == 0) {
             return;
         }
@@ -709,6 +709,6 @@ public class AbstractHueSchedulerTest {
                                        .toList();
         String groupIdString = "/groups/" + groupId;
         expectedScenePutCalls++;
-        orderVerifier.verify(mockedHueApi, calls(1)).putSceneState(groupIdString, putCalls);
+        orderVerifier.verify(mockedHueApi, calls(1)).putSceneState(groupIdString, sceneId, putCalls);
     }
 }

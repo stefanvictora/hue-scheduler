@@ -1081,7 +1081,7 @@ public final class HueScheduler implements Runnable {
                 if (shouldControlIndividually(state)) {
                     updateIndividualIgnoringError(putCallList);
                 } else {
-                    api.putSceneState(putCalls.getId(), getCurrentlyOnPutCalls(putCalls));
+                    api.putSceneState(putCalls.getId(), state.getSceneId(), getCurrentlyOnPutCalls(putCalls));
                 }
             }
         } else {

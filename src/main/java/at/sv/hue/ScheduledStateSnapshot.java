@@ -447,6 +447,10 @@ public class ScheduledStateSnapshot {
         return scheduledState.getGeneration() != generation;
     }
 
+    public String getSceneId() {
+        return scheduledState.getSceneId();
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
