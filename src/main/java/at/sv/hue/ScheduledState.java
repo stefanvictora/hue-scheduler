@@ -176,7 +176,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
     /**
      * Returns the snapshot for the given dateTime. The snapshot is cached for 3 days.
      */
-    public ScheduledStateSnapshot getSnapshot(ZonedDateTime dateTime) {
+    public synchronized ScheduledStateSnapshot getSnapshot(ZonedDateTime dateTime) {
         return snapshotCache.get(getDefinedStart(dateTime),
                 definedStart -> new ScheduledStateSnapshot(this, definedStart, getGeneration(),
                         previousStateLookup, nextStateLookup));
