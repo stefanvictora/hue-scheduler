@@ -2633,6 +2633,7 @@ public class HassApiTest {
                                .bri(38)
                                .build(),
                         PutCall.builder()
+                               .on(true)
                                .id("light.id2")
                                .bri(38)
                                .build()));
@@ -2648,6 +2649,7 @@ public class HassApiTest {
         setupApi("https://123456789.ui.nabu.casa");
 
         putState(PutCall.builder()
+                        .on(true)
                         .id("light.id")
                         .bri(254)
                         .x(0.354)
@@ -2660,6 +2662,7 @@ public class HassApiTest {
     @Test
     void putState_turnOn_xy_color() {
         putState(PutCall.builder()
+                        .on(true)
                         .id("light.id")
                         .bri(254)
                         .x(0.354)
@@ -2672,6 +2675,7 @@ public class HassApiTest {
     @Test
     void putState_turnOn_xy_performsGamutCorrection() {
         putState(PutCall.builder()
+                        .on(true)
                         .id("light.id")
                         .bri(254)
                         .x(0.8)
@@ -2684,6 +2688,7 @@ public class HassApiTest {
     @Test
     void putState_turnOn_xy_missingY_ignoresColor() {
         putState(PutCall.builder()
+                        .on(true)
                         .id("light.id")
                         .bri(254)
                         .x(0.354)); // y missing
@@ -2695,6 +2700,7 @@ public class HassApiTest {
     @Test
     void putState_turnOn_xy_missingX_ignoresColor() {
         putState(PutCall.builder()
+                        .on(true)
                         .id("light.id")
                         .bri(254)
                         .y(0.546)); // x missing
@@ -2706,6 +2712,7 @@ public class HassApiTest {
     @Test
     void putState_turnOn_effect() {
         putState(PutCall.builder()
+                        .on(true)
                         .id("light.id")
                         .bri(1)
                         .effect(Effect.builder().effect("prism").build()));
@@ -2717,6 +2724,7 @@ public class HassApiTest {
     @Test
     void putState_turnOn_effect_none_treatedAsOff() {
         putState(PutCall.builder()
+                        .on(true)
                         .id("light.id")
                         .bri(1)
                         .effect(Effect.builder().effect("none").build()));
@@ -2739,6 +2747,7 @@ public class HassApiTest {
     @Test
     void putState_turnOn_inputBoolean_usesCorrectService() {
         putState(PutCall.builder()
+                        .on(true)
                         .id("input_boolean.test_switch"));
 
         verify(http).postResource(getUrl("/services/input_boolean/turn_on"),
@@ -2758,6 +2767,7 @@ public class HassApiTest {
     @Test
     void putState_turnOn_switch_usesCorrectService() {
         putState(PutCall.builder()
+                        .on(true)
                         .id("switch.tv_mute"));
 
         verify(http).postResource(getUrl("/services/switch/turn_on"),
@@ -2767,6 +2777,7 @@ public class HassApiTest {
     @Test
     void putState_turnOn_fan_usesCorrectService() {
         putState(PutCall.builder()
+                        .on(true)
                         .id("fan.test_fan"));
 
         verify(http).postResource(getUrl("/services/fan/turn_on"),
