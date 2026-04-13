@@ -21,6 +21,7 @@ import at.sv.hue.api.hass.area.HassAreaRegistry;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 import java.net.MalformedURLException;
@@ -31,7 +32,9 @@ import java.util.EnumSet;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -55,7 +58,7 @@ public class HassApiTest {
         HassAvailabilityListener availabilityListener = new HassAvailabilityListener(() -> {
         });
         api = new HassApiImpl(origin, http, areaRegistry, availabilityListener, permits -> {
-        });
+        }, null);
         baseUrl = origin + "/api";
     }
 
@@ -2630,6 +2633,7 @@ public class HassApiTest {
                                .bri(38)
                                .build(),
                         PutCall.builder()
+                               .on(true)
                                .id("light.id2")
                                .bri(38)
                                .build()));
@@ -2645,6 +2649,7 @@ public class HassApiTest {
         setupApi("https://123456789.ui.nabu.casa");
 
         putState(PutCall.builder()
+                        .on(true)
                         .id("light.id")
                         .bri(254)
                         .x(0.354)
@@ -2657,6 +2662,7 @@ public class HassApiTest {
     @Test
     void putState_turnOn_xy_color() {
         putState(PutCall.builder()
+                        .on(true)
                         .id("light.id")
                         .bri(254)
                         .x(0.354)
@@ -2669,6 +2675,7 @@ public class HassApiTest {
     @Test
     void putState_turnOn_xy_performsGamutCorrection() {
         putState(PutCall.builder()
+                        .on(true)
                         .id("light.id")
                         .bri(254)
                         .x(0.8)
@@ -2681,6 +2688,7 @@ public class HassApiTest {
     @Test
     void putState_turnOn_xy_missingY_ignoresColor() {
         putState(PutCall.builder()
+                        .on(true)
                         .id("light.id")
                         .bri(254)
                         .x(0.354)); // y missing
@@ -2692,6 +2700,7 @@ public class HassApiTest {
     @Test
     void putState_turnOn_xy_missingX_ignoresColor() {
         putState(PutCall.builder()
+                        .on(true)
                         .id("light.id")
                         .bri(254)
                         .y(0.546)); // x missing
@@ -2703,6 +2712,7 @@ public class HassApiTest {
     @Test
     void putState_turnOn_effect() {
         putState(PutCall.builder()
+                        .on(true)
                         .id("light.id")
                         .bri(1)
                         .effect(Effect.builder().effect("prism").build()));
@@ -2714,6 +2724,7 @@ public class HassApiTest {
     @Test
     void putState_turnOn_effect_none_treatedAsOff() {
         putState(PutCall.builder()
+                        .on(true)
                         .id("light.id")
                         .bri(1)
                         .effect(Effect.builder().effect("none").build()));
@@ -2736,6 +2747,7 @@ public class HassApiTest {
     @Test
     void putState_turnOn_inputBoolean_usesCorrectService() {
         putState(PutCall.builder()
+                        .on(true)
                         .id("input_boolean.test_switch"));
 
         verify(http).postResource(getUrl("/services/input_boolean/turn_on"),
@@ -2755,6 +2767,7 @@ public class HassApiTest {
     @Test
     void putState_turnOn_switch_usesCorrectService() {
         putState(PutCall.builder()
+                        .on(true)
                         .id("switch.tv_mute"));
 
         verify(http).postResource(getUrl("/services/switch/turn_on"),
@@ -2764,10 +2777,55 @@ public class HassApiTest {
     @Test
     void putState_turnOn_fan_usesCorrectService() {
         putState(PutCall.builder()
+                        .on(true)
                         .id("fan.test_fan"));
 
         verify(http).postResource(getUrl("/services/fan/turn_on"),
                 "{\"entity_id\":\"fan.test_fan\"}");
+    }
+
+    @Test
+    void testZ2mMqttPublish_whenLightIsOff_andAttributesChanged() {
+        // 1. Re-initialize the API for this specific test to include the "zigbee2mqtt" topic.
+        // We reuse 'http' and 'areaRegistry' mocks that are automatically created in @BeforeEach.
+        HassAvailabilityListener availabilityListener = new HassAvailabilityListener(() -> {});
+        api = new HassApiImpl("http://localhost:8123", http, areaRegistry, availabilityListener, permits -> {}, "zigbee2mqtt");
+        
+        // 2. Use the existing test helper method to mock the state of the light as "off"
+        setGetResponse("/states", """
+            [
+              {
+                "entity_id": "light.my_z2m_bulb",
+                "state": "off",
+                "attributes": {
+                  "friendly_name": "My Bulb",
+                  "supported_features": 44
+                }
+              }
+            ]
+            """);
+
+        // 3. Create a PutCall that updates brightness/color but DOES NOT turn the light on (on=null)
+        PutCall silentUpdate = PutCall.builder()
+                .id("light.my_z2m_bulb")
+                .bri(150)
+                .ct(300)
+                .build();
+
+        // 4. Trigger the putState call
+        api.putState(silentUpdate);
+
+        // 5. Verify the correct MQTT publish payload was sent
+        org.mockito.ArgumentCaptor<String> bodyCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(http).postResource(eq(getUrl("/services/mqtt/publish")), bodyCaptor.capture());
+
+        // 6. Verify that the standard light.turn_on service was NEVER called
+        verify(http, org.mockito.Mockito.never()).postResource(eq(getUrl("/services/light/turn_on")), any());
+
+        // 7. Assert the exact JSON payload matches perfectly
+        String payload = bodyCaptor.getValue();
+        String expectedPayload = "{\"topic\":\"zigbee2mqtt/My Bulb/set\",\"payload\":\"{\\\"state\\\":null,\\\"brightness\\\":150,\\\"color_temp\\\":300}\"}";
+        assertThat(payload).isEqualTo(expectedPayload);
     }
 
     @Test

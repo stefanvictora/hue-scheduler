@@ -55,6 +55,7 @@ public class HassApiImpl implements HueApi {
     private final HassAvailabilityListener availabilityListener;
     private final ObjectMapper mapper;
     private final String baseUrl;
+    private final String z2mBaseTopic;
 
     private final Object lightMapLock = new Object();
     private Map<String, State> availableStates;
@@ -63,12 +64,18 @@ public class HassApiImpl implements HueApi {
     private boolean nameToStatesMapInvalidated;
 
     public HassApiImpl(String origin, HttpResourceProvider httpResourceProvider, HassAreaRegistry hassAreaRegistry,
-                       HassAvailabilityListener availabilityListener, RateLimiter rateLimiter) {
+                       HassAvailabilityListener availabilityListener, RateLimiter rateLimiter, String z2mBaseTopic) {
         baseUrl = origin + "/api";
         this.httpResourceProvider = httpResourceProvider;
         this.hassAreaRegistry = hassAreaRegistry;
         this.availabilityListener = availabilityListener;
         this.rateLimiter = rateLimiter;
+        if (z2mBaseTopic == null) {
+            this.z2mBaseTopic = null;
+        } else {
+            String normalizedBaseTopic = z2mBaseTopic.replaceAll("/+$", "").trim();
+            this.z2mBaseTopic = normalizedBaseTopic.isEmpty() ? null : normalizedBaseTopic;
+        }
         mapper = new ObjectMapper();
         mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         mapper.setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL);
@@ -167,9 +174,68 @@ public class HassApiImpl implements HueApi {
     private void putStateInternal(PutCall putCall) {
         String id = putCall.getId();
         assertSupportedStateType(id);
+
+        // ONLY intercept if on is explicitly null (a silent background update)
+        boolean isSilentOffUpdate = putCall.getOn() == null && isLightOff(id);
+        boolean hasAttributesToUpdate = putCall.getBri() != null || putCall.getCt() != null || (putCall.getX() != null && putCall.getY() != null);
+
+        if (isSilentOffUpdate && hasAttributesToUpdate && this.z2mBaseTopic != null) {
+            State state = getAndAssertLightExists(id);
+            
+            // Exclude groups to ensure this only runs for individual bulbs
+            if (!isGroupState(state)) {
+                String friendlyName = state.getAttributes().getFriendly_name();
+                
+                if (friendlyName == null || friendlyName.isBlank()) {
+                    throw new ApiFailure("Cannot publish silent Z2M update for '" + id + "' because friendly_name is missing");
+                }
+                
+                publishZ2mMqttUpdate(putCall, friendlyName);
+                return; // Return immediately. We ONLY wanted a silent update.
+            }
+        }
+
         ChangeState changeState = getChangeState(putCall);
         changeState.setEntity_id(id);
         httpResourceProvider.postResource(getUpdateUrl(putCall), getBody(changeState));
+    }
+
+    /**
+     * Publishes a silent MQTT update to Zigbee2MQTT to change light attributes without turning the light on.
+     * This bypasses the standard Map serialization to ensure the literal "state": null is preserved in the payload,
+     * utilizing Z2M's execute_if_off functionality.
+     *
+     * @param putCall      The scheduled state call containing the new attributes (brightness, color_temp, etc.).
+     * @param friendlyName The specific friendly_name attribute of the target Zigbee2MQTT device.
+     */
+    private void publishZ2mMqttUpdate(PutCall putCall, String friendlyName) {
+        List<String> payloadParts = new ArrayList<>();
+        
+        // Hardcode the null state to bypass JSON serializer dropping it
+        payloadParts.add("\"state\":null");
+        
+        if (putCall.getBri() != null) {
+            payloadParts.add("\"brightness\":" + hueToHassBrightness(putCall.getBri()));
+        }
+        if (putCall.getCt() != null) {
+            payloadParts.add("\"color_temp\":" + putCall.getCt());
+        }
+        if (putCall.getX() != null && putCall.getY() != null) {
+            Double[] xy = getXyColor(putCall);
+            payloadParts.add("\"color\":{\"x\":" + xy[0] + ",\"y\":" + xy[1] + "}");
+        }
+        if (putCall.getTransitionTime() != null) {
+            payloadParts.add("\"transition\":" + convertToSeconds(putCall.getTransitionTime()));
+        }
+
+        // Combine the parts into a raw JSON string
+        String rawZ2mPayload = "{" + String.join(",", payloadParts) + "}";
+
+        MqttPublish publish = new MqttPublish();
+        publish.setTopic(this.z2mBaseTopic + "/" + friendlyName + "/set");
+        publish.setPayload(rawZ2mPayload);
+
+        httpResourceProvider.postResource(createUrl("/services/mqtt/publish"), getBody(publish));
     }
 
     private ChangeState getChangeState(PutCall putCall) {
@@ -640,5 +706,14 @@ public class HassApiImpl implements HueApi {
     private static final class CreateScene {
         String scene_id;
         Map<String, ChangeState> entities;
+    }
+
+    /**
+     * Data Transfer Object for publishing a message via Home Assistant's native MQTT publish service.
+     */
+    @Data
+    private static final class MqttPublish {
+        String topic;
+        String payload;
     }
 }
