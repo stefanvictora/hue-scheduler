@@ -139,6 +139,11 @@ public final class HueScheduler implements Runnable {
             description = "Automatically create and reload states based on scenes matching the naming scheme." +
                     " Default: ${DEFAULT-VALUE}")
     boolean enableAutoSceneStates;
+    @Option(names = "--migrate-input-to-scenes",
+            defaultValue = "${env:MIGRATE_INPUT_TO_SCENES:-false}",
+            description = "One-time migration for Philips Hue only: create scenes from config-file group states and exit. " +
+                          "Scene names use the start expression plus supported flags (i, tr-b, tr). Default: ${DEFAULT-VALUE}")
+    boolean migrateInputToScenes;
     @Option(names = "--scene-sync-name",
             defaultValue = "${env:SCENE_SYNC_NAME:-Hue Scheduler}",
             description = "The name of the synced scene. Related to '--enable-scene-sync'." +
@@ -506,6 +511,9 @@ public final class HueScheduler implements Runnable {
         if (enableAutoSceneStates && HassApiUtils.isHassConnection(accessToken)) {
             fail("--enable-auto-scene-states is not supported when using Home Assistant");
         }
+        if (migrateInputToScenes && HassApiUtils.isHassConnection(accessToken)) {
+            fail("--migrate-input-to-scenes is only supported for Philips Hue Bridge connections");
+        }
     }
 
     private void assertManualOverrideThresholds() {
@@ -579,6 +587,10 @@ public final class HueScheduler implements Runnable {
         } else {
             parseInput();
             performSyncedSceneMigration();
+            if (migrateInputToScenes) {
+                migrateInputToScenes();
+                return;
+            }
             discoverSceneStates();
             start();
         }
@@ -811,8 +823,9 @@ public final class HueScheduler implements Runnable {
         }
         MDC.put("context", state.getContextName() + " (scene sync)");
         try {
+            ZonedDateTime now = currentTime.get();
             stateRegistry.getAssignedGroups(state)
-                         .forEach(groupInfo -> syncScene(groupInfo.groupId(), stateRegistry.getPutCalls(groupInfo.groupLights())));
+                         .forEach(groupInfo -> syncScene(groupInfo.groupId(), stateRegistry.getPutCalls(groupInfo.groupLights(), now)));
             ZonedDateTime nextSyncTime = getNextChangeTime(state, null, currentTime.get());
             if (!justOnce && nextSyncTime != null) {
                 scheduleNextSceneSync(state, false, nextSyncTime);
@@ -1220,6 +1233,88 @@ public final class HueScheduler implements Runnable {
                 api::clearCaches, apiCacheInvalidationIntervalInMinutes, apiCacheInvalidationIntervalInMinutes, TimeUnit.MINUTES);
         stateScheduler.scheduleAtFixedRate(
                 startTimeProvider::clearCaches, 3, 3, TimeUnit.DAYS);
+    }
+
+
+    void migrateInputToScenes() {
+        if (!migrateInputToScenes) {
+            return;
+        }
+        MDC.put("context", "migration");
+        List<ScheduledState> states = new ArrayList<>();
+        stateRegistry.forEach(states::addAll);
+        int migrated = 0;
+        int skipped = 0;
+        ZonedDateTime now = currentTime.get();
+        for (ScheduledState state : states) {
+            if (!state.isGroupState()) {
+                skipped++;
+                continue;
+            }
+            String sceneName = getMigrationSceneName(state);
+            List<PutCall> putCalls = getMigrationPutCalls(state, now);
+            api.createOrUpdateScene(state.getId(), sceneName, putCalls);
+            migrated++;
+        }
+        LOG.info("Input-to-scene migration finished. Migrated: {}, skipped: {}. Exiting.", migrated, skipped);
+        MDC.remove("context");
+    }
+
+    private List<PutCall> getMigrationPutCalls(ScheduledState state, ZonedDateTime now) {
+        ScheduledStateSnapshot snapshot = state.getSnapshot(now);
+        ZonedDateTime definedStart = snapshot.getDefinedStart();
+        List<PutCall> putCalls = stateRegistry.getPutCalls(state.getGroupLightIds(), definedStart);
+        return putCalls.stream()
+                       .map(putCall -> putCall.toBuilder().transitionTime(null).build())
+                       .toList();
+    }
+
+    private static String getMigrationSceneName(ScheduledState state) {
+        List<String> flags = new ArrayList<>();
+        if (state.getInterpolate() == Boolean.TRUE) {
+            flags.add("i");
+        }
+        if (state.getTransitionTimeBeforeString() != null) {
+            flags.add("tr-b:" + state.getTransitionTimeBeforeString());
+        }
+        if (state.getDefinedTransitionTime() != null) {
+            flags.add("tr:" + formatTransitionTime(state.getDefinedTransitionTime()));
+        }
+        if (state.isForced()) {
+            flags.add("f");
+        }
+        if (state.isOff()) {
+            flags.add("off");
+        }
+        if (state.isOn()) {
+            flags.add("on");
+        }
+        String daysFlag = DayOfWeeksParser.formatDaysOfWeek(state.getDaysOfWeek());
+        if (daysFlag != null) {
+            flags.add(daysFlag.replace(",", ";"));
+        }
+        if (flags.isEmpty()) {
+            return state.getStartString();
+        }
+        return state.getStartString() + " [" + String.join(",", flags) + "]";
+    }
+
+    private static String formatTransitionTime(Integer definedTransitionTime) {
+        Duration duration = Duration.ofMillis(definedTransitionTime * 100L);
+        StringBuilder sb = new StringBuilder();
+        if (duration.toHours() > 0) {
+            sb.append(duration.toHours()).append("h");
+        }
+        if (duration.toMinutes() % 60 > 0) {
+            sb.append(duration.toMinutes() % 60).append("min");
+        }
+        if (duration.toSeconds() % 60 > 0) {
+            sb.append(duration.toSeconds() % 60).append("s");
+        }
+        if (duration.toMillis() % 1000L > 0) {
+            sb.append(duration.toMillis() % 1000L / 100);
+        }
+        return sb.toString();
     }
 
     private void performSyncedSceneMigration() {

@@ -684,9 +684,14 @@ public class AbstractHueSchedulerTest {
     /* Scene Sync Assertions */
 
     protected void assertSceneUpdate(String groupId, PutCall.PutCallBuilder... expectedPutCalls) {
+        assertSceneUpdate(groupId, sceneSyncName, expectedPutCalls);
+    }
+
+    protected void assertSceneUpdate(String groupId, String sceneSyncName, PutCall.PutCallBuilder... expectedPutCalls) {
         expectedSceneUpdates++;
         List<PutCall> putCalls = Arrays.stream(expectedPutCalls).map(PutCall.PutCallBuilder::build).toList();
-        sceneSyncOrderVerifier.verify(mockedHueApi, calls(1)).createOrUpdateScene(groupId, sceneSyncName, putCalls);
+        sceneSyncOrderVerifier.verify(mockedHueApi, calls(1)).createOrUpdateScene(groupId,
+                sceneSyncName, putCalls);
     }
 
     protected void advanceTimeAndRunAndAssertScenePutCalls(ScheduledRunnable runnable, int groupId,

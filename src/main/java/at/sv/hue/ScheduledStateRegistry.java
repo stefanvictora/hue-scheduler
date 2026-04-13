@@ -140,14 +140,14 @@ public class ScheduledStateRegistry {
      * definition.
      *
      * @param groupLights the list of light IDs for which to retrieve the active PutCall objects
+     * @param dateTime the time for which to retrieve the active PutCall objects
      * @return a list of active PutCall objects corresponding to the provided light IDs
      */
-    public synchronized List<PutCall> getPutCalls(List<String> groupLights) {
-        ZonedDateTime now = currentTime.get();
-        Map<String, PutCall> putCalls = getActivePutCallsFromGroups(groupLights, now);
-        findActivePutCalls(groupLights, now).stream()
-                                            .flatMap(PutCalls::stream)
-                                            .forEach(putCall -> putCalls.put(putCall.getId(), putCall));
+    public synchronized List<PutCall> getPutCalls(List<String> groupLights, ZonedDateTime dateTime) {
+        Map<String, PutCall> putCalls = getActivePutCallsFromGroups(groupLights, dateTime);
+        findActivePutCalls(groupLights, dateTime).stream()
+                                                 .flatMap(PutCalls::stream)
+                                                 .forEach(putCall -> putCalls.put(putCall.getId(), putCall));
         return new ArrayList<>(putCalls.values());
     }
 

@@ -42,12 +42,15 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
     private final Boolean sceneOnModifier;
     @Getter
     private final Integer definedTransitionTime;
+    @Getter
     private final String transitionTimeBeforeString;
     private final StartTimeProvider startTimeProvider;
+    @Getter
     private final EnumSet<DayOfWeek> daysOfWeek;
     @Getter
     private final boolean groupState;
     private final Boolean force;
+    @Getter
     private final Boolean interpolate;
     @Getter
     private final boolean temporary;

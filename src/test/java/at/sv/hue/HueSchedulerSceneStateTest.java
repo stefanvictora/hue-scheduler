@@ -13,6 +13,179 @@ import static org.mockito.Mockito.when;
 public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
 
     @Test
+    void migrateInputToScenes_notEnabled_skipped() {
+        mockGroupLightsForId(9, 1, 2);
+        mockDefaultGroupCapabilities(9);
+        addState("g9", "12:00");
+        enableInputToSceneMigration(false);
+
+        migrateInputToScenes();
+
+        assertAllSceneUpdatesAsserted();
+    }
+
+    @Test
+    void migrateInputToScenes_groupState_noFlags() {
+        mockGroupLightsForId(9, 1, 2);
+        mockDefaultGroupCapabilities(9);
+        addState("g9", "12:00", "bri:100%");
+        enableInputToSceneMigration(true);
+
+        migrateInputToScenes();
+
+        assertSceneUpdate("/groups/9", "12:00",
+                expectedPutCall(1).bri(254),
+                expectedPutCall(2).bri(254)
+        );
+    }
+
+    @Test
+    void migrateInputToScenes_groupState_createsHueSceneWithSupportedFlagsInName() {
+        mockGroupLightsForId(9, 1, 2);
+        mockDefaultGroupCapabilities(9);
+        addState("g9", "12:00", "bri:80%", "tr-before:10m", "interpolate:true", "tr:5s", "force:true", "on:true");
+        enableInputToSceneMigration(true);
+
+        migrateInputToScenes();
+
+        assertSceneUpdate("/groups/9", "12:00 [i,tr-b:10m,tr:5s,f,on]",
+                expectedPutCall(1).on(true).bri(203),
+                expectedPutCall(2).on(true).bri(203)
+        );
+    }
+
+    @Test
+    void migrateInputToScenes_groupState_offState() {
+        mockGroupLightsForId(9, 1, 2);
+        mockDefaultGroupCapabilities(9);
+        addState("g9", "12:00", "on:false");
+        enableInputToSceneMigration(true);
+
+        migrateInputToScenes();
+
+        assertSceneUpdate("/groups/9", "12:00 [off]",
+                expectedPutCall(1).on(false),
+                expectedPutCall(2).on(false)
+        );
+    }
+
+    @Test
+    void migrateInputToScenes_lightState_isSkipped() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, "12:00", "bri:40%");
+        enableInputToSceneMigration(true);
+
+        migrateInputToScenes();
+
+        assertAllSceneUpdatesAsserted();
+    }
+
+    @Test
+    void migrateInputToScenes_groupState_singleDay_addsDaysFlag() {
+        mockGroupLightsForId(9, 1, 2);
+        mockDefaultGroupCapabilities(9);
+        addState("g9", "12:00", "bri:100%", "days:Mo");
+        enableInputToSceneMigration(true);
+
+        migrateInputToScenes();
+
+        assertSceneUpdate("/groups/9", "12:00 [Mo]",
+                expectedPutCall(1).bri(254),
+                expectedPutCall(2).bri(254)
+        );
+    }
+
+    @Test
+    void migrateInputToScenes_groupState_consecutiveDays_renderedAsRange() {
+        mockGroupLightsForId(9, 1, 2);
+        mockDefaultGroupCapabilities(9);
+        addState("g9", "12:00", "bri:100%", "days:Mo,Tu,We,Th");
+        enableInputToSceneMigration(true);
+
+        migrateInputToScenes();
+
+        assertSceneUpdate("/groups/9", "12:00 [Mo-Th]",
+                expectedPutCall(1).bri(254),
+                expectedPutCall(2).bri(254)
+        );
+    }
+
+    @Test
+    void migrateInputToScenes_groupState_rangeWithExtraDay_renderedAsRangePlusSingle() {
+        mockGroupLightsForId(9, 1, 2);
+        mockDefaultGroupCapabilities(9);
+        addState("g9", "12:00", "bri:100%", "days:Mo,Tu,We,Th,Su");
+        enableInputToSceneMigration(true);
+
+        migrateInputToScenes();
+
+        assertSceneUpdate("/groups/9", "12:00 [Mo-Th;Su]",
+                expectedPutCall(1).bri(254),
+                expectedPutCall(2).bri(254)
+        );
+    }
+
+    @Test
+    void migrateInputToScenes_groupState_twoSeparateRanges_renderedAsTwoRanges() {
+        mockGroupLightsForId(9, 1, 2);
+        mockDefaultGroupCapabilities(9);
+        addState("g9", "12:00", "bri:100%", "days:Mo,Tu,We,Fr,Sa");
+        enableInputToSceneMigration(true);
+
+        migrateInputToScenes();
+
+        assertSceneUpdate("/groups/9", "12:00 [Mo-We;Fr-Sa]",
+                expectedPutCall(1).bri(254),
+                expectedPutCall(2).bri(254)
+        );
+    }
+
+    @Test
+    void migrateInputToScenes_groupState_weekendOnly_renderedAsSaToSu() {
+        mockGroupLightsForId(9, 1, 2);
+        mockDefaultGroupCapabilities(9);
+        addState("g9", "12:00", "bri:100%", "days:Sa,Su");
+        enableInputToSceneMigration(true);
+
+        migrateInputToScenes();
+
+        assertSceneUpdate("/groups/9", "12:00 [Sa-Su]",
+                expectedPutCall(1).bri(254),
+                expectedPutCall(2).bri(254)
+        );
+    }
+
+    @Test
+    void migrateInputToScenes_groupState_wrapAround() {
+        mockGroupLightsForId(9, 1, 2);
+        mockDefaultGroupCapabilities(9);
+        addState("g9", "12:00", "bri:100%", "days:Mo,Tu,Su");
+        enableInputToSceneMigration(true);
+
+        migrateInputToScenes();
+
+        assertSceneUpdate("/groups/9", "12:00 [Mo-Tu;Su]",
+                expectedPutCall(1).bri(254),
+                expectedPutCall(2).bri(254)
+        );
+    }
+
+    @Test
+    void migrateInputToScenes_groupState_daysAndOtherFlags_combinedInSceneName() {
+        mockGroupLightsForId(9, 1, 2);
+        mockDefaultGroupCapabilities(9);
+        addState("g9", "12:00", "bri:80%", "interpolate:true", "days:Mo,Tu,We,Th");
+        enableInputToSceneMigration(true);
+
+        migrateInputToScenes();
+
+        assertSceneUpdate("/groups/9", "12:00 [i,Mo-Th]",
+                expectedPutCall(1).bri(203),
+                expectedPutCall(2).bri(203)
+        );
+    }
+
+    @Test
     void autoSceneStates_notEnabled_ignoresSceneOnStartup() {
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
@@ -1023,6 +1196,14 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
         ensureRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2));
     }
 
+    private void enableInputToSceneMigration(boolean enable) {
+        scheduler.migrateInputToScenes = enable;
+    }
+
+    private void migrateInputToScenes() {
+        scheduler.migrateInputToScenes();
+    }
+    
     private void mockGetAllScenes(Identifier... scenes) {
         when(mockedHueApi.getAllScenes()).thenReturn(Arrays.asList(scenes));
     }
