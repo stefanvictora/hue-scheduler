@@ -110,6 +110,62 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
     }
 
     @Test
+    void autoSceneStates_apiFailureDuringUpdate_ignoresScene_stillReschedulesRemainingScenes() {
+        enableAutoSceneStates();
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        Identifier scene1 = mockSceneLightStates(1, 1, "00:00",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100)
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(50)
+                                   .ct(40));
+        Identifier scene2 = mockSceneLightStates(1, 2, "07:00",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(200)
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(254)
+                                   .ct(40));
+        mockGetAllScenes(scene1, scene2);
+
+        startScheduler(
+                expectedRunnable(now, now.plusHours(7)),
+                expectedRunnable(now.plusHours(7), now.plusDays(1))
+        );
+
+        // New scene created that matches pattern
+        Identifier updateScene1 = mockSceneLightStates(1, 1, "00:00 [on]",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100)
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(50)
+                                   .ct(40));
+        when(mockedHueApi.getSceneLightStates(updateScene1.id())).thenThrow(new RuntimeException("API failure"));
+        simulateSceneCreatedOrUpdated(updateScene1.id());
+
+        // reschedules scene2, but no new state created
+        List<ScheduledRunnable> rescheduledStates = ensureScheduledStates(
+                expectedRunnable(now, now.plusHours(7))
+        );
+
+        advanceTimeAndRunAndAssertScenePutCalls(rescheduledStates.getFirst(), 1, scene2.id(),
+                expectedPutCall(4).bri(200).ct(20),
+                expectedPutCall(5).bri(254).ct(40)
+        );
+
+        ensureRunnable(initialNow.plusHours(7), initialNow.plusDays(1).plusHours(7));
+    }
+
+    @Test
     void autoSceneStates_matchingFormat_addedAsStates_canBeCombinedWithManualStates() {
         enableAutoSceneStates();
         mockDefaultGroupCapabilities(1);

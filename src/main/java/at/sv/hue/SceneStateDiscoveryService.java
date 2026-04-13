@@ -120,7 +120,10 @@ public class SceneStateDiscoveryService implements SceneDiscoveryListener {
         SceneNameParser.ParseResult result = SceneNameParser.parse(scene.name());
         if (result != null) {
             log.info("Creating new state for scene '{}'.", scene.name());
-            affectedGroup = tryCreateAndAddScheduledState(scene, result);
+            String createdGroup = tryCreateAndAddScheduledState(scene, result);
+            if (createdGroup != null) {
+                affectedGroup = createdGroup;
+            }
         }
         if (affectedGroup == null) {
             return;
