@@ -234,7 +234,10 @@ public final class StartTimeProviderImpl implements StartTimeProvider {
     }
 
     private ZonedDateTime parseOffsetExpression(String input, ZonedDateTime dateTime) {
-        String[] parts = input.split("[+-]");
+        String[] parts = input.split("[+-]", 2);
+        if (parts.length != 2 || parts[1].trim().isEmpty()) {
+            throw new InvalidStartTimeExpression("Invalid offset expression: '" + input + "'");
+        }
         ZonedDateTime startTime = parseSunKeywords(parts[0].trim(), dateTime);
         String offsetString = parts[1].trim();
         Matcher matcher = OFFSET_PATTERN.matcher(offsetString);

@@ -202,6 +202,8 @@ class StartTimeProviderTest {
     @Test
     void parse_invalidOffsetExpression() {
         assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("+10", now));
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("sunrise+", now));
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("sunrise + ", now));
     }
 
     @Test
