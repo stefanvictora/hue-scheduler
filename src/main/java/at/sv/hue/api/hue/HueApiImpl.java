@@ -47,7 +47,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumSet;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -650,7 +649,29 @@ public final class HueApiImpl implements HueApi {
 
     private static boolean actionsDiffer(Scene scene, List<SceneAction> actions) {
         List<SceneAction> currentActions = scene.getActions();
-        return !new HashSet<>(currentActions).containsAll(actions);
+        return !actions.stream().allMatch(action -> currentActions.stream().anyMatch(
+                current -> sceneActionsMatch(current, action)));
+    }
+
+    private static boolean sceneActionsMatch(SceneAction a, SceneAction b) {
+        if (!Objects.equals(a.getTarget(), b.getTarget())) {
+            return false;
+        }
+        Action aa = a.getAction();
+        Action ba = b.getAction();
+        return Objects.equals(aa.getOn(), ba.getOn()) &&
+               dimmingMatches(aa.getDimming(), ba.getDimming()) &&
+               Objects.equals(aa.getColor(), ba.getColor()) &&
+               Objects.equals(aa.getColor_temperature(), ba.getColor_temperature()) &&
+               Objects.equals(aa.getEffects_v2(), ba.getEffects_v2()) &&
+               Objects.equals(aa.getGradient(), ba.getGradient()) &&
+               Objects.equals(aa.getDynamics(), ba.getDynamics());
+    }
+
+    private static boolean dimmingMatches(Dimming a, Dimming b) {
+        if (a == null && b == null) return true;
+        if (a == null || b == null) return false;
+        return Math.abs(a.getBrightness() - b.getBrightness()) < 0.5;
     }
 
     private String createScene(Scene newScene) {
