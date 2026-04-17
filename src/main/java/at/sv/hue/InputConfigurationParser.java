@@ -23,7 +23,7 @@ import java.util.regex.Pattern;
 
 public final class InputConfigurationParser {
 
-    private static final Pattern TR_PATTERN = Pattern.compile("(?:(\\d+)h)?(?:(\\d+)min)?(?:(\\d+)s)?(\\d*)?",
+    private static final Pattern TR_PATTERN = Pattern.compile("(?:(\\d+)h)?(?:(\\d+)m(?:in)?)?(?:(\\d+)s)?(\\d*)?",
             Pattern.CASE_INSENSITIVE);
     private static final Pattern GRADIENT_VALUE = Pattern.compile("^\\[(?<list>.+?)](?:@(?<mode>[A-Za-z_]+))?$",
             Pattern.CASE_INSENSITIVE);
@@ -163,10 +163,15 @@ public final class InputConfigurationParser {
                                            .map(point -> parseColorValue(point, capabilities))
                                            .map(color -> Pair.of(color.x(), color.y()))
                                            .toList();
-                        gradient = Gradient.builder()
-                                           .points(points)
-                                           .mode(m.group("mode"))
-                                           .build();
+                        if (points.stream().distinct().count() == 1) {
+                            x = points.getFirst().first();
+                            y = points.getFirst().second();
+                        } else {
+                            gradient = Gradient.builder()
+                                               .points(points)
+                                               .mode(m.group("mode"))
+                                               .build();
+                        }
                         break;
                     case "effect":
                         value = value.trim();
@@ -311,7 +316,7 @@ public final class InputConfigurationParser {
         return Math.max(1, Math.min(254, targetBrightness));
     }
 
-    private static List<ScheduledLightState> turnOnIfNotOff(List<ScheduledLightState> scheduledLightStates) {
+    public static List<ScheduledLightState> turnOnIfNotOff(List<ScheduledLightState> scheduledLightStates) {
         return scheduledLightStates.stream().map(InputConfigurationParser::turnOnIfNotOff).toList();
     }
 

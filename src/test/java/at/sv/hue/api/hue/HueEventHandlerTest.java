@@ -2,8 +2,9 @@ package at.sv.hue.api.hue;
 
 import at.sv.hue.api.LightEventListener;
 import at.sv.hue.api.ResourceModificationEventListener;
+import at.sv.hue.api.SceneDiscoveryListener;
 import at.sv.hue.api.SceneEventListener;
-import at.sv.hue.api.SceneModificationListener;
+import at.sv.hue.api.SceneActionsModificationListener;
 import com.launchdarkly.eventsource.MessageEvent;
 import org.hamcrest.Matcher;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,13 +27,15 @@ class HueEventHandlerTest {
     @Mock
     private ResourceModificationEventListener resourceModificationEventListener;
     @Mock
-    private SceneModificationListener sceneModificationListener;
+    private SceneActionsModificationListener sceneActionsModificationListener;
+    @Mock
+    private SceneDiscoveryListener sceneDiscoveryListener;
     private HueEventHandler handler;
 
     @BeforeEach
     void setUp() {
         handler = new HueEventHandler(lightEventListener, sceneEventListener, resourceModificationEventListener,
-                sceneModificationListener);
+                sceneActionsModificationListener, sceneDiscoveryListener);
     }
 
     @Test
@@ -128,7 +131,7 @@ class HueEventHandlerTest {
     }
 
     @Test
-    void onMessage_sceneEvents_notifiesEventListener() throws Exception {
+    void onMessage_sceneRecalls_notifiesEventListener() throws Exception {
         handler.onMessage("", new MessageEvent("""
                 [
                   {
@@ -206,6 +209,7 @@ class HueEventHandlerTest {
         verify(sceneEventListener).onSceneActivated("3df1b8e5-0ab5-4454-94da-c55bf3748713");
         verifyNoInteractions(lightEventListener);
         verifyNoMoreInteractions(sceneEventListener);
+        verifyNoInteractions(sceneDiscoveryListener);
         verifyResourceModification("ANOTHER_TYPE", "ANOTHER_ID");
         verifyNoMoreInteractions(resourceModificationEventListener); // scene activation alone is not a resource modification
     }
@@ -545,7 +549,7 @@ class HueEventHandlerTest {
     }
 
     @Test
-    void onMessage_addScene_detectsResourceModification() throws Exception {
+    void onMessage_addScene_detectsResourceModificationAndDiscovery() throws Exception {
         handler.onMessage("", new MessageEvent("""
                 [
                   {
@@ -664,13 +668,14 @@ class HueEventHandlerTest {
                 ]"""));
 
         verifyResourceModification("scene", "c1ad153a-b1ca-4250-a352-9dbb6f985586");
+        verifySceneCreatedOrUpdated("c1ad153a-b1ca-4250-a352-9dbb6f985586");
 
         verifyNoInteractions(sceneEventListener);
-        verifyNoInteractions(sceneModificationListener); // no modification, but addition of a new scene
+        verifyNoInteractions(sceneActionsModificationListener); // no modification, but addition of a new scene
     }
 
     @Test
-    void onMessage_sceneDeleted_detectsResourceModification() throws Exception {
+    void onMessage_sceneDeleted_detectsResourceAndRemovalModification() throws Exception {
         handler.onMessage("", new MessageEvent("""
                 [
                   {
@@ -688,14 +693,16 @@ class HueEventHandlerTest {
                 ]"""));
 
         verifyResourceRemoval("scene", "46e3fb34-1f88-4b0f-b138-e8466b76928d");
+        verify(sceneDiscoveryListener).onSceneDeleted("46e3fb34-1f88-4b0f-b138-e8466b76928d");
 
         verifyNoMoreInteractions(resourceModificationEventListener);
         verifyNoInteractions(lightEventListener);
         verifyNoInteractions(sceneEventListener);
+        verifyNoInteractions(sceneActionsModificationListener);
     }
 
     @Test
-    void onMessage_sceneRenamed_detectsResourceModification() throws Exception {
+    void onMessage_sceneRenamed_detectsResourceAndUpdateModification() throws Exception {
         handler.onMessage("", new MessageEvent("""
                 [
                   {
@@ -719,11 +726,61 @@ class HueEventHandlerTest {
                 ]"""));
 
         verifyResourceModification("scene", "70c6eb7f-7966-4a84-b62e-dd04e0c71ad0");
+        verifySceneCreatedOrUpdated("70c6eb7f-7966-4a84-b62e-dd04e0c71ad0");
 
         verifyNoMoreInteractions(resourceModificationEventListener);
         verifyNoInteractions(lightEventListener);
         verifyNoInteractions(sceneEventListener);
-        verifyNoInteractions(sceneModificationListener);
+        verifyNoInteractions(sceneActionsModificationListener);
+    }
+
+    @Test
+    void onMessage_sceneRenamedAndActionsChanged_detectsModifications() throws Exception {
+        handler.onMessage("", new MessageEvent("""
+                [
+                  {
+                    "creationtime": "2024-07-27T13:35:43Z",
+                    "data": [
+                      {
+                        "id": "70c6eb7f-7966-4a84-b62e-dd04e0c71ad0",
+                        "id_v1": "/scenes/OriVDa3ciDdRKI6T",
+                        "metadata": {
+                          "name": "Entspannen"
+                        },
+                        "actions": [
+                          {
+                            "action": {
+                              "dimming": {
+                                "brightness": 50.0
+                              },
+                              "on": {
+                                "on": true
+                              }
+                            },
+                            "target": {
+                              "rid": "1aa6083d-3692-49e5-92f7-b926b302dd49",
+                              "rtype": "light"
+                            }
+                          }
+                        ],
+                        "status": {
+                          "active": "inactive"
+                        },
+                        "type": "scene"
+                      }
+                    ],
+                    "id": "bc3be5e4-f677-452c-9d3b-bb71e36a1358",
+                    "type": "update"
+                  }
+                ]"""));
+
+        verifyResourceModification("scene", "70c6eb7f-7966-4a84-b62e-dd04e0c71ad0");
+        verifySceneCreatedOrUpdated("70c6eb7f-7966-4a84-b62e-dd04e0c71ad0");
+        verifySceneActionsModified("70c6eb7f-7966-4a84-b62e-dd04e0c71ad0");
+
+        verifyNoMoreInteractions(resourceModificationEventListener);
+        verifyNoInteractions(lightEventListener);
+        verifyNoInteractions(sceneEventListener);
     }
 
     @Test
@@ -820,7 +877,8 @@ class HueEventHandlerTest {
         
         verifyNoMoreInteractions(sceneEventListener);
         verifyNoInteractions(lightEventListener);
-        verifyNoInteractions(sceneModificationListener);
+        verifyNoInteractions(sceneActionsModificationListener);
+        verifyNoInteractions(sceneDiscoveryListener);
         verifyNoMoreInteractions(resourceModificationEventListener);
     }
 
@@ -977,24 +1035,8 @@ class HueEventHandlerTest {
         verifyNoMoreInteractions(resourceModificationEventListener);
     }
 
-    private void verifyResourceModification(String type, String id) {
-        verifyResourceModification(type, id, notNullValue());
-    }
-
-    private void verifyResourceRemoval(String type, String id) {
-        verifyResourceModification(type, id, nullValue());
-    }
-
-    private <T> void verifyResourceModification(String type, String id, Matcher<T> contentMatcher) {
-        verify(resourceModificationEventListener).onModification(
-                eq(type),
-                eq(id),
-                argThat(contentMatcher::matches)
-        );
-    }
-
     @Test
-    void onMessage_sceneActionsModified_notifiesSceneModificationListener() throws Exception {
+    void onMessage_sceneActionsModified_notifiesSceneActionsModificationListener() throws Exception {
         handler.onMessage("", new MessageEvent("""
                 [
                   {
@@ -1033,7 +1075,32 @@ class HueEventHandlerTest {
                   }
                 ]"""));
 
-        verify(sceneModificationListener).onSceneModified("f6b7b1ee-31e1-4a24-b848-376a5dd6e2d4");
+        verifySceneActionsModified("f6b7b1ee-31e1-4a24-b848-376a5dd6e2d4");
         verifyResourceModification("scene", "f6b7b1ee-31e1-4a24-b848-376a5dd6e2d4");
+        verifyNoInteractions(sceneDiscoveryListener);
+    }
+
+    private void verifyResourceModification(String type, String id) {
+        verifyResourceModification(type, id, notNullValue());
+    }
+
+    private void verifyResourceRemoval(String type, String id) {
+        verifyResourceModification(type, id, nullValue());
+    }
+
+    private <T> void verifyResourceModification(String type, String id, Matcher<T> contentMatcher) {
+        verify(resourceModificationEventListener).onModification(
+                eq(type),
+                eq(id),
+                argThat(contentMatcher::matches)
+        );
+    }
+
+    private void verifySceneActionsModified(String sceneId) {
+        verify(sceneActionsModificationListener).onSceneActionsModified(sceneId);
+    }
+
+    private void verifySceneCreatedOrUpdated(String sceneId) {
+        verify(sceneDiscoveryListener).onSceneCreatedOrRenamed(sceneId);
     }
 }

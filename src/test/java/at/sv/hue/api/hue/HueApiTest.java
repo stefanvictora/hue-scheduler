@@ -4,6 +4,7 @@ import at.sv.hue.ColorMode;
 import at.sv.hue.Effect;
 import at.sv.hue.Gradient;
 import at.sv.hue.Pair;
+import at.sv.hue.PutCalls;
 import at.sv.hue.ScheduledLightState;
 import at.sv.hue.api.AffectedId;
 import at.sv.hue.api.ApiFailure;
@@ -40,7 +41,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 class HueApiTest {
     private static final Double[][] GAMUT_A = new Double[][]{{0.704, 0.296}, {0.2151, 0.7106}, {0.138, 0.08}};
@@ -416,6 +421,181 @@ class HueApiTest {
                                                               .ctMin(153)
                                                               .ctMax(500)
                                                               .gradientModes(List.of("interpolated_palette", "random_pixelated"))
+                                                              .maxGradientPoints(5)
+                                                              .effects(List.of("candle"))
+                                                              .capabilities(EnumSet.of(Capability.GRADIENT, Capability.COLOR, Capability.COLOR_TEMPERATURE,
+                                                                      Capability.BRIGHTNESS, Capability.ON_OFF))
+                                                              .build()
+                          )
+                          .build()
+        );
+    }
+
+    @Test
+    void getState_hasGradientSupport_allSameColor_convertedToXY() {
+        setGetResponse("/light", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "cb6f54e8-5071-478e-9c0a-949a51b117a2",
+                      "id_v1": "/lights/55",
+                      "owner": {
+                        "rid": "2d019cd6-7de4-46dc-b8af-963add43a000",
+                        "rtype": "device"
+                      },
+                      "metadata": {
+                        "name": "Fernseher Play",
+                        "archetype": "hue_lightstrip_tv",
+                        "function": "decorative"
+                      },
+                      "product_data": {
+                        "function": "decorative"
+                      },
+                      "identify": {},
+                      "service_id": 0,
+                      "on": {
+                        "on": true
+                      },
+                      "dimming": {
+                        "brightness": 7.91,
+                        "min_dim_level": 0.01
+                      },
+                      "dimming_delta": {},
+                      "color_temperature": {
+                        "mirek": null,
+                        "mirek_valid": false,
+                        "mirek_schema": {
+                          "mirek_minimum": 153,
+                          "mirek_maximum": 500
+                        }
+                      },
+                      "color_temperature_delta": {},
+                      "color": {
+                        "xy": {
+                          "x": 0.1969,
+                          "y": 0.0688
+                        },
+                        "gamut": {
+                          "red": {
+                            "x": 0.6915,
+                            "y": 0.3083
+                          },
+                          "green": {
+                            "x": 0.17,
+                            "y": 0.7
+                          },
+                          "blue": {
+                            "x": 0.1532,
+                            "y": 0.0475
+                          }
+                        },
+                        "gamut_type": "C"
+                      },
+                      "dynamics": {
+                        "status": "none",
+                        "status_values": [
+                          "none",
+                          "dynamic_palette"
+                        ],
+                        "speed": 0.0,
+                        "speed_valid": false
+                      },
+                      "mode": "normal",
+                      "gradient": {
+                        "points": [
+                          {
+                            "color": {
+                              "xy": {
+                                "x": 0.1969,
+                                "y": 0.0688
+                              }
+                            }
+                          },
+                          {
+                            "color": {
+                              "xy": {
+                                "x": 0.1969,
+                                "y": 0.0688
+                              }
+                            }
+                          },
+                          {
+                            "color": {
+                              "xy": {
+                                "x": 0.1969,
+                                "y": 0.0688
+                              }
+                            }
+                          },
+                          {
+                            "color": {
+                              "xy": {
+                                "x": 0.1969,
+                                "y": 0.0688
+                              }
+                            }
+                          },
+                          {
+                            "color": {
+                              "xy": {
+                                "x": 0.1969,
+                                "y": 0.0688
+                              }
+                            }
+                          }
+                        ],
+                        "mode": "interpolated_palette",
+                        "points_capable": 5,
+                        "mode_values": [
+                          "interpolated_palette",
+                          "interpolated_palette_mirrored",
+                          "random_pixelated"
+                        ],
+                        "pixel_count": 24
+                      },
+                      "effects_v2": {
+                        "action": {
+                          "effect_values": [
+                            "no_effect",
+                            "candle"
+                          ]
+                        },
+                        "status": {
+                          "effect": "no_effect",
+                          "effect_values": [
+                            "no_effect",
+                            "candle"
+                          ]
+                        }
+                      },
+                      "type": "light"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/device", EMPTY_RESPONSE);
+
+        LightState lightState = getLightState("cb6f54e8-5071-478e-9c0a-949a51b117a2");
+
+        assertLightState(
+                lightState,
+                LightState.builder()
+                          .id("cb6f54e8-5071-478e-9c0a-949a51b117a2")
+                          .on(true)
+                          .brightness(20)
+                          .colorTemperature(null)
+                          .x(0.1969)
+                          .y(0.0688)
+                          .colormode(ColorMode.XY)
+                          .effect("none")
+                          .lightCapabilities(LightCapabilities.builder()
+                                                              .colorGamutType("C")
+                                                              .colorGamut(GAMUT_C)
+                                                              .ctMin(153)
+                                                              .ctMax(500)
+                                                              .gradientModes(List.of("interpolated_palette", "interpolated_palette_mirrored",
+                                                                      "random_pixelated"))
                                                               .maxGradientPoints(5)
                                                               .effects(List.of("candle"))
                                                               .capabilities(EnumSet.of(Capability.GRADIENT, Capability.COLOR, Capability.COLOR_TEMPERATURE,
@@ -1910,6 +2090,18 @@ class HueApiTest {
 
         assertThat(api.getSceneName("SCENE_ID_1")).isEqualTo("Scene_1");
         assertThat(api.getSceneName("SCENE_ID_2")).isEqualTo("Scene_2");
+
+        assertThat(api.getAllScenes())
+                .extracting(Identifier::id, Identifier::name)
+                .containsExactlyInAnyOrder(tuple("SCENE_ID_1", "Scene_1"), tuple("SCENE_ID_2", "Scene_2"));
+        assertThat(api.getScene("SCENE_ID_1")).isEqualTo(new Identifier("SCENE_ID_1", "Scene_1"));
+        assertThat(api.getScene("UNKNOWN_SCENE")).isNull();
+
+        assertThat(api.getGroupIdForScene("SCENE_ID_1"))
+                .isEqualTo(new Identifier("GROUPED_LIGHT_ID_ROOM", "Wohnzimmer"));
+        assertThat(api.getGroupIdForScene("SCENE_ID_2"))
+                .isEqualTo(new Identifier("GROUPED_LIGHT_ID_ZONE", "Couch"));
+        assertThat(api.getGroupIdForScene("UNKNOWN_SCENE")).isNull();
     }
 
     @Test
@@ -2385,6 +2577,73 @@ class HueApiTest {
                         "active": "inactive"
                       },
                       "type": "scene"
+                    },
+                    {
+                      "id": "SCENE_6",
+                      "actions": [
+                        {
+                          "target": {
+                            "rid": "LIGHT_1",
+                            "rtype": "light"
+                          },
+                          "action": {
+                            "on": {
+                              "on": true
+                            },
+                            "gradient": {
+                              "points": [
+                                {
+                                  "color": {
+                                    "xy": {
+                                      "x": 0.15352,
+                                      "y": 0.06006
+                                    }
+                                  }
+                                },
+                                {
+                                  "color": {
+                                    "xy": {
+                                      "x": 0.15352,
+                                      "y": 0.06006
+                                    }
+                                  }
+                                },
+                                {
+                                  "color": {
+                                    "xy": {
+                                      "x": 0.15352,
+                                      "y": 0.06006
+                                    }
+                                  }
+                                }
+                              ],
+                              "mode": "interpolated_palette"
+                            }
+                          }
+                        },
+                        {
+                          "target": {
+                            "rid": "LIGHT_2",
+                            "rtype": "light"
+                          },
+                          "action": {
+                            "on": {
+                              "on": true
+                            }
+                          }
+                        }
+                      ],
+                      "metadata": {
+                        "name": "Scene_6"
+                      },
+                      "group": {
+                        "rid": "ZONE_ID",
+                        "rtype": "zone"
+                      },
+                      "status": {
+                        "active": "inactive"
+                      },
+                      "type": "scene"
                     }
                   ]
                 }
@@ -2615,6 +2874,18 @@ class HueApiTest {
                                                      ))
                                                      .mode("interpolated_palette")
                                                      .build()),
+                ScheduledLightState.builder()
+                                   .id("LIGHT_2")
+                                   .gamut(GAMUT_A)
+        );
+
+        // Collapses gradient with equal points to single color state
+        assertSceneLightStates("SCENE_6",
+                ScheduledLightState.builder()
+                                   .id("LIGHT_1")
+                                   .gamut(GAMUT_C)
+                                   .x(0.15352)
+                                   .y(0.06006),
                 ScheduledLightState.builder()
                                    .id("LIGHT_2")
                                    .gamut(GAMUT_A)
@@ -6332,7 +6603,365 @@ class HueApiTest {
     }
 
     @Test
-    void putSceneState_noExistingTempScene_createAndRecall() {
+    void getOrCreateScene_updateExistingOne_sameActions_correctlyConvertsBrightness() {
+        setGetResponse("/grouped_light", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "GROUPED_LIGHT",
+                      "owner": {
+                        "rid": "ZONE",
+                        "rtype": "zone"
+                      },
+                      "type": "grouped_light"
+                    }
+                  ]
+                }""");
+        setGetResponse("/zone", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "ZONE",
+                      "children": [
+                        {
+                          "rid": "eead3ee7-9e4f-4278-9ddd-3d940bf3f1d0",
+                          "rtype": "light"
+                        },
+                        {
+                          "rid": "af9a2b88-6fb0-4699-9300-356d3f306b0d",
+                          "rtype": "light"
+                        }
+                      ],
+                      "services": [
+                        {
+                          "rid": "GROUPED_LIGHT",
+                          "rtype": "grouped_light"
+                        }
+                      ],
+                      "metadata": {
+                        "name": "Couch",
+                        "archetype": "lounge"
+                      },
+                      "type": "zone"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/scene", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "6f3647b7-9bb8-4175-b3c4-7180cd286bde",
+                      "id_v1": "/scenes/PO0XVSibCLy9tfmA",
+                      "actions": [
+                        {
+                          "target": {
+                            "rid": "eead3ee7-9e4f-4278-9ddd-3d940bf3f1d0",
+                            "rtype": "light"
+                          },
+                          "action": {
+                            "on": {
+                              "on": true
+                            },
+                            "dimming": {
+                              "brightness": 11.86
+                            },
+                            "color": {
+                              "xy": {
+                                "x": 0.6024,
+                                "y": 0.3433
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "target": {
+                            "rid": "af9a2b88-6fb0-4699-9300-356d3f306b0d",
+                            "rtype": "light"
+                          },
+                          "action": {
+                            "on": {
+                              "on": true
+                            },
+                            "dimming": {
+                              "brightness": 19.69
+                            },
+                            "color": {
+                              "xy": {
+                                "x": 0.6024,
+                                "y": 0.3433
+                              }
+                            }
+                          }
+                        }
+                      ],
+                      "palette": {
+                        "color": [
+                          {
+                            "color": {
+                              "xy": {
+                                "x": 0.6024,
+                                "y": 0.3433
+                              }
+                            },
+                            "dimming": {
+                              "brightness": 19.69
+                            }
+                          }
+                        ],
+                        "dimming": [],
+                        "color_temperature": [],
+                        "effects": [],
+                        "effects_v2": []
+                      },
+                      "recall": {},
+                      "metadata": {
+                        "name": "22:00 [tr:2s]"
+                      },
+                      "group": {
+                        "rid": "ae1bc469-6bce-4c67-9410-3c5eef4b8a55",
+                        "rtype": "room"
+                      },
+                      "speed": 0.5,
+                      "auto_dynamic": false,
+                      "status": {
+                        "active": "inactive"
+                      },
+                      "last_actions_update": {
+                        "source": "clip"
+                      },
+                      "type": "scene"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/light", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "eead3ee7-9e4f-4278-9ddd-3d940bf3f1d0",
+                      "id_v1": "/lights/61",
+                      "owner": {
+                        "rid": "b204d882-ea45-4546-8194-3f4f85494d10",
+                        "rtype": "device"
+                      },
+                      "metadata": {
+                        "name": "Spiegel",
+                        "archetype": "hue_omniglow",
+                        "function": "mixed"
+                      },
+                      "identify": {},
+                      "on": {
+                        "on": true
+                      },
+                      "dimming": {
+                        "brightness": 11.86,
+                        "min_dim_level": 0.5
+                      },
+                      "color_temperature": {
+                        "mirek": null,
+                        "mirek_valid": false,
+                        "mirek_schema": {
+                          "mirek_minimum": 50,
+                          "mirek_maximum": 1000
+                        }
+                      },
+                      "color": {
+                        "xy": {
+                          "x": 0.6025,
+                          "y": 0.3433
+                        },
+                        "gamut": {
+                          "red": {
+                            "x": 0.6915,
+                            "y": 0.3083
+                          },
+                          "green": {
+                            "x": 0.17,
+                            "y": 0.7
+                          },
+                          "blue": {
+                            "x": 0.1532,
+                            "y": 0.0475
+                          }
+                        },
+                        "gamut_type": "C"
+                      },
+                      "mode": "normal",
+                      "gradient": {
+                        "points": [],
+                        "mode": "interpolated_palette_mirrored",
+                        "points_capable": 5,
+                        "mode_values": [
+                          "interpolated_palette",
+                          "interpolated_palette_mirrored",
+                          "random_pixelated",
+                          "segmented_palette"
+                        ],
+                        "pixel_count": 40
+                      },
+                      "effects_v2": {
+                        "action": {
+                          "effect_values": [
+                            "no_effect",
+                            "candle",
+                            "fire",
+                            "prism",
+                            "sparkle",
+                            "opal",
+                            "glisten",
+                            "underwater",
+                            "cosmos",
+                            "sunbeam",
+                            "enchant"
+                          ]
+                        },
+                        "status": {
+                          "effect": "no_effect",
+                          "effect_values": [
+                            "no_effect",
+                            "candle",
+                            "fire",
+                            "prism",
+                            "sparkle",
+                            "opal",
+                            "glisten",
+                            "underwater",
+                            "cosmos",
+                            "sunbeam",
+                            "enchant"
+                          ]
+                        }
+                      },
+                      "type": "light"
+                    },
+                    {
+                      "id": "af9a2b88-6fb0-4699-9300-356d3f306b0d",
+                      "id_v1": "/lights/11",
+                      "owner": {
+                        "rid": "afa4e081-7089-471d-8d27-83b59d4541f7",
+                        "rtype": "device"
+                      },
+                      "metadata": {
+                        "name": "Bad Tür",
+                        "archetype": "hue_lightstrip",
+                        "function": "decorative"
+                      },
+                      "on": {
+                        "on": true
+                      },
+                      "dimming": {
+                        "brightness": 19.76,
+                        "min_dim_level": 0.04
+                      },
+                      "color_temperature": {
+                        "mirek": null,
+                        "mirek_valid": false,
+                        "mirek_schema": {
+                          "mirek_minimum": 153,
+                          "mirek_maximum": 500
+                        }
+                      },
+                      "color": {
+                        "xy": {
+                          "x": 0.6024,
+                          "y": 0.3433
+                        },
+                        "gamut": {
+                          "red": {
+                            "x": 0.6915,
+                            "y": 0.3083
+                          },
+                          "green": {
+                            "x": 0.17,
+                            "y": 0.7
+                          },
+                          "blue": {
+                            "x": 0.1532,
+                            "y": 0.0475
+                          }
+                        },
+                        "gamut_type": "C"
+                      },
+                      "mode": "normal",
+                      "effects_v2": {
+                        "action": {
+                          "effect_values": [
+                            "no_effect",
+                            "candle",
+                            "fire",
+                            "prism",
+                            "sparkle",
+                            "opal",
+                            "glisten",
+                            "underwater",
+                            "cosmos",
+                            "sunbeam",
+                            "enchant"
+                          ]
+                        },
+                        "status": {
+                          "effect": "no_effect",
+                          "effect_values": [
+                            "no_effect",
+                            "candle",
+                            "fire",
+                            "prism",
+                            "sparkle",
+                            "opal",
+                            "glisten",
+                            "underwater",
+                            "cosmos",
+                            "sunbeam",
+                            "enchant"
+                          ]
+                        }
+                      },
+                      "type": "light"
+                    }
+                  ]
+                }
+                """);
+
+        List<ScheduledLightState> sceneLightStates = api.getSceneLightStates("6f3647b7-9bb8-4175-b3c4-7180cd286bde");
+
+        PutCalls putCalls = getPutCalls("ID", sceneLightStates);
+
+        api.putSceneState("GROUPED_LIGHT", "6f3647b7-9bb8-4175-b3c4-7180cd286bde", putCalls.toList());
+
+        verifyPut("/scene/6f3647b7-9bb8-4175-b3c4-7180cd286bde", """
+                {
+                  "recall": {
+                    "action": "active"
+                  }
+                }
+                """);
+    }
+
+    private static PutCalls getPutCalls(String id, List<ScheduledLightState> lightStates) {
+        List<PutCall> putCallList = lightStates.stream()
+                                               .map(HueApiTest::getPutCall)
+                                               .toList();
+        return new PutCalls(id, putCallList, null, true);
+    }
+
+    private static PutCall getPutCall(ScheduledLightState lightState) {
+        return PutCall.builder()
+                      .id(lightState.getId())
+                      .bri(lightState.getBri())
+                      .ct(lightState.getCt())
+                      .x(lightState.getX())
+                      .y(lightState.getY())
+                      .on(lightState.getOn())
+                      .build();
+    }
+
+    @Test
+    void putSceneState_noSceneId_noExistingTempScene_createAndRecall() {
         setGetResponse("/grouped_light", """
                 {
                   "errors": [],
@@ -6453,7 +7082,7 @@ class HueApiTest {
         setGetResponse("/scene", EMPTY_RESPONSE);
         mockSceneCreationResult("SCENE_NEW");
 
-        api.putSceneState("GL_ZONE_1", List.of(
+        api.putSceneState("GL_ZONE_1", null, List.of(
                 PutCall.builder().id("LIGHT_A").ct(300).bri(100).transitionTime(5).build(),
                 PutCall.builder().id("LIGHT_B").on(true).gradient(Gradient.builder()
                                                                           .points(List.of(Pair.of(0.123, 0.456),
@@ -6537,7 +7166,7 @@ class HueApiTest {
     }
 
     @Test
-    void putSceneState_noExistingTempScene_failsToCreateScene_exception() {
+    void putSceneState_noSceneId_noExistingTempScene_failsToCreateScene_exception() {
         setGetResponse("/grouped_light", """
                 {
                   "errors": [],
@@ -6631,13 +7260,13 @@ class HueApiTest {
                         """);
 
 
-        assertThrows(ApiFailure.class, () -> api.putSceneState("GL_ZONE_1", List.of(
+        assertThrows(ApiFailure.class, () -> api.putSceneState("GL_ZONE_1", null, List.of(
                 PutCall.builder().id("LIGHT_A").ct(300).bri(100).transitionTime(5).build()
         )));
     }
 
     @Test
-    void putSceneState_hasExistingTempScene_lookedUpByAppData_updatesAndRecall() {
+    void putSceneState_noSceneId_hasExistingTempScene_lookedUpByAppData_updatesAndRecall() {
         setGetResponse("/grouped_light", """
                 {
                   "errors": [],
@@ -6834,7 +7463,7 @@ class HueApiTest {
                 }
                 """);
 
-        api.putSceneState("GL_ZONE_1", List.of(
+        api.putSceneState("GL_ZONE_1", null, List.of(
                 PutCall.builder().id("LIGHT_A").ct(300).bri(100).build()
         ));
 
@@ -6867,6 +7496,349 @@ class HueApiTest {
                 """);
 
         verifyPut("/scene/SCENE_ID_1", """
+                {
+                  "recall": {
+                    "action": "active"
+                  }
+                }
+                """);
+    }
+
+    @Test
+    void putSceneState_withSceneId_hasSameState_justRecalled() {
+        setGetResponse("/grouped_light", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "GL_ZONE_1",
+                      "owner": {
+                        "rid": "ZONE_1",
+                        "rtype": "zone"
+                      },
+                      "type": "grouped_light"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/zone", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "ZONE_1",
+                      "children": [
+                        {
+                          "rid": "LIGHT_A",
+                          "rtype": "light"
+                        }
+                      ],
+                      "services": [
+                        {
+                          "rid": "GL_ZONE_1",
+                          "rtype": "grouped_light"
+                        }
+                      ],
+                      "metadata": {
+                        "name": "Zone One",
+                        "archetype": "lounge"
+                      },
+                      "type": "zone"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/light", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "LIGHT_A",
+                      "metadata": {
+                        "name": "LA"
+                      },
+                      "owner": {
+                        "rid": "DEV_A",
+                        "rtype": "device"
+                      },
+                      "on": {
+                        "on": true
+                      },
+                      "dimming": {
+                        "brightness": 100.0
+                      },
+                      "color_temperature": {
+                        "mirek": 250,
+                        "mirek_valid": true,
+                        "mirek_schema": {
+                          "mirek_minimum": 153,
+                          "mirek_maximum": 500
+                        }
+                      },
+                      "color": {
+                        "xy": {
+                          "x": 0.3,
+                          "y": 0.3
+                        }
+                      },
+                      "type": "light"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/scene", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "SCENE_ID_1",
+                      "actions": [
+                        {
+                          "target": {
+                            "rid": "LIGHT_A",
+                            "rtype": "light"
+                          },
+                          "action": {
+                            "on": {
+                              "on": true
+                            },
+                            "dimming": {
+                              "brightness": 100.0
+                            },
+                            "color_temperature": {
+                              "mirek": 199
+                            }
+                          }
+                        }
+                      ],
+                      "metadata": {
+                        "name": "SCENE",
+                        "appdata": null
+                      },
+                      "group": {
+                        "rid": "ZONE_1",
+                        "rtype": "zone"
+                      },
+                      "speed": 0.6031746031746031,
+                      "auto_dynamic": false,
+                      "status": {
+                        "active": "inactive"
+                      },
+                      "type": "scene"
+                    }
+                  ]
+                }
+                """);
+
+        api.putSceneState("GL_ZONE_1", "SCENE_ID_1", List.of(
+                PutCall.builder().id("LIGHT_A").bri(254).ct(199).transitionTime(5).build()
+        ));
+
+        verifyPut("/scene/SCENE_ID_1", """
+                {
+                  "recall": {
+                    "action": "active",
+                    "duration": 500
+                  }
+                }
+                """);
+    }
+
+    @Test
+    void putSceneState_withSceneId_hasDifferentState_hasExistingTempScene_updatesAndRecall() {
+        setGetResponse("/grouped_light", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "GL_ZONE_1",
+                      "owner": {
+                        "rid": "ZONE_1",
+                        "rtype": "zone"
+                      },
+                      "type": "grouped_light"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/zone", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "ZONE_1",
+                      "children": [
+                        {
+                          "rid": "LIGHT_A",
+                          "rtype": "light"
+                        }
+                      ],
+                      "services": [
+                        {
+                          "rid": "GL_ZONE_1",
+                          "rtype": "grouped_light"
+                        }
+                      ],
+                      "metadata": {
+                        "name": "Zone One",
+                        "archetype": "lounge"
+                      },
+                      "type": "zone"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/light", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "LIGHT_A",
+                      "metadata": {
+                        "name": "LA"
+                      },
+                      "owner": {
+                        "rid": "DEV_A",
+                        "rtype": "device"
+                      },
+                      "on": {
+                        "on": true
+                      },
+                      "dimming": {
+                        "brightness": 100.0
+                      },
+                      "color_temperature": {
+                        "mirek": 250,
+                        "mirek_valid": true,
+                        "mirek_schema": {
+                          "mirek_minimum": 153,
+                          "mirek_maximum": 500
+                        }
+                      },
+                      "color": {
+                        "xy": {
+                          "x": 0.3,
+                          "y": 0.3
+                        }
+                      },
+                      "type": "light"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/scene", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "SCENE_ID_1",
+                      "actions": [
+                        {
+                          "target": {
+                            "rid": "LIGHT_A",
+                            "rtype": "light"
+                          },
+                          "action": {
+                            "on": {
+                              "on": true
+                            },
+                            "dimming": {
+                              "brightness": 100.0
+                            },
+                            "color_temperature": {
+                              "mirek": 200
+                            }
+                          }
+                        }
+                      ],
+                      "metadata": {
+                        "name": "SCENE",
+                        "appdata": null
+                      },
+                      "group": {
+                        "rid": "ZONE_1",
+                        "rtype": "zone"
+                      },
+                      "speed": 0.6031746031746031,
+                      "auto_dynamic": false,
+                      "status": {
+                        "active": "inactive"
+                      },
+                      "type": "scene"
+                    },
+                    {
+                      "id": "TEMP_SCENE_ID",
+                      "actions": [
+                        {
+                          "target": {
+                            "rid": "LIGHT_A",
+                            "rtype": "light"
+                          },
+                          "action": {
+                            "on": {
+                              "on": true
+                            },
+                            "dimming": {
+                              "brightness": 100.0
+                            },
+                            "color_temperature": {
+                              "mirek": 199
+                            }
+                          }
+                        }
+                      ],
+                      "metadata": {
+                        "name": "HueTemp",
+                        "appdata": "hue_sch:temp"
+                      },
+                      "group": {
+                        "rid": "ZONE_1",
+                        "rtype": "zone"
+                      },
+                      "speed": 0.6031746031746031,
+                      "auto_dynamic": false,
+                      "status": {
+                        "active": "inactive"
+                      },
+                      "type": "scene"
+                    }
+                  ]
+                }
+                """);
+
+        api.putSceneState("GL_ZONE_1", "SCENE_ID_1", List.of(
+                PutCall.builder().id("LIGHT_A").bri(254).ct(300).build() // ct differs from given scene
+        ));
+
+        verifyPut("/scene/TEMP_SCENE_ID", """
+                {
+                  "metadata": {
+                    "name": "HueTemp",
+                    "appdata": "hue_sch:temp"
+                  },
+                  "actions": [
+                    {
+                      "target": {
+                        "rid": "LIGHT_A",
+                        "rtype": "light"
+                      },
+                      "action": {
+                        "on": {
+                          "on": true
+                        },
+                        "dimming": {
+                          "brightness": 100.0
+                        },
+                        "color_temperature": {
+                          "mirek": 300
+                        }
+                      }
+                    }
+                  ]
+                }
+                """);
+
+        verifyPut("/scene/TEMP_SCENE_ID", """
                 {
                   "recall": {
                     "action": "active"

@@ -186,6 +186,15 @@ class StartTimeProviderTest {
     }
 
     @Test
+    void parse_keyWord_withOffset_alsoSupportsUnits() {
+        assertStart("sunrise+1h", sunrise.plusHours(1));
+        assertStart("sunrise+15m", sunrise.plusMinutes(15));
+        assertStart("sunrise+15min", sunrise.plusMinutes(15));
+        assertStart("sunrise+1h15min10s", sunrise.plusHours(1).plusMinutes(15).plusSeconds(10));
+        assertStart("civil_start-1h", civilStart.minusHours(1));
+    }
+
+    @Test
     void parse_keyWord_withOffset_invalidExpression() {
         assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("sunrise + sunrise", now));
     }
@@ -193,6 +202,8 @@ class StartTimeProviderTest {
     @Test
     void parse_invalidOffsetExpression() {
         assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("+10", now));
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("sunrise+", now));
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("sunrise + ", now));
     }
 
     @Test

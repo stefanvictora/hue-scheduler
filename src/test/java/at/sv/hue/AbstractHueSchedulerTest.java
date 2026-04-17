@@ -32,7 +32,17 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyList;
+import static org.mockito.Mockito.calls;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @Slf4j
 public class AbstractHueSchedulerTest {
@@ -81,8 +91,9 @@ public class AbstractHueSchedulerTest {
     private int expectedPutCalls;
     private int expectedGroupPutCalls;
     private int expectedScenePutCalls;
-    private boolean enableSceneSync = false;
-    private boolean supportsOffLightUpdates = false;
+    private boolean enableSceneSync;
+    private boolean supportsOffLightUpdates;
+    private boolean enableAutoSceneStates;
 
     @BeforeEach
     void setUp() {
@@ -112,6 +123,9 @@ public class AbstractHueSchedulerTest {
         sceneSyncDelayInSeconds = 0;
         sceneActivationIgnoreWindowInSeconds = 5;
         autoFillGradient = false;
+        supportsOffLightUpdates = false;
+        enableSceneSync = false;
+        enableAutoSceneStates = false;
         create();
     }
 
@@ -149,6 +163,11 @@ public class AbstractHueSchedulerTest {
         create();
     }
 
+    protected void enableAutoSceneStates() {
+        enableAutoSceneStates = true;
+        create();
+    }
+
     protected void requireSceneActivation() {
         requireSceneActivation = true;
         create();
@@ -161,7 +180,7 @@ public class AbstractHueSchedulerTest {
                 minTrGap, BRIGHTNESS_OVERRIDE_THRESHOLD_PERCENT, COLOR_TEMPERATURE_OVERRIDE_THRESHOLD_KELVIN,
                 COLOR_OVERRIDE_THRESHOLD, 3.8, 150, 0.06,
                 sceneActivationIgnoreWindowInSeconds, interpolateAll,
-                enableSceneSync, sceneSyncName, syncFailureRetryInMinutes, sceneSyncDelayInSeconds, autoFillGradient,
+                enableSceneSync, sceneSyncName, enableAutoSceneStates, syncFailureRetryInMinutes, sceneSyncDelayInSeconds, autoFillGradient,
                 supportsOffLightUpdates);
         manualOverrideTracker = scheduler.getManualOverrideTracker();
     }
@@ -219,6 +238,7 @@ public class AbstractHueSchedulerTest {
     /* Start and expected runnables */
 
     protected void startScheduler() {
+        scheduler.discoverSceneStates();
         scheduler.start();
     }
 
@@ -549,13 +569,20 @@ public class AbstractHueSchedulerTest {
         doThrow(throwable).when(mockedHueApi).putState(any());
     }
 
-    protected void mockSceneLightStates(int groupId, String sceneName, ScheduledLightState.ScheduledLightStateBuilder... builder) {
+    protected Identifier mockSceneLightStates(int groupId, String sceneName, ScheduledLightState.ScheduledLightStateBuilder... builder) {
+        return mockSceneLightStates(groupId, sceneName.hashCode(), sceneName, builder);
+    }
+
+    protected Identifier mockSceneLightStates(int groupId, int sceneId, String sceneName, ScheduledLightState.ScheduledLightStateBuilder... builder) {
         List<ScheduledLightState> states = Arrays.stream(builder)
                                                  .map(ScheduledLightState.ScheduledLightStateBuilder::build)
                                                  .toList();
-        String sceneId = "scene-" + groupId + "-" + sceneName;
-        when(mockedHueApi.getSceneId("/groups/" + groupId, sceneName)).thenReturn(sceneId);
-        when(mockedHueApi.getSceneLightStates(sceneId)).thenReturn(states);
+        String sceneIdStr = "/scenes/" + groupId + "/" + sceneId;
+        when(mockedHueApi.getSceneId("/groups/" + groupId, sceneName)).thenReturn(sceneIdStr);
+        when(mockedHueApi.getSceneLightStates(sceneIdStr)).thenReturn(states);
+        when(mockedHueApi.getGroupIdForScene(sceneIdStr)).thenReturn(new Identifier("/groups/" + groupId, "Group Name"));
+        when(mockedHueApi.getScene(sceneIdStr)).thenReturn(new Identifier(sceneIdStr, sceneName));
+        return new Identifier(sceneIdStr, sceneName);
     }
 
     protected void mockIsLightOff(int id, boolean value) {
@@ -629,7 +656,11 @@ public class AbstractHueSchedulerTest {
     }
 
     protected void simulateSceneModified(int groupId, String sceneName) {
-        scheduler.onSceneResourceModified("scene-" + groupId + "-" + sceneName);
+        scheduler.onSceneResourceModified(getSceneId(groupId, sceneName));
+    }
+
+    private static String getSceneId(int groupId, String sceneName) {
+        return "/scenes/" + groupId + "/" + sceneName.hashCode();
     }
 
     /* API Assertions */
@@ -639,7 +670,7 @@ public class AbstractHueSchedulerTest {
     }
 
     protected void assertAllScenePutCallsAsserted() {
-        verify(mockedHueApi, times(expectedScenePutCalls)).putSceneState(any(), anyList());
+        verify(mockedHueApi, times(expectedScenePutCalls)).putSceneState(any(), any(), anyList());
     }
 
     private void assertAllGroupPutCallsAsserted() {
@@ -653,23 +684,28 @@ public class AbstractHueSchedulerTest {
     /* Scene Sync Assertions */
 
     protected void assertSceneUpdate(String groupId, PutCall.PutCallBuilder... expectedPutCalls) {
+        assertSceneUpdate(groupId, sceneSyncName, expectedPutCalls);
+    }
+
+    protected void assertSceneUpdate(String groupId, String sceneSyncName, PutCall.PutCallBuilder... expectedPutCalls) {
         expectedSceneUpdates++;
         List<PutCall> putCalls = Arrays.stream(expectedPutCalls).map(PutCall.PutCallBuilder::build).toList();
-        sceneSyncOrderVerifier.verify(mockedHueApi, calls(1)).createOrUpdateScene(groupId, sceneSyncName, putCalls);
+        sceneSyncOrderVerifier.verify(mockedHueApi, calls(1)).createOrUpdateScene(groupId,
+                sceneSyncName, putCalls);
     }
 
     protected void advanceTimeAndRunAndAssertScenePutCalls(ScheduledRunnable runnable, int groupId,
-                                                           PutCall.PutCallBuilder... putCallBuilders) {
+                                                           String sceneId, PutCall.PutCallBuilder... putCallBuilders) {
         setCurrentTimeTo(runnable);
 
         runnable.run();
 
-        assertScenePutCalls(groupId, putCallBuilders);
+        assertScenePutCalls(groupId, sceneId, putCallBuilders);
 
         assertAllScenePutCallsAsserted();
     }
 
-    protected void assertScenePutCalls(int groupId, PutCall.PutCallBuilder... putCallBuilders) {
+    protected void assertScenePutCalls(int groupId, String sceneId, PutCall.PutCallBuilder... putCallBuilders) {
         if (putCallBuilders.length == 0) {
             return;
         }
@@ -678,6 +714,6 @@ public class AbstractHueSchedulerTest {
                                        .toList();
         String groupIdString = "/groups/" + groupId;
         expectedScenePutCalls++;
-        orderVerifier.verify(mockedHueApi, calls(1)).putSceneState(groupIdString, putCalls);
+        orderVerifier.verify(mockedHueApi, calls(1)).putSceneState(groupIdString, sceneId, putCalls);
     }
 }

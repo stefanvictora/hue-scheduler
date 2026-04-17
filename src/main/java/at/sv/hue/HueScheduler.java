@@ -12,6 +12,7 @@ import at.sv.hue.api.ManualOverrideTracker;
 import at.sv.hue.api.ManualOverrideTrackerImpl;
 import at.sv.hue.api.PutCall;
 import at.sv.hue.api.RateLimiter;
+import at.sv.hue.api.SceneDiscoveryListener;
 import at.sv.hue.api.SceneEventListener;
 import at.sv.hue.api.SceneEventListenerImpl;
 import at.sv.hue.api.hass.HassApiImpl;
@@ -61,7 +62,7 @@ import java.util.stream.Stream;
 
 import static at.sv.hue.InputConfigurationParser.parseBrightnessPercentValue;
 
-@Command(name = "HueScheduler", version = "0.16.1", mixinStandardHelpOptions = true, sortOptions = false)
+@Command(name = "HueScheduler", version = "0.17.0-SNAPSHOT", mixinStandardHelpOptions = true, sortOptions = false)
 public final class HueScheduler implements Runnable {
 
     private static final Logger LOG = LoggerFactory.getLogger(HueScheduler.class);
@@ -133,6 +134,16 @@ public final class HueScheduler implements Runnable {
             description = "Enable the creating of Hue scenes that always match the state of a scheduled room or zone." +
                           " Default: ${DEFAULT-VALUE}")
     boolean enableSceneSync;
+    @Option(names = "--enable-auto-scene-states",
+            defaultValue = "${env:ENABLE_AUTO_SCENE_STATES:-false}",
+            description = "Automatically create and reload states based on scenes matching the naming scheme." +
+                    " Default: ${DEFAULT-VALUE}")
+    boolean enableAutoSceneStates;
+    @Option(names = "--migrate-input-to-scenes",
+            defaultValue = "${env:MIGRATE_INPUT_TO_SCENES:-false}",
+            description = "One-time migration for Philips Hue only: create scenes from config-file group states and exit. " +
+                          "Scene names use the start expression plus supported flags (i, tr-b, tr). Default: ${DEFAULT-VALUE}")
+    boolean migrateInputToScenes;
     @Option(names = "--scene-sync-name",
             defaultValue = "${env:SCENE_SYNC_NAME:-Hue Scheduler}",
             description = "The name of the synced scene. Related to '--enable-scene-sync'." +
@@ -269,6 +280,7 @@ public final class HueScheduler implements Runnable {
     private StartTimeProvider startTimeProvider;
     private SceneEventListenerImpl sceneEventListener;
     private ScheduledStateRegistry stateRegistry;
+    private SceneStateDiscoveryService sceneStateDiscoveryService;
     private int sceneSyncDelayInSeconds = 5;
     private boolean autoFillGradient = true;
     private boolean supportsOffLightUpdates = false;
@@ -289,7 +301,7 @@ public final class HueScheduler implements Runnable {
                         double brightnessSyncThresholdPercentage, int colorTemperatureSyncThresholdKelvin,
                         double colorSyncThreshold,
                         int sceneActivationIgnoreWindowInSeconds, boolean interpolateAll, boolean enableSceneSync,
-                        String sceneSyncName, int syncFailureRetryInMinutes, int sceneSyncDelayInSeconds,
+                        String sceneSyncName, boolean enableAutoSceneStates, int syncFailureRetryInMinutes, int sceneSyncDelayInSeconds,
                         boolean autoFillGradient, boolean supportsOffLightUpdates) {
         this();
         this.api = api;
@@ -317,6 +329,7 @@ public final class HueScheduler implements Runnable {
         this.interpolateAll = interpolateAll;
         this.enableSceneSync = enableSceneSync;
         this.sceneSyncName = sceneSyncName;
+        this.enableAutoSceneStates = enableAutoSceneStates;
         this.syncFailureRetryInMinutes = syncFailureRetryInMinutes;
         this.sceneSyncDelayInSeconds = sceneSyncDelayInSeconds;
         this.autoFillGradient = autoFillGradient;
@@ -326,6 +339,10 @@ public final class HueScheduler implements Runnable {
         lightEventListener = createLightEventListener();
         this.sceneEventListener = new SceneEventListenerImpl(api, fakeTicker, sceneActivationIgnoreWindowInSeconds,
                 sceneSyncName::equals, lightEventListener);
+        sceneStateDiscoveryService = new SceneStateDiscoveryService(api, startTimeProvider, stateRegistry,
+                currentTime, this::initialSchedule, this::resetManualOverride,
+                minTrBeforeGapInMinutes, parseBrightnessPercentValue(brightnessOverrideThresholdPercentage),
+                colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold, enableAutoSceneStates);
     }
 
     private LightEventListenerImpl createLightEventListener() {
@@ -371,10 +388,11 @@ public final class HueScheduler implements Runnable {
     }
 
     private void logEnabledFlags() {
-        LOG.info("Modification Tracking: {}, Scene Sync: {}, Interpolate All: {}, Require Scene Activation: {}, " +
+        LOG.info("Modification Tracking: {}, Scene Sync: {}, Auto Scene States: {}, Interpolate All: {}, Require Scene Activation: {}, " +
                  "Control Group Lights Individually: {}",
                 enabledOrDisabled(!disableUserModificationTracking),
                 enabledOrDisabled(enableSceneSync),
+                enabledOrDisabled(enableAutoSceneStates),
                 enabledOrDisabled(interpolateAll),
                 enabledOrDisabled(requireSceneActivation),
                 enabledOrDisabled(controlGroupLightsIndividually));
@@ -406,6 +424,7 @@ public final class HueScheduler implements Runnable {
         new HassEventStreamReader(websocketOrigin, accessToken, httpClient,
                 new HassEventHandler(lightEventListener, sceneEventListener, availabilityListener, api)).start();
         stateRegistry = new ScheduledStateRegistry(currentTime, api);
+        startTimeProvider = createStartTimeProvider(latitude, longitude, elevation);
     }
 
     private void setupHueApi() {
@@ -418,14 +437,18 @@ public final class HueScheduler implements Runnable {
         lightEventListener = createLightEventListener();
         sceneEventListener = new SceneEventListenerImpl(api, Ticker.systemTicker(),
                 sceneActivationIgnoreWindowInSeconds, sceneSyncName::equals, lightEventListener);
-        new HueEventStreamReader(apiHost, accessToken, httpsClient,
-                new HueEventHandler(lightEventListener, sceneEventListener, api, this::onSceneResourceModified),
-                eventStreamReadTimeoutInMinutes).start();
         stateRegistry = new ScheduledStateRegistry(currentTime, api);
+        startTimeProvider = createStartTimeProvider(latitude, longitude, elevation);
+        sceneStateDiscoveryService = new SceneStateDiscoveryService(api, startTimeProvider, stateRegistry,
+                currentTime, this::initialSchedule, this::resetManualOverride,
+                minTrBeforeGapInMinutes, parseBrightnessPercentValue(brightnessOverrideThresholdPercentage),
+                colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold, enableAutoSceneStates);
+        new HueEventStreamReader(apiHost, accessToken, httpsClient,
+                new HueEventHandler(lightEventListener, sceneEventListener, api, this::onSceneResourceModified,
+                        sceneStateDiscoveryService), eventStreamReadTimeoutInMinutes).start();
     }
 
     private void createAndStart() {
-        startTimeProvider = createStartTimeProvider(latitude, longitude, elevation);
         stateScheduler = createStateScheduler();
         defaultInterpolationTransitionTime = parseInterpolationTransitionTime(defaultInterpolationTransitionTimeString);
         assertInputIsReadable();
@@ -484,6 +507,12 @@ public final class HueScheduler implements Runnable {
         }
         if (enableSceneSync && (sceneSyncName == null || sceneSyncName.isBlank())) {
             fail("--scene-sync-name must be non-empty when --enable-scene-sync is set");
+        }
+        if (enableAutoSceneStates && HassApiUtils.isHassConnection(accessToken)) {
+            fail("--enable-auto-scene-states is not supported when using Home Assistant");
+        }
+        if (migrateInputToScenes && HassApiUtils.isHassConnection(accessToken)) {
+            fail("--migrate-input-to-scenes is only supported for Philips Hue Bridge connections");
         }
     }
 
@@ -558,6 +587,11 @@ public final class HueScheduler implements Runnable {
         } else {
             parseInput();
             performSyncedSceneMigration();
+            if (migrateInputToScenes) {
+                migrateInputToScenes();
+                return;
+            }
+            discoverSceneStates();
             start();
         }
     }
@@ -610,28 +644,34 @@ public final class HueScheduler implements Runnable {
                 colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold, interpolateAll, autoFillGradient);
     }
 
+    void discoverSceneStates() {
+        if (!enableAutoSceneStates) {
+            return;
+        }
+        sceneStateDiscoveryService.discoverSceneStates();
+    }
+
     public void start() {
         ZonedDateTime now = currentTime.get();
         scheduleSolarDataInfoLog();
-        stateRegistry.values().stream()
-                     .flatMap(states -> setupInitialStartup(states, now).stream())
-                     .sorted(Comparator.comparing(ScheduledStateSnapshot::getId)
-                                       .thenComparing(ScheduledStateSnapshot::getDefinedStart))
-                     .forEach(snapshot -> initialSchedule(snapshot, now));
+        stateRegistry.forEach(statesForId -> initialSchedule(statesForId, now));
         scheduleApiCacheClear();
+    }
+
+    private void initialSchedule(List<ScheduledState> statesForId, ZonedDateTime now) {
+        MDC.put("context", "init");
+        getInitialSnapshots(statesForId, now).stream()
+                                             .sorted(Comparator.comparing(ScheduledStateSnapshot::getId)
+                                                               .thenComparing(ScheduledStateSnapshot::getDefinedStart))
+                                             .forEach(snapshot -> initialSchedule(snapshot, now));
     }
 
     /**
      * Prepare the given states. To correctly schedule cross-over states, i.e., states that already started yesterday,
      * we initially calculate all end times using yesterday, and reschedule them if needed afterward.
      */
-    private List<ScheduledStateSnapshot> setupInitialStartup(List<ScheduledState> states, ZonedDateTime now) {
-        MDC.put("context", "init");
+    private List<ScheduledStateSnapshot> getInitialSnapshots(List<ScheduledState> states, ZonedDateTime now) {
         ZonedDateTime yesterday = now.minusDays(1);
-        states.forEach(state -> {
-            state.setPreviousStateLookup(stateRegistry::getPreviousState);
-            state.setNextStateLookup(stateRegistry::getNextStateAfter);
-        });
         return states.stream().map(state -> state.getSnapshot(yesterday)).toList();
     }
 
@@ -657,6 +697,10 @@ public final class HueScheduler implements Runnable {
         LOG.debug("Schedule: {} in {}", snapshot, Duration.ofMillis(delayInMs + overlappingDelayInMs).withNanos(0));
         stateScheduler.schedule(() -> {
             MDC.put("context", snapshot.getContextName());
+            if (snapshot.isCancelled()) {
+                LOG.trace("Already cancelled: {}", snapshot);
+                return;
+            }
             ZonedDateTime now = currentTime.get();
             if (snapshot.endsBefore(now)) {
                 LOG.debug("Already ended: {}", snapshot);
@@ -774,10 +818,14 @@ public final class HueScheduler implements Runnable {
     }
 
     private void syncScene(ScheduledStateSnapshot state, boolean justOnce) {
+        if (state.isCancelled()) {
+            return;
+        }
         MDC.put("context", state.getContextName() + " (scene sync)");
         try {
+            ZonedDateTime now = currentTime.get();
             stateRegistry.getAssignedGroups(state)
-                         .forEach(groupInfo -> syncScene(groupInfo.groupId(), stateRegistry.getPutCalls(groupInfo.groupLights())));
+                         .forEach(groupInfo -> syncScene(groupInfo.groupId(), stateRegistry.getPutCalls(groupInfo.groupLights(), now)));
             ZonedDateTime nextSyncTime = getNextChangeTime(state, null, currentTime.get());
             if (!justOnce && nextSyncTime != null) {
                 scheduleNextSceneSync(state, false, nextSyncTime);
@@ -829,6 +877,9 @@ public final class HueScheduler implements Runnable {
     }
 
     private void performBackgroundInterpolation(ScheduledStateSnapshot state) {
+        if (state.isCancelled()) {
+            return;
+        }
         MDC.put("context", state.getContextName() + " (interpolation)");
         ZonedDateTime now = currentTime.get();
         try {
@@ -1043,7 +1094,7 @@ public final class HueScheduler implements Runnable {
                 if (shouldControlIndividually(state)) {
                     updateIndividualIgnoringError(putCallList);
                 } else {
-                    api.putSceneState(putCalls.getId(), getCurrentlyOnPutCalls(putCalls));
+                    api.putSceneState(putCalls.getId(), state.getSceneId(), getCurrentlyOnPutCalls(putCalls));
                 }
             }
         } else {
@@ -1184,6 +1235,88 @@ public final class HueScheduler implements Runnable {
                 startTimeProvider::clearCaches, 3, 3, TimeUnit.DAYS);
     }
 
+
+    void migrateInputToScenes() {
+        if (!migrateInputToScenes) {
+            return;
+        }
+        MDC.put("context", "migration");
+        List<ScheduledState> states = new ArrayList<>();
+        stateRegistry.forEach(states::addAll);
+        int migrated = 0;
+        int skipped = 0;
+        ZonedDateTime now = currentTime.get();
+        for (ScheduledState state : states) {
+            if (!state.isGroupState()) {
+                skipped++;
+                continue;
+            }
+            String sceneName = getMigrationSceneName(state);
+            List<PutCall> putCalls = getMigrationPutCalls(state, now);
+            api.createOrUpdateScene(state.getId(), sceneName, putCalls);
+            migrated++;
+        }
+        LOG.info("Input-to-scene migration finished. Migrated: {}, skipped: {}. Exiting.", migrated, skipped);
+        MDC.remove("context");
+    }
+
+    private List<PutCall> getMigrationPutCalls(ScheduledState state, ZonedDateTime now) {
+        ScheduledStateSnapshot snapshot = state.getSnapshot(now);
+        ZonedDateTime definedStart = snapshot.getDefinedStart();
+        List<PutCall> putCalls = stateRegistry.getPutCalls(state.getGroupLightIds(), definedStart);
+        return putCalls.stream()
+                       .map(putCall -> putCall.toBuilder().transitionTime(null).build())
+                       .toList();
+    }
+
+    private static String getMigrationSceneName(ScheduledState state) {
+        List<String> flags = new ArrayList<>();
+        if (state.getInterpolate() == Boolean.TRUE) {
+            flags.add("i");
+        }
+        if (state.getTransitionTimeBeforeString() != null) {
+            flags.add("tr-b:" + state.getTransitionTimeBeforeString());
+        }
+        if (state.getDefinedTransitionTime() != null) {
+            flags.add("tr:" + formatTransitionTime(state.getDefinedTransitionTime()));
+        }
+        if (state.isForced()) {
+            flags.add("f");
+        }
+        if (state.isOff()) {
+            flags.add("off");
+        }
+        if (state.isOn()) {
+            flags.add("on");
+        }
+        String daysFlag = DayOfWeeksParser.formatDaysOfWeek(state.getDaysOfWeek());
+        if (daysFlag != null) {
+            flags.add(daysFlag.replace(",", ";"));
+        }
+        if (flags.isEmpty()) {
+            return state.getStartString();
+        }
+        return state.getStartString() + " [" + String.join(",", flags) + "]";
+    }
+
+    private static String formatTransitionTime(Integer definedTransitionTime) {
+        Duration duration = Duration.ofMillis(definedTransitionTime * 100L);
+        StringBuilder sb = new StringBuilder();
+        if (duration.toHours() > 0) {
+            sb.append(duration.toHours()).append("h");
+        }
+        if (duration.toMinutes() % 60 > 0) {
+            sb.append(duration.toMinutes() % 60).append("min");
+        }
+        if (duration.toSeconds() % 60 > 0) {
+            sb.append(duration.toSeconds() % 60).append("s");
+        }
+        if (duration.toMillis() % 1000L > 0) {
+            sb.append(duration.toMillis() % 1000L / 100);
+        }
+        return sb.toString();
+    }
+
     private void performSyncedSceneMigration() {
         if (enableSceneSync && api instanceof HueApiImpl) {
             ((HueApiImpl) api).migrateSyncedScenes("HueScheduler", sceneSyncName);
@@ -1199,6 +1332,10 @@ public final class HueScheduler implements Runnable {
             stateRegistry.findCurrentlyActiveStates()
                          .forEach(state -> scheduleAsyncSceneSync(state, true));
         }
+    }
+
+    private void resetManualOverride(String id) {
+        manualOverrideTracker.reset(id);
     }
 
     private void logGroupOverridden(ScheduledStateSnapshot state, List<LightState> groupStates) {
@@ -1284,6 +1421,10 @@ public final class HueScheduler implements Runnable {
 
     ManualOverrideTracker getManualOverrideTracker() {
         return manualOverrideTracker;
+    }
+
+    SceneDiscoveryListener getSceneDiscoveryListener() {
+        return sceneStateDiscoveryService;
     }
 
     void onSceneResourceModified(String sceneId) {

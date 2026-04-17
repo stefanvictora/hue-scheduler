@@ -2,6 +2,7 @@ package at.sv.hue.time;
 
 import lombok.extern.slf4j.Slf4j;
 
+import java.time.Duration;
 import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -9,10 +10,14 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Slf4j
 public final class StartTimeProviderImpl implements StartTimeProvider {
 
+    private static final Pattern OFFSET_PATTERN = Pattern.compile("(?:(\\d+)h)?(?:(\\d+)m(?:in)?)?(?:(\\d+)s)?",
+            Pattern.CASE_INSENSITIVE);
     private static final int SECONDS_IN_A_DAY = 86_400;
     private static final int SECONDS_IN_HALF_A_DAY = SECONDS_IN_A_DAY / 2;
 
@@ -229,14 +234,35 @@ public final class StartTimeProviderImpl implements StartTimeProvider {
     }
 
     private ZonedDateTime parseOffsetExpression(String input, ZonedDateTime dateTime) {
-        String[] parts = input.split("[+-]");
-        ZonedDateTime startTime = parseSunKeywords(parts[0].trim(), dateTime);
-        int offset = Integer.parseInt(parts[1].trim());
-        if (input.contains("+")) {
-            return startTime.plusMinutes(offset);
-        } else {
-            return startTime.minusMinutes(offset);
+        String[] parts = input.split("[+-]", 2);
+        if (parts.length != 2 || parts[1].trim().isEmpty()) {
+            throw new InvalidStartTimeExpression("Invalid offset expression: '" + input + "'");
         }
+        ZonedDateTime startTime = parseSunKeywords(parts[0].trim(), dateTime);
+        String offsetString = parts[1].trim();
+        Matcher matcher = OFFSET_PATTERN.matcher(offsetString);
+        Duration offset;
+        if (matcher.matches()) {
+            offset = parseOffset(matcher);
+        } else {
+            offset = Duration.ofMinutes(Integer.parseInt(offsetString));
+        }
+        if (input.contains("+")) {
+            return startTime.plus(offset);
+        } else {
+            return startTime.minus(offset);
+        }
+    }
+
+    private static Duration parseOffset(Matcher matcher) {
+        int hours = getIntFromGroup(matcher.group(1));
+        int minutes = getIntFromGroup(matcher.group(2));
+        int seconds = getIntFromGroup(matcher.group(3));
+        return Duration.ofHours(hours).plusMinutes(minutes).plusSeconds(seconds);
+    }
+
+    private static int getIntFromGroup(String group) {
+        return (group == null || group.isEmpty()) ? 0 : Integer.parseInt(group);
     }
 
     private ZonedDateTime parseSunKeywords(String input, ZonedDateTime dateTime) {
