@@ -432,6 +432,181 @@ class HueApiTest {
     }
 
     @Test
+    void getState_hasGradientSupport_allSameColor_convertedToXY() {
+        setGetResponse("/light", """
+                {
+                  "errors": [],
+                  "data": [
+                    {
+                      "id": "cb6f54e8-5071-478e-9c0a-949a51b117a2",
+                      "id_v1": "/lights/55",
+                      "owner": {
+                        "rid": "2d019cd6-7de4-46dc-b8af-963add43a000",
+                        "rtype": "device"
+                      },
+                      "metadata": {
+                        "name": "Fernseher Play",
+                        "archetype": "hue_lightstrip_tv",
+                        "function": "decorative"
+                      },
+                      "product_data": {
+                        "function": "decorative"
+                      },
+                      "identify": {},
+                      "service_id": 0,
+                      "on": {
+                        "on": true
+                      },
+                      "dimming": {
+                        "brightness": 7.91,
+                        "min_dim_level": 0.01
+                      },
+                      "dimming_delta": {},
+                      "color_temperature": {
+                        "mirek": null,
+                        "mirek_valid": false,
+                        "mirek_schema": {
+                          "mirek_minimum": 153,
+                          "mirek_maximum": 500
+                        }
+                      },
+                      "color_temperature_delta": {},
+                      "color": {
+                        "xy": {
+                          "x": 0.1969,
+                          "y": 0.0688
+                        },
+                        "gamut": {
+                          "red": {
+                            "x": 0.6915,
+                            "y": 0.3083
+                          },
+                          "green": {
+                            "x": 0.17,
+                            "y": 0.7
+                          },
+                          "blue": {
+                            "x": 0.1532,
+                            "y": 0.0475
+                          }
+                        },
+                        "gamut_type": "C"
+                      },
+                      "dynamics": {
+                        "status": "none",
+                        "status_values": [
+                          "none",
+                          "dynamic_palette"
+                        ],
+                        "speed": 0.0,
+                        "speed_valid": false
+                      },
+                      "mode": "normal",
+                      "gradient": {
+                        "points": [
+                          {
+                            "color": {
+                              "xy": {
+                                "x": 0.1969,
+                                "y": 0.0688
+                              }
+                            }
+                          },
+                          {
+                            "color": {
+                              "xy": {
+                                "x": 0.1969,
+                                "y": 0.0688
+                              }
+                            }
+                          },
+                          {
+                            "color": {
+                              "xy": {
+                                "x": 0.1969,
+                                "y": 0.0688
+                              }
+                            }
+                          },
+                          {
+                            "color": {
+                              "xy": {
+                                "x": 0.1969,
+                                "y": 0.0688
+                              }
+                            }
+                          },
+                          {
+                            "color": {
+                              "xy": {
+                                "x": 0.1969,
+                                "y": 0.0688
+                              }
+                            }
+                          }
+                        ],
+                        "mode": "interpolated_palette",
+                        "points_capable": 5,
+                        "mode_values": [
+                          "interpolated_palette",
+                          "interpolated_palette_mirrored",
+                          "random_pixelated"
+                        ],
+                        "pixel_count": 24
+                      },
+                      "effects_v2": {
+                        "action": {
+                          "effect_values": [
+                            "no_effect",
+                            "candle"
+                          ]
+                        },
+                        "status": {
+                          "effect": "no_effect",
+                          "effect_values": [
+                            "no_effect",
+                            "candle"
+                          ]
+                        }
+                      },
+                      "type": "light"
+                    }
+                  ]
+                }
+                """);
+        setGetResponse("/device", EMPTY_RESPONSE);
+
+        LightState lightState = getLightState("cb6f54e8-5071-478e-9c0a-949a51b117a2");
+
+        assertLightState(
+                lightState,
+                LightState.builder()
+                          .id("cb6f54e8-5071-478e-9c0a-949a51b117a2")
+                          .on(true)
+                          .brightness(20)
+                          .colorTemperature(null)
+                          .x(0.1969)
+                          .y(0.0688)
+                          .colormode(ColorMode.XY)
+                          .effect("none")
+                          .lightCapabilities(LightCapabilities.builder()
+                                                              .colorGamutType("C")
+                                                              .colorGamut(GAMUT_C)
+                                                              .ctMin(153)
+                                                              .ctMax(500)
+                                                              .gradientModes(List.of("interpolated_palette", "interpolated_palette_mirrored",
+                                                                      "random_pixelated"))
+                                                              .maxGradientPoints(5)
+                                                              .effects(List.of("candle"))
+                                                              .capabilities(EnumSet.of(Capability.GRADIENT, Capability.COLOR, Capability.COLOR_TEMPERATURE,
+                                                                      Capability.BRIGHTNESS, Capability.ON_OFF))
+                                                              .build()
+                          )
+                          .build()
+        );
+    }
+
+    @Test
     void getState_returnsLightState_effectActive_xyAsParameter() {
         setGetResponse("/light", """
                 {
@@ -2402,6 +2577,73 @@ class HueApiTest {
                         "active": "inactive"
                       },
                       "type": "scene"
+                    },
+                    {
+                      "id": "SCENE_6",
+                      "actions": [
+                        {
+                          "target": {
+                            "rid": "LIGHT_1",
+                            "rtype": "light"
+                          },
+                          "action": {
+                            "on": {
+                              "on": true
+                            },
+                            "gradient": {
+                              "points": [
+                                {
+                                  "color": {
+                                    "xy": {
+                                      "x": 0.15352,
+                                      "y": 0.06006
+                                    }
+                                  }
+                                },
+                                {
+                                  "color": {
+                                    "xy": {
+                                      "x": 0.15352,
+                                      "y": 0.06006
+                                    }
+                                  }
+                                },
+                                {
+                                  "color": {
+                                    "xy": {
+                                      "x": 0.15352,
+                                      "y": 0.06006
+                                    }
+                                  }
+                                }
+                              ],
+                              "mode": "interpolated_palette"
+                            }
+                          }
+                        },
+                        {
+                          "target": {
+                            "rid": "LIGHT_2",
+                            "rtype": "light"
+                          },
+                          "action": {
+                            "on": {
+                              "on": true
+                            }
+                          }
+                        }
+                      ],
+                      "metadata": {
+                        "name": "Scene_6"
+                      },
+                      "group": {
+                        "rid": "ZONE_ID",
+                        "rtype": "zone"
+                      },
+                      "status": {
+                        "active": "inactive"
+                      },
+                      "type": "scene"
                     }
                   ]
                 }
@@ -2632,6 +2874,18 @@ class HueApiTest {
                                                      ))
                                                      .mode("interpolated_palette")
                                                      .build()),
+                ScheduledLightState.builder()
+                                   .id("LIGHT_2")
+                                   .gamut(GAMUT_A)
+        );
+
+        // Collapses gradient with equal points to single color state
+        assertSceneLightStates("SCENE_6",
+                ScheduledLightState.builder()
+                                   .id("LIGHT_1")
+                                   .gamut(GAMUT_C)
+                                   .x(0.15352)
+                                   .y(0.06006),
                 ScheduledLightState.builder()
                                    .id("LIGHT_2")
                                    .gamut(GAMUT_A)

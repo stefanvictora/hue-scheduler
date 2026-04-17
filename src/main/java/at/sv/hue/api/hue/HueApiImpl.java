@@ -740,13 +740,19 @@ public final class HueApiImpl implements HueApi {
         }
         if (action.getGradient() != null) {
             Action.Gradient gradient = action.getGradient();
-            List<Pair<Double, Double>> points = gradient.getPoints()
-                                                        .stream()
-                                                        .map(point ->
-                                                                Pair.of(point.getColor().getXy().getX(),
-                                                                        point.getColor().getXy().getY()))
-                                                        .toList();
-            state.gradient(new Gradient(points, gradient.getMode()));
+            if (gradient.getPoints().stream().distinct().count() == 1) {
+                XY xy = gradient.getPoints().getFirst().getColor().getXy();
+                state.x(xy.getX());
+                state.y(xy.getY());
+            } else {
+                List<Pair<Double, Double>> points = gradient.getPoints()
+                                                            .stream()
+                                                            .map(point ->
+                                                                    Pair.of(point.getColor().getXy().getX(),
+                                                                            point.getColor().getXy().getY()))
+                                                            .toList();
+                state.gradient(new Gradient(points, gradient.getMode()));
+            }
         }
         // todo: transition time?
         return state.build();

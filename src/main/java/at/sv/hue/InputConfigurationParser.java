@@ -163,10 +163,15 @@ public final class InputConfigurationParser {
                                            .map(point -> parseColorValue(point, capabilities))
                                            .map(color -> Pair.of(color.x(), color.y()))
                                            .toList();
-                        gradient = Gradient.builder()
-                                           .points(points)
-                                           .mode(m.group("mode"))
-                                           .build();
+                        if (points.stream().distinct().count() == 1) {
+                            x = points.getFirst().first();
+                            y = points.getFirst().second();
+                        } else {
+                            gradient = Gradient.builder()
+                                               .points(points)
+                                               .mode(m.group("mode"))
+                                               .build();
+                        }
                         break;
                     case "effect":
                         value = value.trim();
