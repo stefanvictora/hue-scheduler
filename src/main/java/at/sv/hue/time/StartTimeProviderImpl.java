@@ -30,6 +30,77 @@ public final class StartTimeProviderImpl implements StartTimeProvider {
     }
 
     @Override
+    public void validate(String input) {
+        try {
+            validateExpression(input);
+        } catch (InvalidStartTimeExpression e) {
+            throw e;
+        } catch (Exception e) {
+            throw new InvalidStartTimeExpression("Failed to parse start time expression '" + input + "': " + e.getMessage());
+        }
+    }
+
+    private void validateExpression(String input) {
+        LocalTime time = tryParseTimeString(input);
+        if (time != null) {
+            return;
+        }
+        if (isFunctionExpression(input)) {
+            validateFunctionExpression(input);
+            return;
+        }
+        if (isOffsetExpression(input)) {
+            validateOffsetExpression(input);
+            return;
+        }
+        assertSunKeyword(input);
+    }
+
+    private void validateFunctionExpression(String input) {
+        String normalizedInput = input.trim();
+        int openParen = normalizedInput.indexOf('(');
+        int closeParen = normalizedInput.lastIndexOf(')');
+        String functionName = normalizedInput.substring(0, openParen).trim().toLowerCase(Locale.ENGLISH);
+        String argString = normalizedInput.substring(openParen + 1, closeParen);
+        List<String> args = splitFunctionArguments(argString);
+
+        switch (functionName) {
+            case "notbefore", "notafter", "max", "min" -> {
+                requireArgCount(functionName, args, 2);
+                validateExpression(args.get(0).trim());
+                validateExpression(args.get(1).trim());
+            }
+            case "clamp" -> {
+                requireArgCount(functionName, args, 3);
+                validateExpression(args.get(0).trim());
+                validateExpression(args.get(1).trim());
+                validateExpression(args.get(2).trim());
+            }
+            case "mix" -> {
+                requireArgCount(functionName, args, 3);
+                validateExpression(args.get(0).trim());
+                validateExpression(args.get(1).trim());
+                parseMixWeight(args.get(2).trim());
+            }
+            case "smooth" -> {
+                requireArgCount(functionName, args, 2);
+                validateExpression(args.get(0).trim());
+                parseHalfLifeDays(args.get(1).trim());
+            }
+            default -> throw new InvalidStartTimeExpression("Unknown function: '" + functionName + "'");
+        }
+    }
+
+    private void validateOffsetExpression(String input) {
+        String[] parts = input.split("[+-]", 2);
+        if (parts.length != 2 || parts[1].trim().isEmpty()) {
+            throw new InvalidStartTimeExpression("Invalid offset expression: '" + input + "'");
+        }
+        assertSunKeyword(parts[0].trim());
+        parseOffset(parts[1].trim());
+    }
+
+    @Override
     public ZonedDateTime getStart(String input, ZonedDateTime dateTime) {
         try {
             LocalTime time = tryParseTimeString(input);
@@ -239,19 +310,20 @@ public final class StartTimeProviderImpl implements StartTimeProvider {
             throw new InvalidStartTimeExpression("Invalid offset expression: '" + input + "'");
         }
         ZonedDateTime startTime = parseSunKeywords(parts[0].trim(), dateTime);
-        String offsetString = parts[1].trim();
-        Matcher matcher = OFFSET_PATTERN.matcher(offsetString);
-        Duration offset;
-        if (matcher.matches()) {
-            offset = parseOffset(matcher);
-        } else {
-            offset = Duration.ofMinutes(Integer.parseInt(offsetString));
-        }
+        Duration offset = parseOffset(parts[1].trim());
         if (input.contains("+")) {
             return startTime.plus(offset);
         } else {
             return startTime.minus(offset);
         }
+    }
+
+    private static Duration parseOffset(String offsetString) {
+        Matcher matcher = OFFSET_PATTERN.matcher(offsetString);
+        if (matcher.matches()) {
+            return parseOffset(matcher);
+        }
+        return Duration.ofMinutes(Integer.parseInt(offsetString));
     }
 
     private static Duration parseOffset(Matcher matcher) {
@@ -281,6 +353,20 @@ public final class StartTimeProviderImpl implements StartTimeProvider {
             case "astronomical_end", "astronomical_dusk" -> sunTimesProvider.getAstronomicalEnd(dateTime);
             default -> throw new IllegalArgumentException("Invalid sun keyword: '" + input + "'");
         };
+    }
+
+    private static void assertSunKeyword(String input) {
+        switch (input.toLowerCase(Locale.ENGLISH)) {
+            case "astronomical_start", "astronomical_dawn",
+                 "nautical_start", "nautical_dawn",
+                 "civil_start", "civil_dawn",
+                 "sunrise", "noon", "golden_hour", "sunset", "blue_hour",
+                 "civil_end", "civil_dusk", "night_hour",
+                 "nautical_end", "nautical_dusk",
+                 "astronomical_end", "astronomical_dusk" -> {
+            }
+            default -> throw new InvalidStartTimeExpression("Invalid sun keyword: '" + input + "'");
+        }
     }
 
     @Override

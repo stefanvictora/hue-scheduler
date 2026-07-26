@@ -1,8 +1,11 @@
 package at.sv.hue;
 
+import at.sv.hue.time.StartTimeProvider;
 import lombok.Builder;
 
 import java.time.LocalTime;
+import java.time.DayOfWeek;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -27,10 +30,6 @@ public final class SceneNameParser {
             "astronomical_end", "astronomical_dusk"
     );
 
-    private static final Set<String> FUNCTION_KEYWORDS = Set.of(
-            "max(", "min(", "mix(", "notBefore(", "notAfter(", "clamp("
-    );
-
     // Alternative absolute-time format patterns (all digit-starting, normalised to HH:mm)
     private static final Pattern TIME_H_MM = Pattern.compile("^(\\d{1,2}):(\\d{2})$");
     private static final Pattern TIME_H_DOT_MM = Pattern.compile("^(\\d{1,2})\\.(\\d{2})$");
@@ -41,6 +40,7 @@ public final class SceneNameParser {
     private static final Pattern TIME_H_UHR = Pattern.compile("^(\\d{1,2})\\s*uhr$", Pattern.CASE_INSENSITIVE);
     private static final Pattern TIME_H_MM_UHR = Pattern.compile("^(\\d{1,2}):(\\d{2})\\s*uhr$", Pattern.CASE_INSENSITIVE);
     private static final Pattern TIME_H_DOT_MM_UHR = Pattern.compile("^(\\d{1,2})\\.(\\d{2})\\s*uhr$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern FUNCTION_EXPRESSION_PREFIX = Pattern.compile("^[A-Za-z][A-Za-z0-9_]*\\s*\\(");
 
     private static final List<Map.Entry<Pattern, String>> ALIASES = List.of(
             // English friendly forms (space-separated; single-word forms already work via SUN_KEYWORDS)
@@ -87,9 +87,10 @@ public final class SceneNameParser {
     /**
      * Parses a Hue scene name into a scheduled time expression and optional flags.
      *
-     * @return a {@link ParseResult}, or {@code null} if the name is not a valid schedule pattern
+     * @return a {@link ParseResult}, or {@code null} if the name is an ordinary, non-scheduled scene name
+     * @throws InvalidSceneSchedule if the name has a recognizable schedule form but its expression or flags are invalid
      */
-    public static ParseResult parse(String sceneName) {
+    public static ParseResult parse(String sceneName, StartTimeProvider startTimeProvider) {
         if (sceneName == null || sceneName.isEmpty()) {
             return null;
         }
@@ -101,9 +102,10 @@ public final class SceneNameParser {
         if (timeExpr == null) {
             return null;
         }
+        validateTimeExpression(timeExpr, startTimeProvider);
         ParseResult.ParseResultBuilder builder = ParseResult.builder();
         builder.timeExpression(timeExpr);
-        parseFlags(parts.flags(), builder);
+        parseFlags(parts.flags(), builder, startTimeProvider);
         return builder.build();
     }
 
@@ -111,7 +113,11 @@ public final class SceneNameParser {
         int bracketIndex = sceneName.indexOf('[');
         if (bracketIndex >= 0) {
             if (!sceneName.endsWith("]")) {
-                return null;
+                String possibleTimeExpression = sceneName.substring(0, bracketIndex).trim();
+                if (normalizeTimeExpression(possibleTimeExpression) == null) {
+                    return null;
+                }
+                throw new InvalidSceneSchedule("Unclosed scene schedule flag list");
             }
             String timeExpr = sceneName.substring(0, bracketIndex).trim();
             String flagsPart = sceneName.substring(bracketIndex + 1, sceneName.length() - 1);
@@ -121,7 +127,7 @@ public final class SceneNameParser {
     }
 
     /**
-     * Normalizes the time expression to a canonical form, or returns {@code null} if invalid.
+     * Normalizes the time expression to a canonical form, or returns {@code null} if it is not a schedule expression.
      * Handles absolute times (various formats), functions, sun keyword aliases, and offset expressions.
      */
     private static String normalizeTimeExpression(String expr) {
@@ -134,13 +140,15 @@ public final class SceneNameParser {
         if (Character.isDigit(expr.charAt(0))) {
             return normalizeAbsoluteTime(expr);
         }
-        return normalizeSunExpression(expr);
+        String normalized = normalizeSunExpression(expr);
+        if (normalized == null && Character.isLetter(expr.charAt(0)) && expr.contains("(")) {
+            throw new InvalidSceneSchedule("Invalid schedule expression '" + expr + "'");
+        }
+        return normalized;
     }
 
     private static boolean isFunctionExpression(String expr) {
-        return FUNCTION_KEYWORDS.stream()
-                                .map(String::toLowerCase)
-                                .anyMatch(keyword -> expr.toLowerCase(Locale.ROOT).startsWith(keyword));
+        return FUNCTION_EXPRESSION_PREFIX.matcher(expr).find();
     }
 
     /**
@@ -154,7 +162,7 @@ public final class SceneNameParser {
         }
         LocalTime t = parseAlternativeTime(expr);
         if (t == null) {
-            return null;
+            throw new InvalidSceneSchedule("Invalid schedule time '" + expr + "'");
         }
         return String.format("%02d:%02d", t.getHour(), t.getMinute());
     }
@@ -256,12 +264,13 @@ public final class SceneNameParser {
     private static int getOperatorIndex(String expr) {
         int plusIndex = expr.indexOf('+');
         int minusIndex = expr.indexOf('-');
-        if (plusIndex >= 0) {
-            return plusIndex;
-        } else if (minusIndex >= 0) {
+        if (plusIndex < 0) {
             return minusIndex;
         }
-        return -1;
+        if (minusIndex < 0) {
+            return plusIndex;
+        }
+        return Math.min(plusIndex, minusIndex);
     }
 
     private static String mapAlias(String keyword) {
@@ -273,7 +282,16 @@ public final class SceneNameParser {
         return null;
     }
 
-    private static void parseFlags(String flags, ParseResult.ParseResultBuilder builder) {
+    private static void validateTimeExpression(String expression, StartTimeProvider startTimeProvider) {
+        try {
+            startTimeProvider.validate(expression);
+        } catch (Exception e) {
+            throw new InvalidSceneSchedule("Invalid schedule expression '" + expression + "': " + e.getMessage(), e);
+        }
+    }
+
+    private static void parseFlags(String flags, ParseResult.ParseResultBuilder builder,
+                                   StartTimeProvider startTimeProvider) {
         if (flags == null || flags.isEmpty()) {
             return;
         }
@@ -282,18 +300,62 @@ public final class SceneNameParser {
             if (flag.equals("i")) {
                 builder.interpolate(Boolean.TRUE);
             } else if (flag.startsWith("tr-b:")) {
-                builder.transitionTimeBefore(flag.substring("tr-b:".length()));
+                String value = requireFlagValue(flag, "tr-b:");
+                validateTransitionTimeBefore(value, startTimeProvider);
+                builder.transitionTimeBefore(value);
             } else if (flag.startsWith("tr:")) {
-                builder.transitionTime(flag.substring("tr:".length()));
-            } else if (flag.startsWith("days:")) {
-                builder.daysOfWeek(flag.substring("days:".length()).replace(";", ","));
+                String value = requireFlagValue(flag, "tr:");
+                validateTransitionTime(value);
+                builder.transitionTime(value);
+            } else if (flag.startsWith("d:")) {
+                String value = requireFlagValue(flag, "d:").replace(";", ",");
+                validateDaysOfWeek(value);
+                builder.daysOfWeek(value);
             } else if (flag.equals("f")) {
                 builder.forced(Boolean.TRUE);
             } else if (flag.equals("off")) {
                 builder.on(Boolean.FALSE);
             } else if (flag.equals("on")) {
                 builder.on(Boolean.TRUE);
+            } else {
+                throw new InvalidSceneSchedule("Unknown scene schedule flag '" + flag + "'");
             }
+        }
+    }
+
+    private static String requireFlagValue(String flag, String prefix) {
+        String value = flag.substring(prefix.length()).trim();
+        if (value.isEmpty()) {
+            throw new InvalidSceneSchedule("Scene schedule flag '" + prefix.substring(0, prefix.length() - 1) +
+                                           "' requires a value");
+        }
+        return value;
+    }
+
+    private static void validateTransitionTime(String value) {
+        try {
+            InputConfigurationParser.parseTransitionTime("tr", value);
+        } catch (Exception e) {
+            throw new InvalidSceneSchedule("Invalid transition time '" + value + "'", e);
+        }
+    }
+
+    private static void validateTransitionTimeBefore(String value, StartTimeProvider startTimeProvider) {
+        try {
+            InputConfigurationParser.parseTransitionTime("tr-b", value);
+        } catch (Exception ignored) {
+            validateTimeExpression(value, startTimeProvider);
+        }
+    }
+
+    private static void validateDaysOfWeek(String value) {
+        try {
+            if (value.startsWith(",") || value.endsWith(",") || value.contains(",,")) {
+                throw new InvalidPropertyValue("Empty day restriction segment");
+            }
+            DayOfWeeksParser.parseDayOfWeeks(value, EnumSet.noneOf(DayOfWeek.class));
+        } catch (Exception e) {
+            throw new InvalidSceneSchedule("Invalid day restriction '" + value.replace(",", ";") + "'", e);
         }
     }
 }

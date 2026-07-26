@@ -89,7 +89,7 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
 
         migrateInputToScenes();
 
-        assertSceneUpdate("/groups/9", "12:00 [Mo]",
+        assertSceneUpdate("/groups/9", "12:00 [d:Mo]",
                 expectedPutCall(1).bri(254),
                 expectedPutCall(2).bri(254)
         );
@@ -104,7 +104,7 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
 
         migrateInputToScenes();
 
-        assertSceneUpdate("/groups/9", "12:00 [Mo-Th]",
+        assertSceneUpdate("/groups/9", "12:00 [d:Mo-Th]",
                 expectedPutCall(1).bri(254),
                 expectedPutCall(2).bri(254)
         );
@@ -119,7 +119,7 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
 
         migrateInputToScenes();
 
-        assertSceneUpdate("/groups/9", "12:00 [Mo-Th;Su]",
+        assertSceneUpdate("/groups/9", "12:00 [d:Mo-Th;Su]",
                 expectedPutCall(1).bri(254),
                 expectedPutCall(2).bri(254)
         );
@@ -134,7 +134,7 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
 
         migrateInputToScenes();
 
-        assertSceneUpdate("/groups/9", "12:00 [Mo-We;Fr-Sa]",
+        assertSceneUpdate("/groups/9", "12:00 [d:Mo-We;Fr-Sa]",
                 expectedPutCall(1).bri(254),
                 expectedPutCall(2).bri(254)
         );
@@ -149,7 +149,7 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
 
         migrateInputToScenes();
 
-        assertSceneUpdate("/groups/9", "12:00 [Sa-Su]",
+        assertSceneUpdate("/groups/9", "12:00 [d:Sa-Su]",
                 expectedPutCall(1).bri(254),
                 expectedPutCall(2).bri(254)
         );
@@ -164,7 +164,7 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
 
         migrateInputToScenes();
 
-        assertSceneUpdate("/groups/9", "12:00 [Mo-Tu;Su]",
+        assertSceneUpdate("/groups/9", "12:00 [d:Mo-Tu;Su]",
                 expectedPutCall(1).bri(254),
                 expectedPutCall(2).bri(254)
         );
@@ -179,7 +179,7 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
 
         migrateInputToScenes();
 
-        assertSceneUpdate("/groups/9", "12:00 [i,Mo-Th]",
+        assertSceneUpdate("/groups/9", "12:00 [i,d:Mo-Th]",
                 expectedPutCall(1).bri(203),
                 expectedPutCall(2).bri(203)
         );
@@ -402,7 +402,7 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
                                    .id("/lights/5")
                                    .bri(254)
                                    .ct(40));
-        Identifier scene3 = mockSceneLightStates(1, "12:00 [days:Di;Mi]",
+        Identifier scene3 = mockSceneLightStates(1, "12:00 [d:Di;Mi]",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(200)
@@ -828,7 +828,7 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
 
         ScheduledRunnable nextDayRunnable = ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusHours(7)); // next day
 
-        Identifier updatedScene2 = mockSceneLightStates(1, 2, "INVALID_NAME",
+        Identifier updatedScene2 = mockSceneLightStates(1, 2, "sunrise+foo",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(120),

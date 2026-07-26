@@ -648,10 +648,22 @@ public final class HueApiImpl implements HueApi {
         return new Action.GradientPoint(new Color(new XY(pair.first(), pair.second())));
     }
 
-    private static boolean actionsDiffer(Scene scene, List<SceneAction> actions) {
-        List<SceneAction> currentActions = scene.getActions();
-        return !actions.stream().allMatch(action -> currentActions.stream().anyMatch(
-                current -> sceneActionsMatch(current, action)));
+    static boolean actionsDiffer(Scene scene, List<SceneAction> actions) {
+        List<SceneAction> unmatchedCurrentActions = new ArrayList<>(scene.getActions());
+        for (SceneAction action : actions) {
+            int matchIndex = -1;
+            for (int i = 0; i < unmatchedCurrentActions.size(); i++) {
+                if (sceneActionsMatch(unmatchedCurrentActions.get(i), action)) {
+                    matchIndex = i;
+                    break;
+                }
+            }
+            if (matchIndex < 0) {
+                return true;
+            }
+            unmatchedCurrentActions.remove(matchIndex);
+        }
+        return !unmatchedCurrentActions.isEmpty();
     }
 
     private static boolean sceneActionsMatch(SceneAction a, SceneAction b) {

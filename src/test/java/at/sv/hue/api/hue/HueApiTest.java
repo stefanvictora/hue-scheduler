@@ -7934,6 +7934,34 @@ class HueApiTest {
         api.putState(putCall);
     }
 
+    @Test
+    void actionsDiffer_requestedActionsAreStrictSubset_returnsTrue() {
+        Scene scene = new Scene(List.of(sceneAction("LIGHT_A", 50.0), sceneAction("LIGHT_B", 75.0)));
+
+        assertThat(HueApiImpl.actionsDiffer(scene, List.of(sceneAction("LIGHT_A", 50.0)))).isTrue();
+    }
+
+    @Test
+    void actionsDiffer_sameActionsInDifferentOrder_returnsFalse() {
+        Scene scene = new Scene(List.of(sceneAction("LIGHT_A", 50.0), sceneAction("LIGHT_B", 75.0)));
+
+        assertThat(HueApiImpl.actionsDiffer(scene,
+                List.of(sceneAction("LIGHT_B", 75.0), sceneAction("LIGHT_A", 50.0)))).isFalse();
+    }
+
+    @Test
+    void actionsDiffer_brightnessWithinTolerance_returnsFalse() {
+        Scene scene = new Scene(List.of(sceneAction("LIGHT_A", 50.0)));
+
+        assertThat(HueApiImpl.actionsDiffer(scene, List.of(sceneAction("LIGHT_A", 50.49)))).isFalse();
+        assertThat(HueApiImpl.actionsDiffer(scene, List.of(sceneAction("LIGHT_A", 50.5)))).isTrue();
+    }
+
+    private static SceneAction sceneAction(String lightId, double brightness) {
+        return new SceneAction(new ResourceReference(lightId, "light"),
+                Action.builder().on(new On(true)).dimming(new Dimming(brightness)).build());
+    }
+
     private void performGroupPutCall(PutCall putCall) {
         api.putGroupState(putCall);
     }

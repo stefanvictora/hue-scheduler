@@ -8,6 +8,7 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class StartTimeProviderTest {
@@ -592,5 +593,20 @@ class StartTimeProviderTest {
         // Regression test: smoothing must operate on time-of-day only.
         // Averaging epoch-seconds over past days would incorrectly shift the result date into the past.
         assertStart("smooth(07:00, 14d)", now.with(LocalTime.of(7, 0)));
+    }
+
+    @Test
+    void validate_acceptsCompleteExpressionGrammar_withoutEvaluating() {
+        assertDoesNotThrow(() -> provider.validate(
+                "clamp(smooth(mix(sunset+20, 21:15, 70%), 10d), max(18:30, sunset-15), 22:45)"));
+    }
+
+    @Test
+    void validate_rejectsMalformedOffsetsAndFunctions() {
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.validate("sunrise+"));
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.validate("sunrise+foo"));
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.validate("sunrise+1+2"));
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.validate("max("));
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.validate("max(sunrise,)"));
     }
 }

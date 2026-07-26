@@ -1,25 +1,33 @@
 package at.sv.hue;
 
+import at.sv.hue.time.StartTimeProvider;
+import at.sv.hue.time.StartTimeProviderImpl;
+import at.sv.hue.time.SunTimesProvider;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 
 class SceneNameParserTest {
+
+    private static final StartTimeProvider START_TIME_PROVIDER =
+            new StartTimeProviderImpl(mock(SunTimesProvider.class));
 
     // ---- null / empty / disabled ----
 
     @Test
     void parse_nullOrEmpty_isInvalid() {
-        assertInvalid(null);
-        assertInvalid("");
-        assertInvalid(" ");
+        assertIgnored(null);
+        assertIgnored("");
+        assertIgnored(" ");
     }
 
     @Test
     void parse_hashPrefix_isInvalid_disabled() {
-        assertInvalid("#07:00");
-        assertInvalid(" #07:00");
-        assertInvalid("# sunrise");
+        assertIgnored("#07:00");
+        assertIgnored(" #07:00");
+        assertIgnored("# sunrise");
     }
 
     // ---- HH:mm time expressions ----
@@ -34,8 +42,8 @@ class SceneNameParserTest {
 
     @Test
     void parse_invalidTime_isInvalid() {
-        assertInvalid("25:00");
-        assertInvalid("07:60");
+        assertRejected("25:00");
+        assertRejected("07:60");
     }
 
     // ---- Alternative absolute time formats ----
@@ -124,14 +132,14 @@ class SceneNameParserTest {
 
     @Test
     void parse_invalidAlternativeTimes_areInvalid() {
-        assertInvalid("13pm");
-        assertInvalid("12:60pm");
-        assertInvalid("0pm");
-        assertInvalid("24 Uhr");
-        assertInvalid("7");
-        assertInvalid("24h");
-        assertInvalid("7.60");
-        assertInvalid("24.00");
+        assertRejected("13pm");
+        assertRejected("12:60pm");
+        assertRejected("0pm");
+        assertRejected("24 Uhr");
+        assertRejected("7");
+        assertRejected("24h");
+        assertRejected("7.60");
+        assertRejected("24.00");
     }
 
     // ---- Sun keyword expressions ----
@@ -170,9 +178,9 @@ class SceneNameParserTest {
 
     @Test
     void parse_unknownKeyword_isInvalid() {
-        assertInvalid("Living Room");
-        assertInvalid("solar_noon");
-        assertInvalid("Bright");
+        assertIgnored("Living Room");
+        assertIgnored("solar_noon");
+        assertIgnored("Bright");
     }
 
     // ---- Offset expressions ----
@@ -186,22 +194,39 @@ class SceneNameParserTest {
 
     @Test
     void parse_invalidSunKeyword_withOffset_isInvalid() {
-        assertInvalid("solar_noon+10");
-        assertInvalid("something+30");
+        assertIgnored("solar_noon+10");
+        assertIgnored("something+30");
     }
 
-    // ---- Function expressions (not in scope) ----
+    @Test
+    void parse_knownSunKeyword_withMalformedOffset_isRejected() {
+        assertRejected("sunrise+");
+        assertRejected("sunrise+foo");
+        assertRejected("sunrise+1+2");
+        assertRejected("sunrise-1+2");
+    }
+
+    // ---- Function expressions ----
 
     @Test
     void parse_functionExpression_accepted_caseInsensitive() {
-        assertTimeExpression("max(sunrise,7:00)", "max(sunrise,7:00)");
-        assertTimeExpression("Max(sunrise,7:00)", "Max(sunrise,7:00)");
+        assertTimeExpression("max(sunrise,07:00)", "max(sunrise,07:00)");
+        assertTimeExpression("Max(sunrise,07:00)", "Max(sunrise,07:00)");
         assertTimeExpression("min(sunset,19:00)", "min(sunset,19:00)");
         assertTimeExpression("mix(sunrise,sunset,0.5)", "mix(sunrise,sunset,0.5)");
         assertTimeExpression("notBefore(sunrise,07:00)", "notBefore(sunrise,07:00)");
         assertTimeExpression("notAfter(sunset,19:00)", "notAfter(sunset,19:00)");
         assertTimeExpression("clamp(sunrise,06:00,08:00)", "clamp(sunrise,06:00,08:00)");
-        assertTimeExpression("clamp(NOT_FURTHER_VALIDATED)", "clamp(NOT_FURTHER_VALIDATED)");
+        assertTimeExpression("smooth(sunrise,14d)", "smooth(sunrise,14d)");
+    }
+
+    @Test
+    void parse_malformedFunctionExpression_isRejected() {
+        assertRejected("max(");
+        assertRejected("max(sunrise,)");
+        assertRejected("max(sunrise,7:00)");
+        assertRejected("clamp(NOT_FURTHER_VALIDATED)");
+        assertRejected("unknown(sunrise)");
     }
 
     // ---- Flags ----
@@ -253,7 +278,7 @@ class SceneNameParserTest {
 
     @Test
     void parse_additionalFlags_daysOfWeek_parsed() {
-        SceneNameParser.ParseResult result = parse("07:00 [days:Mo;Di;Mi-Fr]");
+        SceneNameParser.ParseResult result = parse("07:00 [d:Mo;Di;Mi-Fr]");
 
         assertThat(result).isNotNull();
         assertThat(result.daysOfWeek()).isEqualTo("Mo,Di,Mi-Fr");
@@ -266,15 +291,22 @@ class SceneNameParserTest {
     }
 
     @Test
-    void parse_unknownFlag_isIgnored() {
-        assertTimeExpression("07:00[x]", "07:00");
-        assertTimeExpression("07:00[force]", "07:00");
-        assertFlags("07:00[,i]", "07:00", null, null, true);
+    void parse_unknownOrMalformedFlag_isRejected() {
+        assertRejected("07:00[x]");
+        assertRejected("07:00[force]");
+        assertRejected("07:00[,i]");
+        assertRejected("07:00[days:Mo;Tu]");
+        assertRejected("07:00[d:Mo-Funday]");
+        assertRejected("07:00[d:Mo;]");
+        assertRejected("07:00[d:Mo;;Tu]");
+        assertRejected("07:00[tr:nonsense]");
+        assertRejected("07:00[tr-b:nonsense]");
     }
 
     @Test
     void parse_unclosedBracket_isInvalid() {
-        assertInvalid("07:00[i");
+        assertRejected("07:00[i");
+        assertIgnored("Living [Room");
     }
 
     // ---- German locale aliases ----
@@ -353,8 +385,13 @@ class SceneNameParserTest {
         assertFlags("Golden Hour[tr:5min]", "golden_hour", "5min", null, null);
     }
 
-    private static void assertInvalid(String sceneName) {
+    private static void assertIgnored(String sceneName) {
         assertThat(parse(sceneName)).isNull();
+    }
+
+    private static void assertRejected(String sceneName) {
+        assertThatThrownBy(() -> parse(sceneName))
+                .isInstanceOf(InvalidSceneSchedule.class);
     }
 
     private static void assertTimeExpression(String sceneName, String time) {
@@ -374,6 +411,6 @@ class SceneNameParserTest {
     }
 
     private static SceneNameParser.ParseResult parse(String sceneName) {
-        return SceneNameParser.parse(sceneName);
+        return SceneNameParser.parse(sceneName, START_TIME_PROVIDER);
     }
 }

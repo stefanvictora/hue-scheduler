@@ -142,7 +142,8 @@ public final class HueScheduler implements Runnable {
     @Option(names = "--migrate-input-to-scenes",
             defaultValue = "${env:MIGRATE_INPUT_TO_SCENES:-false}",
             description = "One-time migration for Philips Hue only: create scenes from config-file group states and exit. " +
-                          "Scene names use the start expression plus supported flags (i, tr-b, tr). Default: ${DEFAULT-VALUE}")
+                          "Scene names use the start expression plus supported flags (i, tr-b, tr, d, f, on, off). " +
+                          "Default: ${DEFAULT-VALUE}")
     boolean migrateInputToScenes;
     @Option(names = "--scene-sync-name",
             defaultValue = "${env:SCENE_SYNC_NAME:-Hue Scheduler}",
@@ -1291,7 +1292,7 @@ public final class HueScheduler implements Runnable {
         }
         String daysFlag = DayOfWeeksParser.formatDaysOfWeek(state.getDaysOfWeek());
         if (daysFlag != null) {
-            flags.add(daysFlag.replace(",", ";"));
+            flags.add("d:" + daysFlag.replace(",", ";"));
         }
         if (flags.isEmpty()) {
             return state.getStartString();
