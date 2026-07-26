@@ -76,11 +76,7 @@ public class SceneStateDiscoveryService implements SceneDiscoveryListener {
         Identifier identifier = api.getGroupIdForScene(scene.id());
         List<ScheduledLightState> sceneLightStates = api.getSceneLightStates(scene.id());
         List<String> groupLights = api.getGroupLights(identifier.id());
-        if (result.on() == Boolean.TRUE) {
-            sceneLightStates = InputConfigurationParser.turnOnIfNotOff(sceneLightStates);
-        } else if (result.on() == Boolean.FALSE) {
-            sceneLightStates = turnOff(sceneLightStates);
-        }
+        sceneLightStates = InputConfigurationParser.applyOnModifier(sceneLightStates, result.on());
         EnumSet<DayOfWeek> dayOfWeeks = EnumSet.noneOf(DayOfWeek.class);
         if (result.daysOfWeek() != null) {
             DayOfWeeksParser.parseDayOfWeeks(result.daysOfWeek(), dayOfWeeks);
@@ -90,12 +86,6 @@ public class SceneStateDiscoveryService implements SceneDiscoveryListener {
                 dayOfWeeks, startTimeProvider, minTrBeforeGapInMinutes, brightnessOverrideThreshold,
                 colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold, result.forced(), result.interpolate(),
                 true, false);
-    }
-
-    private static List<ScheduledLightState> turnOff(List<ScheduledLightState> sceneLightStates) {
-        return sceneLightStates.stream()
-                               .map(state -> ScheduledLightState.builder().id(state.getId()).on(false).build())
-                               .toList();
     }
 
     private static Integer parseTransitionTime(SceneNameParser.ParseResult result) {

@@ -449,6 +449,41 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
     }
 
     @Test
+    void autoSceneStates_offFlag_sceneReload_keepsAllLightsOff() {
+        enableAutoSceneStates();
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        Identifier scene = mockSceneLightStates(1, "00:00 [off]",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100)
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(50)
+                                   .ct(40));
+        mockGetAllScenes(scene);
+
+        List<ScheduledRunnable> states = startScheduler(
+                expectedRunnable(now, now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertGroupPutCalls(states.getFirst(),
+                expectedGroupPutCall(1).on(false)
+        );
+
+        ScheduledRunnable nextDayState = ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(2));
+
+        simulateSceneModified(1, "00:00 [off]");
+
+        advanceTimeAndRunAndAssertGroupPutCalls(nextDayState,
+                expectedGroupPutCall(1).on(false)
+        );
+
+        ensureRunnable(initialNow.plusDays(2), initialNow.plusDays(3));
+    }
+
+    @Test
     void autoSceneStates_onSceneDeleted_singleState_cancelsState() {
         enableAutoSceneStates();
         mockDefaultGroupCapabilities(1);
