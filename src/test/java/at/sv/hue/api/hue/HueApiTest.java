@@ -6510,6 +6510,28 @@ class HueApiTest {
         verify(resourceProviderMock, never()).postResource(any(), any());
         verify(resourceProviderMock, never()).putResource(any(), any());
 
+        // same state with transition time -> performs update
+
+        createOrUpdateScene("GROUPED_LIGHT", "SCENE",
+                PutCall.builder().id("CT_ONLY").ct(199).bri(254).transitionTime(30),
+                PutCall.builder().id("COLOR").ct(199).bri(254).transitionTime(30)
+        );
+
+        verify(resourceProviderMock).putResource(eq(getUrl("/scene/SCENE")), any());
+
+        Mockito.clearInvocations(resourceProviderMock);
+
+        // same state without transition time -> removes the previous transition time
+
+        createOrUpdateScene("GROUPED_LIGHT", "SCENE",
+                PutCall.builder().id("CT_ONLY").ct(199).bri(254),
+                PutCall.builder().id("COLOR").ct(199).bri(254)
+        );
+
+        verify(resourceProviderMock).putResource(eq(getUrl("/scene/SCENE")), any());
+
+        Mockito.clearInvocations(resourceProviderMock);
+
         // change ct -> performs update
 
         createOrUpdateScene("GROUPED_LIGHT", "SCENE",

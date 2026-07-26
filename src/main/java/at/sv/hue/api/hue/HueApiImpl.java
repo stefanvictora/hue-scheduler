@@ -499,6 +499,7 @@ public final class HueApiImpl implements HueApi {
         } else if (actionsDiffer(existingScene, actions)) {
             Scene updatedScene = getUpdatedScene(sceneSyncName, appdata, actions);
             updateScene(existingScene, updatedScene);
+            existingScene.setActions(actions);
             log.trace("Updated scene id={}", existingScene.getId());
             sceneId = existingScene.getId();
             modified = true;
