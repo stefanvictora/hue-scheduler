@@ -73,7 +73,7 @@ public class ScheduledStateRegistry {
                 .collect(Collectors.toList());
     }
 
-    public synchronized ScheduledStateSnapshot getNextStateAfter(ScheduledStateSnapshot currentState, ZonedDateTime definedStart) {
+    public ScheduledStateSnapshot getNextStateAfter(ScheduledStateSnapshot currentState, ZonedDateTime definedStart) {
         ZonedDateTime theDayAfter = definedStart.plusDays(1).truncatedTo(ChronoUnit.DAYS).withEarlierOffsetAtOverlap();
         return findStatesForId(currentState).stream()
                                             .flatMap(state -> Stream.of(state.getSnapshot(definedStart), state.getSnapshot(theDayAfter)))
@@ -116,7 +116,7 @@ public class ScheduledStateRegistry {
         }
     }
 
-    public synchronized List<GroupInfo> getAssignedGroups(ScheduledStateSnapshot state) {
+    public List<GroupInfo> getAssignedGroups(ScheduledStateSnapshot state) {
         List<String> groupLights = getGroupLights(state);
         List<GroupInfo> assignedGroups = getAssignedGroupsSortedBySizeDesc(groupLights);
         List<GroupInfo> additionalAreas = api.getAdditionalAreas(groupLights);
@@ -145,7 +145,7 @@ public class ScheduledStateRegistry {
      * @param dateTime the time for which to retrieve the active PutCall objects
      * @return a list of active PutCall objects corresponding to the provided light IDs
      */
-    public synchronized List<PutCall> getPutCalls(List<String> groupLights, ZonedDateTime dateTime) {
+    public List<PutCall> getPutCalls(List<String> groupLights, ZonedDateTime dateTime) {
         Map<String, PutCall> putCalls = getActivePutCallsFromGroups(groupLights, dateTime);
         findActivePutCalls(groupLights, dateTime).stream()
                                                  .flatMap(PutCalls::stream)
@@ -247,9 +247,15 @@ public class ScheduledStateRegistry {
                           .toList();
     }
 
-    public synchronized List<ScheduledStateSnapshot> findCurrentlyActiveStates() {
+    public List<ScheduledStateSnapshot> findCurrentlyActiveStates() {
         ZonedDateTime now = currentTime.get();
-        return lightStates.values().stream()
+        List<List<ScheduledState>> stateLists;
+        synchronized (this) {
+            stateLists = lightStates.values().stream()
+                                    .map(List::copyOf)
+                                    .toList();
+        }
+        return stateLists.stream()
                           .map(lightStatesForId -> findActiveSnapshot(lightStatesForId, now))
                           .flatMap(Optional::stream)
                           .toList();
