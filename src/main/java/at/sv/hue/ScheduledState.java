@@ -160,11 +160,10 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
     }
 
     public int parseTransitionTimeBeforeString(ZonedDateTime definedStart) {
-        try {
+        if (InputConfigurationParser.isTransitionTime(transitionTimeBeforeString)) {
             return InputConfigurationParser.parseTransitionTime("tr-before", transitionTimeBeforeString) * 100;
-        } catch (Exception e) {
-            return parseDateTimeBasedTransitionTime(definedStart);
         }
+        return parseDateTimeBasedTransitionTime(definedStart);
     }
 
     private int parseDateTimeBasedTransitionTime(ZonedDateTime definedStart) {

@@ -6,7 +6,6 @@ import at.sv.hue.time.SunTimesProvider;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 
 class SceneNameParserTest {
@@ -42,8 +41,8 @@ class SceneNameParserTest {
 
     @Test
     void parse_invalidTime_isInvalid() {
-        assertRejected("25:00");
-        assertRejected("07:60");
+        assertIgnored("25:00");
+        assertIgnored("07:60");
     }
 
     // ---- Alternative absolute time formats ----
@@ -132,14 +131,14 @@ class SceneNameParserTest {
 
     @Test
     void parse_invalidAlternativeTimes_areInvalid() {
-        assertRejected("13pm");
-        assertRejected("12:60pm");
-        assertRejected("0pm");
-        assertRejected("24 Uhr");
-        assertRejected("7");
-        assertRejected("24h");
-        assertRejected("7.60");
-        assertRejected("24.00");
+        assertIgnored("13pm");
+        assertIgnored("12:60pm");
+        assertIgnored("0pm");
+        assertIgnored("24 Uhr");
+        assertIgnored("7");
+        assertIgnored("24h");
+        assertIgnored("7.60");
+        assertIgnored("24.00");
     }
 
     // ---- Sun keyword expressions ----
@@ -199,11 +198,11 @@ class SceneNameParserTest {
     }
 
     @Test
-    void parse_knownSunKeyword_withMalformedOffset_isRejected() {
-        assertRejected("sunrise+");
-        assertRejected("sunrise+foo");
-        assertRejected("sunrise+1+2");
-        assertRejected("sunrise-1+2");
+    void parse_knownSunKeyword_withMalformedOffset_isIgnored() {
+        assertIgnored("sunrise+");
+        assertIgnored("sunrise+foo");
+        assertIgnored("sunrise+1+2");
+        assertIgnored("sunrise-1+2");
     }
 
     // ---- Function expressions ----
@@ -221,11 +220,11 @@ class SceneNameParserTest {
     }
 
     @Test
-    void parse_malformedFunctionExpression_isRejected() {
-        assertRejected("max(");
-        assertRejected("max(sunrise,)");
-        assertRejected("max(sunrise,7:00)");
-        assertRejected("clamp(NOT_FURTHER_VALIDATED)");
+    void parse_malformedFunctionExpression_isIgnored() {
+        assertIgnored("max(");
+        assertIgnored("max(sunrise,)");
+        assertIgnored("max(sunrise,7:00)");
+        assertIgnored("clamp(NOT_FURTHER_VALIDATED)");
         assertIgnored("unknown(sunrise)");
     }
 
@@ -296,21 +295,21 @@ class SceneNameParserTest {
     }
 
     @Test
-    void parse_unknownOrMalformedFlag_isRejected() {
-        assertRejected("07:00[x]");
-        assertRejected("07:00[force]");
-        assertRejected("07:00[,i]");
-        assertRejected("07:00[days:Mo;Tu]");
-        assertRejected("07:00[d:Mo-Funday]");
-        assertRejected("07:00[d:Mo;]");
-        assertRejected("07:00[d:Mo;;Tu]");
-        assertRejected("07:00[tr:nonsense]");
-        assertRejected("07:00[tr-b:nonsense]");
+    void parse_unknownOrMalformedFlag_isIgnored() {
+        assertIgnored("07:00[x]");
+        assertIgnored("07:00[force]");
+        assertIgnored("07:00[,i]");
+        assertIgnored("07:00[days:Mo;Tu]");
+        assertIgnored("07:00[d:Mo-Funday]");
+        assertIgnored("07:00[d:Mo;]");
+        assertIgnored("07:00[d:Mo;;Tu]");
+        assertIgnored("07:00[tr:nonsense]");
+        assertIgnored("07:00[tr-b:nonsense]");
     }
 
     @Test
     void parse_unclosedBracket_isInvalid() {
-        assertRejected("07:00[i");
+        assertIgnored("07:00[i");
         assertIgnored("Living [Room");
     }
 
@@ -392,11 +391,6 @@ class SceneNameParserTest {
 
     private static void assertIgnored(String sceneName) {
         assertThat(parse(sceneName)).isNull();
-    }
-
-    private static void assertRejected(String sceneName) {
-        assertThatThrownBy(() -> parse(sceneName))
-                .isInstanceOf(InvalidSceneSchedule.class);
     }
 
     private static void assertTimeExpression(String sceneName, String time) {

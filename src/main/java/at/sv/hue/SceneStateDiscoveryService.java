@@ -53,7 +53,7 @@ public class SceneStateDiscoveryService implements SceneDiscoveryListener {
     public void discoverSceneStates() {
         List<Identifier> scenes = api.getAllScenes();
         for (Identifier scene : scenes) {
-            SceneNameParser.ParseResult result = parseSceneName(scene);
+            SceneNameParser.ParseResult result = SceneNameParser.parse(scene.name(), startTimeProvider);
             if (result == null) {
                 continue;
             }
@@ -107,7 +107,7 @@ public class SceneStateDiscoveryService implements SceneDiscoveryListener {
         }
         log.debug("Scene '{}' created or renamed.", scene.name());
         String affectedGroup = removeAffectedStates(sceneId);
-        SceneNameParser.ParseResult result = parseSceneName(scene);
+        SceneNameParser.ParseResult result = SceneNameParser.parse(scene.name(), startTimeProvider);
         if (result != null) {
             log.info("Creating new state for scene '{}'.", scene.name());
             String createdGroup = tryCreateAndAddScheduledState(scene, result);
@@ -120,15 +120,6 @@ public class SceneStateDiscoveryService implements SceneDiscoveryListener {
         }
         log.debug("Rescheduling states for group '{}'.", affectedGroup);
         rescheduleGroupStates(affectedGroup);
-    }
-
-    private SceneNameParser.ParseResult parseSceneName(Identifier scene) {
-        try {
-            return SceneNameParser.parse(scene.name(), startTimeProvider);
-        } catch (InvalidSceneSchedule e) {
-            log.warn("Ignoring invalid scene schedule '{}': {}", scene.name(), e.getMessage());
-            return null;
-        }
     }
 
     @Override

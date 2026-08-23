@@ -392,6 +392,10 @@ public final class InputConfigurationParser {
         }
     }
 
+    static boolean isTransitionTime(String value) {
+        return TR_PATTERN.matcher(value).matches();
+    }
+
     public static int parseTransitionTime(String parameter, String s) {
         Matcher matcher = TR_PATTERN.matcher(s);
         if (!matcher.matches()) {

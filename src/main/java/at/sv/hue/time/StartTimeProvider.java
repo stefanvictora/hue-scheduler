@@ -4,11 +4,9 @@ import java.time.ZonedDateTime;
 
 public interface StartTimeProvider {
     /**
-     * Validates a start time expression without resolving it for a specific date.
-     *
-     * @throws InvalidStartTimeExpression if the input is not a supported start time expression
+     * Returns whether the input is a supported start time expression without resolving it for a specific date.
      */
-    void validate(String input);
+    boolean isValid(String input);
 
     /**
      * @param input    one of the following start time expressions:

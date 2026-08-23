@@ -9,7 +9,6 @@ import java.time.ZonedDateTime;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class StartTimeProviderTest {
@@ -603,19 +602,20 @@ class StartTimeProviderTest {
     }
 
     @Test
-    void validate_acceptsCompleteExpressionGrammar_withoutEvaluating() {
-        assertDoesNotThrow(() -> provider.validate(
-                "clamp(smooth(mix(sunset+20, 21:15, 70%), 10d), max(18:30, sunset-15), 22:45)"));
+    void isValid_acceptsCompleteExpressionGrammar_withoutEvaluating() {
+        assertThat(provider.isValid(
+                "clamp(smooth(mix(sunset+20, 21:15, 70%), 10d), max(18:30, sunset-15), 22:45)"))
+                .isTrue();
         assertThat(sunriseCalls).hasValue(0);
         assertThat(sunsetCalls).hasValue(0);
     }
 
     @Test
-    void validate_rejectsMalformedOffsetsAndFunctions() {
-        assertThrows(InvalidStartTimeExpression.class, () -> provider.validate("sunrise+"));
-        assertThrows(InvalidStartTimeExpression.class, () -> provider.validate("sunrise+foo"));
-        assertThrows(InvalidStartTimeExpression.class, () -> provider.validate("sunrise+1+2"));
-        assertThrows(InvalidStartTimeExpression.class, () -> provider.validate("max("));
-        assertThrows(InvalidStartTimeExpression.class, () -> provider.validate("max(sunrise,)"));
+    void isValid_rejectsMalformedOffsetsAndFunctions() {
+        assertThat(provider.isValid("sunrise+")).isFalse();
+        assertThat(provider.isValid("sunrise+foo")).isFalse();
+        assertThat(provider.isValid("sunrise+1+2")).isFalse();
+        assertThat(provider.isValid("max(")).isFalse();
+        assertThat(provider.isValid("max(sunrise,)")).isFalse();
     }
 }

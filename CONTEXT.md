@@ -13,12 +13,8 @@ An optional constraint limiting the days of the week on which a schedule is elig
 _Avoid_: Weekday flag, days flag
 
 **Scene Schedule**:
-A Hue scene whose name contains a schedule expression that the scheduler can evaluate. A scene name with an invalid expression is not a Scene Schedule.
+A Hue scene whose name contains a valid schedule expression and optional flags that the scheduler can evaluate. A name that cannot be parsed is treated as an ordinary scene name.
 _Avoid_: Scheduled scene, parseable scene
-
-**Scene Schedule Candidate**:
-A Hue scene whose name has the recognizable form of a Scene Schedule but contains an invalid schedule expression or flag. It is rejected with a diagnostic rather than treated as an ordinary scene.
-_Avoid_: Broken schedule, malformed scene
 
 **Scene Recall**:
 Applying the complete stored action set of a Hue scene. A Scene Recall is equivalent to a requested state only when their action targets and payloads match, regardless of ordering.
