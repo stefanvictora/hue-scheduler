@@ -291,16 +291,15 @@ public final class InputConfigurationParser {
         return applyOnModifier(lightStates, onModifier);
     }
 
-    public static List<ScheduledLightState> applyOnModifier(List<ScheduledLightState> scheduledLightStates,
-                                                             Boolean onModifier) {
+    public static List<ScheduledLightState> applyOnModifier(List<ScheduledLightState> lightStates, Boolean onModifier) {
         if (onModifier == Boolean.TRUE) {
-            return turnOnIfNotOff(scheduledLightStates);
+            return turnOnIfNotOff(lightStates);
         } else if (onModifier == Boolean.FALSE) {
-            return scheduledLightStates.stream()
-                                       .map(state -> ScheduledLightState.builder().id(state.getId()).on(false).build())
-                                       .toList();
+            return lightStates.stream()
+                              .map(state -> ScheduledLightState.builder().id(state.getId()).on(false).build())
+                              .toList();
         }
-        return scheduledLightStates;
+        return lightStates;
     }
 
     private static List<ScheduledLightState> scaleBrightness(Integer targetBrightness, List<ScheduledLightState> scheduledLightStates) {
