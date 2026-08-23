@@ -40,7 +40,11 @@ public final class SceneNameParser {
     private static final Pattern TIME_H_UHR = Pattern.compile("^(\\d{1,2})\\s*uhr$", Pattern.CASE_INSENSITIVE);
     private static final Pattern TIME_H_MM_UHR = Pattern.compile("^(\\d{1,2}):(\\d{2})\\s*uhr$", Pattern.CASE_INSENSITIVE);
     private static final Pattern TIME_H_DOT_MM_UHR = Pattern.compile("^(\\d{1,2})\\.(\\d{2})\\s*uhr$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern FUNCTION_EXPRESSION_PREFIX = Pattern.compile("^[A-Za-z][A-Za-z0-9_]*\\s*\\(");
+    private static final Pattern FUNCTION_EXPRESSION_PREFIX = Pattern.compile("^([A-Za-z][A-Za-z0-9_]*)\\s*\\(");
+    // Keep aligned with the supported functions in StartTimeProviderImpl.
+    private static final Set<String> SUPPORTED_FUNCTION_NAMES = Set.of(
+            "notbefore", "notafter", "clamp", "min", "max", "mix", "smooth"
+    );
 
     private static final List<Map.Entry<Pattern, String>> ALIASES = List.of(
             // English friendly forms (space-separated; single-word forms already work via SUN_KEYWORDS)
@@ -141,14 +145,12 @@ public final class SceneNameParser {
             return normalizeAbsoluteTime(expr);
         }
         String normalized = normalizeSunExpression(expr);
-        if (normalized == null && Character.isLetter(expr.charAt(0)) && expr.contains("(")) {
-            throw new InvalidSceneSchedule("Invalid schedule expression '" + expr + "'");
-        }
         return normalized;
     }
 
     private static boolean isFunctionExpression(String expr) {
-        return FUNCTION_EXPRESSION_PREFIX.matcher(expr).find();
+        Matcher matcher = FUNCTION_EXPRESSION_PREFIX.matcher(expr);
+        return matcher.find() && SUPPORTED_FUNCTION_NAMES.contains(matcher.group(1).toLowerCase(Locale.ENGLISH));
     }
 
     /**

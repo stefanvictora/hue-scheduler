@@ -226,7 +226,12 @@ class SceneNameParserTest {
         assertRejected("max(sunrise,)");
         assertRejected("max(sunrise,7:00)");
         assertRejected("clamp(NOT_FURTHER_VALIDATED)");
-        assertRejected("unknown(sunrise)");
+        assertIgnored("unknown(sunrise)");
+    }
+
+    @Test
+    void parse_ordinaryParenthesizedSceneName_isIgnored() {
+        assertIgnored("Dinner (kids)");
     }
 
     // ---- Flags ----
