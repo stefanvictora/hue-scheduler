@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -33,6 +34,8 @@ class StartTimeProviderTest {
     private ZonedDateTime twoDaysAgo;
     private ZonedDateTime previousDaySunrise;
     private ZonedDateTime twoDaysAgoSunrise;
+    private AtomicInteger sunriseCalls;
+    private AtomicInteger sunsetCalls;
 
     private void assertStart(String input, ZonedDateTime time) {
         assertStart(input, now, time);
@@ -56,6 +59,8 @@ class StartTimeProviderTest {
         nextDaySunrise = now.with(LocalTime.of(7, 10));
         previousDaySunrise = now.with(LocalTime.of(6, 0));
         twoDaysAgoSunrise = now.with(LocalTime.of(8, 0));
+        sunriseCalls = new AtomicInteger();
+        sunsetCalls = new AtomicInteger();
         goldenHour = now.with(LocalTime.of(15, 0));
         sunset = now.with(LocalTime.of(16, 0));
         blueHour = now.with(LocalTime.of(16, 15));
@@ -66,6 +71,7 @@ class StartTimeProviderTest {
         provider = new StartTimeProviderImpl(new SunTimesProvider() {
             @Override
             public ZonedDateTime getSunrise(ZonedDateTime dateTime) {
+                sunriseCalls.incrementAndGet();
                 if (dateTime.equals(nextDay)) {
                     return nextDaySunrise;
                 } else if (dateTime.equals(previousDay)) {
@@ -84,6 +90,7 @@ class StartTimeProviderTest {
 
             @Override
             public ZonedDateTime getSunset(ZonedDateTime dateTime) {
+                sunsetCalls.incrementAndGet();
                 return sunset;
             }
 
@@ -599,6 +606,8 @@ class StartTimeProviderTest {
     void validate_acceptsCompleteExpressionGrammar_withoutEvaluating() {
         assertDoesNotThrow(() -> provider.validate(
                 "clamp(smooth(mix(sunset+20, 21:15, 70%), 10d), max(18:30, sunset-15), 22:45)"));
+        assertThat(sunriseCalls).hasValue(0);
+        assertThat(sunsetCalls).hasValue(0);
     }
 
     @Test

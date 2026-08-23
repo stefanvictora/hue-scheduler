@@ -577,7 +577,7 @@ public class AbstractHueSchedulerTest {
         List<ScheduledLightState> states = Arrays.stream(builder)
                                                  .map(ScheduledLightState.ScheduledLightStateBuilder::build)
                                                  .toList();
-        String sceneIdStr = "/scenes/" + groupId + "/" + sceneId;
+        String sceneIdStr = sceneId(groupId, sceneId);
         when(mockedHueApi.getSceneId("/groups/" + groupId, sceneName)).thenReturn(sceneIdStr);
         when(mockedHueApi.getSceneLightStates(sceneIdStr)).thenReturn(states);
         when(mockedHueApi.getGroupIdForScene(sceneIdStr)).thenReturn(new Identifier("/groups/" + groupId, "Group Name"));
@@ -660,7 +660,11 @@ public class AbstractHueSchedulerTest {
     }
 
     private static String getSceneId(int groupId, String sceneName) {
-        return "/scenes/" + groupId + "/" + sceneName.hashCode();
+        return sceneId(groupId, sceneName.hashCode());
+    }
+
+    private static String sceneId(int groupId, Object sceneKey) {
+        return "/scenes/" + groupId + "/" + sceneKey;
     }
 
     /* API Assertions */

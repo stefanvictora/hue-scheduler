@@ -74,6 +74,10 @@ public interface HueApi extends ResourceModificationEventListener {
     void putGroupState(PutCall putCall);
 
     /**
+     * @param groupId  the group ID whose scene is being updated
+     * @param sceneId  {@code null} if the state has no source scene; otherwise may identify an existing scene,
+     *                 which implementations may handle differently
+     * @param putCalls the light state updates to apply
      * @throws ApiFailure if the api call failed
      */
     void putSceneState(String groupId, String sceneId, List<PutCall> putCalls);

@@ -41,6 +41,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -6517,7 +6518,52 @@ class HueApiTest {
                 PutCall.builder().id("COLOR").ct(199).bri(254).transitionTime(30)
         );
 
-        verify(resourceProviderMock).putResource(eq(getUrl("/scene/SCENE")), any());
+        verifyPut("/scene/SCENE", """
+                {
+                  "actions": [
+                    {
+                      "target": {
+                        "rid": "CT_ONLY",
+                        "rtype": "light"
+                      },
+                      "action": {
+                        "on": {
+                          "on": true
+                        },
+                        "dimming": {
+                          "brightness": 100.0
+                        },
+                        "color_temperature": {
+                          "mirek": 199
+                        },
+                        "dynamics": {
+                          "duration": 3000
+                        }
+                      }
+                    },
+                    {
+                      "target": {
+                        "rid": "COLOR",
+                        "rtype": "light"
+                      },
+                      "action": {
+                        "on": {
+                          "on": true
+                        },
+                        "dimming": {
+                          "brightness": 100.0
+                        },
+                        "color_temperature": {
+                          "mirek": 199
+                        },
+                        "dynamics": {
+                          "duration": 3000
+                        }
+                      }
+                    }
+                  ]
+                }
+                """);
 
         Mockito.clearInvocations(resourceProviderMock);
 
@@ -6528,7 +6574,46 @@ class HueApiTest {
                 PutCall.builder().id("COLOR").ct(199).bri(254)
         );
 
-        verify(resourceProviderMock).putResource(eq(getUrl("/scene/SCENE")), any());
+        verifyPut("/scene/SCENE", """
+                {
+                  "actions": [
+                    {
+                      "target": {
+                        "rid": "CT_ONLY",
+                        "rtype": "light"
+                      },
+                      "action": {
+                        "on": {
+                          "on": true
+                        },
+                        "dimming": {
+                          "brightness": 100.0
+                        },
+                        "color_temperature": {
+                          "mirek": 199
+                        }
+                      }
+                    },
+                    {
+                      "target": {
+                        "rid": "COLOR",
+                        "rtype": "light"
+                      },
+                      "action": {
+                        "on": {
+                          "on": true
+                        },
+                        "dimming": {
+                          "brightness": 100.0
+                        },
+                        "color_temperature": {
+                          "mirek": 199
+                        }
+                      }
+                    }
+                  ]
+                }
+                """);
 
         Mockito.clearInvocations(resourceProviderMock);
 
@@ -6625,7 +6710,7 @@ class HueApiTest {
     }
 
     @Test
-    void getOrCreateScene_updateExistingOne_sameActions_correctlyConvertsBrightness() {
+    void putSceneState_sameActions_recallOnly_roundTripsBrightness() {
         setGetResponse("/grouped_light", """
                 {
                   "errors": [],
@@ -6962,6 +7047,9 @@ class HueApiTest {
                   }
                 }
                 """);
+        verify(resourceProviderMock, never()).postResource(any(), any());
+        verify(resourceProviderMock, never()).putResource(
+                eq(getUrl("/scene/6f3647b7-9bb8-4175-b3c4-7180cd286bde")), contains("\"actions\""));
     }
 
     private static PutCalls getPutCalls(String id, List<ScheduledLightState> lightStates) {

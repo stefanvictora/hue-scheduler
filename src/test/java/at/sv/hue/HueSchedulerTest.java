@@ -3685,7 +3685,7 @@ class HueSchedulerTest extends AbstractHueSchedulerTest {
     }
 
     @Test
-    void parse_gradient_rgb_justOnePoint_convertedToXY() {
+    void parse_gradient_xy_justOnePoint_convertedToXY() {
         addKnownLightIdsWithDefaultCapabilities(1);
         addStateNow("1", "gradient:[xy(0.3 0.4)]");
         ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
