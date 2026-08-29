@@ -339,7 +339,7 @@ public final class HueScheduler implements Runnable {
         stateRegistry = new ScheduledStateRegistry(currentTime, api);
         lightEventListener = createLightEventListener();
         this.sceneEventListener = new SceneEventListenerImpl(api, fakeTicker, sceneActivationIgnoreWindowInSeconds,
-                sceneSyncName::equals, lightEventListener);
+                sceneSyncName::equals, lightEventListener, manualOverrideTracker);
         sceneStateDiscoveryService = new SceneStateDiscoveryService(api, startTimeProvider, stateRegistry,
                 currentTime, this::initialSchedule, this::resetManualOverride,
                 minTrBeforeGapInMinutes, parseBrightnessPercentValue(brightnessOverrideThresholdPercentage),
@@ -349,7 +349,6 @@ public final class HueScheduler implements Runnable {
     private LightEventListenerImpl createLightEventListener() {
         return new LightEventListenerImpl(manualOverrideTracker,
                 deviceId -> api.getAffectedIdsByDevice(deviceId),
-                id -> sceneEventListener.wasRecentlyAffectedBySyncedScene(id),
                 api::allowFastSceneUpdate,
                 supportsOffLightUpdates);
     }
@@ -421,7 +420,8 @@ public final class HueScheduler implements Runnable {
         lightEventListener = createLightEventListener();
         sceneEventListener = new SceneEventListenerImpl(api, Ticker.systemTicker(),
                 sceneActivationIgnoreWindowInSeconds,
-                sceneName -> HassApiUtils.matchesSceneSyncName(sceneName, sceneSyncName), lightEventListener);
+                sceneName -> HassApiUtils.matchesSceneSyncName(sceneName, sceneSyncName), lightEventListener,
+                manualOverrideTracker);
         new HassEventStreamReader(websocketOrigin, accessToken, httpClient,
                 new HassEventHandler(lightEventListener, sceneEventListener, availabilityListener, api)).start();
         stateRegistry = new ScheduledStateRegistry(currentTime, api);
@@ -437,7 +437,7 @@ public final class HueScheduler implements Runnable {
                 sceneUpdateSleepDelayInMs, fastSceneUpdateSleepDelayInMs);
         lightEventListener = createLightEventListener();
         sceneEventListener = new SceneEventListenerImpl(api, Ticker.systemTicker(),
-                sceneActivationIgnoreWindowInSeconds, sceneSyncName::equals, lightEventListener);
+                sceneActivationIgnoreWindowInSeconds, sceneSyncName::equals, lightEventListener, manualOverrideTracker);
         stateRegistry = new ScheduledStateRegistry(currentTime, api);
         startTimeProvider = createStartTimeProvider(latitude, longitude, elevation);
         sceneStateDiscoveryService = new SceneStateDiscoveryService(api, startTimeProvider, stateRegistry,
@@ -1111,7 +1111,8 @@ public final class HueScheduler implements Runnable {
 
     private List<PutCall> getCurrentlyOnPutCalls(PutCalls putCalls) {
         return putCalls.stream()
-                       .filter(putCall -> !api.isLightOff(putCall.getId()))
+                       .filter(putCall -> !api.isLightOff(putCall.getId()) ||
+                               manualOverrideTracker.wasTurnedOnBySyncedScene(putCall.getId()))
                        .toList();
     }
 

@@ -1,5 +1,6 @@
 package at.sv.hue;
 
+import at.sv.hue.api.AffectedId;
 import at.sv.hue.api.Capability;
 import at.sv.hue.api.Identifier;
 import at.sv.hue.api.LightCapabilities;
@@ -539,6 +540,80 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
 
         ensureScheduledStates(
                 expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
+        );
+    }
+
+    @Test
+    void sceneControl_syncedSceneTurnedLightOn_bridgeStateStaysStale_doesNotFadeLightBackOff() {
+        minTrGap = 3;
+        create();
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        Identifier scene = mockSceneLightStates(1, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(200));
+        addState("g1", now, "scene:TestScene");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1))
+        );
+
+        mockIsLightOff(5, true); // stale: the bridge has not registered the scene's on action yet
+        simulateSceneWithNameActivated(sceneSyncName,
+                new AffectedId("/lights/4", true),
+                new AffectedId("/lights/5", false),
+                new AffectedId("/groups/1", true));
+        advanceCurrentTime(Duration.ofMinutes(minTrGap));
+
+        runnables.getFirst().run();
+        assertScenePutCalls(1, scene.id(),
+                expectedPutCall(4).bri(100),
+                expectedPutCall(5).bri(200)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusDays(1), initialNow.plusDays(2)) // next day
+        );
+    }
+
+    @Test
+    void sceneControl_syncedSceneTurnedLightOn_thenManualOff_manualControlWins() {
+        minTrGap = 3;
+        create();
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        Identifier scene = mockSceneLightStates(1, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(200));
+        addState("g1", now, "scene:TestScene");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1))
+        );
+
+        mockIsLightOff(5, true);
+        simulateSceneWithNameActivated(sceneSyncName,
+                new AffectedId("/lights/4", true),
+                new AffectedId("/lights/5", false),
+                new AffectedId("/groups/1", true));
+        simulateLightOffEvent("/lights/5");
+        advanceCurrentTime(Duration.ofMinutes(minTrGap));
+
+        runnables.getFirst().run();
+        assertScenePutCalls(1, scene.id(),
+                expectedPutCall(4).bri(100)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusDays(1), initialNow.plusDays(2)) // next day
         );
     }
 

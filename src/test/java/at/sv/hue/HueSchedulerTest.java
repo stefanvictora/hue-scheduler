@@ -21,6 +21,7 @@ import java.util.EnumSet;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -5722,6 +5723,7 @@ class HueSchedulerTest extends AbstractHueSchedulerTest {
         simulateSceneWithNameActivated(sceneSyncName, new AffectedId("/lights/1", false),
                 new AffectedId("/lights/2", true));
 
+        assertTrue(manualOverrideTracker.wasTurnedOnBySyncedScene("/lights/1"));
         ensureScheduledStates(); // no scheduled states
     }
 

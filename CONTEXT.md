@@ -19,3 +19,7 @@ _Avoid_: Scheduled scene, parseable scene
 **Scene Recall**:
 Applying the complete stored action set of a Hue scene. A Scene Recall is equivalent to a requested state only when their action targets and payloads match, regardless of ordering.
 _Avoid_: Scene update, scene application
+
+**Synced Scene Turn-On**:
+A synced scene activation targeting a light with an `on` action. It grants the scheduler control immediately, without waiting for the bridge to confirm the light state; a later off or manual override ends that control.
+_Avoid_: Synced scene engagement, confirmed light-on
