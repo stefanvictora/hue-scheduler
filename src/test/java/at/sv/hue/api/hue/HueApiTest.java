@@ -6567,6 +6567,8 @@ class HueApiTest {
 
         Mockito.clearInvocations(resourceProviderMock);
 
+        // Deliberately omit a Hue event between the two writes: the write-through cache must remember
+        // the transition above, otherwise this request looks unchanged and its removal is skipped.
         // same state without transition time -> removes the previous transition time
 
         createOrUpdateScene("GROUPED_LIGHT", "SCENE",

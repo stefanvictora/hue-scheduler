@@ -827,7 +827,7 @@ public final class HueScheduler implements Runnable {
             ZonedDateTime now = currentTime.get();
             stateRegistry.getAssignedGroups(state)
                          .forEach(groupInfo -> syncScene(groupInfo.groupId(), stateRegistry.getPutCalls(groupInfo.groupLights(), now)));
-            ZonedDateTime nextSyncTime = getNextChangeTime(state, null, currentTime.get());
+            ZonedDateTime nextSyncTime = getNextChangeTime(state, null, now);
             if (!justOnce && nextSyncTime != null) {
                 scheduleNextSceneSync(state, false, nextSyncTime);
             }
