@@ -8,12 +8,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 
 import java.time.DayOfWeek;
-import java.time.ZonedDateTime;
 import java.util.EnumSet;
 import java.util.List;
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
 
 @Slf4j
 public class SceneStateDiscoveryService implements SceneDiscoveryListener {
@@ -21,8 +18,7 @@ public class SceneStateDiscoveryService implements SceneDiscoveryListener {
     private final HueApi api;
     private final StartTimeProvider startTimeProvider;
     private final ScheduledStateRegistry stateRegistry;
-    private final Supplier<ZonedDateTime> currentTime;
-    private final BiConsumer<List<ScheduledState>, ZonedDateTime> initialSchedule;
+    private final Consumer<String> groupStatesRescheduler;
     private final Consumer<String> manualOverrideReset;
     private final int minTrBeforeGapInMinutes;
     private final int brightnessOverrideThreshold;
@@ -31,8 +27,7 @@ public class SceneStateDiscoveryService implements SceneDiscoveryListener {
     private final boolean enabled;
 
     public SceneStateDiscoveryService(HueApi api, StartTimeProvider startTimeProvider,
-                                      ScheduledStateRegistry stateRegistry, Supplier<ZonedDateTime> currentTime,
-                                      BiConsumer<List<ScheduledState>, ZonedDateTime> initialSchedule,
+                                      ScheduledStateRegistry stateRegistry, Consumer<String> groupStatesRescheduler,
                                       Consumer<String> manualOverrideReset,
                                       int minTrBeforeGapInMinutes, int brightnessOverrideThreshold,
                                       int colorTemperatureOverrideThresholdKelvin, double colorOverrideThreshold,
@@ -40,8 +35,7 @@ public class SceneStateDiscoveryService implements SceneDiscoveryListener {
         this.api = api;
         this.startTimeProvider = startTimeProvider;
         this.stateRegistry = stateRegistry;
-        this.currentTime = currentTime;
-        this.initialSchedule = initialSchedule;
+        this.groupStatesRescheduler = groupStatesRescheduler;
         this.manualOverrideReset = manualOverrideReset;
         this.minTrBeforeGapInMinutes = minTrBeforeGapInMinutes;
         this.brightnessOverrideThreshold = brightnessOverrideThreshold;
@@ -152,8 +146,7 @@ public class SceneStateDiscoveryService implements SceneDiscoveryListener {
         if (states == null) {
             return;
         }
-        states.forEach(ScheduledState::invalidate);
         states.forEach(state -> manualOverrideReset.accept(state.getId()));
-        initialSchedule.accept(states, currentTime.get());
+        groupStatesRescheduler.accept(affectedGroup);
     }
 }

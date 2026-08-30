@@ -341,7 +341,7 @@ public final class HueScheduler implements Runnable {
         this.sceneEventListener = new SceneEventListenerImpl(api, fakeTicker, sceneActivationIgnoreWindowInSeconds,
                 sceneSyncName::equals, lightEventListener, manualOverrideTracker);
         sceneStateDiscoveryService = new SceneStateDiscoveryService(api, startTimeProvider, stateRegistry,
-                currentTime, this::initialSchedule, this::resetManualOverride,
+                this::rescheduleGroupStates, this::resetManualOverride,
                 minTrBeforeGapInMinutes, parseBrightnessPercentValue(brightnessOverrideThresholdPercentage),
                 colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold, enableAutoSceneStates);
     }
@@ -441,7 +441,7 @@ public final class HueScheduler implements Runnable {
         stateRegistry = new ScheduledStateRegistry(currentTime, api);
         startTimeProvider = createStartTimeProvider(latitude, longitude, elevation);
         sceneStateDiscoveryService = new SceneStateDiscoveryService(api, startTimeProvider, stateRegistry,
-                currentTime, this::initialSchedule, this::resetManualOverride,
+                this::rescheduleGroupStates, this::resetManualOverride,
                 minTrBeforeGapInMinutes, parseBrightnessPercentValue(brightnessOverrideThresholdPercentage),
                 colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold, enableAutoSceneStates);
         new HueEventStreamReader(apiHost, accessToken, httpsClient,
@@ -1453,10 +1453,49 @@ public final class HueScheduler implements Runnable {
                 LOG.error("Failed to reload scene state for '{}': {}", state, e.getLocalizedMessage(), e);
             }
         }
-        List<String> affectedIds = getAffectedIds(states);
-        syncScenesForActiveStates(affectedIds);
-        reapplyAffectedIdsIfOn(affectedIds);
+        List<String> idsToReschedule = new ArrayList<>();
+        List<String> idsToRefresh = new ArrayList<>();
+        for (String affectedId : getAffectedIds(states)) {
+            if (requiresReschedulingAfterActionUpdate(affectedId)) {
+                idsToReschedule.add(affectedId);
+            } else {
+                idsToRefresh.add(affectedId);
+            }
+        }
+        idsToReschedule.forEach(this::rescheduleGroupStatesAfterActionUpdate);
+        syncScenesForActiveStates(idsToRefresh);
+        reapplyAffectedIdsIfOn(idsToRefresh);
         MDC.remove("context");
+    }
+
+    private boolean requiresReschedulingAfterActionUpdate(String id) {
+        List<ScheduledState> states = stateRegistry.findStatesForId(id);
+        return states != null && states.stream().anyMatch(ScheduledState::hasTransitionBefore);
+    }
+
+    private void rescheduleGroupStatesAfterActionUpdate(String id) {
+        List<ScheduledState> states = invalidateGroupStates(id);
+        if (states == null) {
+            return;
+        }
+        reapplyAffectedIdsIfOn(List.of(id));
+        initialSchedule(states, currentTime.get());
+    }
+
+    private List<ScheduledState> invalidateGroupStates(String id) {
+        List<ScheduledState> states = stateRegistry.findStatesForId(id);
+        if (states != null) {
+            states.forEach(ScheduledState::invalidate);
+        }
+        return states;
+    }
+
+    private void rescheduleGroupStates(String id) {
+        List<ScheduledState> states = invalidateGroupStates(id);
+        if (states == null) {
+            return;
+        }
+        initialSchedule(states, currentTime.get());
     }
 
     private static List<String> getAffectedIds(List<ScheduledState> states) {

@@ -848,6 +848,53 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
     }
 
     @Test
+    void autoSceneStates_sceneActionsMakeInterpolationEligible_reschedulesAffectedGroup() {
+        enableAutoSceneStates();
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        Identifier scene1 = mockSceneLightStates(1, "00:00",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100)
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(50)
+                                   .ct(40));
+        Identifier scene2 = mockSceneLightStates(1, "12:00[i]",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100)
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(50)
+                                   .ct(40));
+        mockGetAllScenes(scene1, scene2);
+
+        startScheduler(
+                expectedRunnable(now, now.plusHours(12)),
+                expectedRunnable(now.plusHours(12), now.plusDays(1))
+        );
+
+        mockSceneLightStates(1, "12:00[i]",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(200)
+                                   .ct(20),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(100)
+                                   .ct(40));
+        simulateSceneModified(1, "12:00[i]");
+
+        ensureScheduledStates(
+                expectedRunnable(now, now.plusDays(1)),
+                expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
+        );
+    }
+
+    @Test
     void autoSceneStates_interpolate_withBackgroundInterpolation_cancelsOnDeletion() {
         enableAutoSceneStates();
         enableSupportForOffLightUpdates(); // enables background interpolation
