@@ -12,7 +12,7 @@
 
 **New in 0.15.0** — **Scene scheduling** (`scene:<name>`): load per-light states from a Hue scene and schedule them as a group — edit the scene in the Hue app and the schedule updates automatically. Plus **gradient support**, **OKLCH color input**, **parameterized effects with speed control**, and smooth **fade-to-off interpolation**. *(Scene scheduling requires Hue Bridge.)*
 
-**New in 0.14.0** — **Update lights even when they're off** (Hue Bridge; enabled by default). Lights are updated in the background, ensuring they turn on directly in the scheduled state. For schedules where lights are intentionally turned off at specific times, **Scene Sync** (`--enable-scene-sync`) remains the recommended approach.
+**New in 0.14.0** — **Update lights even when they're off** (Hue Bridge; enabled by default). Hue Scheduler keeps their brightness and color up to date without turning them on, so they already have the right values when they do turn on. For schedules where lights are intentionally turned off at specific times, **Scene Sync** (`--enable-scene-sync`) remains the recommended approach.
 
 Hue Scheduler goes beyond tools like Adaptive Lighting by giving you precise control over brightness, color temperature, color, power state, and custom interpolations between solar and absolute times. It's designed to work with dumb wall switches: as soon as lights become available, Hue Scheduler applies the correct settings consistently, even after physical on/off toggles.
 
@@ -45,24 +45,28 @@ switch.sensor_hallway_activated   22:00   on:false   days:Mo-Fr
 > Hue Scheduler does **not** automatically turn on lights (unless you specify `on:true`). You stay in control; it handles adjustments once lights are on.
 
 > [!NOTE]
-> Manual changes temporarily suspend the schedule until lights are turned off and back on.
-> If lights turn on mid-transition, Hue Scheduler computes the correct mid-transition state and continues seamlessly.
+> A manual change temporarily pauses scheduled updates for that light until it is turned off and back on.
+> If a light turns on while `tr-before` or interpolation is already in progress, Hue Scheduler catches it up to the expected values and continues for the remaining time.
 
 ## How It Works
 
 Each line has three parts (separated by a tab or ≥2 spaces):
 
 ```yacas
-<Light/Group Name or ID>  <Start Time Expression>  [<Property>:<Value>]*
+<Light/Group Name or ID>  <Scheduled Time>  [<Property>:<Value>]*
 ```
 
 **Light/Group Name or ID**
 
 Which light or group to control. Use names or IDs (e.g., `Couch` or `light.couch`). Combine multiple targets with commas. Supported Home Assistant entities: `light`, `input_boolean`, `switch`, `fan`.
 
-**Start Time Expression**
+**Scheduled time**
 
-Use fixed times (24-hour `HH:mm[:ss]`, e.g., `06:00`, `23:30:15`) or solar times (`sunrise`, `sunset`, etc.). You can offset solar times with ± minutes (e.g., `sunset-30`, `sunrise+60`). Available solar constants (chronological): `astronomical_dawn`, `nautical_dawn`, `civil_dawn`, `sunrise`, `noon`, `golden_hour`, `sunset`, `blue_hour`, `civil_dusk`, `night_hour`, `nautical_dusk`, `astronomical_dusk`.
+Use a fixed time (24-hour `HH:mm[:ss]`, e.g., `06:00`, `23:30:15`) or a solar time (`sunrise`, `sunset`, etc.).
+
+Normally, the entry's values begin to apply at this time. With `tr-before` or `interpolate:true`, they are instead fully reached at this time.
+
+Solar times can be offset by minutes (e.g., `sunset-30`, `sunrise+60`). Available solar times, in chronological order: `astronomical_dawn`, `nautical_dawn`, `civil_dawn`, `sunrise`, `noon`, `golden_hour`, `sunset`, `blue_hour`, `civil_dusk`, `night_hour`, `nautical_dusk`, `astronomical_dusk`.
 
 **Properties**
 
@@ -77,11 +81,11 @@ Use fixed times (24-hour `HH:mm[:ss]`, e.g., `06:00`, `23:30:15`) or solar times
     - **`gradient`** — multi-color gradient for compatible lights (e.g., `gradient:[#FF0000, #00FF00, #0000FF]`)
 - **Advanced**
     - **`scene`** — load per-light states from a Hue scene (e.g., `scene:Relax`)
-    - **`force:true`** — enforce state even after user changes
+    - **`force:true`** — apply this entry even after a manual change
 - **Transitions**
-    - **`tr`** — transition at start (e.g., `tr:10s`, `tr:1h5min`)
-    - **`tr-before`** — pre-transition starting before the state (relative, absolute, or solar, e.g., `tr-before:30min`, `tr-before:06:00`, `tr-before:civil_dawn+5`)
-    - **`interpolate:true`** — auto-transition from the start of the previous state; also spans across days
+    - **`tr`** — start changing when the entry is applied (normally at its scheduled time) and finish after this duration (e.g., `tr:10s`, `tr:1h5min`)
+    - **`tr-before`** — start changing earlier and finish at the scheduled time (e.g., `tr-before:30min`, `tr-before:06:00`, `tr-before:civil_dawn+5`)
+    - **`interpolate:true`** — start changing at the previous entry's scheduled time and finish at this entry's scheduled time; can span days
 
 > [!TIP]
 > Full syntax and edge cases: see the [full configuration guide](docs/light_configuration.md).

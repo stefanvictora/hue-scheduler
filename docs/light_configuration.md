@@ -5,7 +5,7 @@ Hue Scheduler uses a simple **text-based** format. Each non-empty line is one sc
 Each line has three parts separated by a tab **or** at least two spaces (recommended):
 
 ```yacas
-<Light/Group Name or ID>  <Start Time Expression>  [<Property>:<Value>]*
+<Light/Group Name or ID>  <Scheduled Time>  [<Property>:<Value>]*
 ```
 
 ## `<Light/Group Name or ID>`
@@ -41,9 +41,11 @@ input_boolean.test_switch          civil_dusk  on:true
 switch.tv_mute                     civil_dusk  on:true
 ```
 
-## `<Start Time Expression>`
+## `<Scheduled Time>`
 
-Each state has a start time, specified either as a fixed time (24-hour `HH:mm[:ss]`, e.g., `06:00`, `23:30:15`) or a **dynamic solar time**. Available solar constants, in chronological order:
+The second column sets the entry's **scheduled time**. Normally, that is when its values begin to apply. With `tr-before` or `interpolate:true`, it is instead when the values should be fully reached—the change begins earlier.
+
+The scheduled time can be a fixed time (24-hour `HH:mm[:ss]`, e.g., `06:00`, `23:30:15`) or a **dynamic solar time**. Available solar constants, in chronological order:
 
 - `astronomical_dawn` (e.g., `03:26`)
 - `nautical_dawn` (e.g., `04:17`)
@@ -72,14 +74,14 @@ Examples: `sunset-30` (30 minutes before sunset), `sunrise+60` (one hour after s
 
 ### Constraint Functions
 
-You can wrap any start time expression in a **constraint function** to bound dynamic solar times to fixed limits. This is useful when sunrise or sunset varies too much across seasons.
+You can wrap any scheduled time in a **constraint function** to bound dynamic solar times to fixed limits. This is useful when sunrise or sunset varies too much across seasons.
 
 Available functions:
 
 | Function                 | Args | Returns                                                                                                                          |
 |--------------------------|------|----------------------------------------------------------------------------------------------------------------------------------|
-| `notBefore(expr, limit)` | 2    | The **later** of `expr` and `limit` (ensures start is not before `limit`). E.g. `notBefore(sunrise, 06:30)`                      |
-| `notAfter(expr, limit)`  | 2    | The **earlier** of `expr` and `limit` (ensures start is not after `limit`). E.g. `notAfter(sunset+30, 21:00)`                    |
+| `notBefore(expr, limit)` | 2    | The **later** of `expr` and `limit` (ensures the scheduled time is not before `limit`). E.g. `notBefore(sunrise, 06:30)`         |
+| `notAfter(expr, limit)`  | 2    | The **earlier** of `expr` and `limit` (ensures the scheduled time is not after `limit`). E.g. `notAfter(sunset+30, 21:00)`       |
 | `clamp(expr, min, max)`  | 3    | `expr` bounded to `[min, max]`; if `min > max`, logs a warning and returns `expr` unchanged. E.g. `clamp(sunrise, 06:30, 08:00)` |
 | `max(a, b)`              | 2    | Alias for `notBefore` — returns the later of two times                                                                           |
 | `min(a, b)`              | 2    | Alias for `notAfter` — returns the earlier of two times                                                                          |
@@ -126,7 +128,7 @@ Bedroom  clamp(smooth(sunrise, 14d), 06:30, 08:00)  bri:30%
 
 #### Experimental: `mix(...)` — blend two time expressions
 
-`mix(a, b, w)` places the trigger time between two time expressions `a` and `b`. The weight `w` controls how close the result is to `b`:
+`mix(a, b, w)` places the scheduled time between two time expressions `a` and `b`. The weight `w` controls how close the result is to `b`:
 
 - `w = 0` → exactly `a`
 - `w = 1` → exactly `b`
@@ -156,9 +158,9 @@ A common use is blending a solar time with a fixed clock time: `mix(sunrise, 07:
 
 **Rule of thumb:** Use `mix` to narrow the seasonal range; use `smooth` to slow day-to-day changes. Combine them — or add `clamp` — for maximum control.
 
-### FAQ: How is the end of a state determined?
+### FAQ: How long does a schedule entry apply?
 
-Hue Scheduler ends a state at the **start time of the next state for the same target**.
+An entry normally applies until the next entry for the same light or group takes over. Without an early fade, that happens at the next entry's scheduled time. With `tr-before` or `interpolate:true`, the next entry takes over when its early fade begins.
 
 Example:
 
@@ -167,23 +169,23 @@ Hallway  07:00       bri:254
 Hallway  civil_dusk  bri:150
   ```
 
-This results in two **dynamic intervals** (adjusted daily):
+This results in two periods that adjust daily:
 
 - **07:00 → civil_dusk**: `bri:254`
 - **civil_dusk → 07:00**: `bri:150`
 
-To **create gaps**, define a state with no properties:
+To deliberately leave part of the day unscheduled, add an entry with no properties:
 
   ```yacas
 Hallway  07:00  bri:254
 Hallway  10:00
   ```
 
-Only **07:00–10:00** is scheduled. If the light is turned on outside this window, Hue Scheduler does **not** enforce any state.
+Only **07:00–10:00** is scheduled. If the light is turned on outside this window, Hue Scheduler does not apply scheduled values.
 
 ## `[<Property>:<Value>]*`
 
-Properties define the state applied during the interval.
+Properties describe the values and behavior for a schedule entry.
 
 ### Basic
 
@@ -254,7 +256,7 @@ Desk  17:00  gradient:[oklch(0.7 0.2 30), #00FF00, oklch(0.5 0.15 270)]@random_p
 
 - `scene` — **Load per-light states** from an existing Hue scene and schedule them for a group. Each light retains its individual brightness, color temperature, color, effect, and gradient settings from the scene.
 
-  > **Note**: Hue Scheduler listens for scene modifications and automatically reloads the updated light states, re-applying and re-syncing the currently active state.
+  > **Note**: Hue Scheduler listens for scene changes and automatically reloads the updated per-light values. If that scene is currently scheduled and the group is on, the updated values are applied immediately.
 
   ```
   Living room  sunset  scene:Relax
@@ -274,89 +276,112 @@ Desk  17:00  gradient:[oklch(0.7 0.2 30), #00FF00, oklch(0.5 0.15 270)]@random_p
 
   **Parameterized effects:** Scenes that use Hue API v2 effects (e.g., `candle`, `fire`) fully preserve their effect parameters, including color temperature, color, and speed.
 
-  **Interpolation:** Scenes support full interpolation (via `interpolate:true` or `tr-before`), including transitions between two different scenes or from a regular group state to a scene.
+  **Early changes:** Scene entries support both `tr-before` and `interpolate:true`, including gradual changes between two scenes or from regular group values to a scene.
 
 ### Transitions & Interpolations
 
+The scheduled time is the reference point for every change. The important difference is whether the change begins before or at that time:
+
+| Property           | The change begins                                               | The configured values are reached     |
+|--------------------|-----------------------------------------------------------------|---------------------------------------|
+| `tr`               | At the scheduled time, or whenever the entry is later reapplied | After the given duration              |
+| `tr-before`        | At the configured earlier time                                  | At the scheduled time                 |
+| `interpolate:true` | At the previous entry's scheduled time                          | At the current entry's scheduled time |
+
+Without an explicit transition option, the entry is applied at its scheduled time and the Hue Bridge normally uses its default 400 ms transition.
+
 > [!WARNING]
-> Due to a known [firmware bug](https://www.reddit.com/r/tradfri/comments/au903n/firmware_bugs_in_ikea_bulbs/) (see https://github.com/stefanvictora/hue-scheduler/issues/5) with some **Ikea Tradfri**, setting **multiple properties** (e.g., `bri` + `ct`) with a **non-zero transition** may fail. Because the Hue Bridge applies a default 400 ms transition (`tr:4`) if none is given, explicitly set `tr:0` for Tradfri bulbs when changing multiple properties. Alternatively, change one property per state and offset the times.
+> Due to a known [firmware bug](https://www.reddit.com/r/tradfri/comments/au903n/firmware_bugs_in_ikea_bulbs/) (see https://github.com/stefanvictora/hue-scheduler/issues/5) with some **Ikea Tradfri** bulbs, changing **multiple properties** (e.g., `bri` + `ct`) with a **non-zero transition** may fail. The Hue Bridge uses a default 400 ms transition when `tr` is omitted, so set `tr:0` when changing multiple properties—or split the changes into separate entries.
 
-- `tr` — **transition duration** *at* the state's start time. Base unit is 100 ms; default is `4` (= 400 ms). Max `60000` (= 100 min).
+#### `tr` — change after the scheduled time
 
-  > Tip: Units are supported and can be combined, e.g., `tr:10s`, `tr:2min`, `tr:1h20min5s`.
+`tr` sets how long the light takes to reach the entry's values after the entry is applied. Its base unit is 100 ms; the default is `4` (= 400 ms), and the maximum is `60000` (= 100 min).
 
-- `tr-before` — **pre-transition** that starts **before** the state's start time (Hue Scheduler feature). Practically capped at 24 h. Supports relative durations, absolute times, and solar times:
+If the light is off at the scheduled time and turns on later, the entry is applied then and uses the same transition again.
 
-  ```yacas
-  Office  sunrise  on:true  bri:254  tr-before:30min
-  Office  sunrise  on:true  bri:254  tr-before:06:00
-  Office  sunrise  on:true  bri:254  tr-before:civil_dawn+5
-  ```
+Units can be combined for readability, for example `tr:10s`, `tr:2min`, or `tr:1h20min5s`.
 
-  In the first example, the transition starts 30 minutes before sunrise, while in the last example, it starts 5 minutes after `civil_dawn` to smoothly turn on the light to full brightness until sunrise.
+#### `tr-before` — finish at the scheduled time
 
-  > Note: The `tr-before` reference must be **earlier** than the state's start, otherwise it's ignored. Values > 24 h are unsupported and produce undefined schedules.
+`tr-before` starts the change early so the entry's values are reached at its scheduled time. It supports a relative duration, an absolute time, or a solar time:
 
-    **Late turn-on behavior:** If lights are turned on after a `tr-before` has already started, Hue Scheduler shortens the remaining fade and **interpolates** from the previous state:
+```yacas
+Office  sunrise  on:true  bri:254  tr-before:30min
+Office  sunrise  on:true  bri:254  tr-before:06:00
+Office  sunrise  on:true  bri:254  tr-before:civil_dawn+5
+```
 
-  ```yacas
-  Office  06:00  ct:400  tr:2s
-  Office  09:00  ct:200  tr-before:30min  tr:10s
-  ```
+The first entry starts changing 30 minutes before sunrise. The last starts 5 minutes after `civil_dawn`. Both finish at sunrise.
 
-    1. At **08:30**, the full 30-min fade runs from `ct:400` → `ct:200`.
-    2. At **08:45**, the remaining 15 min run, starting near `ct:300`.
-    3. After **09:00**, `tr-before` is ignored; `tr` (10 s, or the default) applies.
+The `tr-before` time must be earlier than the scheduled time; otherwise it is ignored. Durations longer than 24 hours are unsupported and may produce unexpected schedules.
 
-  > Note: Hue Scheduler uses the **previous state's** `tr` for the per-step interpolation calls. Set the previous state's `tr:0` to disable those transitions. If no `tr` is defined, the global default `--default-interpolation-transition-time` is used (default: `4` = 400 ms). If interpolation between two states is **not possible**, `tr-before` and `interpolate:true` are ignored.
+**When a light turns on partway through:** Hue Scheduler calculates where the light should be at that moment, catches it up to those values, and then continues for the remaining time.
 
-- `interpolate:true` — Start transitions **automatically** from the start of the previous state (a shorthand for common `tr-before` patterns). Continuously transition between two defined states—effectively simulating what's often called *natural*, *adaptive* or *circadian lighting*:
+```yacas
+Office  06:00  ct:400  tr:2s
+Office  09:00  ct:200  tr-before:30min  tr:10s
+```
 
-  ```yacas
-  # Instead of:
-  Office  sunrise  bri:100
-  Office  noon     bri:254  tr-before:sunrise
-  Office  sunset   bri:50   tr-before:noon
-  # You can write:
-  Office  sunrise  bri:100
-  Office  noon     bri:254  interpolate:true
-  Office  sunset   bri:50   interpolate:true
-  ```
-   
-    Interpolations also **span days**:
- 
-  ```yacas
-  Office  sunrise  bri:100  interpolate:true
-  Office  noon     bri:254  interpolate:true
-  Office  sunset   bri:50   interpolate:true
-  ```
-   
-    In this example, Hue Scheduler also interpolates from `sunset` → next day's `sunrise`.
+1. At **08:30**, the full 30-minute change runs from `ct:400` to `ct:200`.
+2. If the light turns on at **08:45**, it first catches up to about `ct:300`, then continues to `ct:200` over the remaining 15 minutes.
+3. At or after **09:00**, the early change is over. The second entry's normal `tr:10s` transition applies instead.
 
-  > Tip: Enable interpolation globally with `--interpolate-all`, then override per state using `interpolate:false` or a custom `tr-before` (which takes precedence).
+The initial catch-up uses the previous entry's `tr`—`2s` in this example. If the previous entry has no `tr`, `--default-interpolation-transition-time` is used (400 ms by default). Setting the previous entry's `tr:0` makes the catch-up immediate. This short catch-up transition does not change when the final values are due.
 
-  **`on:false` as interpolation target:** When the target state has `on:false`, interpolation treats it as brightness 0, producing a smooth fade-to-off transition. The same applies when `on:false` is the source: lights fade up from brightness 0. Additional properties like `ct` are interpolated normally alongside the brightness fade.
+If the two entries have no property that can change gradually between them, or an empty entry creates a gap between them, the early change is skipped.
 
-  ```yacas
-  Office  06:00  bri:100  ct:4000
-  Office  22:00  on:false  interpolate:true
-  ```
+#### `interpolate:true` — start at the previous scheduled time
 
-  Here, lights smoothly dim from brightness 100 to 0 between 06:00 and 22:00, turning off when the target state is reached.
+`interpolate:true` automatically starts the change at the previous entry's scheduled time and reaches the current entry's values at its scheduled time. It is a convenient alternative to specifying that earlier time with `tr-before`:
+
+```yacas
+# Explicit start times:
+Office  sunrise  bri:100
+Office  noon     bri:254  tr-before:sunrise
+Office  sunset   bri:50   tr-before:noon
+
+# Equivalent automatic interpolation:
+Office  sunrise  bri:100
+Office  noon     bri:254  interpolate:true
+Office  sunset   bri:50   interpolate:true
+```
+
+Interpolation works only when consecutive entries share at least one property that can change gradually and the desired values differ. An empty entry between them prevents interpolation.
+
+Interpolation can also span days:
+
+```yacas
+Office  sunrise  bri:100  interpolate:true
+Office  noon     bri:254  interpolate:true
+Office  sunset   bri:50   interpolate:true
+```
+
+In this example, Hue Scheduler also interpolates from `sunset` to the next day's `sunrise`.
+
+Enable interpolation globally with `--interpolate-all`, then override individual entries with `interpolate:false`. A custom `tr-before` takes precedence and sets the earlier start explicitly.
+
+**Fading to or from off:** When an entry has `on:false`, interpolation treats it as brightness 0. Other properties, such as `ct`, continue changing normally alongside the brightness.
+
+```yacas
+Office  06:00  bri:100  ct:4000
+Office  22:00  on:false  interpolate:true
+```
+
+Here, the light dims from brightness 100 to 0 between 06:00 and 22:00, then turns off at 22:00.
 
 ### Advanced
 
-- `force:true` — **enforce** the state even if the user manually changed the light since the last scheduled state (`true|false`, default `false`). Relevant only if user-modification tracking is enabled (default).
+- `force:true` — Apply this entry even after the user manually changes the light (`true|false`, default `false`). This matters only while user-modification tracking is enabled (the default).
 
   ```yacas
   Office  09:00  bri:254  ct:6500
   Office  sunset bri:200  ct:3000  force:true
   ```
 
-    Here, the sunset state is always applied—even if the user changed the light during the day.
+    Here, the sunset entry is always applied—even if the user changed the light during the day.
 
-    **Note**: `force:true` can also enforce `on:false`. In that case, lights **cannot** be turned on during the interval (they'll be turned off immediately).
+    **Note**: `force:true` can also enforce `on:false`. In that case, the light cannot remain on while this entry applies; it will be turned off again immediately.
 
     From 0.14.0, setting `force:true` with `on:true` also forces the light to be **always on**.
 
-    With `--require-scene-activation`, `force:true` still applies the state even if a synced scene wasn't activated.
+    With `--require-scene-activation`, `force:true` still applies the entry even if a synced scene was not activated.
