@@ -85,9 +85,10 @@ public final class HueScheduler implements Runnable {
     String accessToken;
     @Parameters(
             index = "2",
+            arity = "0..1",
             paramLabel = "CONFIG_FILE",
             defaultValue = "${env:CONFIG_FILE}",
-            description = "The configuration file containing your schedules.")
+            description = "The optional configuration file containing your schedules.")
     Path configFile;
     @Option(names = "--lat", required = true,
             defaultValue = "${env:LAT}",
@@ -136,7 +137,7 @@ public final class HueScheduler implements Runnable {
     boolean enableSceneSync;
     @Option(names = "--enable-auto-scene-states",
             defaultValue = "${env:ENABLE_AUTO_SCENE_STATES:-false}",
-            description = "Automatically create and reload states based on scenes matching the naming scheme." +
+            description = "Discover state definitions from scene schedules and reload them when their scenes change." +
                     " Default: ${DEFAULT-VALUE}")
     boolean enableAutoSceneStates;
     @Option(names = "--migrate-input-to-scenes",
@@ -376,7 +377,7 @@ public final class HueScheduler implements Runnable {
         MDC.put("context", "init");
         LOG.info("Hue Scheduler v{}", spec.version()[0]);
         LOG.info("API host: {}", apiHost);
-        LOG.info("Config file: {}", configFile);
+        LOG.info("Config file: {}", configFile == null ? "none" : configFile);
         logEnabledFlags();
         assertConfigurationParameters();
         if (HassApiUtils.isHassConnection(accessToken)) {
@@ -452,7 +453,6 @@ public final class HueScheduler implements Runnable {
     private void createAndStart() {
         stateScheduler = createStateScheduler();
         defaultInterpolationTransitionTime = parseInterpolationTransitionTime(defaultInterpolationTransitionTimeString);
-        assertInputIsReadable();
         assertConnectionAndStart();
     }
 
@@ -475,6 +475,8 @@ public final class HueScheduler implements Runnable {
     }
 
     private void assertConfigurationParameters() {
+        assertScheduleSourceConfiguration();
+        assertInputIsReadable();
         assertGeographicConfigurations();
         assertRateLimitingConfiguration();
         assertSceneSyncConfigurations();
@@ -482,6 +484,15 @@ public final class HueScheduler implements Runnable {
         assertSyncThresholds();
         assertApiConfigurations();
         assertTimingConfigurations();
+    }
+
+    private void assertScheduleSourceConfiguration() {
+        if (configFile == null && migrateInputToScenes) {
+            fail("CONFIG_FILE is required when --migrate-input-to-scenes is set");
+        }
+        if (configFile == null && !enableAutoSceneStates) {
+            fail("CONFIG_FILE is required unless --enable-auto-scene-states is set");
+        }
     }
 
     private void assertGeographicConfigurations() {
@@ -576,9 +587,9 @@ public final class HueScheduler implements Runnable {
     }
 
     private void assertInputIsReadable() {
-        if (!Files.isReadable(configFile)) {
-            System.err.println("Given config file '" + configFile.toAbsolutePath() + "' does not exist or is not readable!");
-            System.exit(1);
+        if (configFile != null && !Files.isReadable(configFile)) {
+            throw new CommandLine.ExecutionException(spec.commandLine(),
+                    "Given config file '" + configFile.toAbsolutePath() + "' does not exist or is not readable!");
         }
     }
 
@@ -586,7 +597,9 @@ public final class HueScheduler implements Runnable {
         if (!assertConnection()) {
             stateScheduler.schedule(this::assertConnectionAndStart, currentTime.get().plusSeconds(5), null);
         } else {
-            parseInput();
+            if (configFile != null) {
+                parseInput();
+            }
             performSyncedSceneMigration();
             if (migrateInputToScenes) {
                 migrateInputToScenes();

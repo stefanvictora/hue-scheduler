@@ -136,6 +136,8 @@ Run Hue Scheduler via Docker (recommended) or manually with Java. Configuration 
    
    Volume configuration:
     - `source` — local path to your [configuration file](docs/light_configuration.md) containing the light schedules.
+
+   When using Hue Scene Schedules exclusively, set `ENABLE_AUTO_SCENE_STATES=true` and omit both `CONFIG_FILE` and the `volumes` section.
     
     Advanced options: see [Advanced Command-Line Options](docs/advanced_command_line_options.md). From 0.12.0 onward, enable Scene Sync via `ENABLE_SCENE_SYNC=true` (env) or `--enable-scene-sync` (CLI).
   
@@ -158,8 +160,10 @@ If your Raspberry Pi doesn't have Docker yet, see [docs/docker_on_raspberrypi.md
 1. **Download the latest release**: [releases/latest](https://github.com/stefanvictora/hue-scheduler/releases/latest).
 2. **Run the JAR** (replace placeholders):
    ```shell
-   java -jar hue-scheduler.jar <API_HOST> <ACCESS_TOKEN> --lat=<LATITUDE> --long=<LONGITUDE> --elevation=<ELEVATION> <CONFIG_FILE_PATH>
+   java -jar hue-scheduler.jar <API_HOST> <ACCESS_TOKEN> --lat=<LATITUDE> --long=<LONGITUDE> --elevation=<ELEVATION> [<CONFIG_FILE_PATH>]
    ```
+
+   The configuration file is required unless `--enable-auto-scene-states` is set. When provided, file-based definitions and Scene Schedules are combined.
 
 ## FAQ
 

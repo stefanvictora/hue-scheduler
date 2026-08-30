@@ -2,6 +2,10 @@
  
 ## Index
 
+**Schedule Sources**
+
+- [`--enable-auto-scene-states`](#--enable-auto-scene-states) · [`--migrate-input-to-scenes`](#--migrate-input-to-scenes)
+
 **Scene Sync & Activation**
 
 - [`--enable-scene-sync`](#--enable-scene-sync) · [`--require-scene-activation`](#--require-scene-activation) · [`--scene-sync-name`](#--scene-sync-name) · [`--scene-control-name`](#--scene-control-name) · [`--scene-activation-ignore-window`](#--scene-activation-ignore-window)
@@ -34,6 +38,22 @@
 > Every CLI option can also be set via an environment variable. Example: `--interpolate-all` ⇢ `INTERPOLATE_ALL=true`.
 >
 > **Mapping:** `--some-option` → `SOME_OPTION` (uppercase, hyphens → underscores).
+
+## Schedule Sources
+
+### `--enable-auto-scene-states`
+
+Discovers State Definitions from Hue Scene Schedules and reloads them when their scenes change. This feature is available only with a Philips Hue Bridge.
+
+When enabled, the `CONFIG_FILE` positional argument (or environment variable) is optional. If a configuration file is also provided, its definitions are combined with those discovered from Scene Schedules. An explicitly configured file must still exist and be readable.
+
+**Default:** `false`
+
+### `--migrate-input-to-scenes`
+
+Creates Hue Scene Schedules from supported group definitions in the configuration file, then exits. This one-time migration requires `CONFIG_FILE` even when `--enable-auto-scene-states` is enabled and is available only with a Philips Hue Bridge.
+
+**Default:** `false`
 
 ## Scene Sync & Activation
 
