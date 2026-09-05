@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.function.LongConsumer;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -75,6 +76,7 @@ public class AbstractHueSchedulerTest {
     protected StartTimeProviderImpl startTimeProvider;
     protected boolean controlGroupLightsIndividually;
     protected HueApi mockedHueApi;
+    protected LongConsumer sleepMillis;
     protected String defaultInterpolationTransitionTimeInMs;
     protected int minTrGap = 0; // in minutes
     protected boolean interpolateAll;
@@ -98,6 +100,7 @@ public class AbstractHueSchedulerTest {
     @BeforeEach
     void setUp() {
         mockedHueApi = mock(HueApi.class);
+        sleepMillis = mock(LongConsumer.class);
         resetMockedApi();
         setCurrentAndInitialTimeTo(ZonedDateTime.of(2021, 1, 1, 0, 0, 0,
                 0, ZoneId.of("Europe/Vienna")));
@@ -175,7 +178,7 @@ public class AbstractHueSchedulerTest {
 
     protected void create() {
         scheduler = new HueScheduler(mockedHueApi, stateScheduler, startTimeProvider,
-                () -> now, 10.0, controlGroupLightsIndividually, disableUserModificationTracking,
+                () -> now, sleepMillis, 10.0, controlGroupLightsIndividually, disableUserModificationTracking,
                 requireSceneActivation, defaultInterpolationTransitionTimeInMs, 0, connectionFailureRetryDelay,
                 minTrGap, BRIGHTNESS_OVERRIDE_THRESHOLD_PERCENT, COLOR_TEMPERATURE_OVERRIDE_THRESHOLD_KELVIN,
                 COLOR_OVERRIDE_THRESHOLD, 3.8, 150, 0.06,

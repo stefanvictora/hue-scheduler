@@ -57,6 +57,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.function.LongConsumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
@@ -279,6 +280,7 @@ public final class HueScheduler implements Runnable {
     private final ManualOverrideTracker manualOverrideTracker;
     private LightEventListener lightEventListener;
     private Supplier<ZonedDateTime> currentTime;
+    private final LongConsumer sleepMillis;
     private StartTimeProvider startTimeProvider;
     private SceneEventListenerImpl sceneEventListener;
     private ScheduledStateRegistry stateRegistry;
@@ -288,12 +290,17 @@ public final class HueScheduler implements Runnable {
     private boolean supportsOffLightUpdates = false;
 
     public HueScheduler() {
+        this(HueScheduler::sleep);
+    }
+
+    private HueScheduler(LongConsumer sleepMillis) {
+        this.sleepMillis = Objects.requireNonNull(sleepMillis);
         currentTime = ZonedDateTime::now;
         manualOverrideTracker = new ManualOverrideTrackerImpl();
     }
 
     public HueScheduler(HueApi api, StateScheduler stateScheduler,
-                        StartTimeProvider startTimeProvider, Supplier<ZonedDateTime> currentTime,
+                        StartTimeProvider startTimeProvider, Supplier<ZonedDateTime> currentTime, LongConsumer sleepMillis,
                         double requestsPerSecond, boolean controlGroupLightsIndividually,
                         boolean disableUserModificationTracking, boolean requireSceneActivation,
                         String defaultInterpolationTransitionTimeString,
@@ -305,7 +312,7 @@ public final class HueScheduler implements Runnable {
                         int sceneActivationIgnoreWindowInSeconds, boolean interpolateAll, boolean enableSceneSync,
                         String sceneSyncName, boolean enableAutoSceneStates, int syncFailureRetryInMinutes, int sceneSyncDelayInSeconds,
                         boolean autoFillGradient, boolean supportsOffLightUpdates) {
-        this();
+        this(sleepMillis);
         this.api = api;
         ZonedDateTime initialTime = currentTime.get();
         Ticker fakeTicker = () -> Duration.between(initialTime, currentTime.get()).toNanos();
@@ -1012,8 +1019,8 @@ public final class HueScheduler implements Runnable {
         ScheduledState lastSeenState = stateRegistry.getLastSeenState(state);
         if (shouldSkipInterpolation(lastSeenState, interpolatedPutCalls, state)) {
             if (justTurnedOnBySyncedScene(state)) {
-                // if turned on via synced scene, we still need to wait for the transition time used by the scene (= tr of state)
-                sleepIfNeeded(getInterpolationTransitionTime(state));
+                // The synced scene already applied the interpolated state using the previous state's transition.
+                sleepIfNeeded(getInterpolationTransitionTime(state.getPreviousState()));
             }
             return false; // skip interpolation, last put call is the same as the current one; and no power cycle
         }
@@ -1043,8 +1050,12 @@ public final class HueScheduler implements Runnable {
         if (sleepTime == null) {
             return;
         }
+        sleepMillis.accept(sleepTime * 100L);
+    }
+
+    private static void sleep(long milliseconds) {
         try {
-            Thread.sleep(sleepTime * 100L);
+            Thread.sleep(milliseconds);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
