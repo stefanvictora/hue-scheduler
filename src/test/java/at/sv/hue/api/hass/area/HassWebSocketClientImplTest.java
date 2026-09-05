@@ -176,10 +176,14 @@ class HassWebSocketClientImplTest {
 
     @Test
     void sendCommand_multipleSimultaneousCommands() throws Exception {
+        // Establish ID order while keeping all three commands pending before replying.
         CompletableFuture<String> future1 = asyncSendExampleCommand();
-        CompletableFuture<String> future2 = asyncSendExampleCommand();
-        CompletableFuture<String> future3 = asyncSendExampleCommand();
         simulateWebSocketAuthSuccess();
+        waitForCommandToBeSent(1);
+        CompletableFuture<String> future2 = asyncSendExampleCommand();
+        waitForCommandToBeSent(2);
+        CompletableFuture<String> future3 = asyncSendExampleCommand();
+        waitForCommandToBeSent(3);
 
         simulateSuccessfulWebSocketResponse(2);
         simulateSuccessfulWebSocketResponse(1);
