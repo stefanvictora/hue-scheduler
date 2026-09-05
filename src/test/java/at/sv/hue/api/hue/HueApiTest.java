@@ -8047,6 +8047,82 @@ class HueApiTest {
         assertThat(HueApiImpl.actionsDiffer(scene, List.of(sceneAction("LIGHT_A", 50.5)))).isTrue();
     }
 
+    @Test
+    void actionsDiffer_uniformGradientAndEquivalentColor_returnsFalseInBothDirections() {
+        XY point = new XY(0.3, 0.4);
+        SceneAction gradient = gradientSceneAction("interpolated_palette", point, point);
+        SceneAction color = singleColorSceneAction(point);
+
+        assertThat(HueApiImpl.actionsDiffer(new Scene(List.of(gradient)), List.of(color))).isFalse();
+        assertThat(HueApiImpl.actionsDiffer(new Scene(List.of(color)), List.of(gradient))).isFalse();
+        assertThat(gradient.getAction().getGradient()).isNotNull();
+        assertThat(gradient.getAction().getColor()).isNull();
+    }
+
+    @Test
+    void actionsDiffer_uniformGradientsWithDifferentPointCountsAndModes_returnsFalse() {
+        XY point = new XY(0.3, 0.4);
+        SceneAction first = gradientSceneAction("interpolated_palette", point, point);
+        SceneAction second = gradientSceneAction("random_pixelated", point, point, point);
+
+        assertThat(HueApiImpl.actionsDiffer(new Scene(List.of(first)), List.of(second))).isFalse();
+    }
+
+    @Test
+    void actionsDiffer_uniformGradientAndDifferentColor_returnsTrue() {
+        XY gradientPoint = new XY(0.31, 0.4);
+        SceneAction gradient = gradientSceneAction("interpolated_palette", gradientPoint, gradientPoint);
+        SceneAction color = singleColorSceneAction(new XY(0.3, 0.4));
+
+        assertThat(HueApiImpl.actionsDiffer(new Scene(List.of(gradient)), List.of(color))).isTrue();
+    }
+
+    @Test
+    void actionsDiffer_nearlyUniformGradientAndSingleColor_returnsTrue() {
+        XY point = new XY(0.3, 0.4);
+        XY slightlyDifferentPoint = new XY(0.300001, 0.4);
+        SceneAction gradient = gradientSceneAction("interpolated_palette", point, slightlyDifferentPoint);
+        SceneAction color = singleColorSceneAction(point);
+
+        assertThat(HueApiImpl.actionsDiffer(new Scene(List.of(gradient)), List.of(color))).isTrue();
+    }
+
+    @Test
+    void actionsDiffer_nonuniformGradientsWithDifferentModes_returnsTrue() {
+        XY firstPoint = new XY(0.3, 0.4);
+        XY secondPoint = new XY(0.300001, 0.4);
+        SceneAction interpolated = gradientSceneAction("interpolated_palette", firstPoint, secondPoint);
+        SceneAction pixelated = gradientSceneAction("random_pixelated", firstPoint, secondPoint);
+
+        assertThat(HueApiImpl.actionsDiffer(new Scene(List.of(interpolated)), List.of(pixelated))).isTrue();
+    }
+
+    @Test
+    void actionsDiffer_equivalentGradientAndColorWithDifferentBrightness_returnsTrue() {
+        XY point = new XY(0.3, 0.4);
+        SceneAction gradient = gradientSceneAction("interpolated_palette", point, point);
+        SceneAction color = singleColorSceneAction(point);
+        gradient.getAction().setDimming(new Dimming(50.0));
+        color.getAction().setDimming(new Dimming(75.0));
+
+        assertThat(HueApiImpl.actionsDiffer(new Scene(List.of(gradient)), List.of(color))).isTrue();
+    }
+
+    private static SceneAction singleColorSceneAction(XY point) {
+        SceneAction action = sceneAction("LIGHT_A", 50.0);
+        action.getAction().setColor(new Color(point));
+        return action;
+    }
+
+    private static SceneAction gradientSceneAction(String mode, XY... points) {
+        List<Action.GradientPoint> gradientPoints = Arrays.stream(points)
+                .map(point -> new Action.GradientPoint(new Color(point)))
+                .toList();
+        SceneAction action = sceneAction("LIGHT_A", 50.0);
+        action.getAction().setGradient(new Action.Gradient(gradientPoints, mode));
+        return action;
+    }
+
     private static SceneAction sceneAction(String lightId, double brightness) {
         return new SceneAction(new ResourceReference(lightId, "light"),
                 Action.builder().on(new On(true)).dimming(new Dimming(brightness)).build());

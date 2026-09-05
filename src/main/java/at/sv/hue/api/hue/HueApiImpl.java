@@ -674,11 +674,31 @@ public final class HueApiImpl implements HueApi {
         Action ba = b.getAction();
         return Objects.equals(aa.getOn(), ba.getOn()) &&
                dimmingMatches(aa.getDimming(), ba.getDimming()) &&
-               Objects.equals(aa.getColor(), ba.getColor()) &&
+               sceneColorsMatch(aa, ba) &&
                Objects.equals(aa.getColor_temperature(), ba.getColor_temperature()) &&
                Objects.equals(aa.getEffects_v2(), ba.getEffects_v2()) &&
-               Objects.equals(aa.getGradient(), ba.getGradient()) &&
                Objects.equals(aa.getDynamics(), ba.getDynamics());
+    }
+
+    private static boolean sceneColorsMatch(Action a, Action b) {
+        return normalizedSceneColor(a).equals(normalizedSceneColor(b));
+    }
+
+    private static SceneColor normalizedSceneColor(Action action) {
+        Color uniformColor = uniformGradientColor(action.getGradient());
+        if (uniformColor != null) {
+            return new SceneColor(uniformColor, null);
+        }
+        return new SceneColor(action.getColor(), action.getGradient());
+    }
+
+    private record SceneColor(Color color, Action.Gradient gradient) {}
+
+    private static Color uniformGradientColor(Action.Gradient gradient) {
+        if (gradient == null || gradient.getPoints().stream().distinct().count() != 1) {
+            return null;
+        }
+        return gradient.getPoints().getFirst().getColor();
     }
 
     private static boolean dimmingMatches(Dimming a, Dimming b) {
