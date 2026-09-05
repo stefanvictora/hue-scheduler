@@ -2,6 +2,10 @@
  
 ## Index
 
+**Schedule Sources**
+
+- [`--enable-auto-scene-states`](#--enable-auto-scene-states) · [`--migrate-input-to-scenes`](#--migrate-input-to-scenes)
+
 **Scene Sync & Activation**
 
 - [`--enable-scene-sync`](#--enable-scene-sync) · [`--require-scene-activation`](#--require-scene-activation) · [`--scene-sync-name`](#--scene-sync-name) · [`--scene-control-name`](#--scene-control-name) · [`--scene-activation-ignore-window`](#--scene-activation-ignore-window)
@@ -34,6 +38,22 @@
 > Every CLI option can also be set via an environment variable. Example: `--interpolate-all` ⇢ `INTERPOLATE_ALL=true`.
 >
 > **Mapping:** `--some-option` → `SOME_OPTION` (uppercase, hyphens → underscores).
+
+## Schedule Sources
+
+### `--enable-auto-scene-states`
+
+Discovers State Definitions from Hue Scene Schedules and reloads them when their scenes change. This feature is available only with a Philips Hue Bridge.
+
+When enabled, the `CONFIG_FILE` positional argument (or environment variable) is optional. If a configuration file is also provided, its definitions are combined with those discovered from Scene Schedules. An explicitly configured file must still exist and be readable.
+
+**Default:** `false`
+
+### `--migrate-input-to-scenes`
+
+Creates Hue Scene Schedules from supported group definitions in the configuration file, then exits. This one-time migration requires `CONFIG_FILE` even when `--enable-auto-scene-states` is enabled and is available only with a Philips Hue Bridge.
+
+**Default:** `false`
 
 ## Scene Sync & Activation
 
@@ -92,24 +112,26 @@ Delay **in seconds** after detecting a scene activation during which **turn-on e
 
 ### `--interpolate-all`
 
-Globally sets `interpolate:true` for all states unless a state explicitly uses `interpolate:false`. Useful when you want interpolation between most or all states.
+Globally sets `interpolate:true` for every schedule entry unless an entry explicitly uses `interpolate:false`. Where interpolation is possible, it starts at the previous entry's scheduled time and reaches the current entry's values at its scheduled time.
 
 **Default:** `false`
 
 ### `--default-interpolation-transition-time`
 
-Sets the default transition time used for **interpolated calls** when a light is turned on during a `tr-before` window. Accepts either a multiple of 100 ms (e.g., `4`) or duration strings (e.g., `5s`, `1min`). If the **previous state** defines `tr`, that value is reused instead.
+Controls how quickly a light catches up when it turns on partway through a `tr-before` or interpolation. Hue Scheduler first calculates the values expected at that moment, then uses this short transition to reach them. If the previous schedule entry defines `tr`, that value is used instead.
+
+This setting does not change the duration of the overall early transition or when the final values are due. It accepts either a multiple of 100 ms (e.g., `4`) or a duration string (e.g., `5s`, `1min`).
 
 ```yacas
-# Uses the default:
+# Uses the default catch-up transition:
 Desk  06:00  bri:50%
 Desk  07:00  bri:100%  tr-before:20min
 
-# Reuses previous state's tr:
+# Uses the previous entry's tr when catching up:
 Desk  06:00  bri:50%  tr:10s
 Desk  07:00  bri:100%  tr-before:20min
 
-# Disables interpolation transitions:
+# Catches up immediately:
 Desk  06:00  bri:50%  tr:0
 Desk  07:00  bri:100%  tr-before:20min
 ```
@@ -120,9 +142,11 @@ Desk  07:00  bri:100%  tr-before:20min
 
 Relevant only when user-modification tracking is **enabled**.
 
-Minimum gap **in minutes** enforced between **back-to-back** states that use transitions. Without a gap, the Hue Bridge may not recognize the final target value of the first transition yet and could flag the light as "manually overridden." Hue Scheduler ensures this gap by shortening overlapping transitions as needed.
+Minimum settling time **in minutes** between one transition finishing and the next schedule entry taking over. The schedule remains active during this time; Hue Scheduler shortens the earlier transition so the light holds its final values for the configured buffer.
 
-If overrides are still detected between adjacent transitioning states, increase this value.
+This gives the Hue Bridge time to report the final values before the next update. Without that buffer, the scheduler can mistake the bridge's still-changing values for a manual override.
+
+If overrides are still detected between adjacent entries with transitions, increase this value.
 
 **Default:** `3` minutes
 

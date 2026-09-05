@@ -282,11 +282,11 @@ public class HueSchedulerManualOverrideTest extends AbstractHueSchedulerTest {
         );
 
         advanceTimeAndRunAndAssertPutCalls(runnables.get(1),
-                expectedPutCall(10).bri(DEFAULT_BRIGHTNESS - 20)
+                expectedPutCall(9).bri(DEFAULT_BRIGHTNESS - 10)
         );
 
         advanceTimeAndRunAndAssertPutCalls(runnables.get(2),
-                expectedPutCall(9).bri(DEFAULT_BRIGHTNESS - 10)
+                expectedPutCall(10).bri(DEFAULT_BRIGHTNESS - 20)
         );
 
         // next day runnables

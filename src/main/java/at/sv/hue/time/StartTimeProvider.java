@@ -4,6 +4,11 @@ import java.time.ZonedDateTime;
 
 public interface StartTimeProvider {
     /**
+     * Returns whether the input is a supported start time expression without resolving it for a specific date.
+     */
+    boolean isValid(String input);
+
+    /**
      * @param input    one of the following start time expressions:
      *                 <ul>
      *                   <li>a {@link java.time.format.DateTimeFormatter#ISO_LOCAL_TIME ISO_LOCAL_TIME} formatted string</li>

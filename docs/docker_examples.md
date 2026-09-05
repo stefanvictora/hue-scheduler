@@ -27,6 +27,8 @@ services:
     restart: unless-stopped
  ```
 
+For a setup that uses only Hue Scene Schedules, remove `CONFIG_FILE` and the `volumes` section, then add `ENABLE_AUTO_SCENE_STATES=true` to the environment.
+
 On Windows, adapt the source path, e.g. `C:\Users\user_name\.config\hue-scheduler\input.txt`. (If you use WSL, map from your Linux path instead.)
 
 **Note:** Since 0.13.1, Hue Scheduler is running as a non-root user inside the container. Therefore, ensure that the mounted configuration file has appropriate read permissions for non-root users. Or change the user the application is run like this:
@@ -65,6 +67,8 @@ docker run -d --name hue-scheduler \
 ```
 
 This mounts `input.txt` from your **current working directory** (`$(pwd)`) into the container at `/config/input.txt` (read-only). Adjust the file name and path to fit your setup. `CONFIG_FILE` is the **in-container** path; the bind mount wires it up.
+
+For Scene Schedules only, omit the `-v` argument and `/config/input.txt`, and add `--enable-auto-scene-states`.
 
 Note for Windows:
 - PowerShell: use `${PWD}` instead of `$(pwd)` in the `-v` mount.

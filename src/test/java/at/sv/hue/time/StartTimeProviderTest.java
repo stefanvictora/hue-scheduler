@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -32,6 +33,8 @@ class StartTimeProviderTest {
     private ZonedDateTime twoDaysAgo;
     private ZonedDateTime previousDaySunrise;
     private ZonedDateTime twoDaysAgoSunrise;
+    private AtomicInteger sunriseCalls;
+    private AtomicInteger sunsetCalls;
 
     private void assertStart(String input, ZonedDateTime time) {
         assertStart(input, now, time);
@@ -55,6 +58,8 @@ class StartTimeProviderTest {
         nextDaySunrise = now.with(LocalTime.of(7, 10));
         previousDaySunrise = now.with(LocalTime.of(6, 0));
         twoDaysAgoSunrise = now.with(LocalTime.of(8, 0));
+        sunriseCalls = new AtomicInteger();
+        sunsetCalls = new AtomicInteger();
         goldenHour = now.with(LocalTime.of(15, 0));
         sunset = now.with(LocalTime.of(16, 0));
         blueHour = now.with(LocalTime.of(16, 15));
@@ -65,6 +70,7 @@ class StartTimeProviderTest {
         provider = new StartTimeProviderImpl(new SunTimesProvider() {
             @Override
             public ZonedDateTime getSunrise(ZonedDateTime dateTime) {
+                sunriseCalls.incrementAndGet();
                 if (dateTime.equals(nextDay)) {
                     return nextDaySunrise;
                 } else if (dateTime.equals(previousDay)) {
@@ -83,6 +89,7 @@ class StartTimeProviderTest {
 
             @Override
             public ZonedDateTime getSunset(ZonedDateTime dateTime) {
+                sunsetCalls.incrementAndGet();
                 return sunset;
             }
 
@@ -186,6 +193,15 @@ class StartTimeProviderTest {
     }
 
     @Test
+    void parse_keyWord_withOffset_alsoSupportsUnits() {
+        assertStart("sunrise+1h", sunrise.plusHours(1));
+        assertStart("sunrise+15m", sunrise.plusMinutes(15));
+        assertStart("sunrise+15min", sunrise.plusMinutes(15));
+        assertStart("sunrise+1h15min10s", sunrise.plusHours(1).plusMinutes(15).plusSeconds(10));
+        assertStart("civil_start-1h", civilStart.minusHours(1));
+    }
+
+    @Test
     void parse_keyWord_withOffset_invalidExpression() {
         assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("sunrise + sunrise", now));
     }
@@ -193,6 +209,8 @@ class StartTimeProviderTest {
     @Test
     void parse_invalidOffsetExpression() {
         assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("+10", now));
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("sunrise+", now));
+        assertThrows(InvalidStartTimeExpression.class, () -> provider.getStart("sunrise + ", now));
     }
 
     @Test
@@ -581,5 +599,23 @@ class StartTimeProviderTest {
         // Regression test: smoothing must operate on time-of-day only.
         // Averaging epoch-seconds over past days would incorrectly shift the result date into the past.
         assertStart("smooth(07:00, 14d)", now.with(LocalTime.of(7, 0)));
+    }
+
+    @Test
+    void isValid_acceptsCompleteExpressionGrammar_withoutEvaluating() {
+        assertThat(provider.isValid(
+                "clamp(smooth(mix(sunset+20, 21:15, 70%), 10d), max(18:30, sunset-15), 22:45)"))
+                .isTrue();
+        assertThat(sunriseCalls).hasValue(0);
+        assertThat(sunsetCalls).hasValue(0);
+    }
+
+    @Test
+    void isValid_rejectsMalformedOffsetsAndFunctions() {
+        assertThat(provider.isValid("sunrise+")).isFalse();
+        assertThat(provider.isValid("sunrise+foo")).isFalse();
+        assertThat(provider.isValid("sunrise+1+2")).isFalse();
+        assertThat(provider.isValid("max(")).isFalse();
+        assertThat(provider.isValid("max(sunrise,)")).isFalse();
     }
 }

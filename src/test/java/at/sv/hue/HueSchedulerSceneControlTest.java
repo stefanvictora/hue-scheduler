@@ -1,6 +1,8 @@
 package at.sv.hue;
 
+import at.sv.hue.api.AffectedId;
 import at.sv.hue.api.Capability;
+import at.sv.hue.api.Identifier;
 import at.sv.hue.api.LightCapabilities;
 import org.junit.jupiter.api.Test;
 
@@ -18,7 +20,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
     void sceneControl_init_loadsLightPropertiesForGroupByName() {
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
-        mockSceneLightStates(1, "TestScene",
+        Identifier scene = mockSceneLightStates(1, "TestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(100)
@@ -33,7 +35,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now, now.plusDays(1))
         );
 
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1, scene.id(),
                 expectedPutCall(4).bri(100).ct(20),
                 expectedPutCall(5).bri(50).ct(40)
         );
@@ -77,7 +79,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
 
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
-        mockSceneLightStates(1, "TestScene",
+        Identifier scene = mockSceneLightStates(1, "TestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(100)
@@ -92,7 +94,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now, now.plusDays(1))
         );
 
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1, scene.id(),
                 expectedPutCall(4).bri(100).ct(20),
                 expectedPutCall(5).bri(50).ct(40)
         );
@@ -118,7 +120,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
         mockAssignedGroups(4, 1, 2);
         mockAssignedGroups(5, 1, 2);
         mockAssignedGroups(6, 2);
-        mockSceneLightStates(1, "TestScene",
+        Identifier scene1 = mockSceneLightStates(1, "TestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(100)
@@ -127,7 +129,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                                    .id("/lights/5")
                                    .bri(50)
                                    .ct(40));
-        mockSceneLightStates(2, "TestScene",
+        Identifier scene2 = mockSceneLightStates(2, "TestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(240)
@@ -148,7 +150,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now.plusSeconds(1), now.plusDays(1))
         );
 
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 2,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 2, scene2.id(),
                 expectedPutCall(4).bri(240).ct(340), // todo: we should consider the overrides also here in the future; but they are not officially supported yet
                 expectedPutCall(5).bri(250).ct(350),
                 expectedPutCall(6).bri(254).ct(200)
@@ -168,7 +170,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
         );
 
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.get(1), 1,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.get(1), 1, scene1.id(),
                 expectedPutCall(4).bri(100).ct(20),
                 expectedPutCall(5).bri(50).ct(40)
         );
@@ -206,7 +208,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 ScheduledLightState.builder()
                                    .id("/lights/5")
                                    .bri(150));
-        mockSceneLightStates(2, "AnotherTestScene",
+        Identifier scene2 = mockSceneLightStates(2, "AnotherTestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .gradient(Gradient.builder()
@@ -228,7 +230,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
 
         setCurrentTimeToAndRun(runnables.getFirst());
 
-        assertScenePutCalls(2,
+        assertScenePutCalls(2, scene2.id(),
                 expectedPutCall(4).gradient(Gradient.builder()
                                                     .points(List.of(
                                                             Pair.of(0.2, 0.2),
@@ -239,7 +241,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedPutCall(5).bri(150)
         );
 
-        assertScenePutCalls(2,
+        assertScenePutCalls(2, scene2.id(),
                 expectedPutCall(4).gradient(Gradient.builder()
                                                     .points(List.of(
                                                             Pair.of(0.2, 0.3),
@@ -285,7 +287,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 ScheduledLightState.builder()
                                    .id("/lights/5")
                                    .bri(150));
-        mockSceneLightStates(2, "AnotherTestScene",
+        Identifier scene2 = mockSceneLightStates(2, "AnotherTestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .gradient(Gradient.builder()
@@ -308,7 +310,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
 
         setCurrentTimeToAndRun(runnables.getFirst());
 
-        assertScenePutCalls(2,
+        assertScenePutCalls(2, scene2.id(),
                 expectedPutCall(4).gradient(Gradient.builder()
                                                     .points(List.of(
                                                             Pair.of(0.2, 0.2),
@@ -319,7 +321,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedPutCall(5).bri(150)
         );
 
-        assertScenePutCalls(2,
+        assertScenePutCalls(2, scene2.id(),
                 expectedPutCall(4).gradient(Gradient.builder()
                                                     .points(List.of(
                                                             Pair.of(0.2, 0.2),
@@ -362,7 +364,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 ScheduledLightState.builder()
                                    .id("/lights/5")
                                    .bri(150));
-        mockSceneLightStates(2, "AnotherTestScene",
+        Identifier scene2 = mockSceneLightStates(2, "AnotherTestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .x(0.2)
@@ -380,12 +382,12 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
 
         setCurrentTimeToAndRun(runnables.getFirst());
 
-        assertScenePutCalls(2,
+        assertScenePutCalls(2, scene2.id(),
                 expectedPutCall(4).x(0.5).y(0.4),
                 expectedPutCall(5).bri(150)
         );
 
-        assertScenePutCalls(2,
+        assertScenePutCalls(2, scene2.id(),
                 expectedPutCall(4).x(0.2).y(0.15)
                                   .transitionTime(tr("30min")),
                 expectedPutCall(5).bri(150).transitionTime(tr("30min"))
@@ -415,7 +417,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 ScheduledLightState.builder()
                                    .id("/lights/5")
                                    .bri(150));
-        mockSceneLightStates(2, "AnotherTestScene",
+        Identifier scene2 = mockSceneLightStates(2, "AnotherTestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .ct(300),
@@ -432,12 +434,12 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
 
         setCurrentTimeToAndRun(runnables.getFirst());
 
-        assertScenePutCalls(2,
+        assertScenePutCalls(2, scene2.id(),
                 expectedPutCall(4).ct(250),
                 expectedPutCall(5).bri(150)
         );
 
-        assertScenePutCalls(2,
+        assertScenePutCalls(2, scene2.id(),
                 expectedPutCall(4).ct(300)
                                   .transitionTime(tr("30min")),
                 expectedPutCall(5).bri(150).transitionTime(tr("30min"))
@@ -459,7 +461,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
     void sceneControl_init_withOnProperty_addsOnToIndividualLights_unlessTheyAreOff() {
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
-        mockSceneLightStates(1, "TestScene",
+        Identifier scene = mockSceneLightStates(1, "TestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(100)
@@ -473,7 +475,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now, now.plusDays(1))
         );
 
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1, scene.id(),
                 expectedPutCall(4).on(true).bri(100).ct(20),
                 expectedPutCall(5).on(false)
         );
@@ -517,7 +519,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
         enableSupportForOffLightUpdates();
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
-        mockSceneLightStates(1, "TestScene",
+        Identifier scene = mockSceneLightStates(1, "TestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(100),
@@ -531,13 +533,87 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
         );
 
         mockIsLightOff(5, true);
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1, scene.id(),
                 expectedPutCall(4).bri(100)
                 // light 5 is off, so no put call for it
         );
 
         ensureScheduledStates(
                 expectedRunnable(now.plusDays(1), now.plusDays(2)) // next day
+        );
+    }
+
+    @Test
+    void sceneControl_syncedSceneTurnedLightOn_bridgeStateStaysStale_doesNotFadeLightBackOff() {
+        minTrGap = 3;
+        create();
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        Identifier scene = mockSceneLightStates(1, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(200));
+        addState("g1", now, "scene:TestScene");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1))
+        );
+
+        mockIsLightOff(5, true); // stale: the bridge has not registered the scene's on action yet
+        simulateSceneWithNameActivated(sceneSyncName,
+                new AffectedId("/lights/4", true),
+                new AffectedId("/lights/5", false),
+                new AffectedId("/groups/1", true));
+        advanceCurrentTime(Duration.ofMinutes(minTrGap));
+
+        runnables.getFirst().run();
+        assertScenePutCalls(1, scene.id(),
+                expectedPutCall(4).bri(100),
+                expectedPutCall(5).bri(200)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusDays(1), initialNow.plusDays(2)) // next day
+        );
+    }
+
+    @Test
+    void sceneControl_syncedSceneTurnedLightOn_thenManualOff_manualControlWins() {
+        minTrGap = 3;
+        create();
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4, 5);
+        Identifier scene = mockSceneLightStates(1, "TestScene",
+                ScheduledLightState.builder()
+                                   .id("/lights/4")
+                                   .bri(100),
+                ScheduledLightState.builder()
+                                   .id("/lights/5")
+                                   .bri(200));
+        addState("g1", now, "scene:TestScene");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusDays(1))
+        );
+
+        mockIsLightOff(5, true);
+        simulateSceneWithNameActivated(sceneSyncName,
+                new AffectedId("/lights/4", true),
+                new AffectedId("/lights/5", false),
+                new AffectedId("/groups/1", true));
+        simulateLightOffEvent("/lights/5");
+        advanceCurrentTime(Duration.ofMinutes(minTrGap));
+
+        runnables.getFirst().run();
+        assertScenePutCalls(1, scene.id(),
+                expectedPutCall(4).bri(100)
+        );
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusDays(1), initialNow.plusDays(2)) // next day
         );
     }
 
@@ -634,7 +710,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
     void sceneControl_init_withBrightnessOverride_appliesProportionalScaling() {
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
-        mockSceneLightStates(1, "TestScene",
+        Identifier scene = mockSceneLightStates(1, "TestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(200)  // bright light
@@ -652,7 +728,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
         // With scaleFactor = 127/254 = 0.5
         // Light 4: 200 * 0.5 = 100
         // Light 5: 100 * 0.5 = 50
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1, scene.id(),
                 expectedPutCall(4).bri(100).ct(20),
                 expectedPutCall(5).bri(50).ct(40)
         );
@@ -666,7 +742,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
     void sceneControl_init_withBrightnessOverride_preservesRelativeProportions() {
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
-        mockSceneLightStates(1, "TestScene",
+        Identifier scene = mockSceneLightStates(1, "TestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(254)  // max brightness
@@ -684,7 +760,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
         // With scaleFactor = 100/254 ≈ 0.394
         // Light 4: 254 * 0.394 = 100
         // Light 5: 64 * 0.394 = 25 (maintains 1:4 ratio)
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1, scene.id(),
                 expectedPutCall(4).bri(100).ct(20),
                 expectedPutCall(5).bri(25).ct(40)
         );
@@ -698,7 +774,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
     void sceneControl_init_withMaxBrightnessOverride_leavesSceneUnchanged() {
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
-        mockSceneLightStates(1, "TestScene",
+        Identifier scene = mockSceneLightStates(1, "TestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(200)
@@ -716,7 +792,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
         // With scaleFactor = 254/254 = 1.0 (no change)
         // Light 4: 200 * 1.0 = 200
         // Light 5: 100 * 1.0 = 100
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1, scene.id(),
                 expectedPutCall(4).bri(200).ct(20),
                 expectedPutCall(5).bri(100).ct(40)
         );
@@ -730,7 +806,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
     void sceneControl_init_withLowBrightnessOverride_dimsProportionally() {
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5, 6);
-        mockSceneLightStates(1, "TestScene",
+        Identifier scene = mockSceneLightStates(1, "TestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(200)
@@ -753,7 +829,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
         // Light 4: 200 * 0.098 = 20
         // Light 5: 100 * 0.098 = 10
         // Light 6: 50 * 0.098 = 5
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1, scene.id(),
                 expectedPutCall(4).bri(20).ct(20),
                 expectedPutCall(5).bri(10).ct(40),
                 expectedPutCall(6).bri(5).ct(60)
@@ -768,7 +844,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
     void sceneControl_init_withBrightnessOverride_enforcesMinimumBrightness() {
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
-        mockSceneLightStates(1, "TestScene",
+        Identifier scene = mockSceneLightStates(1, "TestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(10)   // very dim
@@ -786,7 +862,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
         // With scaleFactor = 25/254 ≈ 0.098
         // Light 4: 10 * 0.098 = 1 (rounded, minimum enforced)
         // Light 5: 5 * 0.098 = 0.49 → 1 (minimum enforced)
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1, scene.id(),
                 expectedPutCall(4).bri(1).ct(20),
                 expectedPutCall(5).bri(1).ct(40)
         );
@@ -800,7 +876,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
     void sceneControl_init_withBrightnessOverride_canExceedOriginalBrightness() {
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
-        mockSceneLightStates(1, "TestScene",
+        Identifier scene = mockSceneLightStates(1, "TestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(100)
@@ -818,7 +894,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
         // With scaleFactor = 300/254 ≈ 1.18
         // Light 4: 100 * 1.18 = 118
         // Light 5: 50 * 1.18 = 59
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1, scene.id(),
                 expectedPutCall(4).bri(118).ct(20),
                 expectedPutCall(5).bri(59).ct(40)
         );
@@ -832,7 +908,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
     void sceneControl_init_withBrightnessOverride_capsAtMaximum() {
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
-        mockSceneLightStates(1, "TestScene",
+        Identifier scene = mockSceneLightStates(1, "TestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(200)
@@ -850,7 +926,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
         // With scaleFactor = 300/254 ≈ 1.18
         // Light 4: 200 * 1.18 = 236
         // Light 5: 230 * 1.18 = 271 → 254 (capped at maximum)
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1, scene.id(),
                 expectedPutCall(4).bri(236).ct(20),
                 expectedPutCall(5).bri(254).ct(40)
         );
@@ -864,7 +940,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
     void sceneControl_init_withBrightnessOverride_ignoresMissingBrightnessInScene() {
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
-        mockSceneLightStates(1, "TestScene",
+        Identifier scene = mockSceneLightStates(1, "TestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(100)
@@ -880,7 +956,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
         );
 
         // Light 4 gets scaled, Light 5 is ignored (since no bri in scene)
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1, scene.id(),
                 expectedPutCall(4).bri(59).ct(20),  // 100 * (150/254) ≈ 59
                 expectedPutCall(5).ct(40) // ignored
         );
@@ -894,7 +970,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
     void sceneControl_init_withBrightnessOverride_over100Percent_cappedAtMax() {
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
-        mockSceneLightStates(1, "TestScene",
+        Identifier scene = mockSceneLightStates(1, "TestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(200)
@@ -909,7 +985,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now, now.plusDays(1))
         );
 
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1, scene.id(),
                 expectedPutCall(4).bri(254).ct(20),
                 expectedPutCall(5).bri(201).ct(40)
         );
@@ -948,7 +1024,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
         enableUserModificationTracking();
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
-        mockSceneLightStates(1, "TestScene1",
+        Identifier scene1 = mockSceneLightStates(1, "TestScene1",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(100)
@@ -957,7 +1033,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                                    .id("/lights/5")
                                    .bri(125)
                                    .ct(225));
-        mockSceneLightStates(1, "TestScene2",
+        Identifier scene2 = mockSceneLightStates(1, "TestScene2",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(200)
@@ -975,7 +1051,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now.plusMinutes(10), now.plusDays(1))
         );
 
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1, scene1.id(),
                 expectedPutCall(4).bri(100).ct(200),
                 expectedPutCall(5).bri(125).ct(225)
         );
@@ -989,7 +1065,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedState().id("/lights/4").brightness(100).colorTemperature(200).colormode(ColorMode.CT),
                 expectedState().id("/lights/5").brightness(125).colorTemperature(225).colormode(ColorMode.CT)
         );
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.get(1), 1,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.get(1), 1, scene2.id(),
                 expectedPutCall(4).bri(200).ct(300),
                 expectedPutCall(5).bri(225).ct(325)
         );
@@ -1003,7 +1079,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedState().id("/lights/4").brightness(225).colorTemperature(325).colormode(ColorMode.CT),
                 expectedState().id("/lights/5").brightness(200).colorTemperature(300).colormode(ColorMode.CT)
         );
-        advanceTimeAndRunAndAssertScenePutCalls(nextDay, 1); // override detected
+        advanceTimeAndRunAndAssertScenePutCalls(nextDay, 1, scene1.id()); // override detected
 
         ensureScheduledStates(
                 expectedRunnable(initialNow.plusDays(2), initialNow.plusDays(2).plusMinutes(10)) // next day
@@ -1015,7 +1091,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
         enableUserModificationTracking();
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
-        mockSceneLightStates(1, "TestScene",
+        Identifier scene = mockSceneLightStates(1, "TestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(200)
@@ -1033,7 +1109,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now.plusMinutes(10), now.plusDays(1))
         );
 
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1, scene.id(),
                 expectedPutCall(4).bri(200).ct(300),
                 expectedPutCall(5).bri(100).ct(250)
         );
@@ -1060,7 +1136,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedState().id("/lights/4").brightness(100).colorTemperature(200).colormode(ColorMode.CT),
                 expectedState().id("/lights/5").brightness(100).colorTemperature(200).colormode(ColorMode.CT)
         );
-        advanceTimeAndRunAndAssertScenePutCalls(nextDay, 1); // override detected
+        advanceTimeAndRunAndAssertScenePutCalls(nextDay, 1, scene.id()); // override detected
 
         ensureScheduledStates(
                 expectedRunnable(initialNow.plusDays(2), initialNow.plusDays(2).plusMinutes(10)) // next day
@@ -1071,7 +1147,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
     void sceneControl_sceneThenScene_correctlyHandlesGroupMismatch() {
         mockDefaultGroupCapabilities(2);
         mockGroupLightsForId(2, 5, 6);
-        mockSceneLightStates(2, "TestScene",
+        Identifier scene1 = mockSceneLightStates(2, "TestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/5")
                                    .bri(100)
@@ -1080,7 +1156,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                                    .id("/lights/6")
                                    .bri(150)
                                    .ct(400));
-        mockSceneLightStates(2, "AnotherTestScene",
+        Identifier scene2 = mockSceneLightStates(2, "AnotherTestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(200)
@@ -1101,7 +1177,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now.plusMinutes(5), now.plusDays(1))
         );
 
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 2,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 2, scene1.id(),
                 expectedPutCall(5).bri(100).ct(300),
                 expectedPutCall(6).bri(150).ct(400)
         );
@@ -1110,7 +1186,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(5)) // next day
         );
 
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.get(1), 2,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.get(1), 2, scene2.id(),
                 expectedPutCall(4).bri(200).ct(400).transitionTime(tr("5min")),
                 expectedPutCall(5).bri(250).ct(500).transitionTime(tr("5min")),
                 expectedPutCall(6).bri(300).ct(500).transitionTime(tr("5min"))
@@ -1126,7 +1202,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
         enableSceneSync();
         mockDefaultGroupCapabilities(2);
         mockGroupLightsForId(2, 5, 6, 7); // one additional light, not included in scene
-        mockSceneLightStates(2, "TestScene",
+        Identifier scene1 = mockSceneLightStates(2, "TestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/5")
                                    .bri(100)
@@ -1152,7 +1228,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now.plusMinutes(10), now.plusDays(1))
         );
 
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 2,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 2, scene1.id(),
                 expectedPutCall(5).bri(100).ct(300),
                 expectedPutCall(6).bri(150).ct(400)
         );
@@ -1171,7 +1247,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
     void sceneControl_sceneThenGroup_sceneWithGradient_calculatesFullPicture_correctPutCalls() {
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
-        mockSceneLightStates(1, "TestScene",
+        Identifier scene = mockSceneLightStates(1, "TestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .gradient(Gradient.builder()
@@ -1194,7 +1270,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now.plusMinutes(10), now.plusDays(1))
         );
 
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1, scene.id(),
                 expectedPutCall(4).bri(50).gradient(Gradient.builder()
                                                             .points(List.of(
                                                                     Pair.of(0.123, 0.456),
@@ -1214,14 +1290,14 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
     void sceneControl_sceneToScene_oneWithGradient_trBefore_calculatesFullPicture_correctPutCalls() {
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
-        mockSceneLightStates(1, "TestScene1",
+        Identifier scene1 = mockSceneLightStates(1, "TestScene1",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(100),
                 ScheduledLightState.builder()
                                    .id("/lights/5")
                                    .bri(200));
-        mockSceneLightStates(1, "TestScene2",
+        Identifier scene2 = mockSceneLightStates(1, "TestScene2",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .gradient(Gradient.builder()
@@ -1244,7 +1320,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now.plusMinutes(5), now.plusDays(1))
         );
 
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1, scene1.id(),
                 expectedPutCall(4).bri(100).gradient(Gradient.builder()
                                                              .points(List.of(
                                                                      Pair.of(0.2, 0.3),
@@ -1259,7 +1335,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now.plusDays(1), now.plusDays(1).plusMinutes(5)) // next day
         );
 
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.get(1), 1,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.get(1), 1, scene2.id(),
                 expectedPutCall(4).gradient(Gradient.builder()
                                                     .points(List.of(
                                                             Pair.of(0.2, 0.3),
@@ -1279,7 +1355,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
     void sceneControl_sceneThenGroup_calculatesFullPicture_correctPutCalls() {
         mockDefaultGroupCapabilities(2);
         mockGroupLightsForId(2, 4, 5);
-        mockSceneLightStates(2, "TestScene",
+        Identifier scene = mockSceneLightStates(2, "TestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .ct(300),
@@ -1294,7 +1370,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now.plusMinutes(10), now.plusDays(1))
         );
 
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 2,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 2, scene.id(),
                 expectedPutCall(4).bri(50).ct(300), // bri taken from group
                 expectedPutCall(5).bri(50).ct(400)  // bri taken from group
         );
@@ -1325,7 +1401,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now.plusMinutes(10), now.plusDays(1))
         );
 
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 2,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 2, null,
                 expectedPutCall(4).bri(100).ct(200),
                 expectedPutCall(5).bri(150).ct(200)
         );
@@ -1339,7 +1415,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
     void sceneControl_sceneThenScene_calculatesFullPicture_correctPutCalls() {
         mockDefaultGroupCapabilities(2);
         mockGroupLightsForId(2, 4, 5);
-        mockSceneLightStates(2, "TestScene1",
+        Identifier scene1 = mockSceneLightStates(2, "TestScene1",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .ct(100),
@@ -1363,7 +1439,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now.plusMinutes(10), now.plusDays(1))
         );
 
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 2,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 2, scene1.id(),
                 expectedPutCall(4).bri(100).ct(100),
                 expectedPutCall(5).bri(150).ct(200)
         );
@@ -1377,7 +1453,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
     void sceneControl_interpolate_groupToScene_sameProperties_correctPutCalls() {
         mockDefaultGroupCapabilities(2);
         mockGroupLightsForId(2, 4, 5);
-        mockSceneLightStates(2, "AnotherTestScene",
+        Identifier scene = mockSceneLightStates(2, "AnotherTestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(100)
@@ -1400,7 +1476,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedGroupPutCall(2).bri(50).ct(200)
         );
 
-        assertScenePutCalls(2,
+        assertScenePutCalls(2, scene.id(),
                 expectedPutCall(4).bri(100).ct(300).transitionTime(tr("10min")),
                 expectedPutCall(5).bri(150).ct(400).transitionTime(tr("10min"))
         );
@@ -1420,11 +1496,11 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
 
         powerOnRunnables.getFirst().run();
 
-        assertScenePutCalls(2,
+        assertScenePutCalls(2, scene.id(),
                 expectedPutCall(4).bri(75).ct(250),  // interpolated
                 expectedPutCall(5).bri(100).ct(300)  // interpolated
         );
-        assertScenePutCalls(2,
+        assertScenePutCalls(2, scene.id(),
                 expectedPutCall(4).bri(100).ct(300).transitionTime(tr("5min")),
                 expectedPutCall(5).bri(150).ct(400).transitionTime(tr("5min"))
         );
@@ -1436,7 +1512,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
     void sceneControl_interpolate_groupToScene_differentGamut_performsCorrection() {
         mockDefaultGroupCapabilities(2);
         mockGroupLightsForId(2, 4, 5, 6);
-        mockSceneLightStates(2, "TestScene",
+        Identifier scene = mockSceneLightStates(2, "TestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .x(0.3)
@@ -1467,7 +1543,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
 
         setCurrentTimeToAndRun(runnables.getFirst());
 
-        assertScenePutCalls(2,
+        assertScenePutCalls(2, scene.id(),
                 expectedPutCall(4).x(0.2013).y(0.5974), // gamut corrected for gamut A
                 expectedPutCall(5).gradient(Gradient.builder()
                                                     .points(List.of(
@@ -1477,7 +1553,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedPutCall(6).x(0.18).y(0.6)
         );
 
-        assertScenePutCalls(2,
+        assertScenePutCalls(2, scene.id(),
                 expectedPutCall(4).x(0.3).y(0.18).transitionTime(tr("10min")),
                 expectedPutCall(5).gradient(Gradient.builder()
                                                     .points(List.of(
@@ -1522,7 +1598,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
 
         setCurrentTimeToAndRun(runnables.getFirst());
 
-        assertScenePutCalls(2,
+        assertScenePutCalls(2, null,
                 expectedPutCall(4).x(0.2037).y(0.6171), // gamut corrected for gamut A
                 expectedPutCall(5).x(0.2049).y(0.627) // gamut corrected for gamut A
         );
@@ -1541,7 +1617,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
     void sceneControl_interpolate_groupToScene_sceneHasOffLights_interpolatesBrightness_alsoForOffState_correctPutCalls() {
         mockDefaultGroupCapabilities(2);
         mockGroupLightsForId(2, 4, 5);
-        mockSceneLightStates(2, "TestScene",
+        Identifier scene = mockSceneLightStates(2, "TestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .on(false), // treated as bri:0
@@ -1564,7 +1640,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedGroupPutCall(2).bri(40).x(0.6024).y(0.3433).transitionTime(tr("2s"))
         );
 
-        assertScenePutCalls(2,
+        assertScenePutCalls(2, scene.id(),
                 expectedPutCall(4).on(false).transitionTime(tr("10min")),
                 expectedPutCall(5).bri(100).x(0.6024).y(0.3433).transitionTime(tr("10min"))
         );
@@ -1584,11 +1660,11 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
 
         powerOnRunnables.getFirst().run();
 
-        assertScenePutCalls(2,
+        assertScenePutCalls(2, scene.id(),
                 expectedPutCall(4).bri(20).x(0.6024).y(0.3433).transitionTime(tr("2s")),  // interpolated brightness (implicit target = 0)
                 expectedPutCall(5).bri(70).x(0.6024).y(0.3433).transitionTime(tr("2s"))  // interpolated
         );
-        assertScenePutCalls(2,
+        assertScenePutCalls(2, scene.id(),
                 expectedPutCall(4).on(false).transitionTime(tr("5min")),
                 expectedPutCall(5).bri(100).x(0.6024).y(0.3433).transitionTime(tr("5min"))
         );
@@ -1620,7 +1696,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
         setCurrentTimeToAndRun(runnables.getFirst());
 
         // previous state
-        assertScenePutCalls(2,
+        assertScenePutCalls(2, null,
                 expectedPutCall(4).bri(100).ct(300),
                 expectedPutCall(5).bri(150).ct(400)
         );
@@ -1644,7 +1720,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
 
         powerOnRunnables.getFirst().run();
 
-        assertScenePutCalls(2,
+        assertScenePutCalls(2, null,
                 expectedPutCall(4).bri(75).ct(250),  // interpolated
                 expectedPutCall(5).bri(100).ct(300)  // interpolated
         );
@@ -1668,7 +1744,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                                    .id("/lights/5")
                                    .bri(150)
                                    .ct(400));
-        mockSceneLightStates(2, "AnotherTestScene",
+        Identifier scene2 = mockSceneLightStates(2, "AnotherTestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(200)
@@ -1687,12 +1763,12 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
 
         setCurrentTimeToAndRun(runnables.getFirst());
 
-        assertScenePutCalls(2,
+        assertScenePutCalls(2, scene2.id(),
                 expectedPutCall(4).bri(100).ct(300),
                 expectedPutCall(5).bri(150).ct(400)
         );
 
-        assertScenePutCalls(2,
+        assertScenePutCalls(2, scene2.id(),
                 expectedPutCall(4).bri(200).ct(400).transitionTime(tr("10min")),
                 expectedPutCall(5).bri(250).ct(500).transitionTime(tr("10min"))
         );
@@ -1712,11 +1788,11 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
 
         powerOnRunnables.getFirst().run();
 
-        assertScenePutCalls(2,
+        assertScenePutCalls(2, scene2.id(),
                 expectedPutCall(4).bri(150).ct(350),  // interpolated
                 expectedPutCall(5).bri(200).ct(450)  // interpolated
         );
-        assertScenePutCalls(2,
+        assertScenePutCalls(2, scene2.id(),
                 expectedPutCall(4).bri(200).ct(400).transitionTime(tr("5min")),
                 expectedPutCall(5).bri(250).ct(500).transitionTime(tr("5min"))
         );
@@ -1735,7 +1811,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 ScheduledLightState.builder()
                                    .id("/lights/5")
                                    .bri(150));
-        mockSceneLightStates(2, "TestScene2",
+        Identifier scene2 = mockSceneLightStates(2, "TestScene2",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .on(false),
@@ -1752,12 +1828,12 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
 
         setCurrentTimeToAndRun(runnables.getFirst());
 
-        assertScenePutCalls(2,
+        assertScenePutCalls(2, scene2.id(),
                 expectedPutCall(4).on(false),
                 expectedPutCall(5).bri(150)
         );
 
-        assertScenePutCalls(2,
+        assertScenePutCalls(2, scene2.id(),
                 expectedPutCall(4).on(false).transitionTime(tr("10min")),
                 expectedPutCall(5).bri(250).transitionTime(tr("10min"))
         );
@@ -1779,7 +1855,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 ScheduledLightState.builder()
                                    .id("/lights/5")
                                    .bri(150));
-        mockSceneLightStates(2, "TestScene2",
+        Identifier scene2 = mockSceneLightStates(2, "TestScene2",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(100),
@@ -1796,12 +1872,12 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
 
         setCurrentTimeToAndRun(runnables.getFirst());
 
-        assertScenePutCalls(2,
+        assertScenePutCalls(2, scene2.id(),
                 expectedPutCall(4).bri(1), // min brightness value
                 expectedPutCall(5).bri(150)
         );
 
-        assertScenePutCalls(2,
+        assertScenePutCalls(2, scene2.id(),
                 expectedPutCall(4).bri(100).transitionTime(tr("10min")),
                 expectedPutCall(5).bri(250).transitionTime(tr("10min"))
         );
@@ -1821,11 +1897,11 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
 
         powerOnRunnables.getFirst().run();
 
-        assertScenePutCalls(2,
+        assertScenePutCalls(2, scene2.id(),
                 expectedPutCall(4).bri(50),  // interpolated
                 expectedPutCall(5).bri(200)  // interpolated
         );
-        assertScenePutCalls(2,
+        assertScenePutCalls(2, scene2.id(),
                 expectedPutCall(4).bri(100).transitionTime(tr("5min")),
                 expectedPutCall(5).bri(250).transitionTime(tr("5min"))
         );
@@ -1850,7 +1926,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 ScheduledLightState.builder()
                                    .id("/lights/5")
                                    .bri(150));
-        mockSceneLightStates(2, "TestScene2",
+        Identifier scene2 = mockSceneLightStates(2, "TestScene2",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .gradient(Gradient.builder()
@@ -1872,7 +1948,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
 
         setCurrentTimeToAndRun(runnables.getFirst());
 
-        assertScenePutCalls(2,
+        assertScenePutCalls(2, scene2.id(),
                 expectedPutCall(4).gradient(Gradient.builder()
                                                     .points(List.of(
                                                             Pair.of(0.1637, 0.455),
@@ -1882,7 +1958,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedPutCall(5).bri(150)
         );
 
-        assertScenePutCalls(2,
+        assertScenePutCalls(2, scene2.id(),
                 expectedPutCall(4).gradient(Gradient.builder()
                                                     .points(List.of(
                                                             Pair.of(0.345, 0.678),
@@ -1908,7 +1984,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
 
         powerOnRunnables.getFirst().run();
 
-        assertScenePutCalls(2,
+        assertScenePutCalls(2, scene2.id(),
                 expectedPutCall(4).gradient(Gradient.builder()
                                                     .points(List.of(
                                                             Pair.of(0.234, 0.567), // interpolated
@@ -1917,7 +1993,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                                                     .build()),
                 expectedPutCall(5).bri(200) // interpolated
         );
-        assertScenePutCalls(2,
+        assertScenePutCalls(2, scene2.id(),
                 expectedPutCall(4).gradient(Gradient.builder()
                                                     .points(List.of(
                                                             Pair.of(0.345, 0.678),
@@ -1948,7 +2024,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 ScheduledLightState.builder()
                                    .id("/lights/5")
                                    .bri(150));
-        mockSceneLightStates(2, "TestScene2",
+        Identifier scene2 = mockSceneLightStates(2, "TestScene2",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .gradient(Gradient.builder()
@@ -1971,7 +2047,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
 
         setCurrentTimeToAndRun(runnables.getFirst());
 
-        assertScenePutCalls(2,
+        assertScenePutCalls(2, scene2.id(),
                 expectedPutCall(4).gradient(Gradient.builder()
                                                     .points(List.of(
                                                             Pair.of(0.1637, 0.455),
@@ -1982,7 +2058,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedPutCall(5).bri(150)
         );
 
-        assertScenePutCalls(2,
+        assertScenePutCalls(2, scene2.id(),
                 expectedPutCall(4).gradient(Gradient.builder()
                                                     .points(List.of(
                                                             Pair.of(0.345, 0.678),
@@ -2004,14 +2080,14 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
     void sceneControl_interpolate_sceneToScene_noOverlappingProperties_noInterpolation() {
         mockDefaultGroupCapabilities(2);
         mockGroupLightsForId(2, 4, 5);
-        mockSceneLightStates(2, "TestScene1",
+        Identifier scene1 = mockSceneLightStates(2, "TestScene1",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .ct(200),
                 ScheduledLightState.builder()
                                    .id("/lights/5")
                                    .ct(300));
-        mockSceneLightStates(2, "TestScene2",
+        Identifier scene2 = mockSceneLightStates(2, "TestScene2",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(100),
@@ -2026,7 +2102,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now.plusMinutes(10), now.plusDays(1))
         );
 
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 2,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 2, scene1.id(),
                 expectedPutCall(4).bri(100).ct(200),
                 expectedPutCall(5).bri(200).ct(300)
         );
@@ -2037,7 +2113,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
 
         // second state
 
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.get(1), 2,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.get(1), 2, scene2.id(),
                 expectedPutCall(4).bri(100),
                 expectedPutCall(5).bri(200)
         );
@@ -2058,7 +2134,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 ScheduledLightState.builder()
                                    .id("/lights/5")
                                    .bri(100));
-        mockSceneLightStates(2, "TestScene2",
+        Identifier scene2 = mockSceneLightStates(2, "TestScene2",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .on(true),
@@ -2075,12 +2151,12 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
 
         runnables.getFirst().run();
 
-        assertScenePutCalls(2,
+        assertScenePutCalls(2, scene2.id(),
                 expectedPutCall(4).on(true), // a bit of a constructed case, but if we don't provide any state, the scene would set the light to off
                 expectedPutCall(5).bri(100)
         );
 
-        assertScenePutCalls(2,
+        assertScenePutCalls(2, scene2.id(),
                 expectedPutCall(4).on(true).transitionTime(MAX_TRANSITION_TIME),
                 expectedPutCall(5).bri(117).transitionTime(MAX_TRANSITION_TIME)
         );
@@ -2103,7 +2179,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 ScheduledLightState.builder()
                                    .id("/lights/5")
                                    .ct(100));
-        mockSceneLightStates(2, "TestScene2",
+        Identifier scene2 = mockSceneLightStates(2, "TestScene2",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(100), // unchanged
@@ -2120,12 +2196,12 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
 
         runnables.getFirst().run();
 
-        assertScenePutCalls(2,
+        assertScenePutCalls(2, scene2.id(),
                 expectedPutCall(4).bri(100),
                 expectedPutCall(5).ct(100)
         );
 
-        assertScenePutCalls(2,
+        assertScenePutCalls(2, scene2.id(),
                 expectedPutCall(4).bri(100).transitionTime(MAX_TRANSITION_TIME), // unchanged, but still kept
                 expectedPutCall(5).ct(183).transitionTime(MAX_TRANSITION_TIME)
         );
@@ -2141,7 +2217,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
     void sceneControl_interpolate_sceneToScene_justEffect_noInterpolationPossible() {
         mockDefaultGroupCapabilities(2);
         mockGroupLightsForId(2, 4, 5);
-        mockSceneLightStates(2, "TestScene1",
+        Identifier scene1 = mockSceneLightStates(2, "TestScene1",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .effect(Effect.builder().effect("candle").build()), // only effect
@@ -2163,7 +2239,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now.plusMinutes(10), now.plusDays(1))
         );
 
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 2,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 2, scene1.id(),
                 expectedPutCall(4).bri(100).effect(Effect.builder().effect("candle").build()),
                 expectedPutCall(5).bri(200).ct(300)
         );
@@ -2184,7 +2260,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 ScheduledLightState.builder()
                                    .id("/lights/5")
                                    .bri(200));
-        mockSceneLightStates(2, "TestScene2",
+        Identifier scene2 = mockSceneLightStates(2, "TestScene2",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(300),
@@ -2205,7 +2281,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedGroupPutCall(2).bri(100) // ignores light 5, since not in target state
         );
 
-        assertScenePutCalls(2,
+        assertScenePutCalls(2, scene2.id(),
                 expectedPutCall(4).bri(300).transitionTime(tr("10min")),
                 expectedPutCall(8).bri(400).transitionTime(tr("10min"))
         );
@@ -2220,7 +2296,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
     void sceneControl_init_whitespace_trims() {
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
-        mockSceneLightStates(1, "TestScene",
+        Identifier scene = mockSceneLightStates(1, "TestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(100)
@@ -2235,7 +2311,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now, now.plusDays(1))
         );
 
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1, scene.id(),
                 expectedPutCall(4).bri(100).ct(20),
                 expectedPutCall(5).bri(50).ct(40)
         );
@@ -2250,7 +2326,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
         mockDefaultGroupCapabilities(1);
         addKnownLightIdsWithDefaultCapabilities(2);
         mockGroupLightsForId(1, 4, 5);
-        mockSceneLightStates(1, "TestScene",
+        Identifier scene = mockSceneLightStates(1, "TestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(100)
@@ -2267,7 +2343,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now, now.plusDays(1))  // regular state
         );
 
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1, scene.id(),
                 expectedPutCall(4).bri(100).ct(200),
                 expectedPutCall(5).bri(50).ct(300)
         );
@@ -2294,13 +2370,13 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
         // Rescheduled current scene state -> uses new values
         ScheduledRunnable rescheduledState = ensureRunnable(now, now.plusDays(1));
 
-        advanceTimeAndRunAndAssertScenePutCalls(rescheduledState, 1,
+        advanceTimeAndRunAndAssertScenePutCalls(rescheduledState, 1, scene.id(),
                 expectedPutCall(4).bri(200).ct(400),
                 expectedPutCall(5).bri(150).ct(500)
         );
 
         // Next day also uses new values
-        advanceTimeAndRunAndAssertScenePutCalls(nextDayRunnables.getFirst(), 1,
+        advanceTimeAndRunAndAssertScenePutCalls(nextDayRunnables.getFirst(), 1, scene.id(),
                 expectedPutCall(4).bri(200).ct(400),
                 expectedPutCall(5).bri(150).ct(500)
         );
@@ -2319,7 +2395,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
         mockDefaultGroupCapabilities(1);
         addKnownLightIdsWithDefaultCapabilities(2);
         mockGroupLightsForId(1, 4, 5);
-        mockSceneLightStates(1, "TestScene",
+        Identifier scene = mockSceneLightStates(1, "TestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(100)
@@ -2334,7 +2410,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now, now.plusDays(1))
         );
 
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1, scene.id(),
                 expectedPutCall(4).bri(100).ct(200),
                 expectedPutCall(5).bri(50).ct(300)
         );
@@ -2358,7 +2434,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
 
         // next day, group is on again -> applies new scene values
         mockIsGroupOff(1, false);
-        advanceTimeAndRunAndAssertScenePutCalls(nextDayRunnable, 1,
+        advanceTimeAndRunAndAssertScenePutCalls(nextDayRunnable, 1, scene.id(),
                 expectedPutCall(4).bri(200).ct(400),
                 expectedPutCall(5).bri(150).ct(500)
         );
@@ -2370,7 +2446,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
     void sceneControl_sceneModified_withBriModifier_reAppliesScaling() {
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
-        mockSceneLightStates(1, "TestScene",
+        Identifier scene = mockSceneLightStates(1, "TestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(200),
@@ -2384,7 +2460,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
         );
 
         // bri:127 scales to ~50% (127/254 ≈ 0.5). 200*0.5=100, 100*0.5=50
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1, scene.id(),
                 expectedPutCall(4).bri(100),
                 expectedPutCall(5).bri(50)
         );
@@ -2404,7 +2480,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
         ScheduledRunnable rescheduledState = ensureRunnable(now, now.plusDays(1));
 
         // Scaling should be re-applied: 254*0.5=127, 200*0.5=100
-        advanceTimeAndRunAndAssertScenePutCalls(rescheduledState, 1,
+        advanceTimeAndRunAndAssertScenePutCalls(rescheduledState, 1, scene.id(),
                 expectedPutCall(4).bri(127),
                 expectedPutCall(5).bri(100)
         );
@@ -2414,7 +2490,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
     void sceneControl_sceneModified_withOnModifier_reAppliesTurnOn() {
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
-        mockSceneLightStates(1, "TestScene",
+        Identifier scene = mockSceneLightStates(1, "TestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(100)
@@ -2431,7 +2507,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
         );
 
         // on:true turns on light 4 (not off), but not light 5 (explicitly off in scene)
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1, scene.id(),
                 expectedPutCall(4).bri(100).ct(200).on(true),
                 expectedPutCall(5).bri(50).ct(300).on(false)
         );
@@ -2453,7 +2529,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
         ScheduledRunnable rescheduledState = ensureRunnable(now, now.plusDays(1));
 
         // on:true should be re-applied: both lights are now on
-        advanceTimeAndRunAndAssertScenePutCalls(rescheduledState, 1,
+        advanceTimeAndRunAndAssertScenePutCalls(rescheduledState, 1, scene.id(),
                 expectedPutCall(4).bri(150).ct(250).on(true),
                 expectedPutCall(5).bri(80).ct(350).on(true)
         );
@@ -2463,7 +2539,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
     void sceneControl_sceneModified_multipleStatesReferencingSameScene_allReloaded() {
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
-        mockSceneLightStates(1, "TestScene",
+        Identifier scene = mockSceneLightStates(1, "TestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(100)
@@ -2480,7 +2556,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now.plusHours(12), now.plusDays(1))
         );
 
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1, scene.id(),
                 expectedPutCall(4).bri(100).ct(200),
                 expectedPutCall(5).bri(50).ct(300)
         );
@@ -2502,13 +2578,13 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
         ScheduledRunnable rescheduledState = ensureRunnable(now, now.plusHours(12));
 
         // First state uses new values
-        advanceTimeAndRunAndAssertScenePutCalls(rescheduledState, 1,
+        advanceTimeAndRunAndAssertScenePutCalls(rescheduledState, 1, scene.id(),
                 expectedPutCall(4).bri(254).ct(400),
                 expectedPutCall(5).bri(200).ct(500)
         );
 
         // Second state uses new values with bri modifier (127/254 ≈ 0.5): 254*0.5=127, 200*0.5=100
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.get(1), 1,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.get(1), 1, scene.id(),
                 expectedPutCall(4).bri(127).ct(400),
                 expectedPutCall(5).bri(100).ct(500)
         );
@@ -2520,7 +2596,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
     void sceneControl_nonExistingSceneModification_noError() {
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
-        mockSceneLightStates(1, "TestScene",
+        Identifier scene = mockSceneLightStates(1, "TestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(100)
@@ -2538,7 +2614,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
         // Modifying a scene that no state references - should be a no-op
         simulateSceneModified(99, "OtherScene");
 
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1, scene.id(),
                 expectedPutCall(4).bri(100).ct(200),
                 expectedPutCall(5).bri(50).ct(300)
         );
@@ -2551,7 +2627,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
         enableUserModificationTracking();
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
-        mockSceneLightStates(1, "TestScene",
+        Identifier scene = mockSceneLightStates(1, "TestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(100)
@@ -2569,7 +2645,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
         );
 
         // Run first state
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1, scene.id(),
                 expectedPutCall(4).bri(50).ct(200),
                 expectedPutCall(5).bri(25).ct(300)
         );
@@ -2597,7 +2673,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedState().id("/lights/5").brightness(150).colorTemperature(500).colormode(ColorMode.CT)
         );
         // Re-apply first state, does not trigger manual override
-        advanceTimeAndRunAndAssertScenePutCalls(rescheduledRunnable, 1,
+        advanceTimeAndRunAndAssertScenePutCalls(rescheduledRunnable, 1, scene.id(),
                 expectedPutCall(4).bri(100).ct(400),
                 expectedPutCall(5).bri(75).ct(500)
         );
@@ -2607,7 +2683,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedState().id("/lights/5").brightness(75).colorTemperature(500).colormode(ColorMode.CT)
         );
         // Reloaded second state applied correctly as well
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.get(1), 1,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.get(1), 1, scene.id(),
                 expectedPutCall(4).bri(200).ct(400),
                 expectedPutCall(5).bri(150).ct(500)
         );
@@ -2620,7 +2696,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
         enableSceneSync();
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
-        mockSceneLightStates(1, "TestScene",
+        Identifier scene = mockSceneLightStates(1, "TestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(100)
@@ -2635,7 +2711,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now, now.plusDays(1))
         );
 
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1, scene.id(),
                 expectedPutCall(4).bri(100).ct(200),
                 expectedPutCall(5).bri(50).ct(300)
         );
@@ -2668,7 +2744,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
                 expectedPutCall(5).bri(150).ct(500)
         );
 
-        advanceTimeAndRunAndAssertScenePutCalls(rescheduledState, 1,
+        advanceTimeAndRunAndAssertScenePutCalls(rescheduledState, 1, scene.id(),
                 expectedPutCall(4).bri(200).ct(400),
                 expectedPutCall(5).bri(150).ct(500)
         );
@@ -2679,7 +2755,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
         enableSceneSync();
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
-        mockSceneLightStates(1, "TestScene",
+        Identifier scene = mockSceneLightStates(1, "TestScene",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(100)
@@ -2697,7 +2773,7 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
         );
 
         // Run the currently active group state -> uses full picture
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.getFirst(), 1, null,
                 expectedPutCall(4).bri(180).ct(200),
                 expectedPutCall(5).bri(180).ct(300)
         );
@@ -2732,13 +2808,13 @@ public class HueSchedulerSceneControlTest extends AbstractHueSchedulerTest {
         // The group state is re-applied via power-transition (light-on event)
         ScheduledRunnable rescheduledGroupState = ensureRunnable(now, now.plusHours(2));
 
-        advanceTimeAndRunAndAssertScenePutCalls(rescheduledGroupState, 1,
+        advanceTimeAndRunAndAssertScenePutCalls(rescheduledGroupState, 1, null,
                 expectedPutCall(4).bri(180).ct(400),
                 expectedPutCall(5).bri(180).ct(500)
         );
 
         // The future scene state should use the new values when it becomes active
-        advanceTimeAndRunAndAssertScenePutCalls(runnables.get(1), 1,
+        advanceTimeAndRunAndAssertScenePutCalls(runnables.get(1), 1, scene.id(),
                 expectedPutCall(4).bri(254).ct(400),
                 expectedPutCall(5).bri(200).ct(500)
         );

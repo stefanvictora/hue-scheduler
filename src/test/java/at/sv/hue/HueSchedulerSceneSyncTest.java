@@ -337,6 +337,83 @@ public class HueSchedulerSceneSyncTest extends AbstractHueSchedulerTest {
     }
 
     @Test
+    void sceneSync_interpolationReachesSameState_removesPreviousTransitionTime() {
+        enableSceneSync();
+
+        mockDefaultGroupCapabilities(2);
+        mockGroupLightsForId(2, 5);
+        addState("g2", now, "bri:100", "tr:3s");
+        addState("g2", now.plusMinutes(10), "bri:100", "interpolate:true");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(10)),
+                expectedRunnable(now.plusMinutes(10), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertGroupPutCalls(runnables.getFirst(),
+                expectedGroupPutCall(2).bri(100).transitionTime(tr("3s"))
+        );
+
+        assertSceneUpdate("/groups/2", expectedPutCall(5).bri(100).transitionTime(tr("3s")));
+
+        advanceTimeAndRunAndAssertGroupPutCalls(runnables.get(1),
+                expectedGroupPutCall(2).bri(100)
+        );
+
+        assertSceneUpdate("/groups/2", expectedPutCall(5).bri(100));
+
+        ensureScheduledStates(
+                expectedRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(10)),
+                expectedRunnable(initialNow.plusDays(1).plusMinutes(10), initialNow.plusDays(2))
+        );
+    }
+
+    @Test
+    void sceneSync_writeCrossesInterpolationEndpoint_stillRemovesTransition() {
+        enableSceneSync();
+
+        mockDefaultGroupCapabilities(2);
+        mockGroupLightsForId(2, 5);
+        addState("g2", now, "bri:100", "tr:3s");
+        addState("g2", now.plusMinutes(10), "bri:150", "interpolate:true");
+        addState("g2", now.plusMinutes(20), "bri:200");
+
+        List<ScheduledRunnable> runnables = startScheduler(
+                expectedRunnable(now, now.plusMinutes(20)),
+                expectedRunnable(now.plusMinutes(20), now.plusDays(1)),
+                expectedRunnable(now.plusDays(1), now.plusDays(1))
+        );
+
+        advanceTimeAndRunAndAssertGroupPutCalls(runnables.getFirst(),
+                expectedGroupPutCall(2).bri(100).transitionTime(tr("3s")),
+                expectedGroupPutCall(2).bri(150).transitionTime(tr("10min"))
+        );
+        assertSceneUpdate("/groups/2", expectedPutCall(5).bri(100).transitionTime(tr("3s")));
+
+        ScheduledRunnable sceneSync = ensureScheduledStates(
+                expectedRunnable(now.plusMinutes(2), initialNow.plusMinutes(20)),
+                expectedRunnable(initialNow.plusDays(1), initialNow.plusDays(1).plusMinutes(20))
+        ).getFirst();
+
+        var interpolationEndpoint = initialNow.plusMinutes(10);
+        setCurrentTimeTo(interpolationEndpoint.minusSeconds(1));
+        // Simulate a bridge write that starts before the interpolation endpoint and finishes after it.
+        doAnswer(_ -> {
+            setCurrentTimeTo(interpolationEndpoint.plusSeconds(1));
+            return null;
+        }).when(mockedHueApi).createOrUpdateScene(eq("/groups/2"), eq(sceneSyncName), any());
+
+        sceneSync.run();
+        assertSceneUpdate("/groups/2", expectedPutCall(5).bri(150).transitionTime(tr("3s")));
+
+        // Scheduling must use the time captured before the write, so the now-overdue completion sync still runs.
+        ScheduledRunnable interpolationCompletionSync = ensureRunnable(interpolationEndpoint, initialNow.plusMinutes(20));
+        interpolationCompletionSync.run();
+
+        assertSceneUpdate("/groups/2", expectedPutCall(5).bri(150));
+    }
+
+    @Test
     void sceneSync_usesFullPicture_singleGroup_withNullState_stopsFullPictureCalculation() {
         enableSceneSync();
 
