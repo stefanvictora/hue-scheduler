@@ -43,7 +43,7 @@ switch.tv_mute                     civil_dusk  on:true
 
 ## `<Scheduled Time>`
 
-The second column sets the entry's **scheduled time**. Normally, that is when its values begin to apply. With `tr-before` or `interpolate:true`, it is instead when the values should be fully reached—the change begins earlier.
+The second column sets the entry's **scheduled time**. Normally, that is when its values begin to apply. When a valid early transition is possible, `tr-before` or `interpolate:true` starts the change earlier so the values are fully reached at the scheduled time.
 
 The scheduled time can be a fixed time (24-hour `HH:mm[:ss]`, e.g., `06:00`, `23:30:15`) or a **dynamic solar time**. Available solar constants, in chronological order:
 
@@ -160,7 +160,7 @@ A common use is blending a solar time with a fixed clock time: `mix(sunrise, 07:
 
 ### FAQ: How long does a schedule entry apply?
 
-An entry normally applies until the next entry for the same light or group takes over. Without an early fade, that happens at the next entry's scheduled time. With `tr-before` or `interpolate:true`, the next entry takes over when its early fade begins.
+An entry normally applies until the next entry for the same light or group takes over. If `tr-before` or `interpolate:true` allows a valid early transition, the next entry takes over when its early fade begins. Otherwise, the next entry applies at its scheduled time.
 
 Example:
 

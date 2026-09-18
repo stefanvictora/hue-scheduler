@@ -2,6 +2,8 @@ package at.sv.hue;
 
 import at.sv.hue.api.Identifier;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.time.DayOfWeek;
 import java.time.temporal.ChronoUnit;
@@ -52,6 +54,30 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
                 expectedPutCall(1).on(true).bri(203),
                 expectedPutCall(2).on(true).bri(203)
         );
+    }
+
+    @ParameterizedTest
+    @CsvSource({"0,0", "1,1", "5s,50", "2min,1200", "1h,36000", "1h2min3s4,37234"})
+    void migrateInputToScenes_groupState_preservesTransitionTimeAfterRediscovery(String transitionTime, int expectedTransitionTime) {
+        mockGroupLightsForId(9, 1);
+        mockDefaultGroupCapabilities(9);
+        addState("g9", "00:00", "bri:100", "tr:" + transitionTime);
+        enableInputToSceneMigration(true);
+
+        migrateInputToScenes();
+
+        String sceneName = "00:00 [tr:" + transitionTime + "]";
+        assertSceneUpdate("/groups/9", sceneName, expectedPutCall(1).bri(100));
+
+        enableAutoSceneStates();
+        Identifier scene = mockSceneLightStates(9, sceneName,
+                ScheduledLightState.builder().id("/lights/1").bri(100));
+        mockGetAllScenes(scene);
+
+        ScheduledRunnable state = startScheduler(expectedRunnable(now, now.plusDays(1))).getFirst();
+        advanceTimeAndRunAndAssertGroupPutCalls(state,
+                expectedGroupPutCall(9).bri(100).transitionTime(expectedTransitionTime));
+        ensureNextDayRunnable();
     }
 
     @Test

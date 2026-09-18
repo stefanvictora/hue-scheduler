@@ -1373,6 +1373,9 @@ public final class HueScheduler implements Runnable {
 
     private static String formatTransitionTime(Integer definedTransitionTime) {
         Duration duration = Duration.ofMillis(definedTransitionTime * 100L);
+        if (duration.isZero()) {
+            return "0";
+        }
         StringBuilder sb = new StringBuilder();
         if (duration.toHours() > 0) {
             sb.append(duration.toHours()).append("h");

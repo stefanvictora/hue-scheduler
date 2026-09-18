@@ -64,7 +64,7 @@ Which light or group to control. Use names or IDs (e.g., `Couch` or `light.couch
 
 Use a fixed time (24-hour `HH:mm[:ss]`, e.g., `06:00`, `23:30:15`) or a solar time (`sunrise`, `sunset`, etc.).
 
-Normally, the entry's values begin to apply at this time. With `tr-before` or `interpolate:true`, they are instead fully reached at this time.
+Normally, the entry's values begin to apply at this time. When a valid early transition is possible, `tr-before` or `interpolate:true` starts the change earlier so the values are fully reached at this time.
 
 Solar times can be offset by minutes (e.g., `sunset-30`, `sunrise+60`). Available solar times, in chronological order: `astronomical_dawn`, `nautical_dawn`, `civil_dawn`, `sunrise`, `noon`, `golden_hour`, `sunset`, `blue_hour`, `civil_dusk`, `night_hour`, `nautical_dusk`, `astronomical_dusk`.
 
@@ -163,7 +163,7 @@ If your Raspberry Pi doesn't have Docker yet, see [docs/docker_on_raspberrypi.md
    java -jar hue-scheduler.jar <API_HOST> <ACCESS_TOKEN> --lat=<LATITUDE> --long=<LONGITUDE> --elevation=<ELEVATION> [<CONFIG_FILE_PATH>]
    ```
 
-   The configuration file is required unless `--enable-auto-scene-states` is set. When provided, file-based definitions and Scene Schedules are combined.
+   The configuration file (`CONFIG_FILE`) is required unless `--enable-auto-scene-states` is set without `--migrate-input-to-scenes`: migration needs the file as its source. When provided, file-based definitions and Scene Schedules are combined.
 
 ## FAQ
 

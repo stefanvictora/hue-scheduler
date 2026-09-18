@@ -176,6 +176,9 @@ class HassWebSocketClientImplTest {
 
     @Test
     void sendCommand_multipleSimultaneousCommands() throws Exception {
+        client = new HassWebSocketClientImpl(
+                ORIGIN, ACCESS_TOKEN, mockClient, AUTHENTICATION_TIMEOUT, TEST_WAIT_TIMEOUT);
+
         // Establish ID order while keeping all three commands pending before replying.
         CompletableFuture<String> future1 = asyncSendExampleCommand();
         simulateWebSocketAuthSuccess();
