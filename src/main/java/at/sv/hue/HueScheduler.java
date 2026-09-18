@@ -775,11 +775,15 @@ public final class HueScheduler implements Runnable {
     }
 
     private void schedule(ScheduledStateSnapshot snapshot, long delayInMs) {
+        schedule(snapshot, delayInMs, snapshot);
+    }
+
+    private void schedule(ScheduledStateSnapshot snapshot, long delayInMs, ScheduledStateSnapshot source) {
         MDC.put("context", snapshot.getContextName());
-        if (snapshot.isNullState()) return;
+        if (snapshot.isNullState() || source.isCancelled()) return;
         long overlappingDelayInMs = getPotentialOverlappingDelayInMs(snapshot);
         LOG.debug("Schedule: {} in {}", snapshot, Duration.ofMillis(delayInMs + overlappingDelayInMs).withNanos(0));
-        stateScheduler.schedule(() -> {
+        source.runIfCurrent(() -> stateScheduler.schedule(() -> {
             MDC.put("context", snapshot.getContextName());
             if (snapshot.isCancelled()) {
                 LOG.trace("Already cancelled: {}", snapshot);
@@ -828,7 +832,7 @@ public final class HueScheduler implements Runnable {
                     if (shouldTrackUserModification(snapshot) &&
                         (justTurnedOnThroughNormalScene(snapshot) || stateHasBeenManuallyOverriddenSinceLastSeen(snapshot))) {
                         LOG.info("Manually overridden or scene turn-on: Pause updates until turned off and on again");
-                        manualOverrideTracker.onManuallyOverridden(snapshot.getId());
+                        snapshot.runIfCurrent(() -> manualOverrideTracker.onManuallyOverridden(snapshot.getId()));
                         createPowerTransitionCopyAndReschedule(snapshot);
                         return;
                     }
@@ -847,7 +851,7 @@ public final class HueScheduler implements Runnable {
                 LOG.info("Turned off");
             }
             createPowerTransitionCopyAndReschedule(snapshot);
-        }, currentTime.get().plus(delayInMs + overlappingDelayInMs, ChronoUnit.MILLIS), snapshot.getEnd());
+        }, currentTime.get().plus(delayInMs + overlappingDelayInMs, ChronoUnit.MILLIS), snapshot.getEnd()));
     }
 
     private void createPowerTransitionCopyAndReschedule(ScheduledStateSnapshot snapshot) {
@@ -896,8 +900,7 @@ public final class HueScheduler implements Runnable {
         if (sceneSyncDelayInSeconds == 0) {
             syncScene(state, justOnce);
         } else {
-            stateScheduler.schedule(() -> syncScene(state, justOnce),
-                    currentTime.get().plusSeconds(sceneSyncDelayInSeconds), state.getEnd());
+            state.runIfCurrent(() -> stateScheduler.schedule(() -> syncScene(state, justOnce), currentTime.get().plusSeconds(sceneSyncDelayInSeconds), state.getEnd()));
         }
     }
 
@@ -909,7 +912,7 @@ public final class HueScheduler implements Runnable {
         try {
             ZonedDateTime now = currentTime.get();
             stateRegistry.getAssignedGroups(state)
-                         .forEach(groupInfo -> syncScene(groupInfo.groupId(), stateRegistry.getPutCalls(groupInfo.groupLights(), now)));
+                         .forEach(groupInfo -> state.runIfCurrent(() -> syncScene(groupInfo.groupId(), stateRegistry.getPutCalls(groupInfo.groupLights(), now))));
             ZonedDateTime nextSyncTime = getNextChangeTime(state, null, now);
             if (!justOnce && nextSyncTime != null) {
                 scheduleNextSceneSync(state, false, nextSyncTime);
@@ -937,12 +940,12 @@ public final class HueScheduler implements Runnable {
 
     private void scheduleIfNotYetEnded(ScheduledStateSnapshot state, Runnable runnable, ZonedDateTime scheduledStart) {
         ZonedDateTime end = state.getEnd();
-        stateScheduler.schedule(() -> {
+        state.runIfCurrent(() -> stateScheduler.schedule(() -> {
             if (currentTime.get().isAfter(end)) {
                 return;
             }
             runnable.run();
-        }, scheduledStart, state.getEnd());
+        }, scheduledStart, end));
     }
 
     private void scheduleInitialBackgroundInterpolation(ScheduledStateSnapshot state, ZonedDateTime now) {
@@ -1129,10 +1132,10 @@ public final class HueScheduler implements Runnable {
     }
 
     private void reschedule(ScheduledStateSnapshot snapshot) {
-        if (snapshot.isTemporary()) return;
+        if (snapshot.isTemporary() || snapshot.isCancelled()) return;
         ZonedDateTime now = currentTime.get();
         ScheduledStateSnapshot nextSnapshot = snapshot.getNextDaySnapshot(now);
-        schedule(nextSnapshot, nextSnapshot.getDelayUntilStart(now));
+        schedule(nextSnapshot, nextSnapshot.getDelayUntilStart(now), snapshot);
     }
 
     private long getMs(long seconds) {
@@ -1152,7 +1155,7 @@ public final class HueScheduler implements Runnable {
     }
 
     private static ScheduledStateSnapshot createTemporaryFollowUpSplitState(ScheduledStateSnapshot state) {
-        ScheduledState temporaryCopy = ScheduledState.createTemporaryCopy(state.getScheduledState());
+        ScheduledState temporaryCopy = state.createTemporaryCopy();
         ScheduledStateSnapshot nextSplitSnapshot = temporaryCopy.getSnapshot(state.getDefinedStart());
         nextSplitSnapshot.overwriteEnd(state.getEnd()); // optimization
         return nextSplitSnapshot;
@@ -1166,28 +1169,35 @@ public final class HueScheduler implements Runnable {
         if (wasJustPowerTransition(state) && isOff(state) && !state.isForced()) {
             putCalls.resetOn();
         }
-        markSchedulerInitiatedOffIfNeeded(putCalls);
-        state.recordLastPutCalls(putCalls);
         // todo: are we sure that we always have at least one element here?
         if (putCalls.isGroupUpdate()) {
             if (putCalls.isGeneralGroup()) {
                 PutCall putCall = putCalls.getFirst();
                 if (shouldControlIndividually(state)) {
-                    updateIndividualIgnoringError(getIndividualPutCalls(putCall, state.getId()));
+                    updateIndividualIgnoringError(getIndividualPutCalls(putCall, state.getId()), state, putCalls);
                 } else {
-                    api.putGroupState(putCall);
+                    putIfCurrent(state, putCalls, () -> api.putGroupState(putCall));
                 }
             } else {
                 List<PutCall> putCallList = putCalls.toList();
                 if (shouldControlIndividually(state)) {
-                    updateIndividualIgnoringError(putCallList);
+                    updateIndividualIgnoringError(putCallList, state, putCalls);
                 } else {
-                    api.putSceneState(putCalls.getId(), state.getSceneId(), getCurrentlyOnPutCalls(putCalls));
+                    List<PutCall> currentlyOnPutCalls = getCurrentlyOnPutCalls(putCalls);
+                    putIfCurrent(state, putCalls, () -> api.putSceneState(putCalls.getId(), state.getSceneId(), currentlyOnPutCalls));
                 }
             }
         } else {
-            api.putState(putCalls.getFirst());
+            putIfCurrent(state, putCalls, () -> api.putState(putCalls.getFirst()));
         }
+    }
+
+    private void putIfCurrent(ScheduledStateSnapshot state, PutCalls putCalls, Runnable update) {
+        state.runIfCurrent(() -> {
+            markSchedulerInitiatedOffIfNeeded(putCalls);
+            state.recordLastPutCalls(putCalls);
+            update.run();
+        });
     }
 
     private void markSchedulerInitiatedOffIfNeeded(PutCalls putCalls) {
@@ -1214,10 +1224,10 @@ public final class HueScheduler implements Runnable {
                   .toList();
     }
 
-    private void updateIndividualIgnoringError(List<PutCall> putCallList) {
+    private void updateIndividualIgnoringError(List<PutCall> putCallList, ScheduledStateSnapshot state, PutCalls putCalls) {
         for (PutCall call : putCallList) {
             try {
-                api.putState(call);
+                putIfCurrent(state, putCalls, () -> api.putState(call));
             } catch (ApiFailure e) {
                 LOG.trace("Unsupported api call for light id {}: {}", call.getId(), e.getLocalizedMessage());
             }
@@ -1283,7 +1293,7 @@ public final class HueScheduler implements Runnable {
     }
 
     private ScheduledStateSnapshot createPowerTransitionCopy(ScheduledStateSnapshot state) {
-        ScheduledState copy = ScheduledState.createTemporaryCopy(state.getScheduledState());
+        ScheduledState copy = state.createTemporaryCopy();
         copy.setTriggeredByPowerTransition();
         ScheduledStateSnapshot snapshot = copy.getSnapshot(state.getDefinedStart());
         snapshot.overwriteEnd(state.calculateNextPowerTransitionEnd(currentTime.get()));
@@ -1299,7 +1309,8 @@ public final class HueScheduler implements Runnable {
     }
 
     private void scheduleOnPowerTransition(ScheduledStateSnapshot snapshot) {
-        lightEventListener.runOnPowerTransition(snapshot.getId(), () -> schedule(snapshot, powerTransitionRescheduleDelayInMs));
+        snapshot.runIfCurrent(() -> lightEventListener.runOnPowerTransition(snapshot.getId(),
+                () -> schedule(snapshot, powerTransitionRescheduleDelayInMs)));
     }
 
     private void scheduleSolarDataInfoLog() {

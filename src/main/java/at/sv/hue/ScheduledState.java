@@ -118,12 +118,12 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
     }
 
     public static ScheduledState createTemporaryCopy(ScheduledState state) {
-        return createTemporaryCopy(state, state.startString);
+        return createTemporaryCopy(state, state.temporary ? state.generation : state.getGeneration());
     }
 
-    private static ScheduledState createTemporaryCopy(ScheduledState state, String start) {
+    static ScheduledState createTemporaryCopy(ScheduledState state, int generation) {
         // we pass null for light states, since we always delegate to the original state
-        ScheduledState copy = new ScheduledState(state.identifier, start, null, state.groupLightIds, state.sceneId,
+        ScheduledState copy = new ScheduledState(state.identifier, state.startString, null, state.groupLightIds, state.sceneId,
                 state.sceneBrightnessModifier, state.sceneOnModifier,
                 state.transitionTimeBeforeString, state.definedTransitionTime, state.daysOfWeek, state.startTimeProvider,
                 state.minTrBeforeGapInMinutes, state.brightnessOverrideThreshold, state.colorTemperatureOverrideThresholdKelvin,
@@ -133,7 +133,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
         copy.originalState = state.originalState;
         copy.previousStateLookup = state.previousStateLookup;
         copy.nextStateLookup = state.nextStateLookup;
-        copy.generation = state.getGeneration();
+        copy.generation = generation;
         return copy;
     }
 
@@ -205,7 +205,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
      */
     public synchronized ScheduledStateSnapshot getSnapshot(ZonedDateTime dateTime) {
         return snapshotCache.get(getDefinedStart(dateTime),
-                definedStart -> new ScheduledStateSnapshot(this, definedStart, getGeneration(),
+                definedStart -> new ScheduledStateSnapshot(this, definedStart, temporary ? generation : getGeneration(),
                         previousStateLookup, nextStateLookup));
     }
 
@@ -357,6 +357,19 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
 
     public int getGeneration() {
         return originalState.generation;
+    }
+
+    /**
+     * Serialize side-effect admission with invalidation, including work from temporary copies.
+     * Actions must not look up registry entries or calculate snapshots: those can acquire locks
+     * in the opposite order. Prepare their inputs before entering this gate.
+     */
+    void runIfCurrent(int expectedGeneration, Runnable action) {
+        synchronized (originalState) {
+            if (originalState.generation == expectedGeneration) {
+                action.run();
+            }
+        }
     }
 
     @Override

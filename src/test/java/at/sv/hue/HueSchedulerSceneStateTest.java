@@ -632,11 +632,10 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
         // delete scene
         simulateSceneDeletion(scene.id());
 
-        // cancels also power-on
-        ScheduledRunnable powerOnRunnable = simulateLightOnEvent("/groups/1",
-                expectedPowerOnEnd(now.plusDays(1))).getFirst();
-
-        advanceTimeAndRunAndAssertScenePutCalls(powerOnRunnable, 1, scene.id()); // was canceled
+        // invalidated power-on callbacks cannot enqueue more work
+        simulateLightOnEvent("/groups/1");
+        ensureScheduledStates(0);
+        assertAllScenePutCallsAsserted();
 
         advanceTimeAndRunAndAssertScenePutCalls(nextDayRunnable, 1, scene.id()); // was canceled
     }

@@ -391,11 +391,11 @@ public class ScheduledStateSnapshot {
     }
 
     public void recordLastPutCalls(PutCalls putCalls) {
-        scheduledState.setLastPutCalls(putCalls);
+        runIfCurrent(() -> scheduledState.setLastPutCalls(putCalls));
     }
 
     public void recordLastSeen(ZonedDateTime lastSeen) {
-        scheduledState.setLastSeen(lastSeen);
+        runIfCurrent(() -> scheduledState.setLastSeen(lastSeen));
     }
 
     public boolean isNotSameState(ScheduledState state) {
@@ -445,6 +445,14 @@ public class ScheduledStateSnapshot {
 
     public boolean isCancelled() {
         return scheduledState.getGeneration() != generation;
+    }
+
+    public void runIfCurrent(Runnable action) {
+        scheduledState.runIfCurrent(generation, action);
+    }
+
+    public ScheduledState createTemporaryCopy() {
+        return ScheduledState.createTemporaryCopy(scheduledState, generation);
     }
 
     public String getSceneId() {
