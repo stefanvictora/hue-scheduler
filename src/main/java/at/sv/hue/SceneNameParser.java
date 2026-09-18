@@ -76,7 +76,7 @@ public final class SceneNameParser {
     public record ParseResult(String timeExpression, Boolean interpolate,
                               String transitionTime, String transitionTimeBefore,
                               String daysOfWeek,
-                              Boolean forced, Boolean on) {
+                              Boolean forced, Boolean on, boolean gap) {
     }
 
     private record SceneParts(String timeExpr, String flags) {
@@ -110,7 +110,8 @@ public final class SceneNameParser {
         if (!parseFlags(parts.flags(), builder, startTimeProvider)) {
             return null;
         }
-        return builder.build();
+        ParseResult result = builder.build();
+        return result.gap() && result.on() != null ? null : result;
     }
 
     private static SceneParts parseSceneName(String sceneName) {
@@ -288,10 +289,21 @@ public final class SceneNameParser {
             return true;
         }
         List<String> days = new ArrayList<>();
-        for (String flag : flags.split(",", -1)) {
+        List<String> splitFlags = splitFlags(flags);
+        if (splitFlags == null) {
+            return false;
+        }
+        for (String flag : splitFlags) {
             flag = flag.trim();
             if (flag.equals("i")) {
                 builder.interpolate(Boolean.TRUE);
+            } else if (flag.startsWith("i:")) {
+                if (!"false".equals(getFlagValue(flag, "i:"))) {
+                    return false;
+                }
+                builder.interpolate(Boolean.FALSE);
+            } else if (flag.equals("gap")) {
+                builder.gap(true);
             } else if (flag.startsWith("tr-b:")) {
                 String value = getFlagValue(flag, "tr-b:");
                 if (value == null || !isValidTransitionTimeBefore(value, startTimeProvider)) {
@@ -328,6 +340,26 @@ public final class SceneNameParser {
             return null;
         }
         return value;
+    }
+
+    private static List<String> splitFlags(String flags) {
+        List<String> result = new ArrayList<>();
+        int depth = 0;
+        int start = 0;
+        for (int i = 0; i < flags.length(); i++) {
+            char character = flags.charAt(i);
+            if (character == '(') {
+                depth++;
+            } else if (character == ')') {
+                if (--depth < 0) return null;
+            } else if (character == ',' && depth == 0) {
+                result.add(flags.substring(start, i));
+                start = i + 1;
+            }
+        }
+        if (depth != 0) return null;
+        result.add(flags.substring(start));
+        return result;
     }
 
     private static boolean isValidTransitionTime(String value) {

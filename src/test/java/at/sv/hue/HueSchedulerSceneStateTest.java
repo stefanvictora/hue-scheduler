@@ -96,6 +96,50 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
     }
 
     @Test
+    void migrateInputToScenes_groupState_preservesGapWithOverlappingLightDefinition() {
+        mockGroupLightsForId(1, 4);
+        mockDefaultGroupCapabilities(1);
+        addState("g1", "00:00", "bri:100");
+        addState("g1", "01:00", "days:Mo-Fr");
+        addKnownLightIdsWithDefaultCapabilities(4);
+        addState(4, "00:00", "bri:200");
+        enableInputToSceneMigration(true);
+
+        migrateInputToScenes();
+
+        assertSceneUpdate("/groups/1", "00:00", expectedPutCall(4).bri(200));
+        assertSceneUpdate("/groups/1", "01:00 [Mo-Fr,gap]");
+    }
+
+    @Test
+    void migrateInputToScenes_groupState_preservesExplicitInterpolationOptOut() {
+        interpolateAll = true;
+        create();
+        mockGroupLightsForId(9, 1);
+        mockDefaultGroupCapabilities(9);
+        addState("g9", "12:00", "bri:100", "interpolate:false");
+        enableInputToSceneMigration(true);
+
+        migrateInputToScenes();
+
+        assertSceneUpdate("/groups/9", "12:00 [i:false]", expectedPutCall(1).bri(100));
+    }
+
+    @Test
+    void migrateInputToScenes_groupState_preservesNestedTransitionExpressionWithAnotherFlag() {
+        mockGroupLightsForId(9, 1);
+        mockDefaultGroupCapabilities(9);
+        addState("g9", "00:00", "bri:100");
+        addState("g9", "02:00", "bri:200", "tr-before:max(min(01:00,01:30),00:30)", "force:true");
+        enableInputToSceneMigration(true);
+
+        migrateInputToScenes();
+
+        assertSceneUpdate("/groups/9", "00:00", expectedPutCall(1).bri(100));
+        assertSceneUpdate("/groups/9", "02:00 [tr-b:max(min(01:00,01:30),00:30),f]", expectedPutCall(1).bri(200));
+    }
+
+    @Test
     void migrateInputToScenes_lightState_isSkipped() {
         addKnownLightIdsWithDefaultCapabilities(1);
         addState(1, "12:00", "bri:40%");

@@ -72,6 +72,8 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
     @Setter
     private BiFunction<ScheduledStateSnapshot, ZonedDateTime, ScheduledStateSnapshot> nextStateLookup;
     private volatile int generation;
+    @Getter
+    private final boolean sceneScheduleGap;
 
     @Builder
     public ScheduledState(Identifier identifier, String startString, List<ScheduledLightState> lightStates,
@@ -79,7 +81,8 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
                           String sceneId, Integer sceneBrightnessModifier, Boolean sceneOnModifier, String transitionTimeBeforeString,
                           Integer definedTransitionTime, Set<DayOfWeek> daysOfWeek, StartTimeProvider startTimeProvider,
                           int minTrBeforeGapInMinutes, int brightnessOverrideThreshold, int colorTemperatureOverrideThresholdKelvin,
-                          double colorOverrideThreshold, Boolean force, Boolean interpolate, boolean groupState, boolean temporary) {
+                          double colorOverrideThreshold, Boolean force, Boolean interpolate, boolean groupState, boolean temporary,
+                          boolean sceneScheduleGap) {
         this.identifier = identifier;
         this.startString = startString;
         this.lightStates = lightStates;
@@ -88,6 +91,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
         this.sceneBrightnessModifier = sceneBrightnessModifier;
         this.sceneOnModifier = sceneOnModifier;
         this.interpolate = interpolate;
+        this.sceneScheduleGap = sceneScheduleGap;
         if (daysOfWeek == null || daysOfWeek.isEmpty()) {
             this.daysOfWeek = EnumSet.allOf(DayOfWeek.class);
         } else {
@@ -123,7 +127,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
                 state.sceneBrightnessModifier, state.sceneOnModifier,
                 state.transitionTimeBeforeString, state.definedTransitionTime, state.daysOfWeek, state.startTimeProvider,
                 state.minTrBeforeGapInMinutes, state.brightnessOverrideThreshold, state.colorTemperatureOverrideThresholdKelvin,
-                state.colorOverrideThreshold, state.force, state.interpolate, state.groupState, true
+                state.colorOverrideThreshold, state.force, state.interpolate, state.groupState, true, state.sceneScheduleGap
         );
         copy.lastSeen = state.lastSeen;
         copy.originalState = state.originalState;
@@ -139,6 +143,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
 
     /** @return whether the scene's target light IDs changed */
     public boolean updateLightStates(List<ScheduledLightState> newLightStates) {
+        if (sceneScheduleGap) return false;
         Set<String> previousLightIds = getLightIds(getLightStates());
         this.lightStates = newLightStates;
         return !previousLightIds.equals(getLightIds(newLightStates));
@@ -153,7 +158,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
     }
 
     public boolean hasMatchingSceneMembership() {
-        return !isSceneBased() || new HashSet<>(getGroupLightIds()).equals(getLightIds(getLightStates()));
+        return sceneScheduleGap || !isSceneBased() || new HashSet<>(getGroupLightIds()).equals(getLightIds(getLightStates()));
     }
 
     private static Set<String> getLightIds(List<ScheduledLightState> lightStates) {

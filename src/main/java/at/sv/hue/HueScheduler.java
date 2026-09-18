@@ -4,6 +4,7 @@ import at.sv.hue.api.ApiFailure;
 import at.sv.hue.api.BridgeAuthenticationFailure;
 import at.sv.hue.api.BridgeConnectionFailure;
 import at.sv.hue.api.EmptyGroupException;
+import at.sv.hue.api.GroupNotFoundException;
 import at.sv.hue.api.HttpResourceProviderImpl;
 import at.sv.hue.api.HueApi;
 import at.sv.hue.api.LightEventListener;
@@ -353,7 +354,7 @@ public final class HueScheduler implements Runnable {
         sceneStateDiscoveryService = new SceneStateDiscoveryService(api, startTimeProvider, stateRegistry,
                 this::rescheduleStatesForId, this::resetManualOverride,
                 minTrBeforeGapInMinutes, parseBrightnessPercentValue(brightnessOverrideThresholdPercentage),
-                colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold, enableAutoSceneStates);
+                colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold, enableAutoSceneStates, interpolateAll);
     }
 
     private LightEventListenerImpl createLightEventListener() {
@@ -453,7 +454,7 @@ public final class HueScheduler implements Runnable {
         sceneStateDiscoveryService = new SceneStateDiscoveryService(api, startTimeProvider, stateRegistry,
                 this::rescheduleStatesForId, this::resetManualOverride,
                 minTrBeforeGapInMinutes, parseBrightnessPercentValue(brightnessOverrideThresholdPercentage),
-                colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold, enableAutoSceneStates);
+                colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold, enableAutoSceneStates, interpolateAll);
         new HueEventStreamReader(apiHost, accessToken, httpsClient,
                 createHueEventHandler(), eventStreamReadTimeoutInMinutes).start();
     }
@@ -473,7 +474,13 @@ public final class HueScheduler implements Runnable {
         stateRegistry.forEach(states -> {
             ScheduledState state = states.getFirst();
             if (!state.isGroupState()) return;
-            List<String> lightIds = getCurrentGroupLights(state.getId());
+            List<String> lightIds;
+            try {
+                lightIds = getCurrentGroupLights(state.getId());
+            } catch (GroupNotFoundException e) {
+                removeMissingGroup(states, affectedLights);
+                return;
+            }
             if (new HashSet<>(state.getGroupLightIds()).equals(new HashSet<>(lightIds))) return;
             changedGroups.add(state.getId());
             affectedLights.addAll(state.getGroupLightIds());
@@ -493,6 +500,15 @@ public final class HueScheduler implements Runnable {
                 rescheduleStatesForId(state.getId());
             }
         });
+    }
+
+    private void removeMissingGroup(List<ScheduledState> states, Set<String> affectedLights) {
+        LOG.info("Group '{}' no longer exists. Removing its running definitions.", states.getFirst().getId());
+        for (ScheduledState state : states) {
+            affectedLights.addAll(state.getGroupLightIds());
+            state.invalidate();
+            stateRegistry.remove(state);
+        }
     }
 
     private List<String> getCurrentGroupLights(String groupId) {
@@ -1333,6 +1349,8 @@ public final class HueScheduler implements Runnable {
     }
 
     private List<PutCall> getMigrationPutCalls(ScheduledState state, ZonedDateTime now) {
+        // The bridge needs actions even for a schedule gap; the adapter supplies off placeholders.
+        if (state.isNullState()) return List.of();
         ScheduledStateSnapshot snapshot = state.getSnapshot(now);
         ZonedDateTime definedStart = snapshot.getDefinedStart();
         List<PutCall> putCalls = stateRegistry.getPutCalls(state.getGroupLightIds(), definedStart);
@@ -1347,8 +1365,14 @@ public final class HueScheduler implements Runnable {
         if (days != null) {
             flags.add(days);
         }
+        if (state.isNullState()) {
+            flags.add("gap");
+            return state.getStartString() + " [" + String.join(",", flags) + "]";
+        }
         if (state.getInterpolate() == Boolean.TRUE) {
             flags.add("i");
+        } else if (state.getInterpolate() == Boolean.FALSE) {
+            flags.add("i:false");
         }
         if (state.getTransitionTimeBeforeString() != null) {
             flags.add("tr-b:" + state.getTransitionTimeBeforeString());
@@ -1511,7 +1535,9 @@ public final class HueScheduler implements Runnable {
     }
 
     private void reloadSceneStates(String sceneId) {
-        List<ScheduledState> states = stateRegistry.findStatesWithSceneId(sceneId);
+        List<ScheduledState> states = stateRegistry.findStatesWithSceneId(sceneId).stream()
+                .filter(state -> !state.isSceneScheduleGap())
+                .toList();
         if (states.isEmpty()) {
             return;
         }
@@ -1534,8 +1560,15 @@ public final class HueScheduler implements Runnable {
         Set<String> groupsToRescheduleForMembership = new HashSet<>();
         Set<String> affectedLights = new HashSet<>();
         for (String affectedId : getAffectedIds(states)) {
-            List<String> groupLights = getCurrentGroupLights(affectedId);
             List<ScheduledState> groupStates = stateRegistry.findStatesForId(affectedId);
+            if (groupStates == null) continue;
+            List<String> groupLights;
+            try {
+                groupLights = getCurrentGroupLights(affectedId);
+            } catch (GroupNotFoundException e) {
+                removeMissingGroup(groupStates, affectedLights);
+                continue;
+            }
             List<String> previousGroupLights = groupStates.getFirst().getGroupLightIds();
             groupStates.forEach(state -> state.updateGroupLightIds(groupLights));
             if (groupsWithChangedSceneLights.contains(affectedId) || shouldDeferGroupScheduling(groupStates)) {

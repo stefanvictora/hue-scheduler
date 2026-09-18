@@ -335,7 +335,7 @@ public class AbstractHueSchedulerTest {
         return ensureRunnable(now.plusSeconds(connectionFailureRetryDelay));
     }
 
-    private void assertEnd(ScheduledRunnable state, ZonedDateTime endExclusive) {
+    protected void assertEnd(ScheduledRunnable state, ZonedDateTime endExclusive) {
         Duration between = Duration.between(endExclusive.minusSeconds(1), state.getEnd());
         assertThat(state)
                 .extracting(ScheduledRunnable::getEnd)

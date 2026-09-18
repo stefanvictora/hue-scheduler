@@ -255,6 +255,48 @@ class SceneNameParserTest {
     }
 
     @Test
+    void parse_explicitInterpolationOptOut() {
+        assertFlags("07:00 [i:false]", "07:00", null, null, false);
+        assertFlags("07:00 [i, i: false]", "07:00", null, null, false);
+        assertFlags("07:00 [i:false,i]", "07:00", null, null, true);
+        assertIgnored("07:00 [i:true]");
+        assertIgnored("07:00 [i:]");
+        assertIgnored("07:00 [i:foo]");
+    }
+
+    @Test
+    void parse_gapWithDaysAndValidOptions() {
+        var result = parse("12:00 [Mo-Fr,gap,i,f,tr:5s,tr-b:30min]");
+        assertThat(result).isNotNull();
+        assertThat(result.gap()).isTrue();
+        assertThat(result.daysOfWeek()).isEqualTo("Mo-Fr");
+        assertThat(parse("12:00").gap()).isFalse();
+        assertIgnored("12:00 [gap,on]");
+        assertIgnored("12:00 [off,gap]");
+        assertIgnored("12:00 [gap,tr:invalid]");
+    }
+
+    @Test
+    void parse_transitionFunctionKeepsArgumentCommas() {
+        assertFlags("20:00 [tr-b:min(sunset,19:00)]", "20:00", null, "min(sunset,19:00)", null);
+        var result = parse("20:00 [Mo, tr-b:max(min(sunset,19:00),18:00),f,Fr]");
+        assertThat(result).isNotNull();
+        assertThat(result.transitionTimeBefore()).isEqualTo("max(min(sunset,19:00),18:00)");
+        assertThat(result.daysOfWeek()).isEqualTo("Mo,Fr");
+        assertThat(result.forced()).isTrue();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "tr-b:min(sunset,19:00", "tr-b:min(sunset,19:00))", "tr-b:min(sunset,)",
+            "tr-b:min(sunset,19:00),", ",tr-b:min(sunset,19:00)",
+            "tr-b:min(sunset,19:00),,f", "tr-b:min(sunset,19:00),unknown"
+    })
+    void parse_transitionFunctionStillRejectsMalformedFlags(String flags) {
+        assertIgnored("20:00 [" + flags + "]");
+    }
+
+    @Test
     void parse_trFlag_setsTransitionTime() {
         assertFlags("07:00[tr:5min]", "07:00", "5min", null, null);
     }

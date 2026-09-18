@@ -25,13 +25,14 @@ public class SceneStateDiscoveryService implements SceneDiscoveryListener {
     private final int colorTemperatureOverrideThresholdKelvin;
     private final double colorOverrideThreshold;
     private final boolean enabled;
+    private final boolean interpolateAll;
 
     public SceneStateDiscoveryService(HueApi api, StartTimeProvider startTimeProvider,
                                       ScheduledStateRegistry stateRegistry, Consumer<String> groupStatesRescheduler,
                                       Consumer<String> manualOverrideReset,
                                       int minTrBeforeGapInMinutes, int brightnessOverrideThreshold,
                                       int colorTemperatureOverrideThresholdKelvin, double colorOverrideThreshold,
-                                      boolean enabled) {
+                                      boolean enabled, boolean interpolateAll) {
         this.api = api;
         this.startTimeProvider = startTimeProvider;
         this.stateRegistry = stateRegistry;
@@ -42,6 +43,7 @@ public class SceneStateDiscoveryService implements SceneDiscoveryListener {
         this.colorTemperatureOverrideThresholdKelvin = colorTemperatureOverrideThresholdKelvin;
         this.colorOverrideThreshold = colorOverrideThreshold;
         this.enabled = enabled;
+        this.interpolateAll = interpolateAll;
     }
 
     public void discoverSceneStates() {
@@ -68,7 +70,9 @@ public class SceneStateDiscoveryService implements SceneDiscoveryListener {
 
     private ScheduledState createScheduledState(Identifier scene, SceneNameParser.ParseResult result) {
         Identifier identifier = api.getGroupIdForScene(scene.id());
-        List<ScheduledLightState> sceneLightStates = api.getSceneLightStates(scene.id());
+        List<ScheduledLightState> sceneLightStates = result.gap()
+                ? List.of(ScheduledLightState.builder().id(identifier.id()).build())
+                : api.getSceneLightStates(scene.id());
         List<String> groupLights = api.getGroupLights(identifier.id());
         sceneLightStates = InputConfigurationParser.applyOnModifier(sceneLightStates, result.on());
         EnumSet<DayOfWeek> dayOfWeeks = EnumSet.noneOf(DayOfWeek.class);
@@ -78,8 +82,9 @@ public class SceneStateDiscoveryService implements SceneDiscoveryListener {
         return new ScheduledState(identifier, result.timeExpression(), sceneLightStates, groupLights, scene.id(),
                 null, result.on(), result.transitionTimeBefore(), parseTransitionTime(result),
                 dayOfWeeks, startTimeProvider, minTrBeforeGapInMinutes, brightnessOverrideThreshold,
-                colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold, result.forced(), result.interpolate(),
-                true, false);
+                colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold, result.forced(),
+                result.interpolate() != null ? result.interpolate() : (interpolateAll ? Boolean.TRUE : null),
+                true, false, result.gap());
     }
 
     private static Integer parseTransitionTime(SceneNameParser.ParseResult result) {

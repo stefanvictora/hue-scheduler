@@ -67,7 +67,7 @@ _Avoid_: Property overlap, payload-only difference
 ### Scenes and control
 
 **Scene Schedule**:
-A Hue scene whose name contains a valid Schedule Expression and optional schedule flags. A name that cannot be parsed is treated as an ordinary scene name.
+A Hue scene whose name contains a valid Schedule Expression and optional schedule flags, declaring either a Scene-Backed Definition or a Schedule Gap. A name that cannot be parsed is treated as an ordinary scene name.
 _Avoid_: Scheduled scene, parseable scene
 
 **Scene-Backed Definition**:

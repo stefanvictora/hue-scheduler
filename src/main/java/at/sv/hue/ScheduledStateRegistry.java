@@ -235,8 +235,12 @@ public class ScheduledStateRegistry {
         return states != null ? new ArrayList<>(states) : null;
     }
 
-    public synchronized void forEach(Consumer<List<ScheduledState>> consumer) {
-        lightStates.values().forEach(consumer);
+    public void forEach(Consumer<List<ScheduledState>> consumer) {
+        List<List<ScheduledState>> stateLists;
+        synchronized (this) {
+            stateLists = lightStates.values().stream().map(List::copyOf).toList();
+        }
+        stateLists.forEach(consumer);
     }
 
     public synchronized List<ScheduledState> findStatesWithSceneId(String sceneId) {

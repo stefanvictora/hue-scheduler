@@ -1,6 +1,7 @@
 package at.sv.hue;
 
 import at.sv.hue.api.EmptyGroupException;
+import at.sv.hue.api.GroupNotFoundException;
 import com.launchdarkly.eventsource.MessageEvent;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -13,6 +14,7 @@ import java.util.stream.Collectors;
 
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doThrow;
 
 class HueSchedulerMembershipTest extends AbstractHueSchedulerTest {
 
@@ -43,6 +45,56 @@ class HueSchedulerMembershipTest extends AbstractHueSchedulerTest {
 
     private void roomMembershipChanged(Integer... lights) throws Exception {
         membershipChanged("room", lights);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void deletedGroupDoesNotPreventOtherMembershipUpdates(boolean deletedGroupFirst) throws Exception {
+        controlGroupLightsIndividually = true;
+        create();
+        if (deletedGroupFirst) addDefaultGroupState(1, now, 4);
+        addDefaultGroupState(2, now, 5);
+        if (!deletedGroupFirst) addDefaultGroupState(1, now, 4);
+        var staleTasks = startScheduler(2);
+
+        when(mockedHueApi.getGroupLights("/groups/1")).thenThrow(new GroupNotFoundException("Deleted room"));
+        mockAssignedGroups(4);
+        mockGroupLightsForId(2, 5, 6);
+        roomMembershipChanged(5, 6);
+        staleTasks.forEach(ScheduledRunnable::run);
+        runDueTasks();
+        assertPutCalls(expectedPutCall(5).bri(DEFAULT_BRIGHTNESS).ct(DEFAULT_CT),
+                expectedPutCall(6).bri(DEFAULT_BRIGHTNESS).ct(DEFAULT_CT));
+
+        doThrow(new AssertionError("Deleted group should have been removed"))
+                .when(mockedHueApi).getGroupLights("/groups/1");
+        mockGroupLightsForId(2, 6);
+        mockAssignedGroups(5);
+        roomMembershipChanged(6);
+        runDueTasks();
+        assertPutCalls(expectedPutCall(6).bri(DEFAULT_BRIGHTNESS).ct(DEFAULT_CT));
+    }
+
+    @Test
+    void deletedGroupDuringSceneReloadInvalidatesWorkAndReschedulesOverlappingTargets() {
+        controlGroupLightsIndividually = true;
+        create();
+        mockDefaultGroupCapabilities(1);
+        mockGroupLightsForId(1, 4);
+        var scene = mockSceneLightStates(1, "Colors",
+                ScheduledLightState.builder().id("/lights/4").bri(100));
+        addState("g1", now, "scene:Colors");
+        addDefaultGroupState(2, now, 4, 5);
+        mockAssignedGroups(4, 1, 2);
+        var staleTasks = startScheduler(2);
+
+        when(mockedHueApi.getGroupLights("/groups/1")).thenThrow(new GroupNotFoundException("Deleted room"));
+        mockAssignedGroups(4, 2);
+        scheduler.onSceneResourceModified(scene.id());
+        staleTasks.forEach(ScheduledRunnable::run);
+        runDueTasks();
+        assertPutCalls(expectedPutCall(4).bri(DEFAULT_BRIGHTNESS).ct(DEFAULT_CT),
+                expectedPutCall(5).bri(DEFAULT_BRIGHTNESS).ct(DEFAULT_CT));
     }
 
     private void membershipChanged(String resourceType, Integer... lights) throws Exception {
