@@ -10,6 +10,10 @@ Hue Scheduler governs lighting Targets through time-based State Definitions, inc
 A light, group, or other supported entity governed by one or more State Definitions.
 _Avoid_: Resource, entity, ID
 
+**Group Membership**:
+The set of lights currently belonging to a room or zone. Membership can be empty; the room or zone still exists as a Target.
+_Avoid_: Original group lights, startup membership
+
 **State Definition**:
 A declaration associating a Target and Target Time with zero or more desired light properties, optionally subject to a Day Restriction. A definition with no desired properties creates a Schedule Gap.
 _Avoid_: Scheduled state, schedule row, schedule entry

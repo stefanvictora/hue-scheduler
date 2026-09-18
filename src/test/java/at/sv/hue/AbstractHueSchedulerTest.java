@@ -245,6 +245,14 @@ public class AbstractHueSchedulerTest {
         scheduler.start();
     }
 
+    protected void runDueTasks() {
+        stateScheduler.runDueTasks(now);
+    }
+
+    protected void discardScheduledTasks() {
+        stateScheduler.clear();
+    }
+
     protected List<ScheduledRunnable> startScheduler(int expectedStates) {
         startScheduler();
 

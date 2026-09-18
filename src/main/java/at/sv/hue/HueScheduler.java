@@ -3,6 +3,7 @@ package at.sv.hue;
 import at.sv.hue.api.ApiFailure;
 import at.sv.hue.api.BridgeAuthenticationFailure;
 import at.sv.hue.api.BridgeConnectionFailure;
+import at.sv.hue.api.EmptyGroupException;
 import at.sv.hue.api.HttpResourceProviderImpl;
 import at.sv.hue.api.HueApi;
 import at.sv.hue.api.LightEventListener;
@@ -55,6 +56,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.LongConsumer;
@@ -349,7 +351,7 @@ public final class HueScheduler implements Runnable {
         this.sceneEventListener = new SceneEventListenerImpl(api, fakeTicker, sceneActivationIgnoreWindowInSeconds,
                 sceneSyncName::equals, lightEventListener, manualOverrideTracker);
         sceneStateDiscoveryService = new SceneStateDiscoveryService(api, startTimeProvider, stateRegistry,
-                this::rescheduleGroupStates, this::resetManualOverride,
+                this::rescheduleStatesForId, this::resetManualOverride,
                 minTrBeforeGapInMinutes, parseBrightnessPercentValue(brightnessOverrideThresholdPercentage),
                 colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold, enableAutoSceneStates);
     }
@@ -449,12 +451,56 @@ public final class HueScheduler implements Runnable {
         stateRegistry = new ScheduledStateRegistry(currentTime, api);
         startTimeProvider = createStartTimeProvider(latitude, longitude, elevation);
         sceneStateDiscoveryService = new SceneStateDiscoveryService(api, startTimeProvider, stateRegistry,
-                this::rescheduleGroupStates, this::resetManualOverride,
+                this::rescheduleStatesForId, this::resetManualOverride,
                 minTrBeforeGapInMinutes, parseBrightnessPercentValue(brightnessOverrideThresholdPercentage),
                 colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold, enableAutoSceneStates);
         new HueEventStreamReader(apiHost, accessToken, httpsClient,
-                new HueEventHandler(lightEventListener, sceneEventListener, api, this::onSceneResourceModified,
-                        sceneStateDiscoveryService), eventStreamReadTimeoutInMinutes).start();
+                createHueEventHandler(), eventStreamReadTimeoutInMinutes).start();
+    }
+
+    HueEventHandler createHueEventHandler() {
+        return new HueEventHandler(lightEventListener, sceneEventListener, this::onHueResourceModified,
+                this::onSceneResourceModified, sceneStateDiscoveryService);
+    }
+
+    private void onHueResourceModified(String type, String id, Object content) {
+        api.onModification(type, id, content);
+        if (!"room".equals(type) && !"zone".equals(type) && !"device".equals(type)) {
+            return;
+        }
+        Set<String> changedGroups = new HashSet<>();
+        Set<String> affectedLights = new HashSet<>();
+        stateRegistry.forEach(states -> {
+            ScheduledState state = states.getFirst();
+            if (!state.isGroupState()) return;
+            List<String> lightIds = getCurrentGroupLights(state.getId());
+            if (new HashSet<>(state.getGroupLightIds()).equals(new HashSet<>(lightIds))) return;
+            changedGroups.add(state.getId());
+            affectedLights.addAll(state.getGroupLightIds());
+            affectedLights.addAll(lightIds);
+            states.forEach(groupState -> groupState.updateGroupLightIds(lightIds));
+        });
+        rescheduleMembershipChanges(changedGroups, affectedLights);
+    }
+
+    private void rescheduleMembershipChanges(Set<String> changedGroups, Set<String> affectedLights) {
+        stateRegistry.forEach(states -> {
+            ScheduledState state = states.getFirst();
+            boolean overlaps = state.isGroupState()
+                    ? state.getGroupLightIds().stream().anyMatch(affectedLights::contains)
+                    : affectedLights.contains(state.getId());
+            if (changedGroups.contains(state.getId()) || overlaps) {
+                rescheduleStatesForId(state.getId());
+            }
+        });
+    }
+
+    private List<String> getCurrentGroupLights(String groupId) {
+        try {
+            return api.getGroupLights(groupId);
+        } catch (EmptyGroupException e) {
+            return List.of();
+        }
     }
 
     private void createAndStart() {
@@ -1468,10 +1514,13 @@ public final class HueScheduler implements Runnable {
         }
         MDC.put("context", "scene-reload");
         LOG.info("Scene '{}' modified. Reloading {} state(s).", sceneId, states.size());
+        Set<String> groupsWithChangedSceneLights = new HashSet<>();
         for (ScheduledState state : states) {
             MDC.put("context", "scene-reload");
             try {
-                reloadLightStates(sceneId, state);
+                if (reloadLightStates(sceneId, state)) {
+                    groupsWithChangedSceneLights.add(state.getId());
+                }
                 LOG.info("Reloaded scene state: {}", state);
             } catch (Exception e) {
                 LOG.error("Failed to reload scene state for '{}': {}", state, e.getLocalizedMessage(), e);
@@ -1479,13 +1528,24 @@ public final class HueScheduler implements Runnable {
         }
         List<String> idsToReschedule = new ArrayList<>();
         List<String> idsToRefresh = new ArrayList<>();
+        Set<String> groupsToRescheduleForMembership = new HashSet<>();
+        Set<String> affectedLights = new HashSet<>();
         for (String affectedId : getAffectedIds(states)) {
-            if (requiresReschedulingAfterActionUpdate(affectedId)) {
+            List<String> groupLights = getCurrentGroupLights(affectedId);
+            List<ScheduledState> groupStates = stateRegistry.findStatesForId(affectedId);
+            List<String> previousGroupLights = groupStates.getFirst().getGroupLightIds();
+            groupStates.forEach(state -> state.updateGroupLightIds(groupLights));
+            if (groupsWithChangedSceneLights.contains(affectedId) || shouldDeferGroupScheduling(groupStates)) {
+                groupsToRescheduleForMembership.add(affectedId);
+                affectedLights.addAll(previousGroupLights);
+                affectedLights.addAll(groupLights);
+            } else if (requiresReschedulingAfterActionUpdate(affectedId)) {
                 idsToReschedule.add(affectedId);
             } else {
                 idsToRefresh.add(affectedId);
             }
         }
+        rescheduleMembershipChanges(groupsToRescheduleForMembership, affectedLights);
         idsToReschedule.forEach(this::rescheduleGroupStatesAfterActionUpdate);
         syncScenesForActiveStates(idsToRefresh);
         reapplyAffectedIdsIfOn(idsToRefresh);
@@ -1498,7 +1558,7 @@ public final class HueScheduler implements Runnable {
     }
 
     private void rescheduleGroupStatesAfterActionUpdate(String id) {
-        List<ScheduledState> states = invalidateGroupStates(id);
+        List<ScheduledState> states = invalidateStatesForId(id);
         if (states == null) {
             return;
         }
@@ -1506,7 +1566,7 @@ public final class HueScheduler implements Runnable {
         initialSchedule(states, currentTime.get());
     }
 
-    private List<ScheduledState> invalidateGroupStates(String id) {
+    private List<ScheduledState> invalidateStatesForId(String id) {
         List<ScheduledState> states = stateRegistry.findStatesForId(id);
         if (states != null) {
             states.forEach(ScheduledState::invalidate);
@@ -1514,12 +1574,21 @@ public final class HueScheduler implements Runnable {
         return states;
     }
 
-    private void rescheduleGroupStates(String id) {
-        List<ScheduledState> states = invalidateGroupStates(id);
+    private void rescheduleStatesForId(String id) {
+        List<ScheduledState> states = invalidateStatesForId(id);
         if (states == null) {
             return;
         }
+        if (states.getFirst().isGroupState() && shouldDeferGroupScheduling(states)) {
+            return;
+        }
         initialSchedule(states, currentTime.get());
+    }
+
+    private boolean shouldDeferGroupScheduling(List<ScheduledState> groupStates) {
+        // Room and scene updates can arrive separately. Wait for the matching scene actions.
+        return groupStates.getFirst().getGroupLightIds().isEmpty() ||
+               groupStates.stream().anyMatch(state -> !state.hasMatchingSceneMembership());
     }
 
     private static List<String> getAffectedIds(List<ScheduledState> states) {
@@ -1546,8 +1615,8 @@ public final class HueScheduler implements Runnable {
                      .forEach(snapshot -> scheduleAsyncSceneSync(snapshot, true));
     }
 
-    private void reloadLightStates(String sceneId, ScheduledState state) {
-        state.updateLightStates(createParser().loadLightStates(sceneId,
+    private boolean reloadLightStates(String sceneId, ScheduledState state) {
+        return state.updateLightStates(createParser().loadLightStates(sceneId,
                 state.getSceneBrightnessModifier(), state.getSceneOnModifier()));
     }
 }

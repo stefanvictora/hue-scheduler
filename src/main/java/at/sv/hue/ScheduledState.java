@@ -16,10 +16,12 @@ import java.time.ZonedDateTime;
 import java.time.temporal.TemporalAdjusters;
 import java.util.Arrays;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public final class ScheduledState { // todo: a better name would be StateDefinition
     /**
@@ -30,8 +32,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
 
     private final Identifier identifier;
     private volatile List<ScheduledLightState> lightStates;
-    @Getter
-    private final List<String> groupLightIds;
+    private volatile List<String> groupLightIds;
     @Getter
     private final String startString;
     @Getter
@@ -136,8 +137,27 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
         return sceneId != null;
     }
 
-    public void updateLightStates(List<ScheduledLightState> newLightStates) {
+    /** @return whether the scene's target light IDs changed */
+    public boolean updateLightStates(List<ScheduledLightState> newLightStates) {
+        Set<String> previousLightIds = getLightIds(getLightStates());
         this.lightStates = newLightStates;
+        return !previousLightIds.equals(getLightIds(newLightStates));
+    }
+
+    public List<String> getGroupLightIds() {
+        return originalState.groupLightIds;
+    }
+
+    public void updateGroupLightIds(List<String> lightIds) {
+        originalState.groupLightIds = List.copyOf(lightIds);
+    }
+
+    public boolean hasMatchingSceneMembership() {
+        return !isSceneBased() || new HashSet<>(getGroupLightIds()).equals(getLightIds(getLightStates()));
+    }
+
+    private static Set<String> getLightIds(List<ScheduledLightState> lightStates) {
+        return lightStates.stream().map(ScheduledLightState::getId).collect(Collectors.toSet());
     }
 
     private List<ScheduledLightState> getLightStates() {

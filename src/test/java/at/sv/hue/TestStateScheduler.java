@@ -33,4 +33,15 @@ final class TestStateScheduler implements StateScheduler {
     public void clear() {
         scheduledRunnables.clear();
     }
+
+    public void runDueTasks(ZonedDateTime now) {
+        while (true) {
+            ScheduledRunnable next = getScheduledStates().stream()
+                    .filter(task -> !task.getStart().isAfter(now))
+                    .findFirst().orElse(null);
+            if (next == null) return;
+            scheduledRunnables.remove(next);
+            next.run();
+        }
+    }
 }

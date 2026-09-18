@@ -258,6 +258,8 @@ Desk  17:00  gradient:[oklch(0.7 0.2 30), #00FF00, oklch(0.5 0.15 270)]@random_p
 
   > **Note**: Hue Scheduler listens for scene changes and automatically reloads the updated per-light values. If that scene is currently scheduled and the group is on, the updated values are applied immediately.
 
+  Changes to the lights in a Hue room or zone also refresh its running schedules. The affected group and overlapping schedules are reapplied using current membership, while recorded manual overrides remain in effect. Scene-based schedules wait for the Bridge's scene actions to match the updated group. If a scheduled group becomes empty, its schedules remain dormant until a light is added again; a restart is not required.
+
   ```
   Living room  sunset  scene:Relax
   Living room  22:00   scene:Nightlight   bri:50%   interpolate:true
