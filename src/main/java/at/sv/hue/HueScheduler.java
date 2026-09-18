@@ -1343,6 +1343,10 @@ public final class HueScheduler implements Runnable {
 
     private static String getMigrationSceneName(ScheduledState state) {
         List<String> flags = new ArrayList<>();
+        String days = DayOfWeeksParser.formatDaysOfWeek(state.getDaysOfWeek());
+        if (days != null) {
+            flags.add(days);
+        }
         if (state.getInterpolate() == Boolean.TRUE) {
             flags.add("i");
         }
@@ -1360,10 +1364,6 @@ public final class HueScheduler implements Runnable {
         }
         if (state.isOn()) {
             flags.add("on");
-        }
-        String daysFlag = DayOfWeeksParser.formatDaysOfWeek(state.getDaysOfWeek());
-        if (daysFlag != null) {
-            flags.add("d:" + daysFlag.replace(",", ";"));
         }
         if (flags.isEmpty()) {
             return state.getStartString();

@@ -45,6 +45,8 @@
 
 Discovers State Definitions from Hue Scene Schedules and reloads them when their scenes change. This feature is available only with a Philips Hue Bridge.
 
+Scene names contain a scheduled time followed by optional comma-separated options in brackets, such as `12:00 [Mo-Th,Su,i]`. Write days directly as abbreviations or inclusive ranges: `Mo` for Monday, `Mo-Fr` for Monday through Friday, or `Fr-Mo` for Friday through Monday across the weekend. English and German day abbreviations are supported, case-insensitively. Multiple day entries are combined and can appear anywhere among the other options; omitting days means every day. An unknown option or invalid value makes the scene ineligible for scheduling.
+
 When enabled, the `CONFIG_FILE` positional argument (or environment variable) is optional. If a configuration file is also provided, its definitions are combined with those discovered from Scene Schedules. An explicitly configured file must still exist and be readable.
 
 **Default:** `false`
@@ -52,6 +54,8 @@ When enabled, the `CONFIG_FILE` positional argument (or environment variable) is
 ### `--migrate-input-to-scenes`
 
 Creates Hue Scene Schedules from supported group definitions in the configuration file, then exits. This one-time migration requires `CONFIG_FILE` even when `--enable-auto-scene-states` is enabled and is available only with a Philips Hue Bridge.
+
+Generated names place days before other options, combine consecutive days into ranges, and omit days for daily schedules. For example, `days:Mo,Tu,We,Th,Su` with `interpolate:true` at `12:00` becomes `12:00 [Mo-Th,Su,i]`.
 
 **Default:** `false`
 

@@ -107,7 +107,7 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
     }
 
     @Test
-    void migrateInputToScenes_groupState_singleDay_addsDaysFlag() {
+    void migrateInputToScenes_groupState_singleDay_addsDayRestriction() {
         mockGroupLightsForId(9, 1, 2);
         mockDefaultGroupCapabilities(9);
         addState("g9", "12:00", "bri:100%", "days:Mo");
@@ -115,7 +115,7 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
 
         migrateInputToScenes();
 
-        assertSceneUpdate("/groups/9", "12:00 [d:Mo]",
+        assertSceneUpdate("/groups/9", "12:00 [Mo]",
                 expectedPutCall(1).bri(254),
                 expectedPutCall(2).bri(254)
         );
@@ -130,7 +130,7 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
 
         migrateInputToScenes();
 
-        assertSceneUpdate("/groups/9", "12:00 [d:Mo-Th]",
+        assertSceneUpdate("/groups/9", "12:00 [Mo-Th]",
                 expectedPutCall(1).bri(254),
                 expectedPutCall(2).bri(254)
         );
@@ -145,7 +145,7 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
 
         migrateInputToScenes();
 
-        assertSceneUpdate("/groups/9", "12:00 [d:Mo-Th;Su]",
+        assertSceneUpdate("/groups/9", "12:00 [Mo-Th,Su]",
                 expectedPutCall(1).bri(254),
                 expectedPutCall(2).bri(254)
         );
@@ -160,7 +160,7 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
 
         migrateInputToScenes();
 
-        assertSceneUpdate("/groups/9", "12:00 [d:Mo-We;Fr-Sa]",
+        assertSceneUpdate("/groups/9", "12:00 [Mo-We,Fr-Sa]",
                 expectedPutCall(1).bri(254),
                 expectedPutCall(2).bri(254)
         );
@@ -175,7 +175,7 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
 
         migrateInputToScenes();
 
-        assertSceneUpdate("/groups/9", "12:00 [d:Sa-Su]",
+        assertSceneUpdate("/groups/9", "12:00 [Sa-Su]",
                 expectedPutCall(1).bri(254),
                 expectedPutCall(2).bri(254)
         );
@@ -190,7 +190,7 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
 
         migrateInputToScenes();
 
-        assertSceneUpdate("/groups/9", "12:00 [d:Mo-Tu;Su]",
+        assertSceneUpdate("/groups/9", "12:00 [Mo-Tu,Su]",
                 expectedPutCall(1).bri(254),
                 expectedPutCall(2).bri(254)
         );
@@ -200,15 +200,37 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
     void migrateInputToScenes_groupState_daysAndOtherFlags_combinedInSceneName() {
         mockGroupLightsForId(9, 1, 2);
         mockDefaultGroupCapabilities(9);
-        addState("g9", "12:00", "bri:80%", "interpolate:true", "days:Mo,Tu,We,Th");
+        addState("g9", "12:00", "bri:80%", "interpolate:true", "days:Mo,Tu,We,Th,Su");
         enableInputToSceneMigration(true);
 
         migrateInputToScenes();
 
-        assertSceneUpdate("/groups/9", "12:00 [i,d:Mo-Th]",
+        assertSceneUpdate("/groups/9", "12:00 [Mo-Th,Su,i]",
                 expectedPutCall(1).bri(203),
                 expectedPutCall(2).bri(203)
         );
+    }
+
+    @ParameterizedTest
+    @CsvSource({"MONDAY,0", "THURSDAY,1"})
+    void migrateInputToScenes_groupState_preservesDaysAfterRediscovery(DayOfWeek today, int daysUntilStart) {
+        setupTimeWithDayOfWeek(today);
+        mockGroupLightsForId(9, 1);
+        mockDefaultGroupCapabilities(9);
+        addState("g9", "12:00", "bri:100", "days:Mo-We,Fr", "tr:5s");
+        enableInputToSceneMigration(true);
+
+        migrateInputToScenes();
+
+        String sceneName = "12:00 [Mo-We,Fr,tr:5s]";
+        assertSceneUpdate("/groups/9", sceneName, expectedPutCall(1).bri(100));
+
+        enableAutoSceneStates();
+        Identifier scene = mockSceneLightStates(9, sceneName,
+                ScheduledLightState.builder().id("/lights/1").bri(100));
+        mockGetAllScenes(scene);
+
+        startAndGetSingleRunnable(now.plusDays(daysUntilStart).plusHours(12));
     }
 
     @Test
@@ -428,7 +450,7 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
                                    .id("/lights/5")
                                    .bri(254)
                                    .ct(40));
-        Identifier scene3 = mockSceneLightStates(1, "12:00 [d:Di;Mi]",
+        Identifier scene3 = mockSceneLightStates(1, "12:00 [Di,Mi]",
                 ScheduledLightState.builder()
                                    .id("/lights/4")
                                    .bri(200)

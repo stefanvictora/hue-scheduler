@@ -5,6 +5,7 @@ import lombok.Builder;
 
 import java.time.LocalTime;
 import java.time.DayOfWeek;
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
@@ -286,6 +287,7 @@ public final class SceneNameParser {
         if (flags == null || flags.isEmpty()) {
             return true;
         }
+        List<String> days = new ArrayList<>();
         for (String flag : flags.split(",", -1)) {
             flag = flag.trim();
             if (flag.equals("i")) {
@@ -302,25 +304,20 @@ public final class SceneNameParser {
                     return false;
                 }
                 builder.transitionTime(value);
-            } else if (flag.startsWith("d:")) {
-                String flagValue = getFlagValue(flag, "d:");
-                if (flagValue == null) {
-                    return false;
-                }
-                String value = flagValue.replace(";", ",");
-                if (!areValidDaysOfWeek(value)) {
-                    return false;
-                }
-                builder.daysOfWeek(value);
             } else if (flag.equals("f")) {
                 builder.forced(Boolean.TRUE);
             } else if (flag.equals("off")) {
                 builder.on(Boolean.FALSE);
             } else if (flag.equals("on")) {
                 builder.on(Boolean.TRUE);
+            } else if (isValidDayOrRange(flag)) {
+                days.add(flag);
             } else {
                 return false;
             }
+        }
+        if (!days.isEmpty()) {
+            builder.daysOfWeek(String.join(",", days));
         }
         return true;
     }
@@ -352,10 +349,7 @@ public final class SceneNameParser {
         return isValidTimeExpression(value, startTimeProvider);
     }
 
-    private static boolean areValidDaysOfWeek(String value) {
-        if (value.startsWith(",") || value.endsWith(",") || value.contains(",,")) {
-            return false;
-        }
+    private static boolean isValidDayOrRange(String value) {
         try {
             DayOfWeeksParser.parseDayOfWeeks(value, EnumSet.noneOf(DayOfWeek.class));
             return true;

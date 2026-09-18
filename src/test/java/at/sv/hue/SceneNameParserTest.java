@@ -4,6 +4,9 @@ import at.sv.hue.time.StartTimeProvider;
 import at.sv.hue.time.StartTimeProviderImpl;
 import at.sv.hue.time.SunTimesProvider;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -280,12 +283,48 @@ class SceneNameParserTest {
         assertThat(result.on()).isTrue();
     }
 
-    @Test
-    void parse_additionalFlags_daysOfWeek_parsed() {
-        SceneNameParser.ParseResult result = parse("07:00 [d:Mo;Di;Mi-Fr]");
+    @ParameterizedTest
+    @CsvSource({
+            "Mo,Mo",
+            "Mo-Fr,Mo-Fr",
+            "'Mo-Th,Su','Mo-Th,Su'",
+            "'Mo-We,Fr-Sa','Mo-We,Fr-Sa'",
+            "'Mo,Di,Mi-Fr','Mo,Di,Mi-Fr'",
+            "' mo , DI , Mi - Fr ','mo,DI,Mi - Fr'",
+            "Fr-Mo,Fr-Mo"
+    })
+    void parse_daysOfWeek_parsed(String days, String expectedDays) {
+        SceneNameParser.ParseResult result = parse("07:00 [" + days + "]");
 
         assertThat(result).isNotNull();
-        assertThat(result.daysOfWeek()).isEqualTo("Mo,Di,Mi-Fr");
+        assertThat(result.daysOfWeek()).isEqualTo(expectedDays);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "07:00 [Mo-Th,Su,i,tr:5s,tr-b:30min,f,on]",
+            "07:00 [i,Mo-Th,tr:5s,Su,tr-b:30min,f,on]",
+            "07:00 [i,tr:5s,tr-b:30min,f,on,Mo-Th,Su]"
+    })
+    void parse_daysAndOtherFlags_combinedInAnyOrder(String sceneName) {
+        SceneNameParser.ParseResult result = parse(sceneName);
+
+        assertThat(result).isNotNull();
+        assertThat(result.daysOfWeek()).isEqualTo("Mo-Th,Su");
+        assertThat(result.interpolate()).isTrue();
+        assertThat(result.transitionTime()).isEqualTo("5s");
+        assertThat(result.transitionTimeBefore()).isEqualTo("30min");
+        assertThat(result.forced()).isTrue();
+        assertThat(result.on()).isTrue();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "Mo-Funday", "Mo-", "-Fr", "Mo--Fr", "Mo,", ",Mo", "Mo,,Tu", "Mo, ,Tu",
+            "Mo;Tu", "d:Mo", "d:Mo;Tu", "days:Mo", "Mo,i,unknown"
+    })
+    void parse_invalidDayRestrictions_isIgnored(String flags) {
+        assertIgnored("07:00 [" + flags + "]");
     }
 
     @Test
@@ -300,9 +339,6 @@ class SceneNameParserTest {
         assertIgnored("07:00[force]");
         assertIgnored("07:00[,i]");
         assertIgnored("07:00[days:Mo;Tu]");
-        assertIgnored("07:00[d:Mo-Funday]");
-        assertIgnored("07:00[d:Mo;]");
-        assertIgnored("07:00[d:Mo;;Tu]");
         assertIgnored("07:00[tr:nonsense]");
         assertIgnored("07:00[tr-b:nonsense]");
     }
@@ -407,6 +443,7 @@ class SceneNameParserTest {
         assertThat(result.interpolate()).isEqualTo(interpolate);
         assertThat(result.forced()).isNull();
         assertThat(result.on()).isNull();
+        assertThat(result.daysOfWeek()).isNull();
     }
 
     private static SceneNameParser.ParseResult parse(String sceneName) {
