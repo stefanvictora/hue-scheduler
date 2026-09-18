@@ -783,6 +783,8 @@ public final class HueScheduler implements Runnable {
         if (snapshot.isNullState() || source.isCancelled()) return;
         long overlappingDelayInMs = getPotentialOverlappingDelayInMs(snapshot);
         LOG.debug("Schedule: {} in {}", snapshot, Duration.ofMillis(delayInMs + overlappingDelayInMs).withNanos(0));
+        ZonedDateTime start = currentTime.get().plus(delayInMs + overlappingDelayInMs, ChronoUnit.MILLIS);
+        ZonedDateTime end = snapshot.getEnd();
         source.runIfCurrent(() -> stateScheduler.schedule(() -> {
             MDC.put("context", snapshot.getContextName());
             if (snapshot.isCancelled()) {
@@ -851,7 +853,7 @@ public final class HueScheduler implements Runnable {
                 LOG.info("Turned off");
             }
             createPowerTransitionCopyAndReschedule(snapshot);
-        }, currentTime.get().plus(delayInMs + overlappingDelayInMs, ChronoUnit.MILLIS), snapshot.getEnd()));
+        }, start, end));
     }
 
     private void createPowerTransitionCopyAndReschedule(ScheduledStateSnapshot snapshot) {
@@ -900,7 +902,9 @@ public final class HueScheduler implements Runnable {
         if (sceneSyncDelayInSeconds == 0) {
             syncScene(state, justOnce);
         } else {
-            state.runIfCurrent(() -> stateScheduler.schedule(() -> syncScene(state, justOnce), currentTime.get().plusSeconds(sceneSyncDelayInSeconds), state.getEnd()));
+            ZonedDateTime start = currentTime.get().plusSeconds(sceneSyncDelayInSeconds);
+            ZonedDateTime end = state.getEnd();
+            state.runIfCurrent(() -> stateScheduler.schedule(() -> syncScene(state, justOnce), start, end));
         }
     }
 
@@ -912,7 +916,10 @@ public final class HueScheduler implements Runnable {
         try {
             ZonedDateTime now = currentTime.get();
             stateRegistry.getAssignedGroups(state)
-                         .forEach(groupInfo -> state.runIfCurrent(() -> syncScene(groupInfo.groupId(), stateRegistry.getPutCalls(groupInfo.groupLights(), now))));
+                         .forEach(groupInfo -> {
+                             List<PutCall> putCalls = stateRegistry.getPutCalls(groupInfo.groupLights(), now); // outside runIfCurrent to prevent deadlocks
+                             state.runIfCurrent(() -> syncScene(groupInfo.groupId(), putCalls));
+                         });
             ZonedDateTime nextSyncTime = getNextChangeTime(state, null, now);
             if (!justOnce && nextSyncTime != null) {
                 scheduleNextSceneSync(state, false, nextSyncTime);
