@@ -1,5 +1,9 @@
-# Advanced Configuration — CLI Flags & Tuning
- 
+# Command-line options
+
+[Back to README](../README.md)
+
+Use these options with Java or configure their environment-variable equivalents in Docker. For schedule syntax, see [text-file configuration](light_configuration.md) or [Hue scene schedules](scene_schedules.md).
+
 ## Index
 
 **Schedule Sources**
@@ -43,17 +47,19 @@
 
 ### `--enable-auto-scene-states`
 
-Discovers State Definitions from Hue Scene Schedules and reloads them when their scenes change. This feature is available only with a Philips Hue Bridge.
+Reads schedules from Hue scene names and saved light settings. Creating, editing, renaming, or deleting a scene updates the running schedule automatically. Requires a Philips Hue Bridge.
 
-Scene names contain a scheduled time followed by optional comma-separated options in brackets, such as `12:00 [Mo-Th,Su,i]`. Write days directly as abbreviations or inclusive ranges: `Mo` for Monday, `Mo-Fr` for Monday through Friday, or `Fr-Mo` for Friday through Monday across the weekend. English and German day abbreviations are supported, case-insensitively. Multiple day entries are combined and can appear anywhere among the other options; omitting days means every day. An unknown option or invalid value makes the scene ineligible for scheduling.
+For example, `12:00 [Mo-Th,Su,i]` interpolates toward a scene at noon on Monday through Thursday and Sunday. See the [scene schedule guide](scene_schedules.md) for setup, day abbreviations, and all supported options.
 
-When enabled, the `CONFIG_FILE` positional argument (or environment variable) is optional. If a configuration file is also provided, its definitions are combined with those discovered from Scene Schedules. An explicitly configured file must still exist and be readable.
+When enabled, the `CONFIG_FILE` positional argument (or environment variable) is optional. If a configuration file is also provided, both sources are combined. An explicitly configured file must still exist and be readable.
 
 **Default:** `false`
 
 ### `--migrate-input-to-scenes`
 
-Creates Hue Scene Schedules from supported group definitions in the configuration file, then exits. This one-time migration requires `CONFIG_FILE` even when `--enable-auto-scene-states` is enabled and is available only with a Philips Hue Bridge.
+Creates Hue scenes from group definitions in the configuration file, then exits. Requires a Philips Hue Bridge and `CONFIG_FILE`, even when `--enable-auto-scene-states` is enabled. The input file is left unchanged.
+
+Existing scenes with the generated name in the same group are updated. Individual-light definitions are skipped. Property-free definitions become `[gap]` scenes, and explicit `interpolate:false` becomes `[i:false]`. Read the [migration guide](scene_schedules.md#migrate-a-text-file-schedule) before switching over.
 
 Generated names place days before other options, combine consecutive days into ranges, and omit days for daily schedules. For example, `days:Mo,Tu,We,Th,Su` with `interpolate:true` at `12:00` becomes `12:00 [Mo-Th,Su,i]`.
 
@@ -62,8 +68,6 @@ Generated names place days before other options, combine consecutive days into r
 ## Scene Sync & Activation
 
 ### `--enable-scene-sync`
-
-*New in 0.12.0* — **Home Assistant support added in 0.13.0**
 
 Creates synced scenes that always reflect the scheduled state of a light, room, or zone.
 
@@ -78,8 +82,6 @@ Creates synced scenes that always reflect the scheduled state of a light, room, 
 
 ### `--require-scene-activation`
 
-*New in 0.13.0*
-
 Applies scheduled states **only after** a synced scene has been activated. After activation, the current and subsequent states apply until the lights are turned off or manually modified. Use together with `--enable-scene-sync` when you want explicit, manual opt-in (e.g., via a smart switch or HA automation). If no synced scene has been activated since the last "off", no states are applied (except those with `force:true`).
 
 Use `force:true` to override this behavior for specific states.
@@ -88,23 +90,17 @@ Use `force:true` to override this behavior for specific states.
 
 ### `--scene-sync-name`
 
-*New in 0.12.0*
-
 Sets the name of the synced scene (used with `--enable-scene-sync`).
 
 **Default:** `Hue Scheduler`
 
 ### `--scene-control-name`
 
-*New in 0.15.0*
-
 Name of the temporary Hue scene created internally for scene scheduling (the `scene:` property). This scene is created/updated and then recalled to apply per-light states synchronously. You may need to change this if the default name conflicts with an existing scene.
 
 **Default:** `HueTemp`
 
 ### `--scene-activation-ignore-window`
-
-*New in 0.11.0*
 
 Relevant only when user-modification tracking is **enabled** (i.e., `--disable-user-modification-tracking` is **not** set).
 
@@ -116,7 +112,7 @@ Delay **in seconds** after detecting a scene activation during which **turn-on e
 
 ### `--interpolate-all`
 
-Globally sets `interpolate:true` for every schedule entry unless an entry explicitly uses `interpolate:false`. Where interpolation is possible, it starts at the previous entry's scheduled time and reaches the current entry's values at its scheduled time.
+Sets interpolation as the default for both text-file entries and automatically discovered Hue scene schedules. Override individual definitions with `interpolate:false` in a file or `[i:false]` in a scene name. Where interpolation is possible, it starts at the previous definition's scheduled time and reaches the current definition's values at its scheduled time. An explicit `tr-before` or `tr-b:` takes precedence; schedule gaps interrupt interpolation.
 
 **Default:** `false`
 
@@ -126,7 +122,7 @@ Controls how quickly a light catches up when it turns on partway through a `tr-b
 
 This setting does not change the duration of the overall early transition or when the final values are due. It accepts either a multiple of 100 ms (e.g., `4`) or a duration string (e.g., `5s`, `1min`).
 
-```yacas
+```text
 # Uses the default catch-up transition:
 Desk  06:00  bri:50%
 Desk  07:00  bri:100%  tr-before:20min
@@ -164,8 +160,6 @@ Disables tracking of manual changes. By default, Hue Scheduler compares the prev
 
 ### `--color-override-threshold`
 
-*New in 0.13.0*
-
 OKLab color distance threshold above which a light’s color counts as **manually overridden**. Lower values catch smaller changes but may trigger during transitions; higher values ignore transition noise but might miss subtle tweaks.
 
 Relevant only when user-modification tracking is **enabled**.
@@ -175,8 +169,6 @@ Relevant only when user-modification tracking is **enabled**.
 **Default:** `0.06`
 
 ### `--brightness-override-threshold`
-
-*New in 0.13.0*
 
 Brightness difference threshold (percentage points) above which a light's brightness counts as **manually overridden**. Example: `10` means a change from `50%` → `60%` triggers detection.
 
@@ -188,8 +180,6 @@ Relevant only when user-modification tracking is **enabled**.
 
 ### `--ct-override-threshold`
 
-*New in 0.13.0*
-
 Color temperature difference threshold (**Kelvin**) above which a light's temperature counts as **manually overridden**. Example: `350` means `3000 K` → `3350 K` triggers detection.
 
 Relevant only when user-modification tracking is **enabled**.
@@ -200,23 +190,17 @@ Relevant only when user-modification tracking is **enabled**.
 
 ### `--color-sync-threshold`
 
-*New in 0.14.0*
-
 The OKLab color distance threshold above which a light’s color counts as **significantly changed** to schedule the next scene sync or background interpolation.
 
 **Default:** `0.04`
 
 ### `--brightness-sync-threshold`
 
-*New in 0.14.0*
-
 Brightness difference threshold (percentage points) above which a light's brightness counts as **significantly changed** to schedule the next scene sync or background interpolation.
 
 **Default:** `5` (percentage points)
 
 ### `--ct-sync-threshold`
-
-*New in 0.14.0*
 
 Color temperature difference threshold (**Kelvin**) above which a light's temperature counts as **significantly changed** to schedule the next scene sync or background interpolation.
 
@@ -245,7 +229,7 @@ With Docker, set via env var:
 ```bash
 docker run -d --name hue-scheduler -e log.level=TRACE ...
 ```
-        
+
 ## Performance & Rate Limiting
 
 ### `--max-requests-per-second`
@@ -254,17 +238,13 @@ Max number of **PUT** API requests per second. Philips Hue recommends ~**10** re
 
 Note: Groups are controlled via broadcast messages, which are more expensive. Philips Hue recommends ≤ 1 group update/sec. Hue Scheduler automatically rate-limits light vs. group updates accordingly.
 
-> As a general guideline we always recommend to our developers to stay at roughly 10 commands per second to the /lights resource with a 100ms gap between each API call. For /groups commands you should keep to a maximum of 1 per second.
->
-> > -- [Hue System Performance — Philips Hue Developer Program (meethue.com)](https://developers.meethue.com/develop/application-design-guidance/hue-system-performance/) (requires login)
+See [Hue system performance guidance](https://developers.meethue.com/develop/application-design-guidance/hue-system-performance/) (requires login).
 
 To keep the convenience of groups while improving performance, you can try the experimental `--control-group-lights-individually` option below.
 
 **Default & recommended:** `10`
 
 ### `--max-concurrent-requests`
-
-*New in 0.14.3*
 
 Max number of **concurrent in-flight HTTP requests**. This limits parallel TLS handshakes and connections to the bridge, preventing connection resets when many states fire at once (e.g., morning schedules after an idle night).
 
@@ -279,7 +259,7 @@ Controls lights in a group **individually** instead of using group broadcasts. T
 Note: In this mode, Hue Scheduler does **not** validate whether **all** lights in the group support a given command. Mixed-capability groups (e.g., CT-only + color) may result in some lights not being updated.
 
 **Default:** `false`
-    
+
 ## Reliability & Connectivity
 
 ### `--bridge-failure-retry-delay`
@@ -302,15 +282,11 @@ Read timeout **in minutes** for the API v2 SSE event stream. The connection is a
 
 ### `--scene-update-sleep-delay`
 
-*New in 0.15.0*
-
 Delay **in milliseconds** between scene creation/update and scene recall during scene scheduling (`scene:` property). This ensures the bridge has processed the scene changes before recalling them. Off lights especially take longer to process scene changes.
 
 **Default:** `13000` ms
 
 ### `--fast-scene-update-sleep-delay`
-
-*New in 0.15.0*
 
 Shorter delay **in milliseconds** used for scene scheduling when the target light was recently turned on.
 
@@ -319,8 +295,6 @@ Shorter delay **in milliseconds** used for scene scheduling when the target ligh
 ## Security
 
 ### `--insecure`
-
-*New in 0.12.2*
 
 Disables SSL certificate validation for the Hue Bridge. Required if your bridge still uses a self-signed certificate instead of one issued by Signify. See [Philips Hue Developer Documentation](https://developers.meethue.com/develop/application-design-guidance/using-https/) (login required).
 

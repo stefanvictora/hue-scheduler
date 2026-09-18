@@ -1,3 +1,28 @@
+## [0.17.0] - Unreleased
+
+### Added
+
+- **Schedules in the Hue app** (#58): Create schedules by naming Hue scenes after times, such as `sunset`, `07:00 [Mo-Fr,on]`, or `22:00 [i]`. Each scene supplies the individual light settings for its room or zone. Enable with `--enable-auto-scene-states` or `ENABLE_AUTO_SCENE_STATES=true` (Hue Bridge only).
+  - Supports clock times, solar times, offsets, time functions, weekday restrictions, transitions, interpolation, and forced on/off control.
+  - Scene creation, edits, renames, and deletion update the running schedule automatically.
+  - Run without a configuration file, or combine scene schedules with file-based definitions.
+  - See the [scene schedule guide](docs/scene_schedules.md) for syntax and examples.
+- **Input-to-scene migration:** `--migrate-input-to-scenes` creates Hue scenes from group definitions in a configuration file, then exits. Existing scenes with the generated name in the same group are updated. Individual-light definitions are skipped; schedule gaps and explicit interpolation opt-outs are preserved using `[gap]` and `[i:false]`. See the [migration guide](docs/scene_schedules.md#migrate-a-text-file-schedule) before switching over.
+- **Live room and zone membership updates:** Running Hue schedules refresh when lights are added or removed, including overlapping schedules. Recorded manual overrides are preserved. Groups that become empty remain dormant and resume when lights are added again.
+- **Duration units in solar offsets:** Use expressions such as `sunset+1h15min` or `sunrise-30s` in addition to offsets expressed in minutes.
+
+### Changed
+
+- Reuse existing Hue scenes when their saved actions already match the requested settings, avoiding unnecessary temporary scene updates.
+- Restructured the README around setup and schedule examples, with dedicated scene-schedule and troubleshooting guides. Updated Docker examples to use environment variables.
+
+### Fixed
+
+- Scene edits now refresh and reapply affected group schedules more reliably, including scenes with explicit `[off]` options.
+- Corrected transition waits when recalling synced scenes during interpolation and when catching up after lights turn on. Synced scenes no longer retain an obsolete transition duration after interpolation ends.
+- Canceled schedules stop their background interpolation and scene-sync work.
+- Improved scene-state comparisons for brightness and gradients, including gradients whose points all have the same color, to avoid unnecessary scene updates.
+
 ## [0.16.1] - 2026-04-10
 
 ### Changed

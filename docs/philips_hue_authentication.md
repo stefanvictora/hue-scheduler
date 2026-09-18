@@ -1,5 +1,7 @@
 # Philips Hue Authentication
 
+[Back to README](../README.md)
+
 If you don't know your bridge's IP address, visit [https://discovery.meethue.com](https://discovery.meethue.com/) and copy the `internalipaddress` value. Example:
 
 ```json
@@ -43,4 +45,4 @@ curl -X POST "http://<BRIDGE_IP_ADDRESS>/api" \
 The response will include the `"username"` as above.
 
 > [!TIP]
-> If your bridge still uses a self-signed certificate you will need to use the `--insecure` for running Hue Scheduler.
+> If your bridge still uses a self-signed certificate, use `--insecure` when running Hue Scheduler (Docker: `INSECURE=true`).
