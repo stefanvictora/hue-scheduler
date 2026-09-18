@@ -18,15 +18,18 @@ public final class SceneEventListenerImpl implements SceneEventListener {
     private final HueApi hueApi;
     private final Predicate<String> matchesSyncedSceneName;
     private final LightEventListener lightEventListener;
+    private final ManualOverrideTracker manualOverrideTracker;
     private final Cache<String, String> recentlyAffectedIds;
     private final Cache<String, String> recentlyAffectedSyncedIds;
 
     public SceneEventListenerImpl(HueApi hueApi, Ticker ticker, int ignoreWindowInSeconds,
                                   Predicate<String> matchesSyncedSceneName,
-                                  LightEventListener lightEventListener) {
+                                  LightEventListener lightEventListener,
+                                  ManualOverrideTracker manualOverrideTracker) {
         this.hueApi = hueApi;
         this.matchesSyncedSceneName = matchesSyncedSceneName;
         this.lightEventListener = lightEventListener;
+        this.manualOverrideTracker = manualOverrideTracker;
         recentlyAffectedIds = Caffeine.newBuilder()
                                       .ticker(ticker)
                                       .expireAfterWrite(Duration.ofSeconds(ignoreWindowInSeconds))
@@ -48,6 +51,7 @@ public final class SceneEventListenerImpl implements SceneEventListener {
             affectedIdsByScene.forEach(lightOrGroupId -> {
                 recentlyAffectedSyncedIds.put(lightOrGroupId.id(), lightOrGroupId.id());
                 recentlyAffectedIds.invalidate(lightOrGroupId.id());
+                manualOverrideTracker.onLightTurnedOnBySyncedScene(lightOrGroupId.id());
             });
             List<String> alreadyOnIds = affectedIdsByScene.stream()
                                                           .filter(AffectedId::alreadyOn)

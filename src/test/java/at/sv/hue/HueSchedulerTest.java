@@ -21,6 +21,7 @@ import java.util.EnumSet;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -164,7 +165,7 @@ class HueSchedulerTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now, now.plusDays(1))
         );
 
-        runAndAssertNextDay(scheduledRunnables.get(1));
+        runAndAssertNextDay(scheduledRunnables.getFirst());
     }
 
     @Test
@@ -341,6 +342,20 @@ class HueSchedulerTest extends AbstractHueSchedulerTest {
 
         advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
                 expectedPutCall(ID).bri(DEFAULT_BRIGHTNESS).transitionTime(48060)
+        );
+
+        ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
+    void parse_canParseTransitionTime_withTimeUnits_minutesShortFormAccepted() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addStateNow("1", "bri:" + DEFAULT_BRIGHTNESS, "tr:20m");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
+                expectedPutCall(ID).bri(DEFAULT_BRIGHTNESS).transitionTime(12000)
         );
 
         ensureRunnable(initialNow.plusDays(1));
@@ -3671,13 +3686,16 @@ class HueSchedulerTest extends AbstractHueSchedulerTest {
     }
 
     @Test
-    void parse_gradient_rgb_justOnePoint_exception() {
+    void parse_gradient_xy_justOnePoint_convertedToXY() {
         addKnownLightIdsWithDefaultCapabilities(1);
+        addStateNow("1", "gradient:[xy(0.3 0.4)]");
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
 
-        assertThatThrownBy(() -> addStateNow("1", "gradient:[rgb(94 186 125)]"))
-                .isInstanceOf(InvalidPropertyValue.class)
-                .hasMessageStartingWith("Invalid gradient")
-                .hasMessageContaining("A gradient must contain at least two colors.");
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
+                expectedPutCall(1).x(0.3).y(0.4)
+        );
+
+        ensureRunnable(initialNow.plusDays(1));
     }
 
     @Test
@@ -3686,7 +3704,7 @@ class HueSchedulerTest extends AbstractHueSchedulerTest {
                                                   .maxGradientPoints(2)
                                                   .capabilities(EnumSet.of(Capability.GRADIENT)));
 
-        assertThatThrownBy(() -> addStateNow("1", "gradient:[rgb(94 186 125),rgb(94 186 125),rgb(94 186 125)]"))
+        assertThatThrownBy(() -> addStateNow("1", "gradient:[rgb(94 186 125),rgb(94 186 125),rgb(94 186 166)]"))
                 .isInstanceOf(InvalidPropertyValue.class)
                 .hasMessageStartingWith("Invalid gradient")
                 .hasMessageContaining("The maximum number of gradient points for this light is 2.");
@@ -3797,6 +3815,20 @@ class HueSchedulerTest extends AbstractHueSchedulerTest {
                                                              Pair.of(0.5148, 0.3845)
                                                      ))
                                                      .build())
+        );
+
+        ensureRunnable(initialNow.plusDays(1));
+    }
+
+    @Test
+    void parse_gradient_xy_twoPoints_same_convertedToXY() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addStateNow( "1", "bri:100", "gradient:[xy(0.3 0.4),xy(0.3 0.4)]");
+
+        ScheduledRunnable scheduledRunnable = startAndGetSingleRunnable();
+
+        advanceTimeAndRunAndAssertPutCalls(scheduledRunnable,
+                expectedPutCall(1).bri(100).x(0.3).y(0.4)
         );
 
         ensureRunnable(initialNow.plusDays(1));
@@ -4501,6 +4533,20 @@ class HueSchedulerTest extends AbstractHueSchedulerTest {
         startScheduler(
                 expectedRunnable(now, smoothedSunset),
                 expectedRunnable(smoothedSunset, now.plusDays(1))
+        );
+    }
+
+    @Test
+    void parse_complexStartTimeExpression_canBeParsed() {
+        addKnownLightIdsWithDefaultCapabilities(1);
+        addState(1, now, "bri:100%");
+        addState(1, "clamp(smooth(mix(sunset+20, 21:15, 70%), 10d), max(18:30, mix(sunset-15, 19:00, 40%)), min(22:45, mix(sunset+150, 21:45, 50%)))", "bri:50%");
+        // normal sunset: 16:14:29
+        ZonedDateTime modifiedSunset = now.with(LocalTime.of(19, 49, 22));
+
+        startScheduler(
+                expectedRunnable(now, modifiedSunset),
+                expectedRunnable(modifiedSunset, now.plusDays(1))
         );
     }
 
@@ -5677,6 +5723,7 @@ class HueSchedulerTest extends AbstractHueSchedulerTest {
         simulateSceneWithNameActivated(sceneSyncName, new AffectedId("/lights/1", false),
                 new AffectedId("/lights/2", true));
 
+        assertTrue(manualOverrideTracker.wasTurnedOnBySyncedScene("/lights/1"));
         ensureScheduledStates(); // no scheduled states
     }
 

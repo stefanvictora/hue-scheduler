@@ -50,6 +50,11 @@ public class ManualOverrideTrackerImpl implements ManualOverrideTracker {
         return getOrDefaultState(id).isTurnedOnBySyncedScene();
     }
 
+    @Override
+    public void reset(String id) {
+        trackedStatesPerId.remove(id);
+    }
+
     private TrackedState getOrCreateTrackedState(String id) {
         return trackedStatesPerId.computeIfAbsent(id, i -> new TrackedState());
     }
