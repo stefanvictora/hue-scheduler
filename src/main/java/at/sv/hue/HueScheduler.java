@@ -187,7 +187,7 @@ public final class HueScheduler implements Runnable {
                           "network failure, or if it returned an API error code. Default: ${DEFAULT-VALUE} seconds.")
     int bridgeFailureRetryDelayInSeconds;
     @Option(names = "--scene-update-sleep-delay", paramLabel = "<delay>",
-            defaultValue = "${env:SCENE_UPDATE_SLEEP_DELAY:-13000}",
+            defaultValue = "${env:SCENE_UPDATE_SLEEP_DELAY:-20000}",
             description = "The delay in milliseconds between scene creation/update and scene recall operations. " +
                           "This ensures the bridge has processed the scene changes. Default: ${DEFAULT-VALUE} ms.")
     int sceneUpdateSleepDelayInMs;
