@@ -29,8 +29,10 @@ class HassWebSocketClientImplTest {
     private static final String ORIGIN = "http://example.com";
     private static final String ACCESS_TOKEN = "test_token";
     private static final Duration AUTHENTICATION_TIMEOUT = Duration.ofSeconds(5);
-    private static final Duration RESPONSE_TIMEOUT = Duration.ofMillis(100);
-    private static final Duration TEST_WAIT_TIMEOUT = Duration.ofSeconds(5);
+    private static final Duration RESPONSE_TIMEOUT = Duration.ofSeconds(5);
+    // Only tests that deliberately wait for a timeout should use a short deadline.
+    private static final Duration EXPECTED_TIMEOUT = Duration.ofMillis(100);
+    private static final Duration TEST_WAIT_TIMEOUT = Duration.ofSeconds(10);
 
     private OkHttpClient mockClient;
     private WebSocket mockWebSocket;
@@ -52,7 +54,7 @@ class HassWebSocketClientImplTest {
     @Test
     void sendCommand_timeoutOnAuthentication_exception() throws Exception {
         client = new HassWebSocketClientImpl(
-                ORIGIN, ACCESS_TOKEN, mockClient, Duration.ofMillis(100), RESPONSE_TIMEOUT);
+                ORIGIN, ACCESS_TOKEN, mockClient, EXPECTED_TIMEOUT, RESPONSE_TIMEOUT);
         CompletableFuture<String> futureResult = asyncSendExampleCommand();
 
         assertThatThrownBy(() -> getResult(futureResult))
@@ -82,6 +84,8 @@ class HassWebSocketClientImplTest {
 
     @Test
     void sendCommand_timeoutOnMessage_exception() throws Exception {
+        client = new HassWebSocketClientImpl(
+                ORIGIN, ACCESS_TOKEN, mockClient, AUTHENTICATION_TIMEOUT, EXPECTED_TIMEOUT);
         CompletableFuture<String> futureResult = asyncSendExampleCommand();
         simulateWebSocketAuthSuccess();
         // No response is simulated.
@@ -143,6 +147,8 @@ class HassWebSocketClientImplTest {
 
     @Test
     void sendCommand_invalidJsonResponse_ignoredUntilTimeout() throws Exception {
+        client = new HassWebSocketClientImpl(
+                ORIGIN, ACCESS_TOKEN, mockClient, AUTHENTICATION_TIMEOUT, EXPECTED_TIMEOUT);
         CompletableFuture<String> futureResult = asyncSendExampleCommand();
         simulateWebSocketAuthSuccess();
         waitForCommandToBeSent(1);
@@ -176,9 +182,6 @@ class HassWebSocketClientImplTest {
 
     @Test
     void sendCommand_multipleSimultaneousCommands() throws Exception {
-        client = new HassWebSocketClientImpl(
-                ORIGIN, ACCESS_TOKEN, mockClient, AUTHENTICATION_TIMEOUT, TEST_WAIT_TIMEOUT);
-
         // Establish ID order while keeping all three commands pending before replying.
         CompletableFuture<String> future1 = asyncSendExampleCommand();
         simulateWebSocketAuthSuccess();
