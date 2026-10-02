@@ -30,8 +30,13 @@ import java.net.URL;
 import java.util.EnumSet;
 import java.util.List;
 
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -2623,7 +2628,7 @@ public class HassApiTest {
 
     @Test
     void putSceneState_sendsEachRequestSeparately() {
-        api.putSceneState("1",
+        api.putSceneState("1", null,
                 List.of(PutCall.builder()
                                .on(true)
                                .id("light.id1")

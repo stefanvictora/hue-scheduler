@@ -2,6 +2,8 @@ package at.sv.hue;
 
 import at.sv.hue.api.ApiFailure;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.Duration;
 import java.util.List;
@@ -902,8 +904,10 @@ public class HueSchedulerOffUpdateTest extends AbstractHueSchedulerTest {
         );
     }
 
-    @Test
-    void offEvent_afterSchedulerSendsGroupOnFalse_withInterpolation_doesNotRescheduleWaitingStates() {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void offEvent_afterSchedulerSendsGroupOnFalse_withInterpolation_doesNotRescheduleWaitingStates(boolean controlIndividually) {
+        controlGroupLightsIndividually = controlIndividually;
         enableSupportForOffLightUpdates();
         mockGroupLightsForId(1, 1, 2);
         mockDefaultGroupCapabilities(1);
@@ -917,10 +921,19 @@ public class HueSchedulerOffUpdateTest extends AbstractHueSchedulerTest {
 
         advanceCurrentTime(Duration.ofMinutes(5));
 
-        runAndAssertGroupPutCalls(scheduledRunnables.getFirst(),
-                expectedGroupPutCall(1).bri(50), // interpolated
-                expectedGroupPutCall(1).on(false).transitionTime(tr("5min"))
-        );
+        if (controlIndividually) {
+            runAndAssertPutCalls(scheduledRunnables.getFirst(),
+                    expectedPutCall(1).bri(50), // interpolated
+                    expectedPutCall(2).bri(50),
+                    expectedPutCall(1).on(false).transitionTime(tr("5min")),
+                    expectedPutCall(2).on(false).transitionTime(tr("5min"))
+            );
+        } else {
+            runAndAssertGroupPutCalls(scheduledRunnables.getFirst(),
+                    expectedGroupPutCall(1).bri(50), // interpolated
+                    expectedGroupPutCall(1).on(false).transitionTime(tr("5min"))
+            );
+        }
 
         ensureScheduledStates(
                 expectedRunnable(initialNow.plusMinutes(6), initialNow.plusDays(1)), // background interpolation

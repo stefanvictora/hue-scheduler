@@ -74,13 +74,18 @@ public interface HueApi extends ResourceModificationEventListener {
     void putGroupState(PutCall putCall);
 
     /**
+     * @param groupId  the group ID whose scene is being updated
+     * @param sceneId  {@code null} if the state has no source scene; otherwise may identify an existing scene,
+     *                 which implementations may handle differently
+     * @param putCalls the light state updates to apply
      * @throws ApiFailure if the api call failed
      */
-    void putSceneState(String groupId, List<PutCall> putCalls);
+    void putSceneState(String groupId, String sceneId, List<PutCall> putCalls);
 
     /**
-     * Marks the given group ID as eligible for a fast scene update, skipping the usual sleep delay
-     * in {@link #putSceneState}. The flag expires automatically after a short time window.
+     * Allows the shorter scene-update delay for this group for 30 seconds after an interactive event.
+     * All {@link #putSceneState} calls within the window are eligible, including consecutive interpolation
+     * updates. Calling this method renews the window; applying or recalling a scene does not.
      */
     void allowFastSceneUpdate(String groupId);
 
@@ -97,6 +102,23 @@ public interface HueApi extends ResourceModificationEventListener {
      * @throws ApiFailure if the api call failed
      */
     String getSceneName(String sceneId);
+
+    /**
+     * @return a list of sceneId and name pairs for all scenes in the bridge. Not null.
+     */
+    List<Identifier> getAllScenes();
+
+    /**
+     * @param sceneId the id of the scene
+     * @return the identifier of the scene, containing id and name; null if scene not found.
+     */
+    Identifier getScene(String sceneId);
+
+    /**
+     * @param sceneId the id of the scene
+     * @return the identifier of the group the scene is assigned to; null if scene not found.
+     */
+    Identifier getGroupIdForScene(String sceneId);
 
     /**
      * @return the lights and group id related to the given scene and if they are already on. If not found, empty list. Not null.

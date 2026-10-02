@@ -2,8 +2,9 @@ package at.sv.hue.api.hue;
 
 import at.sv.hue.api.LightEventListener;
 import at.sv.hue.api.ResourceModificationEventListener;
+import at.sv.hue.api.SceneDiscoveryListener;
 import at.sv.hue.api.SceneEventListener;
-import at.sv.hue.api.SceneModificationListener;
+import at.sv.hue.api.SceneActionsModificationListener;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -18,16 +19,19 @@ public final class HueEventHandler implements BackgroundEventHandler {
     private final LightEventListener lightEventListener;
     private final SceneEventListener sceneEventListener;
     private final ResourceModificationEventListener resourceModificationEventListener;
-    private final SceneModificationListener sceneModificationListener;
+    private final SceneActionsModificationListener sceneActionsModificationListener;
+    private final SceneDiscoveryListener sceneDiscoveryListener;
     private final ObjectMapper objectMapper;
 
     public HueEventHandler(LightEventListener lightEventListener, SceneEventListener sceneEventListener,
                            ResourceModificationEventListener resourceModificationEventListener,
-                           SceneModificationListener sceneModificationListener) {
+                           SceneActionsModificationListener sceneActionsModificationListener,
+                           SceneDiscoveryListener sceneDiscoveryListener) {
         this.lightEventListener = lightEventListener;
         this.sceneEventListener = sceneEventListener;
         this.resourceModificationEventListener = resourceModificationEventListener;
-        this.sceneModificationListener = sceneModificationListener;
+        this.sceneActionsModificationListener = sceneActionsModificationListener;
+        this.sceneDiscoveryListener = sceneDiscoveryListener;
         objectMapper = new ObjectMapper();
         objectMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
     }
@@ -64,8 +68,13 @@ public final class HueEventHandler implements BackgroundEventHandler {
                     resourceModificationEventListener.onModification(hueEvent.getType(), hueEvent.getId(),
                             getContent(containerType, resourceNode));
                 }
+                if (hueEvent.isSceneCreation(containerType) || hueEvent.isSceneRenamed(containerType)) {
+                    sceneDiscoveryListener.onSceneCreatedOrRenamed(hueEvent.getId());
+                } else if (hueEvent.isSceneDeletion(containerType)) {
+                    sceneDiscoveryListener.onSceneDeleted(hueEvent.getId());
+                }
                 if (hueEvent.isSceneActionModification(containerType)) {
-                    sceneModificationListener.onSceneModified(hueEvent.getId());
+                    sceneActionsModificationListener.onSceneActionsModified(hueEvent.getId());
                 }
                 if (hueEvent.isLightOrGroup() && hueEvent.isOffEvent()) { // todo:mutation coverage
                     lightEventListener.onLightOff(hueEvent.getId());
@@ -176,6 +185,18 @@ public final class HueEventHandler implements BackgroundEventHandler {
 
         public boolean isSceneActionModification(String containerType) {
             return isScene() && actions != null && "update".equals(containerType);
+        }
+
+        public boolean isSceneDeletion(String containerType) {
+            return isScene() && "delete".equals(containerType);
+        }
+
+        public boolean isSceneCreation(String containerType) {
+            return isScene() && "add".equals(containerType);
+        }
+
+        public boolean isSceneRenamed(String containerType) {
+            return isScene() && metadata != null && metadata.hasNonNull("name") && "update".equals(containerType);
         }
 
         @Data

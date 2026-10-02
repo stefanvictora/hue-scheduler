@@ -15,6 +15,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.MDC;
 
+import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -29,7 +30,8 @@ public class HassWebSocketClientImpl implements HassWebSocketClient {
     private final String origin;
     private final String accessToken;
     private final OkHttpClient client;
-    private final int requestTimeoutSeconds;
+    private final Duration authenticationTimeout;
+    private final Duration responseTimeout;
     private final ObjectMapper mapper;
     private final AtomicInteger messageIdCounter = new AtomicInteger(1);
     private final Object connectionLock = new Object();
@@ -40,10 +42,17 @@ public class HassWebSocketClientImpl implements HassWebSocketClient {
 
     public HassWebSocketClientImpl(String origin, String accessToken, OkHttpClient client,
                                    int requestTimeoutSeconds) {
+        this(origin, accessToken, client,
+                Duration.ofSeconds(requestTimeoutSeconds), Duration.ofSeconds(requestTimeoutSeconds));
+    }
+
+    HassWebSocketClientImpl(String origin, String accessToken, OkHttpClient client,
+                            Duration authenticationTimeout, Duration responseTimeout) {
         this.origin = origin;
         this.accessToken = accessToken;
         this.client = client;
-        this.requestTimeoutSeconds = requestTimeoutSeconds;
+        this.authenticationTimeout = authenticationTimeout;
+        this.responseTimeout = responseTimeout;
         this.mapper = new ObjectMapper();
         this.mapper.setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL);
     }
@@ -85,7 +94,7 @@ public class HassWebSocketClientImpl implements HassWebSocketClient {
 
     private String awaitResponse(int id, CompletableFuture<String> future) {
         try {
-            return future.get(requestTimeoutSeconds, TimeUnit.SECONDS);
+            return future.get(responseTimeout.toMillis(), TimeUnit.MILLISECONDS);
         } catch (Exception e) {
             pendingRequests.remove(id);
             if (e instanceof InterruptedException) {
@@ -113,7 +122,7 @@ public class HassWebSocketClientImpl implements HassWebSocketClient {
 
     private WebSocket awaitAuthentication() {
         try {
-            authFuture.get(requestTimeoutSeconds, TimeUnit.SECONDS);
+            authFuture.get(authenticationTimeout.toMillis(), TimeUnit.MILLISECONDS);
         } catch (Exception e) {
             invalidateConnection(webSocket, e);
             if (e instanceof InterruptedException) {
@@ -204,10 +213,6 @@ public class HassWebSocketClientImpl implements HassWebSocketClient {
                 future.complete(text);
             }
         }
-    }
-
-    CompletableFuture<Void> getAuthFuture() {
-        return authFuture;
     }
 
     WebSocket getWebSocket() {

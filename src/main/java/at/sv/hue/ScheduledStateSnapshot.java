@@ -23,6 +23,7 @@ public class ScheduledStateSnapshot {
     private final ScheduledState scheduledState;
     @Getter
     private final ZonedDateTime definedStart;
+    private final int generation;
     private final Function<ScheduledStateSnapshot, ScheduledStateSnapshot> previousStateLookup;
     private final BiFunction<ScheduledStateSnapshot, ZonedDateTime, ScheduledStateSnapshot> nextStateLookup;
 
@@ -390,11 +391,11 @@ public class ScheduledStateSnapshot {
     }
 
     public void recordLastPutCalls(PutCalls putCalls) {
-        scheduledState.setLastPutCalls(putCalls);
+        runIfCurrent(() -> scheduledState.setLastPutCalls(putCalls));
     }
 
     public void recordLastSeen(ZonedDateTime lastSeen) {
-        scheduledState.setLastSeen(lastSeen);
+        runIfCurrent(() -> scheduledState.setLastSeen(lastSeen));
     }
 
     public boolean isNotSameState(ScheduledState state) {
@@ -440,6 +441,22 @@ public class ScheduledStateSnapshot {
 
     public boolean isScheduledOn(DayOfWeek... day) {
         return scheduledState.isScheduledOn(day);
+    }
+
+    public boolean isCancelled() {
+        return scheduledState.getGeneration() != generation;
+    }
+
+    public void runIfCurrent(Runnable action) {
+        scheduledState.runIfCurrent(generation, action);
+    }
+
+    public ScheduledState createTemporaryCopy() {
+        return ScheduledState.createTemporaryCopy(scheduledState, generation);
+    }
+
+    public String getSceneId() {
+        return scheduledState.getSceneId();
     }
 
     @Override

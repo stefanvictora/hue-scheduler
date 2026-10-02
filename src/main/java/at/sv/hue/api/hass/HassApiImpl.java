@@ -155,7 +155,7 @@ public class HassApiImpl implements HueApi {
     }
 
     @Override
-    public void putSceneState(String groupId, List<PutCall> putCalls) {
+    public void putSceneState(String groupId, String sceneId, List<PutCall> putCalls) {
         putCalls.forEach(this::putState);
     }
 
@@ -231,6 +231,21 @@ public class HassApiImpl implements HueApi {
             return null;
         }
         return scene.attributes.friendly_name;
+    }
+
+    @Override
+    public List<Identifier> getAllScenes() {
+        throw new UnsupportedOperationException("Scene scheduling is not supported by Home Assistant");
+    }
+
+    @Override
+    public Identifier getScene(String sceneId) {
+        throw new UnsupportedOperationException("Scene scheduling is not supported by Home Assistant");
+    }
+
+    @Override
+    public Identifier getGroupIdForScene(String sceneId) {
+        throw new UnsupportedOperationException("Scene scheduling is not supported by Home Assistant");
     }
 
     @Override

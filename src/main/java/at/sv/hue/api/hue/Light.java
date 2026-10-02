@@ -83,6 +83,9 @@ final class Light implements Resource {
         if (gradient == null) {
             return null;
         }
+        if (gradient.getPoints().stream().distinct().count() == 1) {
+            return null;
+        }
         return gradient.getGradient();
     }
 

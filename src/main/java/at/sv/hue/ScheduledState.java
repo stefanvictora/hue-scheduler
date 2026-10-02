@@ -16,10 +16,12 @@ import java.time.ZonedDateTime;
 import java.time.temporal.TemporalAdjusters;
 import java.util.Arrays;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public final class ScheduledState { // todo: a better name would be StateDefinition
     /**
@@ -30,8 +32,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
 
     private final Identifier identifier;
     private volatile List<ScheduledLightState> lightStates;
-    @Getter
-    private final List<String> groupLightIds;
+    private volatile List<String> groupLightIds;
     @Getter
     private final String startString;
     @Getter
@@ -42,12 +43,15 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
     private final Boolean sceneOnModifier;
     @Getter
     private final Integer definedTransitionTime;
+    @Getter
     private final String transitionTimeBeforeString;
     private final StartTimeProvider startTimeProvider;
+    @Getter
     private final EnumSet<DayOfWeek> daysOfWeek;
     @Getter
     private final boolean groupState;
     private final Boolean force;
+    @Getter
     private final Boolean interpolate;
     @Getter
     private final boolean temporary;
@@ -67,6 +71,9 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
     private Function<ScheduledStateSnapshot, ScheduledStateSnapshot> previousStateLookup;
     @Setter
     private BiFunction<ScheduledStateSnapshot, ZonedDateTime, ScheduledStateSnapshot> nextStateLookup;
+    private volatile int generation;
+    @Getter
+    private final boolean sceneScheduleGap;
 
     @Builder
     public ScheduledState(Identifier identifier, String startString, List<ScheduledLightState> lightStates,
@@ -74,7 +81,8 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
                           String sceneId, Integer sceneBrightnessModifier, Boolean sceneOnModifier, String transitionTimeBeforeString,
                           Integer definedTransitionTime, Set<DayOfWeek> daysOfWeek, StartTimeProvider startTimeProvider,
                           int minTrBeforeGapInMinutes, int brightnessOverrideThreshold, int colorTemperatureOverrideThresholdKelvin,
-                          double colorOverrideThreshold, Boolean force, Boolean interpolate, boolean groupState, boolean temporary) {
+                          double colorOverrideThreshold, Boolean force, Boolean interpolate, boolean groupState, boolean temporary,
+                          boolean sceneScheduleGap) {
         this.identifier = identifier;
         this.startString = startString;
         this.lightStates = lightStates;
@@ -83,6 +91,7 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
         this.sceneBrightnessModifier = sceneBrightnessModifier;
         this.sceneOnModifier = sceneOnModifier;
         this.interpolate = interpolate;
+        this.sceneScheduleGap = sceneScheduleGap;
         if (daysOfWeek == null || daysOfWeek.isEmpty()) {
             this.daysOfWeek = EnumSet.allOf(DayOfWeek.class);
         } else {
@@ -105,24 +114,26 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
         snapshotCache = Caffeine.newBuilder()
                                 .expireAfterWrite(Duration.ofDays(3))
                                 .build();
+        generation = 0;
     }
 
     public static ScheduledState createTemporaryCopy(ScheduledState state) {
-        return createTemporaryCopy(state, state.startString);
+        return createTemporaryCopy(state, state.temporary ? state.generation : state.getGeneration());
     }
 
-    private static ScheduledState createTemporaryCopy(ScheduledState state, String start) {
+    static ScheduledState createTemporaryCopy(ScheduledState state, int generation) {
         // we pass null for light states, since we always delegate to the original state
-        ScheduledState copy = new ScheduledState(state.identifier, start, null, state.groupLightIds, state.sceneId,
+        ScheduledState copy = new ScheduledState(state.identifier, state.startString, null, state.groupLightIds, state.sceneId,
                 state.sceneBrightnessModifier, state.sceneOnModifier,
                 state.transitionTimeBeforeString, state.definedTransitionTime, state.daysOfWeek, state.startTimeProvider,
                 state.minTrBeforeGapInMinutes, state.brightnessOverrideThreshold, state.colorTemperatureOverrideThresholdKelvin,
-                state.colorOverrideThreshold, state.force, state.interpolate, state.groupState, true
+                state.colorOverrideThreshold, state.force, state.interpolate, state.groupState, true, state.sceneScheduleGap
         );
         copy.lastSeen = state.lastSeen;
         copy.originalState = state.originalState;
         copy.previousStateLookup = state.previousStateLookup;
         copy.nextStateLookup = state.nextStateLookup;
+        copy.generation = generation;
         return copy;
     }
 
@@ -130,8 +141,28 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
         return sceneId != null;
     }
 
-    public void updateLightStates(List<ScheduledLightState> newLightStates) {
+    /** @return whether the scene's target light IDs changed */
+    public boolean updateLightStates(List<ScheduledLightState> newLightStates) {
+        if (sceneScheduleGap) return false;
+        Set<String> previousLightIds = getLightIds(getLightStates());
         this.lightStates = newLightStates;
+        return !previousLightIds.equals(getLightIds(newLightStates));
+    }
+
+    public List<String> getGroupLightIds() {
+        return originalState.groupLightIds;
+    }
+
+    public void updateGroupLightIds(List<String> lightIds) {
+        originalState.groupLightIds = List.copyOf(lightIds);
+    }
+
+    public boolean hasMatchingSceneMembership() {
+        return sceneScheduleGap || !isSceneBased() || new HashSet<>(getGroupLightIds()).equals(getLightIds(getLightStates()));
+    }
+
+    private static Set<String> getLightIds(List<ScheduledLightState> lightStates) {
+        return lightStates.stream().map(ScheduledLightState::getId).collect(Collectors.toSet());
     }
 
     private List<ScheduledLightState> getLightStates() {
@@ -154,11 +185,10 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
     }
 
     public int parseTransitionTimeBeforeString(ZonedDateTime definedStart) {
-        try {
+        if (InputConfigurationParser.isTransitionTime(transitionTimeBeforeString)) {
             return InputConfigurationParser.parseTransitionTime("tr-before", transitionTimeBeforeString) * 100;
-        } catch (Exception e) {
-            return parseDateTimeBasedTransitionTime(definedStart);
         }
+        return parseDateTimeBasedTransitionTime(definedStart);
     }
 
     private int parseDateTimeBasedTransitionTime(ZonedDateTime definedStart) {
@@ -173,9 +203,10 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
     /**
      * Returns the snapshot for the given dateTime. The snapshot is cached for 3 days.
      */
-    public ScheduledStateSnapshot getSnapshot(ZonedDateTime dateTime) {
+    public synchronized ScheduledStateSnapshot getSnapshot(ZonedDateTime dateTime) {
         return snapshotCache.get(getDefinedStart(dateTime),
-                definedStart -> new ScheduledStateSnapshot(this, definedStart, previousStateLookup, nextStateLookup));
+                definedStart -> new ScheduledStateSnapshot(this, definedStart, temporary ? generation : getGeneration(),
+                        previousStateLookup, nextStateLookup));
     }
 
     /**
@@ -316,6 +347,29 @@ public final class ScheduledState { // todo: a better name would be StateDefinit
 
     public void setTriggeredByPowerTransition() {
         this.triggeredByPowerTransition = true;
+    }
+
+    public synchronized void invalidate() {
+        generation += 1;
+        snapshotCache.invalidateAll();
+        lastSeen = null;
+    }
+
+    public int getGeneration() {
+        return originalState.generation;
+    }
+
+    /**
+     * Serialize side-effect admission with invalidation, including work from temporary copies.
+     * Actions must not look up registry entries or calculate snapshots: those can acquire locks
+     * in the opposite order. Prepare their inputs before entering this gate.
+     */
+    void runIfCurrent(int expectedGeneration, Runnable action) {
+        synchronized (originalState) {
+            if (originalState.generation == expectedGeneration) {
+                action.run();
+            }
+        }
     }
 
     @Override
