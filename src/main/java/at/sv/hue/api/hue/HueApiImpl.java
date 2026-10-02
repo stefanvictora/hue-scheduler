@@ -32,6 +32,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.benmanes.caffeine.cache.AsyncLoadingCache;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.Ticker;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 
@@ -52,6 +53,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
+import java.util.function.LongConsumer;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -67,6 +69,7 @@ public final class HueApiImpl implements HueApi {
     private static final String CACHE_KEY_ROOMS = "allRooms";
     private static final String CACHE_KEY_ZIGBEE_CONNECTIVITY = "allZigbeeConnectivity";
     private static final int DEFAULT_HUE_TRANSITION_TIME = 4; // 400ms in 100ms units
+    private static final Duration FAST_SCENE_UPDATE_WINDOW = Duration.ofSeconds(30);
 
     private final HttpResourceProvider resourceProvider;
     private final ObjectMapper mapper;
@@ -76,6 +79,7 @@ public final class HueApiImpl implements HueApi {
     private final String sceneControlAppData;
     private final int sceneUpdateSleepDelayInMs;
     private final int fastSceneUpdateSleepDelayInMs;
+    private final LongConsumer sleepMillis;
     private final AsyncLoadingCache<String, Map<String, Light>> availableLightsCache;
     private final AsyncLoadingCache<String, Map<String, Device>> availableDevicesCache;
     private final AsyncLoadingCache<String, Map<String, Light>> availableGroupedLightsCache;
@@ -88,6 +92,15 @@ public final class HueApiImpl implements HueApi {
     public HueApiImpl(HttpResourceProvider resourceProvider, String host, RateLimiter rateLimiter,
                       int apiCacheInvalidationIntervalInMinutes, String sceneControlName, String sceneControlAppData,
                       int sceneUpdateSleepDelayInMs, int fastSceneUpdateSleepDelayInMs) {
+        this(resourceProvider, host, rateLimiter, apiCacheInvalidationIntervalInMinutes, sceneControlName,
+                sceneControlAppData, sceneUpdateSleepDelayInMs, fastSceneUpdateSleepDelayInMs,
+                Ticker.systemTicker(), HueApiImpl::sleep);
+    }
+
+    // Inject time and waiting for deterministic tests of window expiry and update/recall ordering.
+    HueApiImpl(HttpResourceProvider resourceProvider, String host, RateLimiter rateLimiter,
+               int apiCacheInvalidationIntervalInMinutes, String sceneControlName, String sceneControlAppData,
+               int sceneUpdateSleepDelayInMs, int fastSceneUpdateSleepDelayInMs, Ticker ticker, LongConsumer sleepMillis) {
         this.resourceProvider = resourceProvider;
         mapper = new ObjectMapper();
         mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
@@ -100,6 +113,7 @@ public final class HueApiImpl implements HueApi {
         this.sceneControlAppData = sceneControlAppData;
         this.sceneUpdateSleepDelayInMs = sceneUpdateSleepDelayInMs;
         this.fastSceneUpdateSleepDelayInMs = fastSceneUpdateSleepDelayInMs;
+        this.sleepMillis = sleepMillis;
         availableLightsCache = createCache(this::lookupLights, apiCacheInvalidationIntervalInMinutes);
         availableDevicesCache = createCache(this::lookupDevices, apiCacheInvalidationIntervalInMinutes);
         availableGroupedLightsCache = createCache(this::lookupGroupedLights, apiCacheInvalidationIntervalInMinutes);
@@ -108,7 +122,8 @@ public final class HueApiImpl implements HueApi {
         availableRoomsCache = createCache(this::lookupRooms, apiCacheInvalidationIntervalInMinutes);
         availableZigbeeConnectivityCache = createCache(this::lookupZigbeeConnectivity, apiCacheInvalidationIntervalInMinutes);
         fastSceneUpdateIds = Caffeine.newBuilder()
-                                     .expireAfterWrite(Duration.ofSeconds(30))
+                                     .ticker(ticker)
+                                     .expireAfterWrite(FAST_SCENE_UPDATE_WINDOW)
                                      .build();
     }
 
@@ -258,13 +273,8 @@ public final class HueApiImpl implements HueApi {
         }
         SceneUpdateResult result = createOrUpdateSceneInternal(groupedLightId, sceneControlAppData, sceneControlName,
                 removeTransitionTime(putCalls));
-        boolean fastUpdate = consumeFastSceneUpdate(groupedLightId);
         if (result.modified) {
-            if (fastUpdate) {
-                sleep(fastSceneUpdateSleepDelayInMs);
-            } else {
-                sleep(sceneUpdateSleepDelayInMs);
-            }
+            waitForSceneUpdate(groupedLightId);
         }
         Integer recallDuration = getRecallDuration(putCalls);
         recallScene(result.sceneId, recallDuration);
@@ -290,8 +300,15 @@ public final class HueApiImpl implements HueApi {
         fastSceneUpdateIds.put(groupId, groupId);
     }
 
-    private boolean consumeFastSceneUpdate(String groupId) {
-        return fastSceneUpdateIds.asMap().remove(groupId) != null;
+    private boolean isFastSceneUpdateAllowed(String groupId) {
+        return fastSceneUpdateIds.getIfPresent(groupId) != null;
+    }
+
+    private void waitForSceneUpdate(String groupId) {
+        int delayInMs = isFastSceneUpdateAllowed(groupId)
+                ? fastSceneUpdateSleepDelayInMs
+                : sceneUpdateSleepDelayInMs;
+        sleepMillis.accept(delayInMs);
     }
 
     private static List<PutCall> removeTransitionTime(List<PutCall> putCalls) {
@@ -309,7 +326,7 @@ public final class HueApiImpl implements HueApi {
                        .orElse(null);
     }
 
-    private void sleep(int delayInMs) {
+    private static void sleep(long delayInMs) {
         try {
             log.trace("Sleep for {} to ensure scene is properly recalled before next operation.",
                     Duration.ofMillis(delayInMs));

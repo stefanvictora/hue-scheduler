@@ -83,8 +83,9 @@ public interface HueApi extends ResourceModificationEventListener {
     void putSceneState(String groupId, String sceneId, List<PutCall> putCalls);
 
     /**
-     * Marks the given group ID as eligible for a fast scene update, skipping the usual sleep delay
-     * in {@link #putSceneState}. The flag expires automatically after a short time window.
+     * Allows the shorter scene-update delay for this group for 30 seconds after an interactive event.
+     * All {@link #putSceneState} calls within the window are eligible, including consecutive interpolation
+     * updates. Calling this method renews the window; applying or recalling a scene does not.
      */
     void allowFastSceneUpdate(String groupId);
 

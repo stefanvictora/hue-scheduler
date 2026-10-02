@@ -193,7 +193,8 @@ public final class HueScheduler implements Runnable {
     int sceneUpdateSleepDelayInMs;
     @Option(names = "--fast-scene-update-sleep-delay", paramLabel = "<delay>",
             defaultValue = "${env:FAST_SCENE_UPDATE_SLEEP_DELAY:-2000}",
-            description = "Shorter delay in milliseconds used for scene scheduling when the target light was recently turned on. " +
+            description = "Shorter delay in milliseconds used for scene scheduling for 30 seconds after turn-on or " +
+                          "live scene/schedule or group membership changes. " +
                           "Default: ${DEFAULT-VALUE} ms.")
     int fastSceneUpdateSleepDelayInMs;
     int syncFailureRetryInMinutes = 3;
@@ -1546,6 +1547,10 @@ public final class HueScheduler implements Runnable {
         }
         if (states.getFirst().isGroupState() && shouldDeferGroupScheduling(states)) {
             return;
+        }
+        if (states.getFirst().isGroupState() && !api.isGroupOff(id)) {
+            // Resource edits reapply current values without treating membership changes as a power cycle.
+            api.allowFastSceneUpdate(id);
         }
         initialSchedule(states, currentTime.get());
     }

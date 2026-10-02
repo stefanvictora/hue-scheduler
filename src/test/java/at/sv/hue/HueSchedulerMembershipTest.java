@@ -202,6 +202,7 @@ class HueSchedulerMembershipTest extends AbstractHueSchedulerTest {
         runDueTasks();
         assertAllScenePutCallsAsserted();
         assertAllSceneUpdatesAsserted(); // do not write a scene using incomplete membership
+        assertFastSceneUpdateNotAllowed("/groups/1");
 
         simulateSceneModified(1, "Colors"); // a repeated scene notification must not bypass the wait
         runDueTasks();
@@ -214,6 +215,7 @@ class HueSchedulerMembershipTest extends AbstractHueSchedulerTest {
             mockGroupLightsForId(1, 4, 5, 6);
             roomMembershipChanged(4, 5, 6);
         }
+        assertFastSceneUpdateAllowed("/groups/1");
         runDueTasks();
         assertScenePutCalls(1, null, expectedPutCall(4).bri(180).ct(200),
                 expectedPutCall(5).bri(180).ct(300), expectedPutCall(6).bri(180).ct(400));

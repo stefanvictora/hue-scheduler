@@ -755,6 +755,8 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now, now.plusDays(1))
         );
 
+        assertFastSceneUpdateAllowed("/groups/1");
+
         advanceTimeAndRunAndAssertScenePutCalls(states.getFirst(), 1, scene.id(),
                 expectedPutCall(4).bri(100).ct(20),
                 expectedPutCall(5).bri(50).ct(40)
@@ -763,8 +765,9 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
         ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(2)); // next day
     }
 
-    @Test
-    void autoSceneStates_onExistingSceneStateRenamed_automaticallyRecreatesState() {
+    @ParameterizedTest
+    @CsvSource({"false,false", "true,false", "true,true"})
+    void autoSceneStates_onExistingSceneStateRenamed_automaticallyRecreatesState(boolean oneLightOff, boolean groupOff) {
         enableAutoSceneStates();
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
@@ -790,6 +793,11 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
 
         ScheduledRunnable nextDayRunnable = ensureRunnable(initialNow.plusDays(1), initialNow.plusDays(2)); // next day
 
+        assertFastSceneUpdateNotAllowed("/groups/1"); // startup uses the regular delay
+        mockIsLightOff(5, oneLightOff);
+        mockIsLightOff(4, groupOff);
+        mockIsGroupOff(1, groupOff);
+
         // Existing scene renamed
         Identifier updatedScene = mockSceneLightStates(1, 1, "12:00",
                 ScheduledLightState.builder()
@@ -802,15 +810,27 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
                                    .ct(40));
         simulateSceneCreatedOrUpdated(updatedScene.id());
 
+        if (groupOff) {
+            assertFastSceneUpdateNotAllowed("/groups/1");
+        } else {
+            assertFastSceneUpdateAllowed("/groups/1");
+        }
+
         // Reschedules updated state with new start/end time
         List<ScheduledRunnable> rescheduledStates = ensureScheduledStates(
                 expectedRunnable(now, now.plusHours(12))
         );
 
-        advanceTimeAndRunAndAssertScenePutCalls(rescheduledStates.getFirst(), 1, scene.id(),
-                expectedPutCall(4).bri(100).ct(20),
-                expectedPutCall(5).bri(50).ct(40)
-        );
+        if (groupOff) {
+            advanceTimeAndRunAndAssertScenePutCalls(rescheduledStates.getFirst(), 1, scene.id());
+        } else if (oneLightOff) {
+            advanceTimeAndRunAndAssertScenePutCalls(rescheduledStates.getFirst(), 1, scene.id(),
+                    expectedPutCall(4).bri(100).ct(20));
+        } else {
+            advanceTimeAndRunAndAssertScenePutCalls(rescheduledStates.getFirst(), 1, scene.id(),
+                    expectedPutCall(4).bri(100).ct(20),
+                    expectedPutCall(5).bri(50).ct(40));
+        }
 
         ensureRunnable(initialNow.plusHours(12), initialNow.plusDays(1).plusHours(12));
 
@@ -868,6 +888,7 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
 
         // Nothing rescheduled
         ensureScheduledStates(0);
+        assertFastSceneUpdateNotAllowed("/groups/1");
 
         // Next day state was not canceled
         advanceTimeAndRunAndAssertScenePutCalls(nextDayRunnable, 1, scene.id(),
@@ -978,6 +999,8 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
                                    .bri(100)
                                    .ct(40));
         simulateSceneModified(1, "12:00[i]");
+
+        assertFastSceneUpdateAllowed("/groups/1");
 
         ensureScheduledStates(
                 expectedRunnable(now, now.plusDays(1)),
@@ -1138,6 +1161,8 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
                 expectedRunnable(now.plusDays(1), now.plusDays(1)) // zero length
         );
 
+        assertFastSceneUpdateAllowed("/groups/1");
+
         setCurrentTimeToAndRun(reschedulesStates.getFirst());
 
         assertScenePutCalls(1, scene2.id(),
@@ -1220,6 +1245,8 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
 
         // Delete scene2
         simulateSceneDeletion(scene2.id());
+
+        assertFastSceneUpdateAllowed("/groups/1");
 
         // Reschedules scene1 state -> resets manual override
         ScheduledRunnable adjustedScene1Runnable = ensureRunnable(now, initialNow.plusDays(1));

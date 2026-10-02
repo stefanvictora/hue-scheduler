@@ -284,11 +284,13 @@ Read timeout **in minutes** for the API v2 SSE event stream. The connection is a
 
 Delay **in milliseconds** between scene creation/update and scene recall during scene scheduling (`scene:` property). This ensures the bridge has processed the scene changes before recalling them. Off lights especially take longer to process scene changes.
 
-**Default:** `13000` ms
+**Default:** `20000` ms
 
 ### `--fast-scene-update-sleep-delay`
 
-Shorter delay **in milliseconds** used for scene scheduling when the target light was recently turned on.
+Shorter delay **in milliseconds** used for scene scheduling for 30 seconds after turn-on, or after live changes to a scene, its schedule, or group membership while the group is on. Scene schedules include creating, renaming, and deleting scheduled scenes. Membership changes wait until the group's lights and scene actions agree and preserve manual overrides.
+
+Every scene creation/update followed by a recall within that window uses this delay, including consecutive interpolation updates. A new qualifying event restarts the window; scene updates and recalls do not extend it. After the window expires, the normal `--scene-update-sleep-delay` applies again. Direct recalls and unchanged scenes do not need either delay.
 
 **Default:** `2000` ms
 
