@@ -334,7 +334,7 @@ This does **not** reload a text-file schedule. Restart Hue Scheduler after editi
 
 Delay **in milliseconds** between creating or updating the temporary control scene and recalling it. Applies to Hue scene scheduling, including the `scene:` property and automatically discovered scene schedules. This gives the bridge time to process the changed settings before applying them; off lights especially take longer to process scene changes.
 
-**Default:** `20000` ms
+**Default:** `60000` ms
 
 ### `--fast-scene-update-sleep-delay`
 

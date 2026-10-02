@@ -105,7 +105,9 @@ The scheduler ignores a gap scene's saved light actions, including later edits t
 - **Create or delete a scene:** The corresponding schedule is added or removed automatically.
 - **Add or remove room or zone lights:** Running schedules refresh their membership. Scene schedules wait for the bridge's scene actions to match the updated group. Recorded manual overrides remain in effect during membership changes.
 
-No restart is needed for these changes. If a running group becomes empty, its schedules remain dormant until a light is added again. A deleted group has its running definitions removed, while other groups continue updating; any file-based configuration remains unchanged. Ordinary scene edits can restore scheduled control; membership updates preserve already-recorded manual overrides.
+No restart is needed for these changes. Schedules for an empty group remain dormant until a light is added, including scenes discovered while the group is already empty. A deleted group has its running definitions removed, while other groups continue updating; any file-based configuration remains unchanged. Ordinary scene edits can restore scheduled control; membership updates preserve already-recorded manual overrides.
+
+If a connection or API error prevents loading a newly created or renamed scene, the scheduler keeps its last successfully loaded definition, if any, and retries after `--bridge-failure-retry-delay` (default: 10 seconds). Each attempt reads the current scene name and settings. A newer rename or deletion supersedes outstanding attempts; an ordinary or invalid scene name removes the schedule without retrying.
 
 ## Scene schedules, scene references, and Scene Sync
 
@@ -126,6 +128,8 @@ This lets you keep individual-light schedules in a file while managing room scen
 ## Migrate a text-file schedule
 
 `--migrate-input-to-scenes` creates Hue scenes from group definitions in a configuration file, then exits. It requires a Hue Bridge and a readable input file. The input file is left unchanged.
+
+Migration only writes scenes; it does not run schedules or process bridge events, even when `--enable-auto-scene-states` or `--enable-scene-sync` is also set. If the initial connection fails, the command exits with an error so you can retry it.
 
 **Migration writes to the bridge. An existing scene with the generated name in the same group is updated.** Keep a copy of your input file and check for naming conflicts first.
 

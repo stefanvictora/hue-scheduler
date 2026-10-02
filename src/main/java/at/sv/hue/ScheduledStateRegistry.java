@@ -47,6 +47,15 @@ public class ScheduledStateRegistry {
         }
     }
 
+    public synchronized List<ScheduledState> replaceSceneStates(String sceneId, ScheduledState replacement) {
+        List<ScheduledState> removed = findStatesWithSceneId(sceneId);
+        removed.forEach(this::remove);
+        if (replacement != null) {
+            addState(replacement);
+        }
+        return removed;
+    }
+
     public synchronized ScheduledStateSnapshot getPreviousState(ScheduledStateSnapshot currentStateSnapshot) {
         return getDistinctPreviousStatesBefore(currentStateSnapshot).stream()
                                                                     .findFirst()

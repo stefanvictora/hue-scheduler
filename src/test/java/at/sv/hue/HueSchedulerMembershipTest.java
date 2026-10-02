@@ -49,6 +49,34 @@ class HueSchedulerMembershipTest extends AbstractHueSchedulerTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
+    void sceneDiscoveredInEmptyGroupResumesWhenFirstLightIsAdded(boolean initialDiscovery) throws Exception {
+        enableAutoSceneStates();
+        controlGroupLightsIndividually = true;
+        create();
+        mockDefaultGroupCapabilities(1);
+        var scene = mockSceneLightStates(1, "00:00");
+        when(mockedHueApi.getGroupLights("/groups/1")).thenThrow(new EmptyGroupException("No lights"));
+        if (initialDiscovery) when(mockedHueApi.getAllScenes()).thenReturn(List.of(scene));
+        startScheduler(0);
+        if (!initialDiscovery) {
+            scheduler.getSceneDiscoveryListener().onSceneCreatedOrRenamed(scene.id());
+            ensureScheduledStates(0);
+        }
+
+        doReturn(List.of("/lights/4")).when(mockedHueApi).getGroupLights("/groups/1");
+        mockAssignedGroups(4, 1);
+        mockSceneLightStates(1, "00:00", ScheduledLightState.builder().id("/lights/4")
+                .bri(DEFAULT_BRIGHTNESS).ct(DEFAULT_CT));
+        roomMembershipChanged(4);
+        // Membership and the scene's new actions arrive as separate bridge events.
+        simulateSceneModified(1, "00:00");
+        runDueTasks();
+
+        assertPutCalls(expectedPutCall(4).bri(DEFAULT_BRIGHTNESS).ct(DEFAULT_CT));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
     void deletedGroupDoesNotPreventOtherMembershipUpdates(boolean deletedGroupFirst) throws Exception {
         controlGroupLightsIndividually = true;
         create();

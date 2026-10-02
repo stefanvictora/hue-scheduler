@@ -388,10 +388,19 @@ public final class HueScheduler implements Runnable {
         LOG.info("Config file: {}", configFile == null ? "none" : configFile);
         logEnabledFlags();
         assertConfigurationParameters();
+        if (!migrateInputToScenes) {
+            stateScheduler = createStateScheduler();
+        }
         if (HassApiUtils.isHassConnection(accessToken)) {
             setupHassApi();
         } else {
             setupHueApi();
+        }
+        if (migrateInputToScenes) {
+            api.assertConnection();
+            parseInput();
+            migrateInputToScenes();
+            return;
         }
         createAndStart();
     }
@@ -450,13 +459,16 @@ public final class HueScheduler implements Runnable {
         stateRegistry = new ScheduledStateRegistry(currentTime, api);
         startTimeProvider = createStartTimeProvider(latitude, longitude, elevation);
         sceneStateDiscoveryService = createSceneStateDiscoveryService();
-        new HueEventStreamReader(apiHost, accessToken, httpsClient,
-                createHueEventHandler(), eventStreamReadTimeoutInMinutes).start();
+        if (!migrateInputToScenes) {
+            new HueEventStreamReader(apiHost, accessToken, httpsClient,
+                    createHueEventHandler(), eventStreamReadTimeoutInMinutes).start();
+        }
     }
 
     private SceneStateDiscoveryService createSceneStateDiscoveryService() {
         return new SceneStateDiscoveryService(api, startTimeProvider, stateRegistry,
                 this::rescheduleStatesForId, manualOverrideTracker::reset,
+                retry -> stateScheduler.schedule(retry, currentTime.get().plusSeconds(bridgeFailureRetryDelayInSeconds), null),
                 minTrBeforeGapInMinutes, parseBrightnessPercentValue(brightnessOverrideThresholdPercentage),
                 colorTemperatureOverrideThresholdKelvin, colorOverrideThreshold, enableAutoSceneStates, interpolateAll);
     }
@@ -522,7 +534,6 @@ public final class HueScheduler implements Runnable {
     }
 
     private void createAndStart() {
-        stateScheduler = createStateScheduler();
         defaultInterpolationTransitionTime = parseInterpolationTransitionTime(defaultInterpolationTransitionTimeString);
         assertConnectionAndStart();
     }
@@ -672,10 +683,6 @@ public final class HueScheduler implements Runnable {
                 parseInput();
             }
             performSyncedSceneMigration();
-            if (migrateInputToScenes) {
-                migrateInputToScenes();
-                return;
-            }
             discoverSceneStates();
             start();
         }

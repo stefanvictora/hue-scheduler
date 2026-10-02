@@ -70,6 +70,10 @@ _Avoid_: Property overlap, payload-only difference
 A Hue scene whose name contains a valid Schedule Expression and optional schedule flags, declaring either a Scene-Backed Definition or a Schedule Gap. A name that cannot be parsed is treated as an ordinary scene name.
 _Avoid_: Scheduled scene, parseable scene
 
+**Input-to-Scene Migration**:
+A one-time conversion of configuration-file State Definitions for groups into Scene Schedules. Migration creates scenes without running schedules or applying their desired properties to lights.
+_Avoid_: Migration mode, schedule import
+
 **Scene-Backed Definition**:
 A State Definition whose per-light desired properties come from a Hue scene's current stored actions. Later changes to those actions change the definition.
 _Avoid_: Scene scheduling, scene state

@@ -375,7 +375,7 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
     }
 
     @Test
-    void autoSceneStates_apiFailureDuringUpdate_ignoresScene_stillReschedulesRemainingScenes() {
+    void autoSceneStates_apiFailureDuringUpdate_preservesExistingSchedules() {
         enableAutoSceneStates();
         mockDefaultGroupCapabilities(1);
         mockGroupLightsForId(1, 4, 5);
@@ -417,17 +417,8 @@ public class HueSchedulerSceneStateTest extends AbstractHueSchedulerTest {
         when(mockedHueApi.getSceneLightStates(updateScene1.id())).thenThrow(new RuntimeException("API failure"));
         simulateSceneCreatedOrUpdated(updateScene1.id());
 
-        // reschedules scene2, but no new state created
-        List<ScheduledRunnable> rescheduledStates = ensureScheduledStates(
-                expectedRunnable(now, now.plusHours(7))
-        );
-
-        advanceTimeAndRunAndAssertScenePutCalls(rescheduledStates.getFirst(), 1, scene2.id(),
-                expectedPutCall(4).bri(200).ct(20),
-                expectedPutCall(5).bri(254).ct(40)
-        );
-
-        ensureRunnable(initialNow.plusHours(7), initialNow.plusDays(1).plusHours(7));
+        // A failed replacement does not invalidate or reschedule the existing definitions.
+        ensureScheduledStates(0);
     }
 
     @Test
