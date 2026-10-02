@@ -2,13 +2,17 @@
 
 [Back to README](../README.md)
 
-These examples use Vienna, Austria and a local Hue Bridge. Replace the host, token, coordinates, and time zone with your own. For Home Assistant, use its origin (such as `http://homeassistant.local:8123`) and a long-lived access token.
+You need Docker with the Compose plugin. The image includes Java. For Raspberry Pi installation, see [Docker on Raspberry Pi](docker_on_raspberrypi.md).
 
-Configure the container through **environment variables**. Command-line flags map to uppercase names with underscores: `--enable-scene-sync` becomes `ENABLE_SCENE_SYNC`.
+These examples use Vienna, Austria and a local Hue Bridge. Replace the host, [access token](philips_hue_authentication.md), coordinates, and time zone with your own. For Home Assistant, use its origin (such as `http://homeassistant.local:8123`) and a long-lived access token. The address must be reachable from the container; `localhost` refers to the container itself.
+
+Configure the container through **environment variables**. Command-line flags map to uppercase names with underscores: `--enable-scene-sync` becomes `ENABLE_SCENE_SYNC`. The image's entrypoint does not forward extra command-line arguments, so use `environment` in Compose or `-e` with `docker run`.
+
+Set `TZ` to your local time zone so that fixed times and solar events use the right day and time. The container defaults to UTC if `TZ` is omitted.
 
 ## Compose with a text file
 
-Create `input.txt` next to `docker-compose.yml` before starting the container:
+Create `input.txt` with your [text-file schedule](light_configuration.md). Save the following as `docker-compose.yml` in the same directory:
 
 ```yaml
 services:
@@ -38,7 +42,7 @@ Scene Sync is optional. Remove `ENABLE_SCENE_SYNC` if you do not need scenes for
 
 ## Compose with Hue scene schedules only
 
-This setup needs a Hue Bridge. It reads the schedule from your Hue scenes, so there is no configuration file to mount:
+This setup requires a Hue Bridge. First [create schedule scenes in the Hue app](scene_schedules.md#create-your-first-schedule), then save the following as `docker-compose.yml`. The schedule comes from those scenes, so there is no configuration file to mount:
 
 ```yaml
 services:
@@ -59,24 +63,37 @@ services:
 
 ## Start, update, and stop
 
-Run these commands from the directory containing `docker-compose.yml`:
+Run these commands from the directory containing `docker-compose.yml` to download the image and start in the background:
 
 ```shell
-# Download the image and start in the background
 docker compose pull
 docker compose up -d
+```
 
-# Follow logs (Ctrl+C stops following; the container keeps running)
+Check that the scheduler has connected and loaded your schedule:
+
+```shell
 docker compose logs -f
+```
 
-# Reload an edited input.txt
-docker compose restart
+Press Ctrl+C to stop following logs; the container keeps running.
 
-# Stop and remove the container
+| Change | Apply it with |
+|---|---|
+| Edit `input.txt` | `docker compose restart` |
+| Edit environment variables in `docker-compose.yml` | `docker compose up -d` |
+| Update the image | `docker compose pull`, then `docker compose up -d` |
+| Edit Hue schedule scenes | No restart needed |
+
+To move to another release, first change the image tag in `docker-compose.yml`, then follow the update commands above. Restarting alone does not load a new image or changed environment variables.
+
+To stop and remove the container:
+
+```shell
 docker compose down
 ```
 
-To update, run `docker compose pull` followed by `docker compose up -d` again. Changes to environment variables in the Compose file also require `docker compose up -d`.
+Your host's `input.txt` and `docker-compose.yml` remain in place. Run `docker compose up -d` to start again.
 
 For more detailed logs, add `log.level: "TRACE"` under `environment`. See [logging options](advanced_command_line_options.md#-dloglevel-jvm).
 
@@ -90,10 +107,12 @@ On Linux, you can instead run the container as your own user. Add this to the se
     user: "${HOST_UID}:${HOST_GID}"
 ```
 
-Then start it with:
+Export these values in your shell before running Compose commands:
 
 ```bash
-HOST_UID=$(id -u) HOST_GID=$(id -g) docker compose up -d
+export HOST_UID=$(id -u)
+export HOST_GID=$(id -g)
+docker compose up -d
 ```
 
 ## Using docker run

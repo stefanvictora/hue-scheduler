@@ -8,9 +8,11 @@
 
 Schedule your Philips Hue or Home Assistant lights by time of day, sun position, and weekday. Set brightness, color temperature, colors, and effects, with gradual transitions throughout the day.
 
-Hue Scheduler adjusts lights when you turn them on and pauses after a manual change. With a Hue Bridge, it also keeps off lights ready with the scheduled settings. Use Scene Sync to give motion sensors and smart switches a scene that always matches your schedule.
+Hue Scheduler adjusts lights to the current schedule when you turn them on and pauses scheduled adjustments after a manual change. With a Hue Bridge, it also prepares the scheduled brightness and colors while lights are off. Optional **Scene Sync** gives motion sensors and smart switches a scene with the current scheduled settings.
 
-**New in 0.17.0:** Create and edit schedules directly in the Hue app by naming scenes after times, such as `sunset` or `22:00 [i]`. Scene changes and changes to the lights in a room or zone update running schedules automatically. See the [scene schedule guide](docs/scene_schedules.md) and [changelog](CHANGELOG.md).
+**New in 0.17.0:** Create and edit schedules directly in the Hue app by naming scenes after times, such as `sunset` or `22:00 [i]`. Scene edits and changes to the lights in a Hue room or zone update running schedules automatically. See the [scene schedule guide](docs/scene_schedules.md) and [changelog](CHANGELOG.md).
+
+[Quick start](#quick-start) · [Sensors and switches](#motion-sensors-and-smart-switches) · [All guides](#documentation)
 
 ## Choose how to create your schedule
 
@@ -19,11 +21,11 @@ Hue Scheduler adjusts lights when you turn them on and pauses after a manual cha
 | [Text file](docs/light_configuration.md) | Hue Bridge and Home Assistant | Write one line per time and target. Configure individual lights, groups, or supported Home Assistant entities. |
 | [Hue scene schedules](docs/scene_schedules.md) | Hue Bridge | Save the desired light settings in a scene and put the time in its name. Enable `--enable-auto-scene-states`; no text file is needed. |
 
-You can also combine both methods. A text-file schedule can use an existing Hue scene's colors and brightness with `scene:Relax`.
+You can also combine both methods. With a Hue Bridge, a text-file schedule can use an existing scene's colors and brightness with `scene:Relax`.
 
 ### Text-file example
 
-Create `input.txt`, using a tab or **at least two spaces** between columns:
+Create `input.txt`, using a tab or **at least two spaces** between the target, time, and each property:
 
 ```text
 # Bright in the morning, gradually warmer and dimmer in the evening
@@ -38,7 +40,7 @@ Porch light  23:00       on:false  tr:5min
 
 Replace the names with your own lights or groups. With Home Assistant, you can use entity IDs such as `light.living_room`.
 
-`interpolate:true` means “gradually reach these values by this time, starting at the previous entry's time.” In this example, the living room changes from its morning settings to its evening settings between 07:00 and sunset.
+`interpolate:true` means “gradually reach these values by this time, starting at the previous entry's time.” In this example, the living room gradually reaches its evening settings between 07:00 and sunset, then its nighttime settings by 23:00. Those settings remain in effect until 07:00 the next day. Interpolation also works across midnight; see [transitions and interpolation](docs/light_configuration.md#transitions--interpolations).
 
 ### Hue scene example
 
@@ -52,18 +54,23 @@ Save three scenes in a Hue room or zone, each with the light settings you want:
 
 Enable `ENABLE_AUTO_SCENE_STATES=true` in Docker or `--enable-auto-scene-states` with Java. Edit the scenes in the Hue app whenever you want to change the schedule. See [scene names and options](docs/scene_schedules.md#scene-names) for weekday restrictions, transitions, and power control.
 
-> [!NOTE]
-> By default, you decide when lights turn on. Schedule `on:true` in a text file or `[on]` in a scene name to turn them on automatically; see the [Home Assistant group limitation](docs/faq.md#do-lights-turn-on-automatically). A manual change pauses scheduled adjustments until the light is turned off and on again, or you activate a synced Hue Scheduler scene. Use `force:true` or `[f]` when a schedule must take precedence over manual changes.
+To move group schedules from a text file into the Hue app, use [`--migrate-input-to-scenes`](docs/scene_schedules.md#migrate-a-text-file-schedule). Migration is optional; existing text-file schedules continue to work.
+
+### When lights change
+
+- **You decide when lights turn on.** Add `on:true` in a text file or `[on]` in a scene name for automatic turn-on. Home Assistant has a [limitation when updating groups](docs/faq.md#do-lights-turn-on-automatically).
+- **Manual changes pause scheduled adjustments.** Turn the light off and on again, or activate a synced Hue Scheduler scene, to resume. If you enable `--require-scene-activation`, resuming requires that scene activation.
+- **A schedule can take precedence.** Use `force:true` or `[f]` to apply settings despite manual changes; see [manual overrides](docs/faq.md#what-happens-when-i-change-a-light-manually).
 
 ## Quick start
 
-You need a Hue Bridge or Home Assistant instance, a device that stays on, and either **Docker** or **Java 25**.
+You need a Hue Bridge or Home Assistant instance and a device that stays on to run Hue Scheduler. Choose **Docker with Compose** or **Java 25**; the Docker image already includes Java.
 
 ### 1. Get your connection details
 
 - **Hue Bridge:** Find its IP address and [create an API key](docs/philips_hue_authentication.md).
-- **Home Assistant:** Use its origin, such as `http://homeassistant.local:8123`, and a [long-lived access token](https://www.home-assistant.io/docs/authentication/).
-- Have your latitude, longitude, and time zone ready. Solar times are calculated locally. Elevation is optional and defaults to 0 metres.
+- **Home Assistant:** Use its base address, including `http://` or `https://` and the port if needed, such as `http://homeassistant.local:8123`. Do not append `/api`. Create a [long-lived access token](https://www.home-assistant.io/docs/authentication/).
+- Have your latitude, longitude, and time zone ready. Latitude and longitude are required even for schedules that currently use only fixed times. Solar times are calculated locally. Elevation is optional and defaults to 0 metres.
 
 ### 2. Run with Docker Compose
 
@@ -90,7 +97,7 @@ services:
     restart: unless-stopped
 ```
 
-Create `input.txt` before starting the container. The example mounts it from the same directory as the Compose file.
+Create `input.txt` with your schedule, using the [example above](#text-file-example), before starting the container. The example mounts it from the same directory as the Compose file.
 
 **Using only Hue scene schedules?** Add `ENABLE_AUTO_SCENE_STATES: "true"` under `environment`, then remove `CONFIG_FILE` and the entire `volumes` section. To combine scenes and a text file, keep both.
 
@@ -100,13 +107,17 @@ docker compose up -d
 docker compose logs -f
 ```
 
-Stop with `docker compose down`. After editing `input.txt`, reload it with `docker compose restart`. Hue scene edits are picked up automatically.
+The logs show the version, connection details, enabled features, and loaded schedules. Check for errors, then turn on a scheduled light to try the current settings. Press **Ctrl+C** to stop following the logs; the container keeps running.
+
+Stop Hue Scheduler with `docker compose down`. After editing `input.txt`, reload it with `docker compose restart`. After changing Compose settings, run `docker compose up -d` to recreate the container with those settings. Hue scene edits are picked up automatically.
+
+To update, set the desired image tag in Compose and run `docker compose pull` followed by `docker compose up -d`. See the [changelog](CHANGELOG.md) for release-specific changes.
 
 See [Docker examples](docs/docker_examples.md) for a complete setup without an input file, `docker run`, and file permissions. For installation on a Raspberry Pi, see [Docker on Raspberry Pi](docs/docker_on_raspberrypi.md).
 
 ### Or run with Java
 
-Download `hue-scheduler.jar` from the [releases page](https://github.com/stefanvictora/hue-scheduler/releases).
+Check that `java -version` reports Java 25, then download `hue-scheduler.jar` from the [releases page](https://github.com/stefanvictora/hue-scheduler/releases). Replace the `<...>` placeholders below with your values, without the angle brackets.
 
 With a text file:
 
@@ -120,13 +131,13 @@ With Hue scene schedules:
 java -jar hue-scheduler.jar <API_HOST> <ACCESS_TOKEN> --lat=<LATITUDE> --long=<LONGITUDE> --enable-auto-scene-states
 ```
 
-Java uses the system time zone. To choose one explicitly, put `-Duser.timezone=Europe/Vienna` before `-jar`. Add `--elevation=<METRES>` if needed. Restart after editing a text-file schedule.
+Java uses the system time zone. To choose one explicitly, put `-Duser.timezone=Europe/Vienna` before `-jar`. Add `--elevation=<METRES>` if needed. Keep the process running; **Ctrl+C** stops it. Restart after editing a text-file schedule.
 
 ## Motion sensors and smart switches
 
 Enable **Scene Sync** with `ENABLE_SCENE_SYNC: "true"` in Docker or `--enable-scene-sync` with Java. Hue Scheduler creates scenes that follow your schedule; the default scene name on Hue is **Hue Scheduler**. Assign this scene to your motion sensor or switch so it activates the right settings immediately.
 
-Scene Sync works with both Hue Bridge and Home Assistant, and with either schedule source. It is separate from scene schedules: **scene schedules define what should happen; synced scenes let you activate the current result.**
+Scene Sync works with both Hue Bridge and Home Assistant. On Hue, it works with either schedule source; Home Assistant uses text-file schedules. **Scene schedules define what should happen; synced scenes let you activate the current result.** Enabling one feature does not enable the other.
 
 To apply schedules only after you activate a synced scene, also enable `--require-scene-activation`. See [Scene Sync and activation options](docs/advanced_command_line_options.md#scene-sync--activation) for details and Home Assistant setup notes.
 
@@ -143,17 +154,28 @@ To apply schedules only after you activate a synced scene, also enable `--requir
 
 ## Developing
 
-Build and run the tests with Java 25:
+To build from source, first clone the repository:
 
 ```shell
 git clone https://github.com/stefanvictora/hue-scheduler.git
 cd hue-scheduler
+```
+
+For a local Docker image, run:
+
+```shell
+docker build -t hue-scheduler:local .
+```
+
+Docker handles the build and tests internally; you do not need Java or Maven installed on the host.
+
+To build the JAR and run the tests directly, install **JDK 25** and run:
+
+```shell
 ./mvnw clean install
 ```
 
-On Windows, use `./mvnw.cmd clean install`. The runnable JAR, including dependencies, is written to `target/hue-scheduler.jar`.
-
-Build a local Docker image with `docker build -t hue-scheduler:local .`.
+On Windows, use `./mvnw.cmd clean install`. The runnable JAR, including dependencies, is written to `target/hue-scheduler.jar`. Use that path in place of `hue-scheduler.jar` in the Java examples.
 
 ## Similar projects
 

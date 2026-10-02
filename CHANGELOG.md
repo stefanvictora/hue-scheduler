@@ -1,4 +1,8 @@
+# Changelog
+
 ## [0.17.0] - Unreleased
+
+Existing text-file schedules remain supported. Scene schedules are optional and disabled by default; migrating a text file is not required.
 
 ### Added
 

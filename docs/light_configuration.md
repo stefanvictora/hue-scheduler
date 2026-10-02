@@ -6,7 +6,7 @@ This guide covers schedules written in a text file, such as `input.txt`. For sch
 
 Each non-empty line is one schedule entry. Lines starting with `#` or `//` are comments; empty lines are ignored. Put comments on their own lines.
 
-Each line has three parts separated by a tab **or** at least two spaces (recommended):
+Start with the light or group, then the time, followed by any properties. Separate **each field**, including each `property:value` pair, with a tab or at least two spaces (recommended):
 
 ```text
 <Light/Group Name or ID>  <Scheduled Time>  [<Property>:<Value>]*
@@ -17,6 +17,10 @@ Living room  07:00   bri:100%  ct:5000
 Living room  sunset  bri:60%   ct:3000  interpolate:true
 Living room  23:00   bri:30%   ct:2200  interpolate:true
 ```
+
+This example starts with bright, cool settings at 07:00, gradually dims and warms toward the sunset settings, and reaches the nighttime settings at 23:00. Put `interpolate:true` on the entry whose values you want to **reach** at the named time. The schedule does not turn lights on unless you add `on:true`.
+
+Use single spaces within names and values, such as `Living room` or `color:rgb(60 208 226)`. The brackets and `*` in the syntax above mean that properties are optional and repeatable; do not type them into the file.
 
 Restart Hue Scheduler after saving changes to the file. With Docker Compose, use `docker compose restart`.
 
@@ -143,10 +147,10 @@ An entry normally applies until the next entry for the same light or group takes
 
 Example:
 
-  ```text
+```text
 Hallway  07:00       bri:254
 Hallway  civil_dusk  bri:150
-  ```
+```
 
 This results in two periods that adjust daily:
 
@@ -155,12 +159,12 @@ This results in two periods that adjust daily:
 
 To deliberately leave part of the day unscheduled, add an entry with no properties:
 
-  ```text
+```text
 Hallway  07:00  bri:254
 Hallway  10:00
-  ```
+```
 
-Only **07:00–10:00** is scheduled. If the light is turned on outside this window, Hue Scheduler does not apply scheduled values.
+Only **07:00–10:00** is scheduled by these entries. At 10:00, Hue Scheduler stops applying these settings; it does not turn the light off or undo them. Schedules for overlapping groups or individual lights can still apply outside this window.
 
 ## `[<Property>:<Value>]*`
 
@@ -186,25 +190,25 @@ Properties describe the values and behavior for a schedule entry.
     Office        sunrise     bri:254  ct:6500  tr:10s  days:Mo-Fr
     Office        sunset      bri:200  ct:3000  tr-before:20min  days:Mo-Fr
 
-    Living room   22:00       bri:100   effect:prism  days:Fr,Sa
-    Living room   23:59       days:Fr,Sa
+    Desk lamp     22:00       bri:100   effect:prism  days:Fr,Sa
+    Desk lamp     23:59       days:Fr,Sa
     ```
 
 ### Color
 
 Hue Scheduler supports several ways to set color:
 
-- `color` — **hex** (e.g., `#3CD0E2`), **RGB** (e.g., `rgb(60 208 226)`), **XY** (e.g., `xy(0.6024 0.3433)`), or **OKLCH** (e.g., `oklch(0.7 0.15 180)`). Cannot be combined with other color properties. If `bri` is omitted, Hue Scheduler derives a suitable brightness for the color.
+- `color` — **hex** (e.g., `#3CD0E2`), **RGB** (e.g., `rgb(60 208 226)`), **XY** (e.g., `xy(0.6024 0.3433)`), or **OKLCH** (e.g., `oklch(0.7 0.15 180)`). Cannot be combined with other color properties. If `bri` is omitted, hex, RGB, and OKLCH colors supply a derived brightness. XY coordinates specify only the color; add `bri` to set brightness explicitly.
 
   **OKLCH syntax:** `oklch(L C h)` where **L** is lightness (`0.0–1.0` or percentage, e.g., `50%`), **C** is chroma (≥ 0), and **h** is hue in degrees. Angle units `deg`, `grad`, `rad`, `turn` are supported. Brightness is derived from the L component when `bri` is not explicitly set.
 
-- `effect` — Activates a light effect. The effect persists until the light is turned off or `effect:none`. Brightness can still be adjusted. Supported effects vary by model. Examples (Hue color lights): `candle`, `fire`, `prism`, `sparkle`, `opal`, `glisten`.
+- `effect` — Activates an effect on an **individual light**; direct `effect:` entries cannot target a group. To schedule a room with per-light effects, use a [scene reference](#scene-scheduling) or [Hue scene schedule](scene_schedules.md). The effect persists until the light is turned off or `effect:none`. Brightness can still be adjusted. Supported effects vary by model. Examples (Hue color lights): `candle`, `fire`, `prism`, `sparkle`, `opal`, `glisten`.
 
   **Speed parameter:** Append `@<speed>` to control effect speed, where speed is `0.0–1.0` (e.g., `effect:candle@0.5`, `effect:fire@1.0`).
 
   **Parameterized effects:** Effects can be combined with `color`, `ct`, or `x`/`y` to set the effect's color parameter. When an effect is active, these color properties become parameters of the effect rather than direct light state properties. For example, `effect:candle  ct:350` creates a candle effect with a warm color temperature, and `effect:opal  color:#FF5500` sets the effect's color. With `effect:none`, color properties behave as regular light state properties.
 
-- `gradient` — Multi-color gradient for compatible lights. Syntax: `gradient:[<color>, <color>, ...]` with 2–5 color points. Colors can be in any supported format: `#hex`, `rgb(r g b)`, `xy(x y)`, `oklch(L C h)`. Cannot be combined with other color properties or `effect`.
+- `gradient` — Multi-color gradient for compatible lights. Syntax: `gradient:[<color>, <color>, ...]` with at least 2 color points, up to the device's supported maximum (typically 5). Colors can be in any supported format: `#hex`, `rgb(r g b)`, `xy(x y)`, `oklch(L C h)`. Cannot be combined with other color properties or `effect`.
 
   **Mode suffix:** Optionally append `@<mode>` (e.g., `gradient:[#FF0000, #0000FF]@interpolated_palette`). Available modes depend on the device. Current known values: `interpolated_palette`, `interpolated_palette_mirrored`, `random_pixelated`, `segmented_palette`.
 
@@ -215,7 +219,8 @@ Hue Scheduler supports several ways to set color:
 - `x` / `y` — **[CIE xy](https://en.wikipedia.org/wiki/CIE_1931_color_space)** coordinates (`0.0–1.0`). Useful for exact colors read from the Hue API. Cannot be combined with other color properties. Deprecated, use `color:xy(x y)` instead.
 
 Examples:
-```
+
+```text
 Desk  10:00  color:#3CD0E2
 Desk  11:00  color:rgb(60 208 226)
 Desk  11:30  color:xy(0.1652 0.3103)
@@ -241,14 +246,14 @@ Desk  17:00  gradient:[oklch(0.7 0.2 30), #00FF00, oklch(0.5 0.15 270)]@random_p
 
   After room or zone membership changes, scene-based schedules wait for the bridge's saved scene actions to match the updated group.
 
-  ```
+  ```text
   Living room  sunset  scene:Relax
   Living room  22:00   scene:Nightlight   bri:50%   interpolate:true
   ```
 
   **Proportional brightness scaling:** When `bri` is specified alongside `scene:`, each light's brightness is scaled proportionally. For example, `bri:50%` dims all lights to half their scene-defined brightness. Values above `100%` proportionally boost brightness — useful for making a scene brighter than its original definition. Individual lights are capped at their maximum.
 
-  ```
+  ```text
   # Dim to half the saved brightness
   Living room  sunset   scene:Relax  bri:50%
   # Boost to double, capped per light
@@ -296,7 +301,7 @@ Office  sunrise  on:true  bri:254  tr-before:06:00
 Office  sunrise  on:true  bri:254  tr-before:civil_dawn+5
 ```
 
-The first entry starts changing 30 minutes before sunrise. The last starts 5 minutes after `civil_dawn`. Both finish at sunrise.
+These are three alternative ways to set an early start; choose one. The first starts 30 minutes before sunrise, the second at 06:00, and the third 5 minutes after `civil_dawn`. Each finishes at sunrise, provided its start time is earlier than sunrise and a previous entry supplies settings to fade from.
 
 The `tr-before` time must be earlier than the scheduled time; otherwise it is ignored. Durations longer than 24 hours are unsupported and may produce unexpected schedules.
 

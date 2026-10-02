@@ -1,10 +1,19 @@
 # Hue scene schedules
 
-[Back to README](../README.md)
+[Back to README](../README.md) · [Text-file configuration](light_configuration.md) · [Command-line options](advanced_command_line_options.md)
 
 Create a schedule directly in the Hue app: save the light settings you want in a scene, then use its name to specify when they apply. Hue Scheduler reads the scenes and keeps the schedule up to date as you edit them.
 
 This feature requires a **Philips Hue Bridge** and `--enable-auto-scene-states` (Docker: `ENABLE_AUTO_SCENE_STATES=true`). It is disabled by default and is not available with Home Assistant.
+
+When enabled, Hue Scheduler discovers matching scene names across the bridge, including existing scenes. Only scenes whose entire name matches the syntax below become schedules.
+
+- [Create your first schedule](#create-your-first-schedule)
+- [Scene names, times, and options](#scene-names)
+- [Leave part of the day unscheduled](#schedule-gaps)
+- [Edit a running schedule](#editing-a-running-schedule)
+- [Compare scene schedules, scene references, and Scene Sync](#scene-schedules-scene-references-and-scene-sync)
+- [Combine scenes and a text file](#combine-scenes-and-a-text-file), or [migrate a file to scenes](#migrate-a-text-file-schedule)
 
 ## Create your first schedule
 
@@ -18,9 +27,11 @@ This feature requires a **Philips Hue Bridge** and `--enable-auto-scene-states` 
    java -jar hue-scheduler.jar <BRIDGE_IP> <ACCESS_TOKEN> --lat=<LATITUDE> --long=<LONGITUDE> --enable-auto-scene-states
    ```
 
-The room uses the morning scene from 07:00 and gradually changes toward the sunset scene during the day. It then gradually reaches the nighttime scene by 23:00. The `[i]` option belongs to the scene you want to **reach** at the named time.
+The room starts with the morning settings at 07:00, gradually changes toward the sunset scene during the day, and reaches the nighttime settings at 23:00. Those settings remain in effect until 07:00 the next day. The `[i]` option belongs to the scene you want to **reach** at the named time.
 
 You still decide when lights turn on. Add `[on]` to a scene name if the schedule should turn them on automatically; for example, `07:00 [on]`.
+
+You do not need to activate each scene in the Hue app for its schedule to apply. If you change a light manually, scheduled adjustments normally pause for that light; see [manual changes](faq.md#what-happens-when-i-change-a-light-manually).
 
 ## Scene names
 
@@ -76,7 +87,14 @@ Unknown options or invalid values make the whole scene name ineligible for sched
 
 ### Schedule gaps
 
-Use `08:00` followed by `12:00 [gap]` to stop prescribing this group's light settings at noon. A gap does not switch lights off and interrupts interpolation. Schedules for other overlapping groups or individual lights still apply. Days work normally, for example `12:00 [Mo-Fr,gap]`. Combining `gap` with `on` or `off` is invalid; transition and interpolation options do not give a gap any light settings.
+For a schedule that applies only in the morning, create these two scenes:
+
+| Scene name | Scheduled behavior |
+|---|---|
+| `08:00` | Apply the saved settings from 08:00 until noon. |
+| `12:00 [gap]` | Stop applying this group's settings until 08:00 the next day. |
+
+A gap does not switch lights off or undo the last settings, and it interrupts interpolation. Schedules for other overlapping groups or individual lights still apply. Days work normally, for example `12:00 [Mo-Fr,gap]`. Combining `gap` with `on` or `off` is invalid; transition and interpolation options do not give a gap any light settings.
 
 The scheduler ignores a gap scene's saved light actions, including later edits to them. Manually activating the scene in Hue still executes those actions. Migration initializes gap scenes with all lights off, so manually recalling a migrated gap scene switches its lights off. The Hue app may require at least one light saved as on before allowing you to edit such a scene, including renaming it; you can change its saved actions without affecting the scheduled gap.
 
@@ -139,4 +157,8 @@ Check the generated scenes before switching over:
 - Explicit `interpolate:false` becomes `[i:false]`, preserving the choice even with `--interpolate-all` enabled.
 - Long time expressions and option lists may exceed the scene-name length accepted by the bridge.
 
-To use the result, start normally with `--enable-auto-scene-states` and without the migration flag. Remove migrated definitions from the file, or omit the file entirely if everything you need is now in scenes. Keep the original file as a backup.
+After checking the generated scenes:
+
+1. Remove migrated definitions from the active file, or omit the file entirely if all your schedules are now in scenes. Keep the original file as a backup.
+2. Start Hue Scheduler with `--enable-auto-scene-states` and without `--migrate-input-to-scenes`. For Docker, set `ENABLE_AUTO_SCENE_STATES=true` and leave `MIGRATE_INPUT_TO_SCENES` unset or `false`.
+3. Check the startup log and confirm that the expected schedules are loaded. Use the [scene-only Docker setup](docker_examples.md#compose-with-hue-scene-schedules-only) if you no longer need a file.

@@ -2,9 +2,15 @@
 
 [Back to README](../README.md)
 
-Use these options with Java or configure their environment-variable equivalents in Docker. For schedule syntax, see [text-file configuration](light_configuration.md) or [Hue scene schedules](scene_schedules.md).
+Use these options with Java or configure their environment-variable equivalents in Docker. For schedule syntax, see [text-file configuration](light_configuration.md) or [Hue scene schedules](scene_schedules.md). For complete container examples, see the [Docker guide](docker_examples.md).
+
+The defaults below apply when neither a command-line value nor an environment variable is set. With Java, an explicit command-line value takes precedence over the environment variable. The Docker image reads its configuration from environment variables.
 
 ## Index
+
+**Startup**
+
+- [Connection, location, and configuration file](#connection-location-and-configuration-file) · [Environment variables](#environment-variables)
 
 **Schedule Sources**
 
@@ -28,7 +34,7 @@ Use these options with Java or configure their environment-variable equivalents 
 
 **Reliability & Connectivity**
 
-- [`--bridge-failure-retry-delay`](#--bridge-failure-retry-delay) · [`--power-on-reschedule-delay`](#--power-on-reschedule-delay) · [`--event-stream-read-timeout`](#--event-stream-read-timeout) · [`--scene-update-sleep-delay`](#--scene-update-sleep-delay) · [`--fast-scene-update-sleep-delay`](#--fast-scene-update-sleep-delay)
+- [`--bridge-failure-retry-delay`](#--bridge-failure-retry-delay) · [`--power-on-reschedule-delay`](#--power-on-reschedule-delay) · [`--event-stream-read-timeout`](#--event-stream-read-timeout) · [`--api-cache-invalidation-interval`](#--api-cache-invalidation-interval) · [`--scene-update-sleep-delay`](#--scene-update-sleep-delay) · [`--fast-scene-update-sleep-delay`](#--fast-scene-update-sleep-delay)
 
 **Performance & Rate Limiting**
 
@@ -38,10 +44,40 @@ Use these options with Java or configure their environment-variable equivalents 
 
 - [`--insecure`](#--insecure)
 
-> [!NOTE]
-> Every CLI option can also be set via an environment variable. Example: `--interpolate-all` ⇢ `INTERPOLATE_ALL=true`.
->
-> **Mapping:** `--some-option` → `SOME_OPTION` (uppercase, hyphens → underscores).
+## Connection, location, and configuration file
+
+```shell
+java -jar hue-scheduler.jar <API_HOST> <ACCESS_TOKEN> [CONFIG_FILE] --lat=<LATITUDE> --long=<LONGITUDE> [OPTIONS]
+```
+
+Replace the angle-bracketed placeholders with your values. Square brackets indicate optional arguments; do not type the brackets.
+
+| Java argument | Environment variable | Meaning |
+|---|---|---|
+| First positional argument | `API_HOST` | Hue Bridge IP address or host, or Home Assistant origin such as `http://homeassistant.local:8123`. Required. |
+| Second positional argument | `ACCESS_TOKEN` | Hue Bridge application key or Home Assistant long-lived access token. Required. |
+| Third positional argument | `CONFIG_FILE` | Path to the schedule file. Required unless automatic Hue scene discovery is enabled; always required for migration. In Docker, use the path **inside the container**. |
+| `--lat` | `LAT` | Latitude in degrees, from `-90` to `90`. Required. |
+| `--long` | `LONG` | Longitude in degrees, from `-180` to `180`. Required. |
+| `--elevation` | `ELEVATION` | Elevation in meters for more accurate sunrise and sunset times. Default: `0`. |
+
+Coordinates are required even if your schedule currently uses only clock times. Set Docker's `TZ` to your local time zone, such as `Europe/Vienna`; the image defaults to `UTC`. Java uses the system time zone unless overridden with `-Duser.timezone=Europe/Vienna` before `-jar`.
+
+Use `java -jar hue-scheduler.jar --help` to see the installed version's command-line help, or `--version` to print its version.
+
+## Environment variables
+
+Application options map to uppercase names with underscores: `--some-option` becomes `SOME_OPTION`. For example:
+
+| Java option | Docker environment setting |
+|---|---|
+| `--interpolate-all` | `INTERPOLATE_ALL=true` |
+| `--max-concurrent-requests=2` | `MAX_CONCURRENT_REQUESTS=2` |
+| `--scene-sync-name="My schedule"` | `SCENE_SYNC_NAME=My schedule` |
+
+For boolean options, use `true` or `false`. In a Compose file, quote these values, for example `INTERPOLATE_ALL: "true"`. Logging uses the separate setting [`log.level`](#-dloglevel-jvm), with that exact spelling.
+
+Restart the application after changing its options. For changes to a Compose file's environment variables, run `docker compose up -d` to recreate the container with the new settings; `docker compose restart` alone does not apply them.
 
 ## Schedule Sources
 
@@ -69,7 +105,9 @@ Generated names place days before other options, combine consecutive days into r
 
 ### `--enable-scene-sync`
 
-Creates synced scenes that always reflect the scheduled state of a light, room, or zone.
+Creates and updates scenes with the current scheduled values for the rooms or groups containing scheduled lights. These scenes can be activated by a sensor, switch, or automation. The default scene name is `Hue Scheduler`.
+
+Scene Sync publishes the schedule's current values. To **read a schedule from scene names**, enable [`--enable-auto-scene-states`](#--enable-auto-scene-states) separately. Either feature can be used without the other.
 
 **Home Assistant notes:**
 
@@ -82,9 +120,9 @@ Creates synced scenes that always reflect the scheduled state of a light, room, 
 
 ### `--require-scene-activation`
 
-Applies scheduled states **only after** a synced scene has been activated. After activation, the current and subsequent states apply until the lights are turned off or manually modified. Use together with `--enable-scene-sync` when you want explicit, manual opt-in (e.g., via a smart switch or HA automation). If no synced scene has been activated since the last "off", no states are applied (except those with `force:true`).
+Applies scheduled states **only after** a synced scene has been activated. After activation, the current and subsequent states apply until the lights are turned off or manually modified. Use this when you want to start scheduled control explicitly, for example via a smart switch or Home Assistant automation.
 
-Use `force:true` to override this behavior for specific states.
+Requires `--enable-scene-sync`; the application will not start without it. Turning a light on normally does not start scheduled control in this mode. Use `force:true` in a file or `[f]` in a scene name to bypass the activation requirement for a particular definition.
 
 **Default:** `false`
 
@@ -96,7 +134,7 @@ Sets the name of the synced scene (used with `--enable-scene-sync`).
 
 ### `--scene-control-name`
 
-Name of the temporary Hue scene created internally for scene scheduling (the `scene:` property). This scene is created/updated and then recalled to apply per-light states synchronously. You may need to change this if the default name conflicts with an existing scene.
+Name of the temporary Hue scene used internally to apply per-light settings together, both for the `scene:` property and for automatically discovered scene schedules. Hue Scheduler creates or updates this scene, then recalls it. You may need to change the name if it conflicts with an existing scene. This is separate from the user-facing synced scene named by `--scene-sync-name`.
 
 **Default:** `HueTemp`
 
@@ -104,7 +142,7 @@ Name of the temporary Hue scene created internally for scene scheduling (the `sc
 
 Relevant only when user-modification tracking is **enabled** (i.e., `--disable-user-modification-tracking` is **not** set).
 
-Delay **in seconds** after detecting a scene activation during which **turn-on events** for affected lights/groups are ignored. Prevents Hue Scheduler from immediately taking over after you turned lights on via a scene.
+Time **in seconds** during which a turn-on event is associated with the scene that caused it. Turning on lights through an ordinary scene pauses scheduled control, so Hue Scheduler does not immediately overwrite that scene. Activating a synced Hue Scheduler scene resumes scheduled control instead.
 
 **Default:** `8` seconds
 
@@ -154,13 +192,15 @@ If overrides are still detected between adjacent entries with transitions, incre
 
 ### `--disable-user-modification-tracking`
 
-Disables tracking of manual changes. By default, Hue Scheduler compares the previously seen state with the current state and only applies the scheduled state if the user hasn’t modified the light since then. To enforce a state regardless of user changes, use the per-state property `force:true`.
+Disables the checks that normally pause scheduled adjustments after a manual change. With tracking enabled, turn the light off and on again, or activate a synced Hue Scheduler scene, to resume scheduled control. If `--require-scene-activation` is enabled, a synced scene activation is required.
+
+To bypass manual changes for just one definition, use `force:true` in a file or `[f]` in a scene name instead of disabling tracking globally.
 
 **Default:** `false`
 
 ### `--color-override-threshold`
 
-OKLab color distance threshold above which a light’s color counts as **manually overridden**. Lower values catch smaller changes but may trigger during transitions; higher values ignore transition noise but might miss subtle tweaks.
+Minimum OKLab color distance that counts as a **manual override**. Lower values detect smaller changes but may also detect differences during transitions; higher values tolerate those differences but may miss subtle adjustments.
 
 Relevant only when user-modification tracking is **enabled**.
 
@@ -170,7 +210,7 @@ Relevant only when user-modification tracking is **enabled**.
 
 ### `--brightness-override-threshold`
 
-Brightness difference threshold (percentage points) above which a light's brightness counts as **manually overridden**. Example: `10` means a change from `50%` → `60%` triggers detection.
+Minimum brightness difference, in percentage points, that counts as a **manual override**. For example, `10` detects a change from approximately `50%` to `60%` or more. Values are rounded to the bridge's brightness scale.
 
 Relevant only when user-modification tracking is **enabled**.
 
@@ -180,7 +220,7 @@ Relevant only when user-modification tracking is **enabled**.
 
 ### `--ct-override-threshold`
 
-Color temperature difference threshold (**Kelvin**) above which a light's temperature counts as **manually overridden**. Example: `350` means `3000 K` → `3350 K` triggers detection.
+Minimum color temperature difference, in **Kelvin**, that counts as a **manual override**. For example, `350` detects a difference of about `350 K` or more. Bridge color temperatures are stored in mireds, so conversion can introduce small rounding differences.
 
 Relevant only when user-modification tracking is **enabled**.
 
@@ -210,9 +250,9 @@ Color temperature difference threshold (**Kelvin**) above which a light's temper
 
 ### `-Dlog.level` (JVM)
 
-Sets the application log level:
+Sets the application log level. Each level includes messages from the less detailed levels above it:
 
-- `ERROR` — Only API error responses (should rarely occur)
+- `ERROR` — Failed API calls, scene updates, and other errors
 - `WARN` — Also logs bridge unreachability and retries
 - `INFO` — Applied light states, manual overrides, daily solar times
 - `DEBUG` *(default)* — Every scheduled state, state endings, on-events
@@ -224,11 +264,13 @@ Note: JVM arguments must appear **before** `-jar`:
 java -Dlog.level=TRACE -jar hue-scheduler.jar ...
 ```
 
-With Docker, set via env var:
+With Docker, set the environment variable `log.level` (not `LOG_LEVEL`):
 
 ```bash
 docker run -d --name hue-scheduler -e log.level=TRACE ...
 ```
+
+In Compose, add `log.level: "TRACE"` under `environment`. The `...` in these commands stands for your remaining startup arguments or Docker options; see the [complete Docker examples](docker_examples.md).
 
 ## Performance & Rate Limiting
 
@@ -276,19 +318,27 @@ Delay **in milliseconds** between receiving an **on-event** and (re)applying the
 
 ### `--event-stream-read-timeout`
 
-Read timeout **in minutes** for the API v2 SSE event stream. The connection is automatically restored after a timeout. The default (2 hours) may be adjusted in future releases based on further observations.
+Read timeout **in minutes** for the Hue Bridge's API v2 event stream (SSE). The connection is automatically restored after a timeout. This setting does not apply to Home Assistant's WebSocket connection.
 
 **Default:** `120` minutes
 
+### `--api-cache-invalidation-interval`
+
+Refresh interval **in minutes** for cached API resources such as lights and groups. Hue resource events also update the caches as changes arrive; this interval provides a periodic refresh. Home Assistant resource caches are cleared at this interval and reloaded when needed.
+
+This does **not** reload a text-file schedule. Restart Hue Scheduler after editing that file.
+
+**Default:** `30` minutes; must be greater than `0`
+
 ### `--scene-update-sleep-delay`
 
-Delay **in milliseconds** between scene creation/update and scene recall during scene scheduling (`scene:` property). This ensures the bridge has processed the scene changes before recalling them. Off lights especially take longer to process scene changes.
+Delay **in milliseconds** between creating or updating the temporary control scene and recalling it. Applies to Hue scene scheduling, including the `scene:` property and automatically discovered scene schedules. This gives the bridge time to process the changed settings before applying them; off lights especially take longer to process scene changes.
 
 **Default:** `20000` ms
 
 ### `--fast-scene-update-sleep-delay`
 
-Shorter delay **in milliseconds** used for scene scheduling for 30 seconds after turn-on, or after live changes to a scene, its schedule, or group membership while the group is on. Scene schedules include creating, renaming, and deleting scheduled scenes. Membership changes wait until the group's lights and scene actions agree and preserve manual overrides.
+Shorter delay **in milliseconds** used for Hue scene scheduling for 30 seconds after turn-on, or after live changes to a scene, its schedule, or group membership while the group is on. Live schedule changes include creating, renaming, and deleting scheduled scenes. Membership changes wait until the group's lights and scene actions agree and preserve manual overrides.
 
 Every scene creation/update followed by a recall within that window uses this delay, including consecutive interpolation updates. A new qualifying event restarts the window; scene updates and recalls do not extend it. After the window expires, the normal `--scene-update-sleep-delay` applies again. Direct recalls and unchanged scenes do not need either delay.
 
